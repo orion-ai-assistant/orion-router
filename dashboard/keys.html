@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orion AI Gateway - Virtual Keys</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Manrope:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/lucide-static@latest/font/lucide.css">
+    <link rel="stylesheet" href="/admin/static/css/style.css">
+    <style>
+        [v-cloak] {
+            display: none !important;
+        }
+    </style>
+    <!-- Load Vue 3 Global Build -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script type="module" src="/admin/static/js/app.js"></script>
+</head>
+
+<body>
+    <div id="app" v-cloak>
+        <div class="app-container">
+            <nav class="sidebar glass-panel">
+                <div class="logo">
+                    <div class="logo-icon"></div>
+                    <h2>Orion<span>Gateway</span></h2>
+                </div>
+                <ul class="nav-links">
+                    <template v-for="tab in tabs" :key="tab.id">
+                        <li :data-tab="tab.id" :class="{ active: activeTab === tab.id }" @click="setTab(tab.id)">
+                            <i :class="['lucide-' + tab.icon, 'icon']"></i>
+                            <span v-text="tab.label"></span>
+                        </li>
+                    </template>
+                </ul>
+            </nav>
+
+            <main class="content-area">
+                <section id="keys" class="tab-content active">
+
+                    <header>
+                        <div class="header-titles">
+                            <h1>Virtual API Keys</h1>
+                            <p>Client-facing Orion keys and budgets</p>
+                        </div>
+                        <button class="primary-btn glow-effect plus-btn" @click="showKeyModal = true">+ Add Key</button>
+                    </header>
+                    <div class="table-container glass-panel">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th class="col-budget">Budget</th>
+                                    <th class="col-used">Used</th>
+                                    <th class="col-status">Status</th>
+                                    <th class="col-time">Created</th>
+                                    <th class="col-actions">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template v-for="key in virtualKeys" :key="key.id">
+                                    <tr>
+                                        <td v-text="key.name"></td>
+                                        <td class="text-center col-budget" v-text="key.budget > 0 ? money(key.budget, 2) : 'Unlimited'"></td>
+                                        <td class="text-center col-used" v-text="(key.used_amount === null || key.used_amount === undefined || Number(key.used_amount) === 0) ? '$0' : money(key.used_amount, 4)"></td>
+                                        <td class="text-center"><span class="badge" :class="key.is_active ? 'active' : 'inactive'"
+                                                v-text="key.is_active ? 'Active' : 'Inactive'"></span></td>
+                                        <td class="text-center col-time" v-text="dateTime(key.created_at)"></td>
+                                        <td class="row-actions col-actions">
+                                            <button class="secondary-btn" @click="openEditVirtualKey(key)">Edit</button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </main>
+        </div>
+
+        <!-- Global Admin Login Modal -->
+        <div class="modal-overlay" :class="{ show: showLogin }">
+            <div class="modal glass-panel">
+                <h2>Admin Authentication</h2>
+                <p>Please enter the admin secret to access gateway settings.</p>
+                <div class="input-group" style="margin-top: 1rem;">
+                    <input type="password" v-model="adminKeyInput" @keydown.enter="login()" placeholder="Admin key">
+                </div>
+                <div class="state-box error" v-show="loginError" v-text="loginError"></div>
+                <div class="modal-actions">
+                    <button class="primary-btn glow-effect" style="width: 100%;" @click="login()">Unlock</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Create Key Modal -->
+        <div class="modal-overlay" :class="{ show: showKeyModal }">
+            <div class="modal glass-panel">
+                <h2>Create New API Key</h2>
+                <div class="input-group"><label>Key Name</label><input v-model.trim="virtualKeyForm.name"
+                        placeholder="Production Key"></div>
+                <div class="input-group"><label>Budget Limit ($)</label><input type="number" min="0" step="0.1"
+                        v-model.number="virtualKeyForm.budget"></div>
+                <div class="modal-actions">
+                    <button class="secondary-btn" @click="showKeyModal = false">Cancel</button>
+                    <button class="primary-btn glow-effect" @click="createVirtualKey()">Create Key</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Success Modal for Raw Key -->
+        <div class="modal-overlay" :class="{ show: rawKey }">
+            <div class="modal glass-panel success-modal">
+                <h2>API Key Created</h2>
+                <p>This raw key is shown once.</p>
+                <div class="raw-key-box" v-text="rawKey"></div>
+                <div class="modal-actions"><button class="primary-btn" @click="rawKey = ''">Close</button></div>
+            </div>
+        </div>
+
+        <!-- Edit Key Modal -->
+        <div class="modal-overlay" :class="{ show: showEditKeyModal }">
+            <div class="modal glass-panel">
+                <h2>Edit Virtual Key</h2>
+                <div class="input-group">
+                    <label>Key Name</label>
+                    <input v-model.trim="editingVirtualKey.name" placeholder="Production Key" required>
+                </div>
+                <div class="input-group">
+                    <label>Budget Limit ($)</label>
+                    <input type="number" min="0" step="0.1" v-model.number="editingVirtualKey.budget" required>
+                </div>
+                <label class="active-toggle-box" :class="{ 'is-active': editingVirtualKey.is_active }" style="margin-top: 1rem;">
+                    <input type="checkbox" v-model="editingVirtualKey.is_active">
+                    <div class="toggle-label">
+                        <span class="title">Active Status</span>
+                        <span class="subtitle">Enable key for gateway routing</span>
+                    </div>
+                </label>
+                <div class="modal-actions" style="margin-top: 1.5rem; display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <button class="danger-btn" @click="deleteVirtualKey(editingVirtualKey.id)">Delete</button>
+                    <div style="display: flex; gap: 12px;">
+                        <button class="secondary-btn" @click="showEditKeyModal = false">Cancel</button>
+                        <button class="primary-btn glow-effect" @click="updateVirtualKey()">Save Changes</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Global Confirm Modal -->
+        <div class="modal-overlay" :class="{ show: confirmDialog.show }">
+            <div class="modal glass-panel" style="max-width: 400px; text-align: center;">
+                <div style="font-size: 48px; color: var(--error); margin-bottom: 1rem;"><i class="lucide-alert-triangle"></i></div>
+                <h2 style="margin-bottom: 0.5rem;">Are you sure?</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 1.5rem;" v-text="confirmDialog.message"></p>
+                <div class="modal-actions" style="justify-content: center; gap: 1rem;">
+                    <button class="secondary-btn" @click="cancelConfirm()">Cancel</button>
+                    <button class="danger-btn" @click="executeConfirm()">Yes, Proceed</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Container -->
+        <div class="toast-container">
+            <transition-group name="toast">
+                <div v-for="toast in toasts" :key="toast.id" class="toast" :class="'toast-' + toast.type">
+                    <i :class="toast.type === 'error' ? 'lucide-alert-circle' : 'lucide-check-circle'"></i>
+                    <div class="toast-content" v-text="toast.message"></div>
+                    <button class="toast-close" @click="removeToast(toast.id)"><i class="lucide-x"></i></button>
+                </div>
+            </transition-group>
+        </div>
+    </div>
+</body>
+
+</html>

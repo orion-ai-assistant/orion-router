@@ -1,0 +1,48 @@
+{
+  "families": [
+    {
+      "id": "gemma",
+      "name": "Gemma",
+      "rules": [
+        {
+          "info": "Düşünme (thinking) bütçesini 50'nin altında tutmak modelin yapısal bozulmalarına ve saçmalamasına yol açabilir.",
+          "models": [
+            "gemma-2-9b-it",
+            "gemma-2-27b-it"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gemini",
+      "name": "Google Gemini",
+      "rules": [
+        {
+          "info": "Düşünme (thinking) özelliği aktif edildiğinde, bütçe en az 1024 token olarak ayarlanmalıdır. Daha düşük bütçeler desteklenmez.",
+          "models": [
+            "gemini-2.5-flash",
+            "gemini-1.5-pro"
+          ]
+        },
+        {
+          "info": "Gemini 3.1 modellerinde düşünme bütçesi opsiyoneldir.",
+          "models": [
+            "gemini-3.1-flash"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gpt-oss",
+      "name": "GPT-OSS",
+      "rules": [
+        {
+          "info": "Düşünme bütçesinde bir alt sınır yoktur, bütçe 1 bile ayarlansa model stabil çalışmaya devam edebilir.",
+          "models": [
+            "gpt-oss-20b"
+          ]
+        }
+      ]
+    }
+  ]
+}

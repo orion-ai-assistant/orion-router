@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orion AI Gateway - Models</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Manrope:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/lucide-static@latest/font/lucide.css">
+    <link rel="stylesheet" href="/admin/static/css/style.css">
+    <style>
+        [v-cloak] {
+            display: none !important;
+        }
+    </style>
+    <!-- Load Vue 3 Global Build -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script type="module" src="/admin/static/js/app.js"></script>
+</head>
+
+<body>
+    <div id="app" v-cloak>
+        <div class="app-container">
+            <nav class="sidebar glass-panel">
+                <div class="logo">
+                    <div class="logo-icon"></div>
+                    <h2>Orion<span>Gateway</span></h2>
+                </div>
+                <ul class="nav-links">
+                    <template v-for="tab in tabs" :key="tab.id">
+                        <li :data-tab="tab.id" :class="{ active: activeTab === tab.id }" @click="setTab(tab.id)">
+                            <i :class="['lucide-' + tab.icon, 'icon']"></i>
+                            <span v-text="tab.label"></span>
+                        </li>
+                    </template>
+                </ul>
+            </nav>
+
+            <main class="content-area">
+                <section id="models" class="tab-content active">
+
+                    <header>
+                        <div class="header-titles">
+                            <h1>Models</h1>
+                            <p>Register concrete models and their provider</p>
+                        </div>
+                        <button class="primary-btn glow-effect plus-btn" @click="showAddModelModal = true">+ Add Model</button>
+                    </header>
+                    <div class="table-container glass-panel">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th class="col-provider">Provider</th>
+                                    <th class="col-capability">Capability</th>
+                                    <th class="col-temp">Temp</th>
+                                    <th class="col-status">Status</th>
+                                    <th class="col-actions text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template v-for="model in models" :key="model.id">
+                                    <tr>
+                                        <td class="model-cell" style="font-weight: 600;" v-text="model.name"></td>
+                                        <td>
+                                            <span class="badge badge-provider" v-text="model.provider"></span>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-capability" v-text="model.capability"></span>
+                                        </td>
+                                        <td class="text-center" v-text="model.temperature !== null ? parseFloat(model.temperature).toFixed(1) : '-'"></td>
+                                        <td class="text-center">
+                                            <span class="badge" :class="model.is_active ? 'active' : 'inactive'"
+                                                v-text="model.is_active ? 'Active' : 'Inactive'"></span>
+                                        </td>
+                                        <td class="row-actions col-actions">
+                                            <button class="secondary-btn" @click="openEditModel(model)">Edit</button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </main>
+        </div>
+
+        <!-- Global Admin Login Modal -->
+        <div class="modal-overlay" :class="{ show: showLogin }">
+            <div class="modal glass-panel">
+                <h2>Admin Authentication</h2>
+                <p>Please enter the admin secret to access gateway settings.</p>
+                <div class="input-group" style="margin-top: 1rem;">
+                    <input type="password" v-model="adminKeyInput" @keydown.enter="login()" placeholder="Admin key">
+                </div>
+                <div class="state-box error" v-show="loginError" v-text="loginError"></div>
+                <div class="modal-actions">
+                    <button class="primary-btn glow-effect" style="width: 100%;" @click="login()">Unlock</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Model Modal -->
+        <div class="modal-overlay" :class="{ show: showAddModelModal }">
+            <div class="modal glass-panel">
+                <h2>Register New Model</h2>
+                <form @submit.prevent="createModel()">
+                    <div class="input-group">
+                        <label>Model ID / Name</label>
+                        <input v-model.trim="modelForm.name" required placeholder="e.g. gemini-2.5-pro">
+                    </div>
+                    <div class="input-group">
+                        <label>Provider</label>
+                        <div class="custom-select-wrapper">
+                            <select v-model="modelForm.provider" required>
+                                <template v-for="name in providerNames()" :key="name">
+                                    <option :value="name" v-text="name"></option>
+                                </template>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label>Capability</label>
+                        <div class="custom-select-wrapper">
+                            <select v-model="modelForm.capability"
+                                @change="modelForm.temperature = (modelForm.capability === 'chat' || modelForm.capability === 'tts') ? modelForm.temperature : null">
+                                <option value="chat">chat</option>
+                                <option value="tts">tts</option>
+                                <option value="embed">embed</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="input-group" v-show="modelForm.capability === 'chat' || modelForm.capability === 'tts'">
+                        <label>Default Temperature (0.0 to 2.0)</label>
+                        <input v-model="modelForm.temperature" type="number" min="0" max="2" step="0.1" placeholder="optional (e.g. 0.7)">
+                    </div>
+                    <div class="modal-actions" style="margin-top: 1.5rem;">
+                        <button class="secondary-btn" type="button" @click="showAddModelModal = false">Cancel</button>
+                        <button class="primary-btn glow-effect" type="submit">Add Model</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Edit Model Modal -->
+        <div class="modal-overlay" :class="{ show: showEditModelModal }">
+            <div class="modal glass-panel">
+                <h2>Edit Registered Model</h2>
+                <form @submit.prevent="updateModel(editingModel)">
+                    <div class="input-group">
+                        <label>Model ID / Name</label>
+                        <input v-model.trim="editingModel.name" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Provider</label>
+                        <div class="custom-select-wrapper">
+                            <select v-model="editingModel.provider" required>
+                                <template v-for="name in providerNames()" :key="name">
+                                    <option :value="name" v-text="name"></option>
+                                </template>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label>Capability</label>
+                        <div class="custom-select-wrapper">
+                            <select v-model="editingModel.capability"
+                                @change="editingModel.temperature = (editingModel.capability === 'chat' || editingModel.capability === 'tts') ? editingModel.temperature : null">
+                                <option value="chat">chat</option>
+                                <option value="tts">tts</option>
+                                <option value="embed">embed</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="input-group" v-show="editingModel.capability === 'chat' || editingModel.capability === 'tts'">
+                        <label>Default Temperature (0.0 to 2.0)</label>
+                        <input v-model="editingModel.temperature" type="number" min="0" max="2" step="0.1" placeholder="optional">
+                    </div>
+                    <label class="active-toggle-box" :class="{ 'is-active': editingModel.is_active }">
+                        <input type="checkbox" v-model="editingModel.is_active">
+                        <div class="toggle-label">
+                            <span class="title">Active Status</span>
+                            <span class="desc">Enable for routing</span>
+                        </div>
+                    </label>
+                    <div class="modal-actions" style="margin-top: 1.5rem; display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                        <button class="danger-btn" type="button" @click="deleteModel(editingModel.id)">Delete</button>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="secondary-btn" type="button" @click="showEditModelModal = false">Cancel</button>
+                            <button class="primary-btn glow-effect" type="submit" :disabled="!isModelDirty(editingModel)">Save Changes</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <!-- Global Confirm Modal -->
+        <div class="modal-overlay" :class="{ show: confirmDialog.show }">
+            <div class="modal glass-panel" style="max-width: 400px; text-align: center;">
+                <div style="font-size: 48px; color: var(--error); margin-bottom: 1rem;"><i class="lucide-alert-triangle"></i></div>
+                <h2 style="margin-bottom: 0.5rem;">Are you sure?</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 1.5rem;" v-text="confirmDialog.message"></p>
+                <div class="modal-actions" style="justify-content: center; gap: 1rem;">
+                    <button class="secondary-btn" @click="cancelConfirm()">Cancel</button>
+                    <button class="danger-btn" @click="executeConfirm()">Yes, Proceed</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Container -->
+        <div class="toast-container">
+            <transition-group name="toast">
+                <div v-for="toast in toasts" :key="toast.id" class="toast" :class="'toast-' + toast.type">
+                    <i :class="toast.type === 'error' ? 'lucide-alert-circle' : 'lucide-check-circle'"></i>
+                    <div class="toast-content" v-text="toast.message"></div>
+                    <button class="toast-close" @click="removeToast(toast.id)"><i class="lucide-x"></i></button>
+                </div>
+            </transition-group>
+        </div>
+    </div>
+</body>
+
+</html>

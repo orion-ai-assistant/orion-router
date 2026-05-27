@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orion AI Gateway - Playground</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Manrope:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/lucide-static@latest/font/lucide.css">
+    <link rel="stylesheet" href="/admin/static/css/style.css">
+    <style>
+        [v-cloak] {
+            display: none !important;
+        }
+    </style>
+    <!-- Load Vue 3 Global Build -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script type="module" src="/admin/static/js/app.js"></script>
+</head>
+
+<body>
+    <div id="app" v-cloak>
+        <div class="app-container">
+            <nav class="sidebar glass-panel">
+                <div class="logo">
+                    <div class="logo-icon"></div>
+                    <h2>Orion<span>Gateway</span></h2>
+                </div>
+                <ul class="nav-links">
+                    <template v-for="tab in tabs" :key="tab.id">
+                        <li :data-tab="tab.id" :class="{ active: activeTab === tab.id }" @click="setTab(tab.id)">
+                            <i :class="['lucide-' + tab.icon, 'icon']"></i>
+                            <span v-text="tab.label"></span>
+                        </li>
+                    </template>
+                </ul>
+            </nav>
+
+            <main class="content-area">
+                <section id="playground" class="tab-content active">
+
+                    <header>
+                        <div class="header-titles">
+                            <h1>Playground</h1>
+                            <p>Test registered models without typing provider names</p>
+                        </div>
+                    </header>
+                    <div class="pg-segmented-control">
+                        <button class="pg-subtab" :class="{ active: playground.tab === 'chat' }"
+                            @click="playground.tab = 'chat'">Chat</button>
+                        <button class="pg-subtab" :class="{ active: playground.tab === 'tts' }"
+                            @click="playground.tab = 'tts'">Text-to-Speech</button>
+                        <button class="pg-subtab" :class="{ active: playground.tab === 'embed' }"
+                            @click="playground.tab = 'embed'">Embeddings</button>
+                    </div>
+
+                    <div class="playground-layout" v-show="playground.tab === 'chat'">
+                        <div class="pg-sidebar glass-panel">
+                            <h3 class="panel-title">Configuration</h3>
+                            <label>Model or Group</label>
+                            <div class="custom-select-wrapper">
+                                <select v-model="playground.chat.model"><template v-for="route in routeOptions('chat')"
+                                        :key="route.value">
+                                        <option :value="route.value" v-text="route.label"></option>
+                                    </template></select>
+                            </div>
+                            <label>Temperature</label>
+                            <input type="number" min="0" max="2" step="0.1" v-model="playground.chat.temperature"
+                                placeholder="optional">
+                            <label>Thinking Config</label>
+                            <input v-model.trim="playground.chat.thinking" placeholder="none, 1024, high">
+                        </div>
+                        <div class="pg-main-area glass-panel">
+                            <div class="chat-messages custom-scrollbar">
+                                <template v-for="msg in playground.chat.messages" :key="msg.id">
+                                    <div class="message" :class="[msg.role, msg.type || 'content']" v-html="msg.html">
+                                    </div>
+                                </template>
+                            </div>
+                            <div class="pg-input-wrapper">
+                                <textarea v-model="playground.chat.input"
+                                    placeholder="Type a message to the AI..."></textarea>
+                            </div>
+                            <div class="action-row">
+                                <button class="primary-btn glow-effect" @click="sendChat()">Send</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="playground-layout" v-show="playground.tab === 'tts'">
+                        <div class="pg-sidebar glass-panel">
+                            <h3 class="panel-title">Audio Settings</h3>
+                            <label>Model or Group</label>
+                            <div class="custom-select-wrapper">
+                                <select v-model="playground.tts.model"><template v-for="route in routeOptions('tts')"
+                                        :key="route.value">
+                                        <option :value="route.value" v-text="route.label"></option>
+                                    </template></select>
+                            </div>
+                            <label>Voice Persona</label>
+                            <div class="custom-select-wrapper">
+                                <select v-model="playground.tts.voice"><template v-for="voice in voices" :key="voice">
+                                        <option :value="voice" v-text="voice"></option>
+                                    </template></select>
+                            </div>
+                            <label>Temperature</label>
+                            <input type="number" min="0" max="2" step="0.1" v-model="playground.tts.temperature"
+                                placeholder="optional">
+                        </div>
+                        <div class="pg-main-area glass-panel">
+                            <div class="pg-input-wrapper">
+                                <textarea v-model="playground.tts.input"
+                                    placeholder="Text to synthesize..."></textarea>
+                            </div>
+                            <div class="action-row">
+                                <button class="primary-btn glow-effect"
+                                    @click="generateTTS()">Generate Audio</button>
+                            </div>
+                            <div class="state-box error" v-show="playground.tts.error" v-text="playground.tts.error">
+                            </div>
+                            <div class="result-box" v-show="playground.tts.url"><audio :src="playground.tts.url"
+                                    controls class="modern-audio"></audio><a class="download-link"
+                                    :href="playground.tts.url" download="speech.wav">Download</a></div>
+                        </div>
+                    </div>
+
+                    <div class="playground-layout" v-show="playground.tab === 'embed'">
+                        <div class="pg-sidebar glass-panel">
+                            <h3 class="panel-title">Embedding Settings</h3>
+                            <label>Model or Group</label>
+                            <div class="custom-select-wrapper">
+                                <select v-model="playground.embed.model"><template v-for="route in routeOptions('embed')"
+                                        :key="route.value">
+                                        <option :value="route.value" v-text="route.label"></option>
+                                    </template></select>
+                            </div>
+                        </div>
+                        <div class="pg-main-area glass-panel">
+                            <div class="pg-input-wrapper">
+                                <textarea v-model="playground.embed.input"
+                                    placeholder="Text to embed..."></textarea>
+                            </div>
+                            <div class="action-row">
+                                <button class="primary-btn glow-effect"
+                                    @click="generateEmbedding()">Generate Vector</button>
+                            </div>
+                            <div class="state-box error" v-show="playground.embed.error"
+                                v-text="playground.embed.error"></div>
+                            <div class="result-box col" v-show="playground.embed.preview">
+                                <div class="embed-badge" v-text="playground.embed.dim"></div>
+                                <div class="embed-preview" v-text="playground.embed.preview"></div>
+                                <pre class="embed-json custom-scrollbar" v-text="playground.embed.json"></pre>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+
+        <!-- Global Admin Login Modal -->
+        <div class="modal-overlay" :class="{ show: showLogin }">
+            <div class="modal glass-panel">
+                <h2>Admin Authentication</h2>
+                <p>Please enter the admin secret to access gateway settings.</p>
+                <div class="input-group" style="margin-top: 1rem;">
+                    <input type="password" v-model="adminKeyInput" @keydown.enter="login()" placeholder="Admin key">
+                </div>
+                <div class="state-box error" v-show="loginError" v-text="loginError"></div>
+                <div class="modal-actions">
+                    <button class="primary-btn glow-effect" style="width: 100%;" @click="login()">Unlock</button>
+                </div>
+            </div>
+        </div>
+        <!-- Global Confirm Modal -->
+        <div class="modal-overlay" :class="{ show: confirmDialog.show }">
+            <div class="modal glass-panel" style="max-width: 400px; text-align: center;">
+                <div style="font-size: 48px; color: var(--error); margin-bottom: 1rem;"><i class="lucide-alert-triangle"></i></div>
+                <h2 style="margin-bottom: 0.5rem;">Are you sure?</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 1.5rem;" v-text="confirmDialog.message"></p>
+                <div class="modal-actions" style="justify-content: center; gap: 1rem;">
+                    <button class="secondary-btn" @click="cancelConfirm()">Cancel</button>
+                    <button class="danger-btn" @click="executeConfirm()">Yes, Proceed</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Container -->
+        <div class="toast-container">
+            <transition-group name="toast">
+                <div v-for="toast in toasts" :key="toast.id" class="toast" :class="'toast-' + toast.type">
+                    <i :class="toast.type === 'error' ? 'lucide-alert-circle' : 'lucide-check-circle'"></i>
+                    <div class="toast-content" v-text="toast.message"></div>
+                    <button class="toast-close" @click="removeToast(toast.id)"><i class="lucide-x"></i></button>
+                </div>
+            </transition-group>
+        </div>
+    </div>
+</body>
+
+</html>

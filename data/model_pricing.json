@@ -1,0 +1,32 @@
+{
+  "gpt-4o-mini": {
+    "input": 0.00000015,
+    "output": 0.0000006,
+    "think": 0.0000006
+  },
+  "gemma-2-9b-it": {
+    "input": 0.0000001,
+    "output": 0.0000002,
+    "think": 0.0000002
+  },
+  "gemini-2.5-flash-lite": {
+    "input": 0.00000025,
+    "output": 0.000001,
+    "think": 0.000001
+  },
+  "gemini-3.1-flash-tts-preview": {
+    "input": 0.000001,
+    "output": 0.000020,
+    "think": 0.0
+  },
+  "local-embed": {
+    "input": 0.0,
+    "output": 0.0,
+    "think": 0.0
+  },
+  "tts-1": {
+    "input": 0.000015,
+    "output": 0.0,
+    "think": 0.0
+  }
+}
