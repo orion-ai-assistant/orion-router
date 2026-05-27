@@ -54,10 +54,11 @@
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Name</th>
+                                    <th class="col-model">Name</th>
                                     <th class="col-provider">Provider</th>
                                     <th class="col-capability">Capability</th>
-                                    <th class="col-temp">Temp</th>
+                                    <th class="col-temp">Temperature</th>
+                                    <th class="text-center">Pricing (1M)</th>
                                     <th class="col-status">Status</th>
                                     <th class="col-actions text-center">Actions</th>
                                 </tr>
@@ -72,7 +73,23 @@
                                         <td>
                                             <span class="badge badge-capability" v-text="model.capability"></span>
                                         </td>
-                                        <td class="text-center" v-text="model.temperature !== null ? parseFloat(model.temperature).toFixed(1) : '-'"></td>
+                                        <td class="col-temp" v-text="model.temperature !== null ? parseFloat(model.temperature).toFixed(1) : '-'"></td>
+                                        <td class="text-center">
+                                            <div class="pricing-container">
+                                                <div class="pricing-item" v-show="model.capability === 'chat' || model.capability === 'tts' || model.capability === 'embed'">
+                                                    <span class="pricing-label">in</span>
+                                                    <span class="pricing-value">{{ money(model.input_price) }}</span>
+                                                </div>
+                                                <div class="pricing-item" v-show="model.capability === 'chat' || model.capability === 'tts'">
+                                                    <span class="pricing-label">out</span>
+                                                    <span class="pricing-value">{{ money(model.output_price) }}</span>
+                                                </div>
+                                                <div class="pricing-item" v-show="model.capability === 'chat' && model.think_price > 0">
+                                                    <span class="pricing-label">think</span>
+                                                    <span class="pricing-value">{{ money(model.think_price) }}</span>
+                                                </div>
+                                            </div>
+                                        </td>
                                         <td class="text-center">
                                             <span class="badge" :class="model.is_active ? 'active' : 'inactive'"
                                                 v-text="model.is_active ? 'Active' : 'Inactive'"></span>
@@ -138,6 +155,23 @@
                         <label>Default Temperature (0.0 to 2.0)</label>
                         <input v-model="modelForm.temperature" type="number" min="0" max="2" step="0.1" placeholder="optional (e.g. 0.7)">
                     </div>
+                    <div class="input-group">
+                        <label>Pricing (per 1M tokens/chars)</label>
+                        <div style="display: flex; gap: 8px;">
+                            <div style="flex: 1;" v-show="modelForm.capability === 'chat' || modelForm.capability === 'tts' || modelForm.capability === 'embed'">
+                                <label style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 2px;">Input</label>
+                                <input v-model="modelForm.input_price" type="number" min="0" step="0.00000001" placeholder="0.0">
+                            </div>
+                            <div style="flex: 1;" v-show="modelForm.capability === 'chat' || modelForm.capability === 'tts'">
+                                <label style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 2px;">Output</label>
+                                <input v-model="modelForm.output_price" type="number" min="0" step="0.00000001" placeholder="0.0">
+                            </div>
+                            <div style="flex: 1;" v-show="modelForm.capability === 'chat'">
+                                <label style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 2px;">Think</label>
+                                <input v-model="modelForm.think_price" type="number" min="0" step="0.00000001" placeholder="0.0">
+                            </div>
+                        </div>
+                    </div>
                     <div class="modal-actions" style="margin-top: 1.5rem;">
                         <button class="secondary-btn" type="button" @click="showAddModelModal = false">Cancel</button>
                         <button class="primary-btn glow-effect" type="submit">Add Model</button>
@@ -179,6 +213,23 @@
                     <div class="input-group" v-show="editingModel.capability === 'chat' || editingModel.capability === 'tts'">
                         <label>Default Temperature (0.0 to 2.0)</label>
                         <input v-model="editingModel.temperature" type="number" min="0" max="2" step="0.1" placeholder="optional">
+                    </div>
+                    <div class="input-group">
+                        <label>Pricing (per 1M tokens/chars)</label>
+                        <div style="display: flex; gap: 8px;">
+                            <div style="flex: 1;" v-show="editingModel.capability === 'chat' || editingModel.capability === 'tts' || editingModel.capability === 'embed'">
+                                <label style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 2px;">Input</label>
+                                <input v-model="editingModel.input_price" type="number" min="0" step="0.00000001" placeholder="0.0">
+                            </div>
+                            <div style="flex: 1;" v-show="editingModel.capability === 'chat' || editingModel.capability === 'tts'">
+                                <label style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 2px;">Output</label>
+                                <input v-model="editingModel.output_price" type="number" min="0" step="0.00000001" placeholder="0.0">
+                            </div>
+                            <div style="flex: 1;" v-show="editingModel.capability === 'chat'">
+                                <label style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 2px;">Think</label>
+                                <input v-model="editingModel.think_price" type="number" min="0" step="0.00000001" placeholder="0.0">
+                            </div>
+                        </div>
                     </div>
                     <label class="active-toggle-box" :class="{ 'is-active': editingModel.is_active }">
                         <input type="checkbox" v-model="editingModel.is_active">

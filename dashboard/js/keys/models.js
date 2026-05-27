@@ -29,11 +29,14 @@ export async function createModel() {
                 provider,
                 capability,
                 temperature: tempVal,
-                is_active: true
+                is_active: true,
+                input_price: this.modelForm.input_price || 0,
+                output_price: this.modelForm.output_price || 0,
+                think_price: this.modelForm.think_price || 0
             })
         });
         if (res.ok) {
-            this.modelForm = { name: '', provider: this.providerNames()[0] || '', capability: 'chat', temperature: null };
+            this.modelForm = { name: '', provider: this.providerNames()[0] || '', capability: 'chat', temperature: null, input_price: 0, output_price: 0, think_price: 0 };
             this.showAddModelModal = false;
             await this.loadModels();
         } else {
@@ -73,7 +76,10 @@ export async function updateModel(model) {
                 provider: provider,
                 capability: model.capability,
                 temperature: tempVal,
-                is_active: !!model.is_active
+                is_active: !!model.is_active,
+                input_price: model.input_price || 0,
+                output_price: model.output_price || 0,
+                think_price: model.think_price || 0
             })
         });
         if (res.ok) {

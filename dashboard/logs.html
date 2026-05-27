@@ -55,8 +55,8 @@
                             <thead>
                                 <tr>
                                     <th class="col-key">Key</th>
+                                    <th class="col-model">Model</th>
                                     <th class="col-provider">Provider</th>
-                                    <th>Model</th>
                                     <th class="col-capability">Capability</th>
                                     <th class="col-tokens">Tokens</th>
                                     <th class="col-cost">Cost</th>
@@ -69,23 +69,48 @@
                                 <template v-for="log in logs" :key="log.id">
                                     <tr>
                                         <td v-text="log.key_name || 'Admin'"></td>
+                                        <td class="model-cell" v-text="log.requested_model"></td>
                                         <td>
                                             <span class="badge badge-provider" v-text="log.provider"></span>
                                         </td>
-                                        <td class="model-cell" v-text="log.requested_model"></td>
                                         <td>
-                                            <span class="badge badge-capability" v-text="log.capability || 'chat'"></span>
+                                            <span class="badge badge-capability"
+                                                v-text="log.capability || 'chat'"></span>
                                         </td>
-                                        <td class="col-tokens"
-                                            v-text="log.capability === 'tts' ? ('In: ' + (log.prompt_tokens || 0) + '  Out: ' + (log.completion_tokens || 0)) : log.capability === 'embed' ? ('In: ' + (log.prompt_tokens || 0) + '  Dim: ' + (log.completion_tokens || 0)) : ('In: ' + (log.prompt_tokens || 0) + '  Out: ' + (log.completion_tokens || 0) + '  Think: ' + (log.thoughts_tokens || 0))">
+                                        <td class="col-tokens">
+                                            <div class="pricing-container">
+                                                <div class="pricing-item">
+                                                    <span class="pricing-label">in</span>
+                                                    <span class="pricing-value" v-text="log.prompt_tokens || 0"></span>
+                                                </div>
+                                                <div class="pricing-item" v-show="log.capability !== 'embed'">
+                                                    <span class="pricing-label">out</span>
+                                                    <span class="pricing-value"
+                                                        v-text="log.completion_tokens || 0"></span>
+                                                </div>
+                                                <div class="pricing-item" v-show="log.capability === 'embed'">
+                                                    <span class="pricing-label">dim</span>
+                                                    <span class="pricing-value"
+                                                        v-text="log.completion_tokens || 0"></span>
+                                                </div>
+                                                <div class="pricing-item"
+                                                    v-show="log.capability !== 'tts' && log.capability !== 'embed'">
+                                                    <span class="pricing-label">think</span>
+                                                    <span class="pricing-value"
+                                                        v-text="log.thoughts_tokens || 0"></span>
+                                                </div>
+                                            </div>
                                         </td>
-                                        <td class="text-center col-cost" v-text="log.cost === null || log.cost === undefined ? '-' : (Number(log.cost) === 0 ? '$0' : money(log.cost, 6))"></td>
+                                        <td class="text-center col-cost"
+                                            v-text="log.cost === null || log.cost === undefined ? '-' : (Number(log.cost) === 0 ? '$0' : money(log.cost, 6))">
+                                        </td>
                                         <td class="text-center">
                                             <span class="badge" :class="log.success ? 'active' : 'inactive'"
                                                 v-text="log.success ? 'Success' : 'Failed'"></span>
                                         </td>
                                         <td class="text-center col-time" v-text="dateTime(log.created_at)"></td>
-                                        <td class="text-center"><button class="secondary-btn narrow-btn" @click="showLogDetails(log.id)">View</button></td>
+                                        <td class="text-center"><button class="secondary-btn narrow-btn"
+                                                @click="showLogDetails(log.id)">View</button></td>
                                     </tr>
                                 </template>
                             </tbody>
@@ -99,7 +124,9 @@
         <div class="modal-overlay" :class="{ show: showLogin }">
             <div class="modal glass-panel">
                 <h2>Admin Authentication</h2>
-                <p>Please enter the admin secret to access gateway settings. <br><small v-if="isDefaultPassword" style="color: var(--text-secondary); margin-top: 0.5rem; display: block;">Default password is <strong>orion-admin</strong>. You can change it later in settings.</small></p>
+                <p>Please enter the admin secret to access gateway settings. <br><small v-if="isDefaultPassword"
+                        style="color: var(--text-secondary); margin-top: 0.5rem; display: block;">Default password is
+                        <strong>orion-admin</strong>. You can change it later in settings.</small></p>
                 <div class="input-group" style="margin-top: 1rem;">
                     <input type="password" v-model="adminKeyInput" @keydown.enter="login()" placeholder="Admin key">
                 </div>
@@ -160,30 +187,31 @@
                         @click="activeLogDetails = null">Close</button>
                 </div>
             </div>
-        <!-- Global Confirm Modal -->
-        <div class="modal-overlay" :class="{ show: confirmDialog.show }">
-            <div class="modal glass-panel" style="max-width: 400px; text-align: center;">
-                <div style="font-size: 48px; color: var(--error); margin-bottom: 1rem;"><i class="lucide-alert-triangle"></i></div>
-                <h2 style="margin-bottom: 0.5rem;">Are you sure?</h2>
-                <p style="color: var(--text-secondary); margin-bottom: 1.5rem;" v-text="confirmDialog.message"></p>
-                <div class="modal-actions" style="justify-content: center; gap: 1rem;">
-                    <button class="secondary-btn" @click="cancelConfirm()">Cancel</button>
-                    <button class="danger-btn" @click="executeConfirm()">Yes, Proceed</button>
+            <!-- Global Confirm Modal -->
+            <div class="modal-overlay" :class="{ show: confirmDialog.show }">
+                <div class="modal glass-panel" style="max-width: 400px; text-align: center;">
+                    <div style="font-size: 48px; color: var(--error); margin-bottom: 1rem;"><i
+                            class="lucide-alert-triangle"></i></div>
+                    <h2 style="margin-bottom: 0.5rem;">Are you sure?</h2>
+                    <p style="color: var(--text-secondary); margin-bottom: 1.5rem;" v-text="confirmDialog.message"></p>
+                    <div class="modal-actions" style="justify-content: center; gap: 1rem;">
+                        <button class="secondary-btn" @click="cancelConfirm()">Cancel</button>
+                        <button class="danger-btn" @click="executeConfirm()">Yes, Proceed</button>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Toast Container -->
-        <div class="toast-container">
-            <transition-group name="toast">
-                <div v-for="toast in toasts" :key="toast.id" class="toast" :class="'toast-' + toast.type">
-                    <i :class="toast.type === 'error' ? 'lucide-alert-circle' : 'lucide-check-circle'"></i>
-                    <div class="toast-content" v-text="toast.message"></div>
-                    <button class="toast-close" @click="removeToast(toast.id)"><i class="lucide-x"></i></button>
-                </div>
-            </transition-group>
+            <!-- Toast Container -->
+            <div class="toast-container">
+                <transition-group name="toast">
+                    <div v-for="toast in toasts" :key="toast.id" class="toast" :class="'toast-' + toast.type">
+                        <i :class="toast.type === 'error' ? 'lucide-alert-circle' : 'lucide-check-circle'"></i>
+                        <div class="toast-content" v-text="toast.message"></div>
+                        <button class="toast-close" @click="removeToast(toast.id)"><i class="lucide-x"></i></button>
+                    </div>
+                </transition-group>
+            </div>
         </div>
-    </div>
     </div>
 </body>
 

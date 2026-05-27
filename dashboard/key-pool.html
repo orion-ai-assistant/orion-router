@@ -54,8 +54,8 @@
                         <table>
                             <thead>
                                 <tr>
-                                    <th class="col-provider">Provider</th>
                                     <th class="col-label">Label</th>
+                                    <th class="col-provider">Provider</th>
                                     <th>Key</th>
                                     <th class="col-priority">Priority</th>
                                     <th class="col-status">Status</th>
@@ -65,10 +65,10 @@
                             <tbody>
                                 <template v-for="key in keyPool" :key="key.id">
                                     <tr>
+                                        <td v-text="key.label"></td>
                                         <td>
                                             <span class="badge badge-provider" v-text="key.provider"></span>
                                         </td>
-                                        <td v-text="key.label"></td>
                                         <td style="font-family: monospace; font-size: 0.85rem;" v-text="key.masked_key || '••••••••••••••••'"></td>
                                         <td class="text-center" v-text="key.priority"></td>
                                         <td class="text-center">

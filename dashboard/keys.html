@@ -54,11 +54,11 @@
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Name</th>
+                                    <th class="col-model">Name</th>
                                     <th class="col-budget">Budget</th>
                                     <th class="col-used">Used</th>
                                     <th class="col-status">Status</th>
-                                    <th class="col-time">Created</th>
+                                    <th class="text-center">Created</th>
                                     <th class="col-actions">Actions</th>
                                 </tr>
                             </thead>
@@ -70,7 +70,7 @@
                                         <td class="text-center col-used" v-text="(key.used_amount === null || key.used_amount === undefined || Number(key.used_amount) === 0) ? '$0' : money(key.used_amount, 4)"></td>
                                         <td class="text-center"><span class="badge" :class="key.is_active ? 'active' : 'inactive'"
                                                 v-text="key.is_active ? 'Active' : 'Inactive'"></span></td>
-                                        <td class="text-center col-time" v-text="dateTime(key.created_at)"></td>
+                                        <td class="text-center" v-text="dateTime(key.created_at)"></td>
                                         <td class="row-actions col-actions">
                                             <button class="secondary-btn" @click="openEditVirtualKey(key)">Edit</button>
                                         </td>

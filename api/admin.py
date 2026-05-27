@@ -467,15 +467,20 @@ async def delete_provider_key_pool_item(key_id: str):
 async def list_models():
     rows = await db_manager.fetch(
         """
-        SELECT id, name, provider, capability, temperature, is_active, created_at
-        FROM router_models
-        ORDER BY capability ASC, provider ASC, name ASC
+        SELECT m.id, m.name, m.provider, m.capability, m.temperature, m.is_active, m.created_at,
+               p.input_price, p.output_price, p.think_price
+        FROM router_models m
+        LEFT JOIN router_model_pricing p ON m.name = p.model_name
+        ORDER BY m.capability ASC, m.provider ASC, m.name ASC
         """
     )
     models = []
     for row in rows:
         item = dict(row)
         item["temperature"] = float(item["temperature"]) if item["temperature"] is not None else None
+        item["input_price"] = float(item["input_price"]) if item["input_price"] is not None else 0.0
+        item["output_price"] = float(item["output_price"]) if item["output_price"] is not None else 0.0
+        item["think_price"] = float(item["think_price"]) if item["think_price"] is not None else 0.0
         models.append(item)
     return {"models": models}
 
@@ -492,6 +497,9 @@ async def create_model(request: Request):
     else:
         temperature = None
     is_active = bool(body.get("is_active", True))
+    input_price = float(body.get("input_price", 0.0) if body.get("input_price") not in (None, "") else 0.0)
+    output_price = float(body.get("output_price", 0.0) if body.get("output_price") not in (None, "") else 0.0)
+    think_price = float(body.get("think_price", 0.0) if body.get("think_price") not in (None, "") else 0.0)
 
     row = await db_manager.fetchrow(
         """
@@ -505,8 +513,13 @@ async def create_model(request: Request):
         temperature,
         is_active,
     )
+    await db_manager.upsert_pricing(name, input_price, output_price, think_price)
+
     item = dict(row)
     item["temperature"] = float(item["temperature"]) if item["temperature"] is not None else None
+    item["input_price"] = input_price
+    item["output_price"] = output_price
+    item["think_price"] = think_price
     return item
 
 
@@ -529,6 +542,9 @@ async def update_model(model_id: str, request: Request):
     else:
         temperature = None
     is_active = bool(body.get("is_active", existing["is_active"]))
+    input_price = float(body.get("input_price", 0.0) if body.get("input_price") not in (None, "") else 0.0)
+    output_price = float(body.get("output_price", 0.0) if body.get("output_price") not in (None, "") else 0.0)
+    think_price = float(body.get("think_price", 0.0) if body.get("think_price") not in (None, "") else 0.0)
 
     row = await db_manager.fetchrow(
         """
@@ -545,8 +561,13 @@ async def update_model(model_id: str, request: Request):
         temperature,
         is_active,
     )
+    await db_manager.upsert_pricing(name, input_price, output_price, think_price)
+
     item = dict(row)
     item["temperature"] = float(item["temperature"]) if item["temperature"] is not None else None
+    item["input_price"] = input_price
+    item["output_price"] = output_price
+    item["think_price"] = think_price
     return item
 
 

@@ -51,7 +51,7 @@ createApp({
             editingProviderKey: { provider: '', label: '', api_key: '', priority: 100, is_active: true },
             showAddModelModal: false,
             showEditModelModal: false,
-            editingModel: { name: '', provider: '', capability: 'chat', temperature: null, is_active: true },
+            editingModel: { name: '', provider: '', capability: 'chat', temperature: null, is_active: true, input_price: 0, output_price: 0, think_price: 0 },
             showAddGroupModal: false,
             showEditGroupModal: false,
             editingGroup: { name: '', capability: 'chat', is_active: true },
@@ -72,7 +72,7 @@ createApp({
 
             // --- Forms ---
             keyForm: { provider: '', label: '', api_key: '', priority: 100 },
-            modelForm: { name: '', provider: '', capability: 'chat', temperature: null },
+            modelForm: { name: '', provider: '', capability: 'chat', temperature: null, input_price: 0, output_price: 0, think_price: 0 },
             groupForm: { name: '', description: '', capability: 'chat' },
             virtualKeyForm: { name: '', budget: 0 },
             settingsForm: { adminSecret: '' },
@@ -305,9 +305,16 @@ createApp({
         ...playground,
 
         // --- Helpers & Formatters ---
-        money(val, decimals = 4) {
-            if (val === null || val === undefined) return '$0.0000';
-            return '$' + parseFloat(val).toFixed(decimals);
+        money(val, maxDecimals = 8) {
+            if (val === null || val === undefined) return '$0.00';
+            const num = parseFloat(val);
+            if (isNaN(num) || num === 0) return '$0.00';
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: maxDecimals
+            }).format(num);
         },
 
         number(val) {
@@ -378,7 +385,10 @@ createApp({
                 model.provider !== model._original.provider ||
                 model.capability !== model._original.capability ||
                 this.normalizeTemperature(model.temperature) !== model._original.temperature ||
-                !!model.is_active !== model._original.is_active
+                !!model.is_active !== model._original.is_active ||
+                Number(model.input_price || 0) !== Number(model._original.input_price || 0) ||
+                Number(model.output_price || 0) !== Number(model._original.output_price || 0) ||
+                Number(model.think_price || 0) !== Number(model._original.think_price || 0)
             );
         },
 

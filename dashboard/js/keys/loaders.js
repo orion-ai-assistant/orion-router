@@ -62,12 +62,18 @@ export async function loadModels() {
                 capability: normalizedCapability,
                 temperature: normalizedTemperature,
                 is_active: normalizedActive,
+                input_price: model.input_price || 0,
+                output_price: model.output_price || 0,
+                think_price: model.think_price || 0,
                 _original: {
                     name: normalizedName,
                     provider: normalizedProvider,
                     capability: normalizedCapability,
                     temperature: normalizedTemperature,
-                    is_active: normalizedActive
+                    is_active: normalizedActive,
+                    input_price: model.input_price || 0,
+                    output_price: model.output_price || 0,
+                    think_price: model.think_price || 0
                 }
             };
         });
