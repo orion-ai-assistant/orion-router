@@ -6,7 +6,7 @@ services:
     restart: unless-stopped
     ports:
       - "20128:20128"
-    command: ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "20128", "--reload"]
+    command: ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "20128", "--reload", "--log-level", "warning"]
     volumes:
       - .:/app
     environment:

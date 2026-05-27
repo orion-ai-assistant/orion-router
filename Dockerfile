@@ -15,4 +15,4 @@ RUN uv pip install --system --no-cache-dir .
 
 EXPOSE 20128
 
-CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "20128"]
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "20128", "--log-level", "warning"]

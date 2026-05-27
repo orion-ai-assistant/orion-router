@@ -14,6 +14,7 @@ import os
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse
 
 from core.lifespan import lifespan
 from api import admin, chat, embeddings, files, speech
@@ -26,6 +27,10 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger("service-router")
+
+# Uvicorn loglarını --log-level warning ile başlattığımızda erişim logları (access) da kapanır.
+# Erişim loglarını tekrar açmak için manuel olarak INFO seviyesine çekiyoruz.
+logging.getLogger("uvicorn.access").setLevel(logging.INFO)
 
 # ---------------------------------------------------------------------------
 #  Uygulama
@@ -52,3 +57,7 @@ app.include_router(files.router)
 @app.get("/health", tags=["Health"])
 async def health():
     return {"status": "ok"}
+
+@app.get("/", include_in_schema=False)
+async def root():
+    return RedirectResponse(url="/admin")
