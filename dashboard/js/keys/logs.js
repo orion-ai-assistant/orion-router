@@ -1,14 +1,37 @@
-// services/router/dashboard/js/keys/logs.js
+function sanitizeForDisplay(obj) {
+    if (obj === null || obj === undefined) return obj;
+    if (Array.isArray(obj)) {
+        return obj.map(sanitizeForDisplay);
+    }
+    if (typeof obj === 'object') {
+        const result = {};
+        for (const key in obj) {
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                const val = obj[key];
+                if (typeof val === 'string' && val.length > 200 && (
+                    key === 'audio_base64' || 
+                    key === 'b64_json' || 
+                    key === 'audio' || 
+                    key.endsWith('_base64') || 
+                    val.startsWith('data:image/') || 
+                    val.startsWith('data:audio/')
+                )) {
+                    result[key] = val.substring(0, 50) + `... [truncated base64, length: ${val.length}]`;
+                } else {
+                    result[key] = sanitizeForDisplay(val);
+                }
+            }
+        }
+        return result;
+    }
+    return obj;
+}
 
 // --- Log Operations ---
 export async function showLogDetails(logId) {
     this.activeLogDetails = {
         requestText: 'Loading...',
         responseText: 'Loading...',
-        requestLines: [],
-        responseLines: [],
-        requestLoadedCount: 0,
-        responseLoadedCount: 0,
         fullRequest: '',
         fullResponse: ''
     };
@@ -17,25 +40,33 @@ export async function showLogDetails(logId) {
         if (res.ok) {
             const data = await res.json();
 
-            let reqFull = '';
-            let resFull = '';
+            let reqFullDisplay = '';
+            let resFullDisplay = '';
+            let reqFullActual = '';
+            let resFullActual = '';
 
             try {
                 if (data.request_json) {
                     const parsedReq = typeof data.request_json === 'string' ? JSON.parse(data.request_json) : data.request_json;
-                    reqFull = JSON.stringify(parsedReq, null, 2);
+                    reqFullActual = JSON.stringify(parsedReq, null, 2);
+                    const displayReq = sanitizeForDisplay(parsedReq);
+                    reqFullDisplay = JSON.stringify(displayReq, null, 2);
                 }
             } catch (e) {
-                reqFull = typeof data.request_json === 'string' ? data.request_json : JSON.stringify(data.request_json) || '';
+                reqFullActual = typeof data.request_json === 'string' ? data.request_json : JSON.stringify(data.request_json) || '';
+                reqFullDisplay = reqFullActual;
             }
 
             try {
                 if (data.response_json) {
                     const parsedRes = typeof data.response_json === 'string' ? JSON.parse(data.response_json) : data.response_json;
-                    resFull = JSON.stringify(parsedRes, null, 2);
+                    resFullActual = JSON.stringify(parsedRes, null, 2);
+                    const displayRes = sanitizeForDisplay(parsedRes);
+                    resFullDisplay = JSON.stringify(displayRes, null, 2);
                 }
             } catch (e) {
-                resFull = typeof data.response_json === 'string' ? data.response_json : JSON.stringify(data.response_json) || '';
+                resFullActual = typeof data.response_json === 'string' ? data.response_json : JSON.stringify(data.response_json) || '';
+                resFullDisplay = resFullActual;
             }
 
             let responseDataParsed = null;
@@ -47,22 +78,34 @@ export async function showLogDetails(logId) {
                 console.error("Failed to parse response_json for responseData:", e);
             }
 
-            const reqLines = reqFull ? reqFull.split('\n') : ['Null'];
-            const resLines = resFull ? resFull.split('\n') : ['Null'];
-            const reqInitialCount = Math.min(200, reqLines.length);
-            const resInitialCount = Math.min(200, resLines.length);
+            const limitText = (fullText) => {
+                if (!fullText) return 'Null';
+                const lines = fullText.split('\n');
+                let isTruncated = false;
+                let text = fullText;
+                
+                if (lines.length > 500) {
+                    text = lines.slice(0, 500).join('\n');
+                    isTruncated = true;
+                }
+                
+                if (text.length > 50000) {
+                    text = text.substring(0, 50000);
+                    isTruncated = true;
+                }
+                
+                if (isTruncated) {
+                    text += '\n\n... [İçerik çok uzun olduğu için kısaltıldı. Tamamını görmek için "Copy Full" butonunu kullanın] ...';
+                }
+                
+                return text;
+            };
 
             this.activeLogDetails = {
-                requestLines: reqLines,
-                requestLoadedCount: reqInitialCount,
-                requestText: reqLines.slice(0, reqInitialCount).join('\n'),
-
-                responseLines: resLines,
-                responseLoadedCount: resInitialCount,
-                responseText: resLines.slice(0, resInitialCount).join('\n'),
-
-                fullRequest: reqFull,
-                fullResponse: resFull,
+                requestText: limitText(reqFullDisplay),
+                responseText: limitText(resFullDisplay),
+                fullRequest: reqFullActual,
+                fullResponse: resFullActual,
                 capability: data.capability,
                 responseData: responseDataParsed
             };
@@ -77,30 +120,3 @@ export async function showLogDetails(logId) {
     }
 }
 
-export function handleJsonScroll(event, type) {
-    if (!this.activeLogDetails) return;
-    const el = event.target;
-    if (el.scrollHeight - el.scrollTop - el.clientHeight < 100) {
-        if (type === 'request') {
-            if (this.activeLogDetails.requestLoadedCount < this.activeLogDetails.requestLines.length) {
-                this.activeLogDetails.requestLoadedCount = Math.min(
-                    this.activeLogDetails.requestLoadedCount + 200,
-                    this.activeLogDetails.requestLines.length
-                );
-                this.activeLogDetails.requestText = this.activeLogDetails.requestLines
-                    .slice(0, this.activeLogDetails.requestLoadedCount)
-                    .join('\n');
-            }
-        } else if (type === 'response') {
-            if (this.activeLogDetails.responseLoadedCount < this.activeLogDetails.responseLines.length) {
-                this.activeLogDetails.responseLoadedCount = Math.min(
-                    this.activeLogDetails.responseLoadedCount + 200,
-                    this.activeLogDetails.responseLines.length
-                );
-                this.activeLogDetails.responseText = this.activeLogDetails.responseLines
-                    .slice(0, this.activeLogDetails.responseLoadedCount)
-                    .join('\n');
-            }
-        }
-    }
-}
