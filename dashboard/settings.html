@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Orion AI Gateway - Model Info</title>
+    <title>Orion AI Gateway - Settings</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
@@ -12,7 +12,6 @@
         rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/lucide-static@latest/font/lucide.css">
     <link rel="stylesheet" href="/admin/static/css/style.css">
-    <link rel="stylesheet" href="/admin/static/css/model_info.css">
     <style>
         [v-cloak] {
             display: none !important;
@@ -42,45 +41,24 @@
             </nav>
 
             <main class="content-area">
-                <section id="model-info" class="tab-content active">
+                <section id="settings" class="tab-content active">
 
                     <header>
                         <div class="header-titles">
-                            <h1>Model Bilgileri</h1>
-                            <p>Model bazlı kurallar ve notlar</p>
+                            <h1>Settings</h1>
+                            <p>Manage gateway configurations</p>
                         </div>
                     </header>
-                    <div class="model-info-layout glass-panel">
-                        <div class="model-info-sidebar custom-scrollbar">
-                            <template v-for="family in modelFamilies" :key="family.name">
-                                <button class="family-btn"
-                                    :class="{ active: selectedFamily && selectedFamily.name === family.name }"
-                                    @click="selectedFamily = family" v-text="family.name"></button>
-                            </template>
+                    <div class="glass-panel" style="padding: 2rem;">
+                        <h2 style="margin-bottom: 0.5rem;">Admin Authentication</h2>
+                        <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Change the admin secret used to access this dashboard.</p>
+                        
+                        <div class="input-group" style="max-width: 400px;">
+                            <label>New Admin Secret</label>
+                            <input type="password" v-model="settingsForm.adminSecret" placeholder="Enter new secret">
                         </div>
-                        <div class="model-info-content custom-scrollbar">
-                            <template v-if="!selectedFamily">
-                                <div class="empty-state">
-                                    <p>Lütfen soldan bir model ailesi seçin.</p>
-                                </div>
-                            </template>
-                            <template v-if="selectedFamily">
-                                <div>
-                                    <template v-for="rule in selectedFamily.rules" :key="rule.info">
-                                        <div class="rule-card">
-                                            <div class="rule-info" v-text="'⚠️ ' + rule.info"></div>
-                                            <div class="rule-models">
-                                                <template v-for="m in rule.models">
-                                                    <span class="model-badge" v-text="m"></span>
-                                                </template>
-                                            </div>
-                                        </div>
-                                    </template>
-                                    <template v-if="!selectedFamily.rules || selectedFamily.rules.length === 0">
-                                        <div class="empty-state">Bu aile için kural bulunamadı.</div>
-                                    </template>
-                                </div>
-                            </template>
+                        <div style="margin-top: 1rem;">
+                            <button class="primary-btn glow-effect" @click="saveSettings()">Save Changes</button>
                         </div>
                     </div>
                 </section>
@@ -101,6 +79,7 @@
                 </div>
             </div>
         </div>
+
         <!-- Global Confirm Modal -->
         <div class="modal-overlay" :class="{ show: confirmDialog.show }">
             <div class="modal glass-panel" style="max-width: 400px; text-align: center;">

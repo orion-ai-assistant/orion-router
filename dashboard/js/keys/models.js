@@ -100,14 +100,15 @@ export async function deleteModel(modelId, confirmed = false) {
             method: 'DELETE'
         });
         if (res.ok) {
-            await this.loadModels();
             this.showEditModelModal = false;
+            this.showToast('Model deleted successfully!', 'success');
+            await this.loadModels();
         } else {
             const err = await res.json();
-            alert('Error: ' + (err.detail || 'Failed to delete model'));
+            this.showToast('Error: ' + (err.detail || 'Failed to delete model'), 'error');
         }
     } catch (err) {
         console.error(err);
-        alert('Failed to delete model');
+        this.showToast('Failed to delete model', 'error');
     }
 }

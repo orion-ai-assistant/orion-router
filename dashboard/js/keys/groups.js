@@ -154,14 +154,15 @@ export async function deleteGroupItem(group, itemId, confirmed = false) {
     try {
         const res = await this.adminFetch(`/admin/api/model-groups/${group.id}/items/${itemId}`, { method: 'DELETE' });
         if (res.ok) {
+            this.showToast('Model removed from group successfully!', 'success');
             await this.loadGroups();
         } else {
             const err = await res.json();
-            alert('Error: ' + (err.detail || 'Failed to remove model from group'));
+            this.showToast('Error: ' + (err.detail || 'Failed to remove model from group'), 'error');
         }
     } catch (err) {
         console.error(err);
-        alert('Failed to remove model from group');
+        this.showToast('Failed to remove model from group', 'error');
     }
 }
 

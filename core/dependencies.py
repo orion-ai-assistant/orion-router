@@ -13,7 +13,7 @@ import logging
 
 from fastapi import Request, HTTPException, Header
 from database import db_manager
-from core.config import ADMIN_SECRET
+from core import config
 
 logger = logging.getLogger("service-router.deps")
 
@@ -50,7 +50,7 @@ async def authenticate_request(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="API key is required. Send via Authorization: Bearer <key>")
 
     # --- 1. Admin Secret kontrolü ---
-    if token == ADMIN_SECRET:
+    if token == config.ADMIN_SECRET:
         return {"source": "system", "key_id": None}
 
     # --- 2. Virtual Key kontrolü ---
@@ -81,6 +81,6 @@ async def authenticate_request(request: Request) -> dict:
 
 async def verify_admin(x_admin_key: str = Header(default=None)):
     """Dependency: Admin yetkisi kontrolü."""
-    if not x_admin_key or x_admin_key != ADMIN_SECRET:
+    if not x_admin_key or x_admin_key != config.ADMIN_SECRET:
         raise HTTPException(status_code=401, detail="Unauthorized admin access")
     return True

@@ -25,8 +25,8 @@ def _load_env_file():
                         # Çift veya tek tırnakları temizle
                         if (val.startswith('"') and val.endswith('"')) or (val.startswith("'") and val.endswith("'")):
                             val = val[1:-1]
-                        # Sadece sistemde tanımlı olmayan değişkenleri ata (ezmemek için)
-                        if key and key not in os.environ:
+                        # .env dosyasındaki değerleri yükle (sistem ortam değişkenlerini ezebilsin)
+                        if key:
                             os.environ[key] = val
         except Exception:
             pass

@@ -57,7 +57,7 @@ async def get_admin_ui():
 async def get_admin_page(page: str):
     """Admin arayüzündeki diğer sayfaları (örn. keys, models) döner."""
     page_name = page.replace(".html", "")
-    valid_pages = {"keys", "logs", "key-pool", "models", "groups", "playground", "model-info"}
+    valid_pages = {"keys", "logs", "key-pool", "models", "groups", "playground", "model-info", "settings"}
     
     if page_name in valid_pages:
         page_path = os.path.join(_DASHBOARD_DIR, f"{page_name}.html")
@@ -69,6 +69,51 @@ async def get_admin_page(page: str):
     if os.path.exists(index_path):
         return FileResponse(index_path, media_type="text/html")
     return Response(content="Admin UI not found.", status_code=404)
+
+
+@router.get("/api/settings/is-default-password")
+async def check_is_default_password():
+    from core import config
+    return {"is_default": config.ADMIN_SECRET == "orion-admin"}
+
+
+@router.put("/api/settings/admin-secret", dependencies=[Depends(verify_admin)])
+async def update_admin_secret(request: Request):
+    try:
+        body = await request.json()
+        new_secret = (body.get("admin_secret") or "").strip()
+        if not new_secret:
+            raise HTTPException(status_code=400, detail="Admin secret cannot be empty")
+        
+        # Update in memory
+        from core import config
+        config.ADMIN_SECRET = new_secret
+        
+        # Update in .env file
+        env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+        lines = []
+        secret_found = False
+        if os.path.exists(env_path):
+            with open(env_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+        
+        for i, line in enumerate(lines):
+            if line.strip().startswith("ADMIN_SECRET="):
+                lines[i] = f'ADMIN_SECRET="{new_secret}"\n'
+                secret_found = True
+                break
+        
+        if not secret_found:
+            lines.append(f'\nADMIN_SECRET="{new_secret}"\n')
+            
+        with open(env_path, "w", encoding="utf-8") as f:
+            f.writelines(lines)
+            
+        return {"status": "success"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ---------------------------------------------------------------------------
@@ -115,7 +160,7 @@ async def create_admin_key(request: Request):
 
 
 @router.put("/api/keys/{key_id}", dependencies=[Depends(verify_admin)])
-async def update_admin_key(key_id: int, request: Request):
+async def update_admin_key(key_id: str, request: Request):
     """Sanal API anahtarını günceller."""
     try:
         body = await request.json()
@@ -150,7 +195,7 @@ async def update_admin_key(key_id: int, request: Request):
 
 
 @router.delete("/api/keys/{key_id}", dependencies=[Depends(verify_admin)])
-async def delete_admin_key(key_id: int):
+async def delete_admin_key(key_id: str):
     """Sanal API anahtarını siler."""
     try:
         result = await db_manager.execute(

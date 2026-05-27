@@ -86,14 +86,15 @@ export async function deleteProviderKey(keyId, confirmed = false) {
             method: 'DELETE'
         });
         if (res.ok) {
-            await this.loadKeyPool();
             this.showEditProviderKeyModal = false;
+            this.showToast('Provider key deleted successfully!', 'success');
+            await this.loadKeyPool();
         } else {
             const err = await res.json();
-            alert('Error: ' + (err.detail || 'Failed to delete key'));
+            this.showToast('Error: ' + (err.detail || 'Failed to delete key'), 'error');
         }
     } catch (err) {
         console.error(err);
-        alert('Failed to delete key');
+        this.showToast('Failed to delete key', 'error');
     }
 }

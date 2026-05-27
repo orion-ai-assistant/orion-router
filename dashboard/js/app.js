@@ -18,10 +18,12 @@ createApp({
                 { id: 'models', label: 'Models', icon: 'bot' },
                 { id: 'groups', label: 'Groups', icon: 'network' },
                 { id: 'playground', label: 'Playground', icon: 'terminal' },
-                { id: 'model-info', label: 'Model Info', icon: 'info' }
+                { id: 'model-info', label: 'Model Info', icon: 'info' },
+                { id: 'settings', label: 'Settings', icon: 'settings' }
             ],
             activeTab: 'dashboard',
             showLogin: false,
+            isDefaultPassword: false,
             adminKeyInput: '',
             loginError: '',
             showKeyModal: false,
@@ -73,6 +75,7 @@ createApp({
             modelForm: { name: '', provider: '', capability: 'chat', temperature: null },
             groupForm: { name: '', description: '', capability: 'chat' },
             virtualKeyForm: { name: '', budget: 0 },
+            settingsForm: { adminSecret: '' },
 
             // --- Playground state ---
             voices: [],
@@ -110,8 +113,21 @@ createApp({
         // --- API & Auth helper ---
         adminFetch,
 
+        async checkPasswordStatus() {
+            try {
+                const res = await fetch('/admin/api/settings/is-default-password');
+                if (res.ok) {
+                    const data = await res.json();
+                    this.isDefaultPassword = data.is_default;
+                }
+            } catch (err) {
+                console.error("Error checking password status:", err);
+            }
+        },
+
         // --- Auth methods ---
         async init() {
+            await this.checkPasswordStatus();
             // Determine active tab from URL path
             const path = window.location.pathname;
             if (path.includes('/keys')) {
@@ -128,6 +144,8 @@ createApp({
                 this.activeTab = 'playground';
             } else if (path.includes('/model-info')) {
                 this.activeTab = 'model-info';
+            } else if (path.includes('/settings')) {
+                this.activeTab = 'settings';
             } else {
                 this.activeTab = 'dashboard';
             }
@@ -210,6 +228,8 @@ createApp({
                     }
                 } else if (tab === 'model-info') {
                     await this.loadModelInfo();
+                } else if (tab === 'settings') {
+                    // Settings page doesn't need data fetching initially
                 }
             } catch (err) {
                 console.error(`Error loading active tab (${tab}):`, err);
@@ -429,6 +449,32 @@ createApp({
         },
         cancelConfirm() {
             this.confirmDialog.show = false;
+        },
+
+        // --- Settings Methods ---
+        async saveSettings() {
+            if (!this.settingsForm.adminSecret) {
+                this.showToast('Admin secret cannot be empty', 'error');
+                return;
+            }
+            try {
+                const res = await this.adminFetch('/admin/api/settings/admin-secret', {
+                    method: 'PUT',
+                    body: JSON.stringify({ admin_secret: this.settingsForm.adminSecret })
+                });
+                if (res.ok) {
+                    this.showToast('Admin secret updated successfully!');
+                    // Also update the currently logged in key so we don't get logged out
+                    setAdminKey(this.settingsForm.adminSecret);
+                    await this.checkPasswordStatus();
+                    this.settingsForm.adminSecret = '';
+                } else {
+                    const data = await res.json().catch(() => ({}));
+                    this.showToast(data.detail || 'Failed to update admin secret', 'error');
+                }
+            } catch (e) {
+                this.showToast('Network error updating admin secret', 'error');
+            }
         }
     },
 

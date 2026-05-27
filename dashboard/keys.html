@@ -87,7 +87,7 @@
         <div class="modal-overlay" :class="{ show: showLogin }">
             <div class="modal glass-panel">
                 <h2>Admin Authentication</h2>
-                <p>Please enter the admin secret to access gateway settings.</p>
+                <p>Please enter the admin secret to access gateway settings. <br><small v-if="isDefaultPassword" style="color: var(--text-secondary); margin-top: 0.5rem; display: block;">Default password is <strong>orion-admin</strong>. You can change it later in settings.</small></p>
                 <div class="input-group" style="margin-top: 1rem;">
                     <input type="password" v-model="adminKeyInput" @keydown.enter="login()" placeholder="Admin key">
                 </div>
