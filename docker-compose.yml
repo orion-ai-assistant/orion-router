@@ -21,7 +21,7 @@ services:
         condition: service_healthy
 
   router-db:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     container_name: router-db
     restart: unless-stopped
     networks:
