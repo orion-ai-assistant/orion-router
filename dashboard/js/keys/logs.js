@@ -22,20 +22,29 @@ export async function showLogDetails(logId) {
 
             try {
                 if (data.request_json) {
-                    const parsed = JSON.parse(data.request_json);
-                    reqFull = JSON.stringify(parsed, null, 2);
+                    const parsedReq = typeof data.request_json === 'string' ? JSON.parse(data.request_json) : data.request_json;
+                    reqFull = JSON.stringify(parsedReq, null, 2);
                 }
             } catch (e) {
-                reqFull = data.request_json || '';
+                reqFull = typeof data.request_json === 'string' ? data.request_json : JSON.stringify(data.request_json) || '';
             }
 
             try {
                 if (data.response_json) {
-                    const parsed = JSON.parse(data.response_json);
-                    resFull = JSON.stringify(parsed, null, 2);
+                    const parsedRes = typeof data.response_json === 'string' ? JSON.parse(data.response_json) : data.response_json;
+                    resFull = JSON.stringify(parsedRes, null, 2);
                 }
             } catch (e) {
-                resFull = data.response_json || '';
+                resFull = typeof data.response_json === 'string' ? data.response_json : JSON.stringify(data.response_json) || '';
+            }
+
+            let responseDataParsed = null;
+            try {
+                if (data.response_json) {
+                    responseDataParsed = typeof data.response_json === 'string' ? JSON.parse(data.response_json) : data.response_json;
+                }
+            } catch (e) {
+                console.error("Failed to parse response_json for responseData:", e);
             }
 
             const reqLines = reqFull ? reqFull.split('\n') : ['Null'];
@@ -55,7 +64,7 @@ export async function showLogDetails(logId) {
                 fullRequest: reqFull,
                 fullResponse: resFull,
                 capability: data.capability,
-                responseData: data.response_json ? JSON.parse(data.response_json) : null
+                responseData: responseDataParsed
             };
         } else {
             alert('Failed to load log details');

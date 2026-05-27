@@ -1,0 +1,52 @@
+services:
+  router:
+    build:
+      context: .
+    container_name: orion-router
+    restart: unless-stopped
+    ports:
+      - "20128:20128"
+    command: ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "20128", "--reload"]
+    volumes:
+      - .:/app
+    environment:
+      - POSTGRES_HOST=router-db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=orion_router
+      - POSTGRES_USER=router_user
+      - POSTGRES_PASSWORD=router_pass
+    env_file:
+      - .env
+    networks:
+      - orion-network
+    depends_on:
+      router-db:
+        condition: service_healthy
+
+  router-db:
+    image: postgres:16-alpine
+    container_name: router-db
+    restart: unless-stopped
+    networks:
+      - orion-network
+    environment:
+      POSTGRES_DB: orion_router
+      POSTGRES_USER: router_user
+      POSTGRES_PASSWORD: router_pass
+    ports:
+      - "5433:5432" # Host'taki diğer postgres (5432) ile çakışmaması için 5433 portundan açılır.
+    volumes:
+      - router_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U router_user -d orion_router"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  router_postgres_data:
+
+networks:
+  orion-network:
+    name: orion-network
+    external: true
