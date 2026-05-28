@@ -86,6 +86,52 @@ async def _log_usage(app_state, key_id: str | None, provider: str, model: str, u
 
 
 # ---------------------------------------------------------------------------
+#  Tool-call ID sanitiser
+# ---------------------------------------------------------------------------
+
+def _sanitize_tool_ids_for_non_gemini(messages: list[dict]) -> list[dict]:
+    """Gemini'nin uzun Base64 tool_call_id değerlerini kısa ID'lere dönüştürür.
+
+    Gemini, thought_signature verisini ``call_<name>__ts__<b64>`` biçiminde tool_call_id'ye
+    gömer.  Bu değerler Gemini-dışı modellere gönderildiğinde gereksiz yüzlerce token
+    harcar.  Bu fonksiyon:
+      1) assistant mesajlarındaki tool_calls[].id içinde ``__ts__`` varsa kısa bir ID ile
+         değiştirir (``call_0``, ``call_1``, …).
+      2) Takip eden ``role: tool`` mesajlarındaki tool_call_id'yi de aynı kısa ID ile eşler.
+    """
+    id_map: dict[str, str] = {}
+    counter = 0
+    out: list[dict] = []
+
+    for msg in messages:
+        msg = dict(msg)  # shallow copy – orijinali değiştirme
+
+        # --- assistant + tool_calls ---
+        if msg.get("role") == "assistant" and msg.get("tool_calls"):
+            new_tcs = []
+            for tc in msg["tool_calls"]:
+                tc = dict(tc)
+                old_id = tc.get("id", "")
+                if "__ts__" in old_id:
+                    if old_id not in id_map:
+                        id_map[old_id] = f"call_{counter}"
+                        counter += 1
+                    tc["id"] = id_map[old_id]
+                new_tcs.append(tc)
+            msg["tool_calls"] = new_tcs
+
+        # --- tool response ---
+        if msg.get("role") == "tool":
+            old_tcid = msg.get("tool_call_id", "")
+            if old_tcid in id_map:
+                msg = dict(msg)
+                msg["tool_call_id"] = id_map[old_tcid]
+
+        out.append(msg)
+    return out
+
+
+# ---------------------------------------------------------------------------
 #  DynamicLLMRouter
 # ---------------------------------------------------------------------------
 
@@ -184,11 +230,17 @@ class DynamicLLMRouter:
         """Pluginden SSE chunk'larını yield eder; internal_usage'ı DB'ye kaydeder. Hataları merkezi loglar."""
         accumulated_content = ""
         accumulated_reasoning = ""
+        accumulated_tool_calls: list[dict] = []
         usage = None
         has_error = False
         error_details = None
         
         logger.info(f"Starting chat stream: provider={provider}, model={model}, kwargs={kwargs}")
+        
+        # Gemini-dışı provider'lara giden mesajlardaki uzun tool_call_id'leri kısalt
+        if provider != "gemini":
+            messages = _sanitize_tool_ids_for_non_gemini(messages)
+        
         try:
             async for chunk in plugin.stream_chat(
                 model=model, messages=messages,
@@ -216,6 +268,20 @@ class DynamicLLMRouter:
                                         accumulated_reasoning += delta["reasoning_content"]
                                     if "content" in delta and delta["content"]:
                                         accumulated_content += delta["content"]
+                                    if "tool_calls" in delta:
+                                        for tc_delta in delta["tool_calls"]:
+                                            idx = tc_delta.get("index", 0)
+                                            # Yeni tool_call mı, yoksa mevcut olana ekleme mi?
+                                            while len(accumulated_tool_calls) <= idx:
+                                                accumulated_tool_calls.append({"id": "", "type": "function", "function": {"name": "", "arguments": ""}})
+                                            entry = accumulated_tool_calls[idx]
+                                            if tc_delta.get("id"):
+                                                entry["id"] = tc_delta["id"]
+                                            fn = tc_delta.get("function", {})
+                                            if fn.get("name"):
+                                                entry["function"]["name"] = fn["name"]
+                                            if fn.get("arguments"):
+                                                entry["function"]["arguments"] += fn["arguments"]
                         except Exception:
                             pass
                     yield chunk
@@ -247,15 +313,15 @@ class DynamicLLMRouter:
                     "error": error_details or "Unknown error"
                 }
             else:
-                res_data = {
-                    "choices": [{
-                        "message": {
-                            "role": "assistant",
-                            "content": accumulated_content,
-                            "reasoning_content": accumulated_reasoning if accumulated_reasoning else None
-                        }
-                    }]
+                msg_data: dict[str, Any] = {
+                    "role": "assistant",
+                    "content": accumulated_content,
                 }
+                if accumulated_reasoning:
+                    msg_data["reasoning_content"] = accumulated_reasoning
+                if accumulated_tool_calls:
+                    msg_data["tool_calls"] = accumulated_tool_calls
+                res_data = {"choices": [{"message": msg_data}]}
             
             asyncio.create_task(
                 _log_usage(
