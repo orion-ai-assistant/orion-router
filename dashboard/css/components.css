@@ -206,7 +206,7 @@ td.row-actions {
 }
 
 .col-provider {
-    width: 110px;
+    width: 100px;
 }
 
 .col-label {
@@ -241,7 +241,7 @@ td.row-actions {
     display: flex;
     flex-direction: row;
     flex-wrap: nowrap;
-    gap: 12px;
+    gap: 16px;
     align-items: center;
     justify-content: center;
 }
@@ -254,6 +254,7 @@ td.row-actions {
     justify-content: center;
     white-space: nowrap;
     padding: 8px 0;
+    flex-shrink: 0;
 }
 
 .pricing-label {
@@ -276,7 +277,7 @@ td.row-actions {
 }
 
 .col-capability {
-    width: 110px;
+    width: 90px;
 }
 
 .col-key {
@@ -284,7 +285,7 @@ td.row-actions {
 }
 
 .col-tokens {
-    width: 120px;
+    width: 150px;
     text-align: center;
 }
 
