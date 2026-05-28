@@ -302,6 +302,12 @@ class DynamicLLMRouter:
                     "completion_tokens": len(accumulated_content) // 4,
                     "thoughts_tokens": len(accumulated_reasoning) // 4
                 }
+
+            # Provider'dan gelen usage'ı kontrol et, 0 ise ücret yansımamış demektir, sadece uyar
+            if accumulated_content and usage.get("completion_tokens", 0) == 0:
+                logger.warning(f"[{provider}] API reported 0 completion_tokens despite generating {len(accumulated_content)} chars.")
+            if accumulated_reasoning and usage.get("thoughts_tokens", 0) == 0:
+                logger.warning(f"[{provider}] API reported 0 thoughts_tokens despite generating {len(accumulated_reasoning)} reasoning chars.")
                 
             req_data = {
                 "model": model,

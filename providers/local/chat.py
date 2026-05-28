@@ -71,8 +71,19 @@ class LocalChatProvider(BaseChat):
                     if data.get("usage"):
                         got_usage = True
                         usage = data["usage"]
-                        r = (usage.get("completion_tokens_details") or {}).get("reasoning_tokens", 0)
-                        usage["thoughts_tokens"] = r if r else max(0, thought_chars // 4)
+                        raw_completion = usage.get("completion_tokens", 0) or 0
+                        details = usage.get("completion_tokens_details") or {}
+                        r = details.get("reasoning_tokens", 0) or 0
+                        if r:
+                            # API reasoning_tokens döndü; output = toplam - reasoning
+                            usage["thoughts_tokens"] = r
+                            usage["completion_tokens"] = max(0, raw_completion - r)
+                        elif thought_chars > 0:
+                            # API detay vermedi ama thinking stream'i geldi;
+                            # kısa output'u char'dan tahmin et, thinking'i farktan bul
+                            est_output = max(1, out_chars // 4) if out_chars else 0
+                            usage["completion_tokens"] = est_output
+                            usage["thoughts_tokens"] = max(0, raw_completion - est_output)
                         yield {"internal_usage": usage}
                         continue
 
@@ -81,7 +92,6 @@ class LocalChatProvider(BaseChat):
                     if delta.get("reasoning_content"):
                         rc = delta["reasoning_content"]
                         thought_chars += len(rc)
-                        out_chars += len(rc)
                         yield f'data: {{"choices":[{{"delta":{{"reasoning_content":{json.dumps(rc, ensure_ascii=False)}}}}}]}}\n\n'
 
                     if delta.get("content"):

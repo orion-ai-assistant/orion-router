@@ -66,9 +66,14 @@ class OpenRouterChatProvider(BaseChat):
                 async for data in self._iter_sse_lines(response):
                     if data.get("usage"):
                         usage = data["usage"]
-                        r = (usage.get("completion_tokens_details") or {}).get("reasoning_tokens", 0)
+                        details = usage.get("completion_tokens_details") or {}
+                        r = details.get("reasoning_tokens", 0) or 0
                         if r:
                             usage["thoughts_tokens"] = r
+                            # completion_tokens reasoning dahil toplamı içerir;
+                            # gerçek output = completion_tokens - reasoning_tokens
+                            raw_completion = usage.get("completion_tokens", 0) or 0
+                            usage["completion_tokens"] = max(0, raw_completion - r)
                         yield {"internal_usage": usage}
                         continue
 
