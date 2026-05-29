@@ -14,6 +14,10 @@ services:
       - POSTGRES_PASSWORD=router_pass
     env_file:
       - .env
+    volumes:
+      - .:/app
+      - /app/dashboard/out
+    command: ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "20128", "--reload"]
     networks:
       - orion-network
     depends_on:

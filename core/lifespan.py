@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI):
     logger.info("Starting up Orion Custom Service Router")
     print("\n" + "="*60)
     print("🚀 Orion Router başarıyla başlatıldı!")
-    print("👉 Yönetim Paneli: http://localhost:20128/admin")
+    print("👉 Yönetim Paneli: http://localhost:20128/dashboard")
     print("="*60 + "\n")
     await db_manager.init_db()
 

@@ -1,0 +1,15 @@
+dashboard/node_modules
+dashboard/.next
+dashboard/out
+.git
+.github
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv
+venv
+ENV
+db.sqlite3
+data/

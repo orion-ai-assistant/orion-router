@@ -37,10 +37,15 @@ logging.getLogger("uvicorn.access").setLevel(logging.INFO)
 # ---------------------------------------------------------------------------
 app = FastAPI(title="Orion Custom Service Router", lifespan=lifespan)
 
-# Admin UI statik dosyaları
+# Dashboard UI statik dosyaları
 _dashboard_dir = os.path.join(os.path.dirname(__file__), "dashboard")
 if os.path.exists(_dashboard_dir):
-    app.mount("/admin/static", StaticFiles(directory=_dashboard_dir), name="admin_static")
+    app.mount("/dashboard/static", StaticFiles(directory=_dashboard_dir), name="dashboard_static")
+    
+    # Next.js SPA assets mount
+    _next_dir = os.path.join(_dashboard_dir, "out", "_next")
+    if os.path.exists(_next_dir):
+        app.mount("/dashboard/_next", StaticFiles(directory=_next_dir), name="dashboard_next")
 
 # ---------------------------------------------------------------------------
 #  Router'ları bağla
@@ -60,4 +65,4 @@ async def health():
 
 @app.get("/", include_in_schema=False)
 async def root():
-    return RedirectResponse(url="/admin")
+    return RedirectResponse(url="/dashboard")

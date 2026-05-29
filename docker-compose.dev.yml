@@ -9,6 +9,7 @@ services:
     command: ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "20128", "--reload", "--log-level", "warning"]
     volumes:
       - .:/app
+      - /app/dashboard/out
     environment:
       - POSTGRES_HOST=router-db
       - POSTGRES_PORT=5432

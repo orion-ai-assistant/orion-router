@@ -39,7 +39,7 @@ Orion Router artık ana projeden ayrılarak bağımsız bir depo (repository) ha
 │   └── openrouter.py   # OpenRouter Sağlayıcısı
 ├── database.py         # asyncpg DB Bağlantı Havuzu ve Tablolar
 ├── dynamic_router.py   # Dinamik Yükleyici (Auto-Discovery) & Maliyet Hesaplama
-├── main.py             # Uvicorn FastAPI Uygulama Girişi ve Admin API'leri
+├── main.py             # Uvicorn FastAPI Uygulama Girişi ve Dashboard API'leri
 ├── pyproject.toml      # Paket Yönetim ve Bağımlılık Yapılandırması
 ├── docker-compose.yml  # Docker Compose Yapılandırması
 └── Dockerfile          # Bağımsız Docker İmajı Oluşturucu
@@ -59,14 +59,14 @@ Bu komut:
 2. Router uygulamasını başlatır ve **20128** portundan yayına alır.
 
 Sistem ayağa kalktıktan sonra Gateway Dashboard'una şu adresten ulaşabilirsiniz:
-👉 **[http://localhost:20128/admin](http://localhost:20128/admin)**
+👉 **[http://localhost:20128/dashboard](http://localhost:20128/dashboard)**
 
 ### 1. `main.py`
 Uygulamanın ana giriş noktasıdır.
 - **FastAPI Lifespan:** Uygulama başlarken veritabanı bağlantı havuzunu başlatır (`init_db`) ve dinamik yönlendiriciyi ayağa kaldırır. Kapanırken havuzu kapatır.
 - **`authenticate_request` (Dependency):** Gelen `Authorization: Bearer <key>` veya `x-orion-api-key` değerini alır, SHA-256 ile hash'ini kontrol eder. Sanal anahtarın aktiflik durumunu ve bütçe sınırını (`budget` ve `used_amount`) sorgular. Sanal anahtarı doğrular ancak **asla gerçek OpenAI/OpenRouter anahtarlarını istemciye sızdırmaz.**
 - **`/v1/chat/completions`:** İstemcinin standard sohbet isteklerini karşılayıp `DynamicLLMRouter.run_combo` fonksiyonuna aktarır ve yanıtı `StreamingResponse` (SSE) olarak döner.
-- **Admin API'leri (`/admin/api/...`):** Sanal anahtar listeleme/oluşturma, canlı kullanım istatistikleri (`/stats`) ve log izleme uç noktalarını sunar.
+- **Dashboard API'leri (`/dashboard/api/...`):** Sanal anahtar listeleme/oluşturma, canlı kullanım istatistikleri (`/stats`) ve log izleme uç noktalarını sunar.
 
 ### 2. `database.py`
 PostgreSQL ile asenkron bağlantıları yönetir.
@@ -89,7 +89,7 @@ Her sağlayıcı `BaseLLMProvider` interface'ine (`stream_chat` metodu) uymak zo
 - **`local.py`:** Ollama veya Llama.cpp gibi yerel motorlara istek atar. Gelişmiş akış şablonu (state machine) ile metin içindeki `<think>...</think>` bloklarını ayıklar ve istemciye düşünme (`thinking`) ile asıl içerik (`content`) olarak ayrı ayrı (SSE event'i şeklinde) gönderir.
 
 ### 5. `dashboard/` (Kullanıcı Arayüzü)
-- **Tek Sayfa Uygulaması (SPA):** Sunucu dışına hiçbir bağımlılığı yoktur, doğrudan FastAPI (`StaticFiles`) tarafından `/admin` adresinde sunulur.
+- **Tek Sayfa Uygulaması (SPA):** Sunucu dışına hiçbir bağımlılığı yoktur, doğrudan FastAPI (`StaticFiles`) tarafından `/dashboard` adresinde sunulur.
 - **Teknolojiler:** Premium karanlık tema, Glassmorphic buzlu cam tasarımı, CSS HSL renk değişkenleri ve Vanilla JS.
 - **Playground Sekmesi:** Yeni üretilen sanal anahtarı girip OpenRouter, OpenAI, Gemini veya Local sağlayıcıları üzerinden canlı olarak modellerle sohbet edip test etmenize olanak tanır.
 

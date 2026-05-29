@@ -17,7 +17,7 @@ from core.dependencies import verify_admin
 
 logger = logging.getLogger("service-router.admin")
 
-router = APIRouter(prefix="/admin", tags=["Admin"])
+router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 # Admin UI dizini: bu dosyanın bulunduğu konumdan (api/) iki üst dizin → dashboard/
 _DASHBOARD_DIR = os.path.join(os.path.dirname(__file__), "..", "dashboard")
@@ -35,40 +35,6 @@ def _require_text(value, field_name: str) -> str:
         raise HTTPException(status_code=400, detail=f"{field_name} is required")
     return value
 
-
-# ---------------------------------------------------------------------------
-#  UI
-# ---------------------------------------------------------------------------
-
-@router.get("")
-@router.get("/")
-async def get_admin_ui():
-    """Admin arayüzünün ana sayfasını (index.html) döner."""
-    admin_ui_path = os.path.join(_DASHBOARD_DIR, "index.html")
-    if not os.path.exists(admin_ui_path):
-        return Response(
-            content="Admin UI not found. Please create dashboard/index.html",
-            status_code=404,
-        )
-    return FileResponse(admin_ui_path, media_type="text/html")
-
-
-@router.get("/{page}")
-async def get_admin_page(page: str):
-    """Admin arayüzündeki diğer sayfaları (örn. keys, models) döner."""
-    page_name = page.replace(".html", "")
-    valid_pages = {"keys", "logs", "key-pool", "models", "groups", "playground", "model-info", "settings"}
-    
-    if page_name in valid_pages:
-        page_path = os.path.join(_DASHBOARD_DIR, f"{page_name}.html")
-        if os.path.exists(page_path):
-            return FileResponse(page_path, media_type="text/html")
-            
-    # Eğer geçerli bir sayfa değilse ana sayfaya yönlendir ya da index.html döner
-    index_path = os.path.join(_DASHBOARD_DIR, "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path, media_type="text/html")
-    return Response(content="Admin UI not found.", status_code=404)
 
 
 @router.get("/api/settings/is-default-password")
@@ -720,3 +686,57 @@ async def delete_model_group_item(group_id: str, item_id: str):
         group_id,
     )
     return {"status": "success", "result": result}
+
+
+# ---------------------------------------------------------------------------
+#  UI (Fallback for SPA Routing)
+# ---------------------------------------------------------------------------
+
+@router.get("", include_in_schema=False)
+@router.head("", include_in_schema=False)
+@router.get("/", include_in_schema=False)
+@router.head("/", include_in_schema=False)
+@router.get("/{path:path}", include_in_schema=False)
+@router.head("/{path:path}", include_in_schema=False)
+async def get_admin_ui(path: str = ""):
+    """SPA Client-Side Router for Next.js - returns HTML and RSC payloads."""
+    # Exclude API routes
+    if path.startswith("api/") or path == "api":
+        raise HTTPException(status_code=404, detail="Not Found")
+        
+    out_dir = os.path.join(_DASHBOARD_DIR, "out")
+    
+    # 1. Clean up the path (remove leading slashes if any)
+    safe_path = path.lstrip("/")
+    target_path = os.path.join(out_dir, safe_path) if safe_path else out_dir
+    
+    # 2. Check if the exact requested file exists (e.g. favicon.ico, settings.txt, __next._index.txt)
+    if safe_path and os.path.isfile(target_path):
+        return FileResponse(target_path)
+        
+    # 3. Check if an HTML file exists for the requested path (e.g. /keys -> keys.html)
+    if safe_path and not safe_path.endswith(".html") and not safe_path.endswith(".txt"):
+        html_path = f"{target_path}.html"
+        if os.path.isfile(html_path):
+            return FileResponse(html_path, media_type="text/html")
+            
+        # 4. Check if there's an index.html inside a directory (e.g. /keys/ -> keys/index.html)
+        index_in_dir = os.path.join(target_path, "index.html")
+        if os.path.isdir(target_path) and os.path.isfile(index_in_dir):
+            return FileResponse(index_in_dir, media_type="text/html")
+
+    # 5. Final Fallback to root index.html (SPA fallback)
+    root_index = os.path.join(out_dir, "index.html")
+    if os.path.exists(root_index):
+        return FileResponse(root_index, media_type="text/html")
+        
+    # Fallback to old dashboard index.html if out doesn't exist
+    old_index = os.path.join(_DASHBOARD_DIR, "index.html")
+    if os.path.exists(old_index):
+        return FileResponse(old_index, media_type="text/html")
+        
+    return Response(
+        content="Admin UI not found. Please build the Next.js project.",
+        status_code=404,
+    )
+

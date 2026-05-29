@@ -1,0 +1,161 @@
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Manrope:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@theme {
+  --font-sans: 'Manrope', sans-serif;
+  --font-heading: 'Sora', sans-serif;
+  --font-mono: 'DM Mono', monospace;
+
+  --color-background: var(--bg-base);
+  --color-foreground: var(--text-primary);
+  
+  --color-card: var(--bg-glass);
+  --color-card-foreground: var(--text-primary);
+  
+  --color-popover: var(--bg-glass);
+  --color-popover-foreground: var(--text-primary);
+  
+  --color-primary: var(--text-primary);
+  --color-primary-foreground: var(--bg-base);
+  
+  --color-secondary: var(--bg-glass-hover);
+  --color-secondary-foreground: var(--text-primary);
+  
+  --color-muted: var(--surface-raise);
+  --color-muted-foreground: var(--text-secondary);
+  
+  --color-accent: var(--accent-primary);
+  --color-accent-foreground: var(--text-primary);
+  
+  --color-destructive: var(--danger);
+  --color-destructive-foreground: var(--text-primary);
+  
+  --color-border: var(--glass-border);
+  --color-input: var(--glass-border);
+  --color-ring: var(--text-muted);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+}
+
+:root {
+  --bg-base: #121212;
+  --bg-glass: #18181b;
+  --bg-glass-hover: #27272a;
+  --glass-border: #27272a;
+
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+
+  --accent-primary: #3f3f46;
+  --accent-glow: transparent;
+  --accent-gradient: #3f3f46;
+  --accent-gradient-reverse: #52525b;
+
+  --danger: #ef4444;
+  --success: #10b981;
+  --warning: #f59e0b;
+
+  --surface-raise: #27272a;
+  --surface-raise-strong: #3f3f46;
+  --surface-raise-muted: #18181b;
+  --shadow-elevated: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-pill: 8px;
+
+  --transition-fast: 0.2s ease;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans min-h-screen relative overflow-x-hidden antialiased;
+  }
+  .app-container {
+    zoom: 1.1;
+  }
+}
+
+/* Custom design classes from original theme */
+.glass-panel {
+  background-color: var(--bg-glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-elevated);
+  position: relative;
+  
+  /* Corner screw details in the style of Neuro */
+  background-image: 
+      radial-gradient(circle at 14px 14px, #3f3f46 1px, #18181b 2.5px, transparent 3.5px),
+      radial-gradient(circle at calc(100% - 14px) 14px, #3f3f46 1px, #18181b 2.5px, transparent 3.5px),
+      radial-gradient(circle at 14px calc(100% - 14px), #3f3f46 1px, #18181b 2.5px, transparent 3.5px),
+      radial-gradient(circle at calc(100% - 14px) calc(100% - 14px), #3f3f46 1px, #18181b 2.5px, transparent 3.5px);
+  background-repeat: no-repeat;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-pill);
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Logo Animation / Styles */
+.logo-icon {
+  width: 36px;
+  height: 36px;
+  background: var(--accent-gradient);
+  border-radius: 10px;
+  position: relative;
+  box-shadow: 0 0 15px var(--accent-glow);
+}
+
+.logo-icon::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  background: var(--bg-base);
+  border-radius: 8px;
+}
+
+/* Dashboard Banner */
+.dashboard-banner {
+  width: 100%;
+  height: 160px;
+  background-image: url('/dashboard/static/images/dashboard_banner.png');
+  background-size: cover;
+  background-position: center 30%;
+  border-radius: var(--radius-md);
+  margin-bottom: 24px;
+  border: 1px solid var(--glass-border);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.dashboard-banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(6, 7, 10, 0.75) 0%, rgba(6, 7, 10, 0) 70%),
+              linear-gradient(to right, rgba(6, 7, 10, 0.3) 0%, transparent 100%);
+  pointer-events: none;
+}
