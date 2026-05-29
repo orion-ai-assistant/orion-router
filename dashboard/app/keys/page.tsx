@@ -30,6 +30,7 @@ export default function VirtualKeysPage() {
   const [showKeyModal, setShowKeyModal] = useState<boolean>(false);
   const [showEditKeyModal, setShowEditKeyModal] = useState<boolean>(false);
   const [newRawKey, setNewRawKey] = useState<string>('');
+  const [rawKeyDialogOpen, setRawKeyDialogOpen] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
 
   // Form states
@@ -91,6 +92,7 @@ export default function VirtualKeysPage() {
         const data = await res.json();
         setShowKeyModal(false);
         setNewRawKey(data.raw_key);
+        setRawKeyDialogOpen(true);
         setVirtualKeyForm({ name: '', budget: 0 });
         showToast('Virtual key created successfully!');
         await loadVirtualKeys();
@@ -168,6 +170,7 @@ export default function VirtualKeysPage() {
     navigator.clipboard.writeText(text);
     setCopied(true);
     showToast('API key copied to clipboard!');
+    setRawKeyDialogOpen(false);
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -382,7 +385,13 @@ export default function VirtualKeysPage() {
       </Dialog>
 
       {/* Raw Key Success Modal */}
-      <Dialog open={!!newRawKey} onOpenChange={(open) => !open && setNewRawKey('')}>
+      <Dialog
+        open={rawKeyDialogOpen}
+        onOpenChange={setRawKeyDialogOpen}
+        onOpenChangeComplete={(open) => {
+          if (!open) setNewRawKey('');
+        }}
+      >
         <DialogContent className="max-w-[440px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl text-center">
           <DialogHeader>
             <DialogTitle className="text-xl font-heading font-semibold text-white">API Key Created</DialogTitle>

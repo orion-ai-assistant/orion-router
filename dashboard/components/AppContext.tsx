@@ -158,7 +158,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (confirmDialog.callback) {
       confirmDialog.callback();
     }
-    setConfirmDialog({ show: false, message: '', callback: null });
+    setConfirmDialog((prev) => ({ ...prev, show: false }));
   };
 
   return (
@@ -166,8 +166,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       {children}
 
       {/* Admin Login Dialog */}
-      <Dialog open={showLogin} onOpenChange={() => {}}>
-        <DialogContent className="max-w-[440px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl [&>button]:hidden">
+      <Dialog open={showLogin} onOpenChange={() => {}} modal>
+        <DialogContent
+          showCloseButton={false}
+          className="max-w-[440px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl"
+        >
           <DialogHeader>
             <DialogTitle className="text-xl font-heading font-semibold text-white">Admin Authentication</DialogTitle>
             <DialogDescription className="text-zinc-400 text-sm mt-2">
@@ -209,7 +212,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       </Dialog>
 
       {/* Global Confirm Dialog */}
-      <Dialog open={confirmDialog.show} onOpenChange={(show) => !show && setConfirmDialog({ show: false, message: '', callback: null })}>
+      <Dialog
+        open={confirmDialog.show}
+        onOpenChange={(show) => setConfirmDialog((prev) => ({ ...prev, show }))}
+        onOpenChangeComplete={(open) => {
+          if (!open) {
+            setConfirmDialog({ show: false, message: '', callback: null });
+          }
+        }}
+      >
         <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-6 rounded-2xl text-center glass-panel text-white shadow-2xl">
           <div className="flex flex-col items-center justify-center">
             <div className="text-red-500 mb-4 bg-red-950/30 border border-red-500/20 w-16 h-16 rounded-full flex items-center justify-center">
@@ -225,7 +236,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           <DialogFooter className="mt-6 flex justify-center gap-3 w-full">
             <Button
               variant="outline"
-              onClick={() => setConfirmDialog({ show: false, message: '', callback: null })}
+              onClick={() => setConfirmDialog((prev) => ({ ...prev, show: false }))}
               className="border-zinc-800 text-white hover:bg-zinc-900 rounded-md font-medium"
             >
               Cancel

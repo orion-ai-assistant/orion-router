@@ -3,12 +3,14 @@
 import React, { useState, useEffect } from 'react';
 import { adminFetch } from '@/lib/api';
 import { money, dateTime } from '@/lib/utils';
+import { formatPayloadForDisplay, extractTtsAudio } from '@/lib/format-payload';
 import { useApp } from '@/components/AppContext';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { RefreshCw, Copy, Check } from 'lucide-react';
+import { PayloadViewer } from '@/components/PayloadViewer';
+import { RefreshCw } from 'lucide-react';
 
 interface LogItem {
   id: number;
@@ -26,172 +28,112 @@ interface LogItem {
 }
 
 interface LogDetails {
-  requestText: string;
-  responseText: string;
+  requestHtml: string;
+  responseHtml: string;
   fullRequest: string;
   fullResponse: string;
   capability: string;
-  responseData: any;
-}
-
-function sanitizeForDisplay(obj: any): any {
-  if (obj === null || obj === undefined) return obj;
-  if (Array.isArray(obj)) {
-    return obj.map(sanitizeForDisplay);
-  }
-  if (typeof obj === 'object') {
-    const result: any = {};
-    for (const key in obj) {
-      if (Object.prototype.hasOwnProperty.call(obj, key)) {
-        const val = obj[key];
-        if (typeof val === 'string' && val.length > 200 && (
-          key === 'audio_base64' || 
-          key === 'b64_json' || 
-          key === 'audio' || 
-          key.endsWith('_base64') || 
-          val.startsWith('data:image/') || 
-          val.startsWith('data:audio/')
-        )) {
-          result[key] = val.substring(0, 50) + `... [truncated base64, length: ${val.length}]`;
-        } else {
-          result[key] = sanitizeForDisplay(val);
-        }
-      }
-    }
-    return result;
-  }
-  return obj;
+  ttsAudio: { audio_base64: string; content_type?: string } | null;
 }
 
 export default function LogsPage() {
   const { showToast } = useApp();
   const [logs, setLogs] = useState<LogItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [payloadDialogOpen, setPayloadDialogOpen] = useState(false);
   const [activeLogDetails, setActiveLogDetails] = useState<LogDetails | null>(null);
   
   // Copies tracking
   const [copiedReq, setCopiedReq] = useState(false);
   const [copiedRes, setCopiedRes] = useState(false);
 
-  const loadLogs = async () => {
-    setLoading(true);
+  const fetchLogs = async (mode: 'initial' | 'poll' | 'refresh') => {
+    if (mode === 'initial') {
+      setLoading(true);
+    }
     try {
       const res = await adminFetch('/dashboard/api/logs');
       if (res.ok) {
         const data = await res.json();
-        setLogs(data.logs || []);
+        const incoming: LogItem[] = data.logs || [];
+        if (mode === 'poll') {
+          setLogs((prev) => {
+            const ids = new Set(prev.map((l) => l.id));
+            const fresh = incoming.filter((l) => !ids.has(l.id));
+            if (fresh.length === 0) return prev;
+            return [...fresh, ...prev];
+          });
+        } else {
+          setLogs(incoming);
+        }
       }
     } catch (err) {
       console.error('Failed to load logs:', err);
-      showToast('Failed to load logs', 'error');
+      if (mode !== 'poll') {
+        showToast('Failed to load logs', 'error');
+      }
     } finally {
-      setLoading(false);
+      if (mode === 'initial') {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
-    loadLogs();
-    
+    fetchLogs('initial');
+
+    const pollId = window.setInterval(() => {
+      fetchLogs('poll');
+    }, 5000);
+
     const handleAuth = () => {
-      loadLogs();
+      fetchLogs('refresh');
     };
     window.addEventListener('orion-authenticated', handleAuth);
     return () => {
+      window.clearInterval(pollId);
       window.removeEventListener('orion-authenticated', handleAuth);
     };
   }, []);
 
   const handleShowDetails = async (logId: number) => {
+    setPayloadDialogOpen(true);
     setActiveLogDetails({
-      requestText: 'Loading...',
-      responseText: 'Loading...',
+      requestHtml: '',
+      responseHtml: '',
       fullRequest: '',
       fullResponse: '',
       capability: 'chat',
-      responseData: null
+      ttsAudio: null,
     });
     
     try {
       const res = await adminFetch(`/dashboard/api/logs/${logId}`);
       if (res.ok) {
         const data = await res.json();
-
-        let reqFullDisplay = '';
-        let resFullDisplay = '';
-        let reqFullActual = '';
-        let resFullActual = '';
-
-        try {
-          if (data.request_json) {
-            const parsedReq = typeof data.request_json === 'string' ? JSON.parse(data.request_json) : data.request_json;
-            reqFullActual = JSON.stringify(parsedReq, null, 2);
-            const displayReq = sanitizeForDisplay(parsedReq);
-            reqFullDisplay = JSON.stringify(displayReq, null, 2);
-          }
-        } catch (e) {
-          reqFullActual = typeof data.request_json === 'string' ? data.request_json : JSON.stringify(data.request_json) || '';
-          reqFullDisplay = reqFullActual;
-        }
-
-        try {
-          if (data.response_json) {
-            const parsedRes = typeof data.response_json === 'string' ? JSON.parse(data.response_json) : data.response_json;
-            resFullActual = JSON.stringify(parsedRes, null, 2);
-            const displayRes = sanitizeForDisplay(parsedRes);
-            resFullDisplay = JSON.stringify(displayRes, null, 2);
-          }
-        } catch (e) {
-          resFullActual = typeof data.response_json === 'string' ? data.response_json : JSON.stringify(data.response_json) || '';
-          resFullDisplay = resFullActual;
-        }
-
-        let responseDataParsed = null;
-        try {
-          if (data.response_json) {
-            responseDataParsed = typeof data.response_json === 'string' ? JSON.parse(data.response_json) : data.response_json;
-          }
-        } catch (e) {
-          console.error("Failed to parse response_json for responseData:", e);
-        }
-
-        const limitText = (fullText: string) => {
-          if (!fullText) return 'Null';
-          const lines = fullText.split('\n');
-          let isTruncated = false;
-          let text = fullText;
-          
-          if (lines.length > 500) {
-            text = lines.slice(0, 500).join('\n');
-            isTruncated = true;
-          }
-          
-          if (text.length > 50000) {
-            text = text.substring(0, 50000);
-            isTruncated = true;
-          }
-          
-          if (isTruncated) {
-            text += '\n\n... [Content too long and was truncated. Use "Copy Full" to get complete JSON] ...';
-          }
-          
-          return text;
-        };
+        const request = formatPayloadForDisplay(data.request_json);
+        const response = formatPayloadForDisplay(data.response_json);
+        const capability = data.capability || 'chat';
+        const ttsAudio =
+          capability === 'tts' ? extractTtsAudio(data.response_json) : null;
 
         setActiveLogDetails({
-          requestText: limitText(reqFullDisplay),
-          responseText: limitText(resFullDisplay),
-          fullRequest: reqFullActual,
-          fullResponse: resFullActual,
-          capability: data.capability,
-          responseData: responseDataParsed
+          requestHtml: request.displayHtml,
+          responseHtml: response.displayHtml,
+          fullRequest: request.fullText,
+          fullResponse: response.fullText,
+          capability,
+          ttsAudio,
         });
       } else {
         showToast('Failed to load log details', 'error');
+        setPayloadDialogOpen(false);
         setActiveLogDetails(null);
       }
     } catch (err) {
       console.error(err);
       showToast('Failed to load log details', 'error');
+      setPayloadDialogOpen(false);
       setActiveLogDetails(null);
     }
   };
@@ -216,7 +158,7 @@ export default function LogsPage() {
           <p className="text-zinc-400 text-sm mt-1">Recent routed calls</p>
         </div>
         <Button
-          onClick={loadLogs}
+          onClick={() => fetchLogs('refresh')}
           className="bg-transparent border border-zinc-800 text-white hover:bg-zinc-800 font-medium px-5 py-2.5 rounded-md transition-all flex items-center gap-1.5"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
@@ -338,72 +280,52 @@ export default function LogsPage() {
       </div>
 
       {/* Payloads Modal */}
-      <Dialog open={!!activeLogDetails} onOpenChange={(open) => !open && setActiveLogDetails(null)}>
-        <DialogContent className="max-w-[950px] w-[95%] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl overflow-y-auto max-h-[90vh]">
+      <Dialog
+        open={payloadDialogOpen}
+        onOpenChange={setPayloadDialogOpen}
+        onOpenChangeComplete={(open) => {
+          if (!open) setActiveLogDetails(null);
+        }}
+      >
+        <DialogContent className="w-[min(96vw,1720px)] max-w-[min(96vw,1720px)] border border-zinc-800 bg-[#18181b] p-6 sm:p-8 rounded-2xl text-white shadow-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-heading font-semibold text-white">Request & Response Payloads</DialogTitle>
           </DialogHeader>
 
-          {/* Audio Player for TTS */}
-          {activeLogDetails && activeLogDetails.capability === 'tts' && activeLogDetails.responseData?.audio_base64 && (
-            <div className="my-4 p-4 bg-white/5 border border-white/10 rounded-lg flex items-center justify-between gap-4">
-              <span className="font-semibold text-purple-400 flex items-center gap-2 text-sm">
-                🔊 Generated Audio Output:
-              </span>
+          {activeLogDetails?.ttsAudio && (
+            <div className="my-4 p-4 bg-zinc-800/40 border border-zinc-700 rounded-lg flex flex-col sm:flex-row sm:items-center gap-3">
+              <span className="font-medium text-zinc-300 text-sm shrink-0">Audio output</span>
               <audio
                 controls
-                className="flex-grow max-w-[600px] h-10"
-                src={`data:${activeLogDetails.responseData.content_type || 'audio/wav'};base64,${activeLogDetails.responseData.audio_base64}`}
+                className="w-full sm:max-w-[600px] h-10"
+                src={`data:${activeLogDetails.ttsAudio.content_type || 'audio/wav'};base64,${activeLogDetails.ttsAudio.audio_base64}`}
               />
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-4 text-left">
-            {/* Request Payload */}
-            <div className="min-w-0 flex flex-col">
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="text-purple-400 font-semibold text-sm">Request JSON</h3>
-                {activeLogDetails?.fullRequest && (
-                  <Button
-                    variant="outline"
-                    onClick={() => copyText(activeLogDetails.fullRequest, true)}
-                    className="border-zinc-800 hover:bg-zinc-800 text-xs px-2.5 py-1 h-auto flex items-center gap-1 rounded"
-                  >
-                    {copiedReq ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                    {copiedReq ? 'Copied' : 'Copy Full'}
-                  </Button>
-                )}
-              </div>
-              <pre className="custom-scrollbar bg-black/40 border border-zinc-850 p-4 rounded-lg font-mono text-xs overflow-auto h-[350px] text-zinc-300 whitespace-pre-wrap break-all">
-                {activeLogDetails ? activeLogDetails.requestText : 'Loading...'}
-              </pre>
+          {activeLogDetails && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6 my-4 text-left min-h-0">
+              <PayloadViewer
+                label="Request JSON"
+                displayHtml={activeLogDetails.requestHtml || 'Loading...'}
+                fullText={activeLogDetails.fullRequest}
+                copied={copiedReq}
+                onCopy={() => copyText(activeLogDetails.fullRequest, true)}
+              />
+              <PayloadViewer
+                label="Response JSON"
+                displayHtml={activeLogDetails.responseHtml || 'Loading...'}
+                fullText={activeLogDetails.fullResponse}
+                copied={copiedRes}
+                onCopy={() => copyText(activeLogDetails.fullResponse, false)}
+              />
             </div>
+          )}
 
-            {/* Response Payload */}
-            <div className="min-w-0 flex flex-col">
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="text-purple-400 font-semibold text-sm">Response JSON</h3>
-                {activeLogDetails?.fullResponse && (
-                  <Button
-                    variant="outline"
-                    onClick={() => copyText(activeLogDetails.fullResponse, false)}
-                    className="border-zinc-800 hover:bg-zinc-800 text-xs px-2.5 py-1 h-auto flex items-center gap-1 rounded"
-                  >
-                    {copiedRes ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                    {copiedRes ? 'Copied' : 'Copy Full'}
-                  </Button>
-                )}
-              </div>
-              <pre className="custom-scrollbar bg-black/40 border border-zinc-850 p-4 rounded-lg font-mono text-xs overflow-auto h-[350px] text-zinc-300 whitespace-pre-wrap break-all">
-                {activeLogDetails ? activeLogDetails.responseText : 'Loading...'}
-              </pre>
-            </div>
-          </div>
-
-          <DialogFooter className="mt-4">
+          <DialogFooter className="mt-2">
             <Button
-              onClick={() => setActiveLogDetails(null)}
-              className="w-full bg-white text-black hover:bg-zinc-200 font-medium py-3 rounded-md transition-all shadow-lg"
+              onClick={() => setPayloadDialogOpen(false)}
+              className="w-full border border-zinc-700 bg-zinc-800 text-white hover:bg-zinc-700 font-medium py-3 rounded-md transition-all"
             >
               Close
             </Button>

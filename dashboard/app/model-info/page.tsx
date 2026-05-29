@@ -53,7 +53,7 @@ export default function ModelInfoPage() {
 
       <div className="model-info-layout glass-panel bg-[#18181b] border border-zinc-800 rounded-md overflow-hidden shadow-xl flex h-[calc(100vh-300px)]">
         {/* Sidebar */}
-        <div className="model-info-sidebar w-[260px] border-r border-border py-4 flex flex-col overflow-y-auto bg-[#18181b]/50 shrink-0 custom-scrollbar">
+        <div className="model-info-sidebar w-[260px] border-r border-border pt-6 pb-4 flex flex-col gap-0.5 overflow-y-auto bg-[#18181b]/50 shrink-0 custom-scrollbar">
           {loading ? (
             <div className="text-zinc-500 text-xs px-6 py-4 italic">Loading families...</div>
           ) : modelFamilies.length === 0 ? (
@@ -76,7 +76,7 @@ export default function ModelInfoPage() {
         </div>
 
         {/* Content Area */}
-        <div className="model-info-content flex-1 p-8 overflow-y-auto custom-scrollbar bg-black/10">
+        <div className="model-info-content flex-1 p-8 overflow-y-auto custom-scrollbar bg-zinc-900/20">
           {!selectedFamily ? (
             <div className="empty-state flex flex-col items-center justify-center h-full text-zinc-500 italic gap-4">
               <p>Lütfen soldan bir model ailesi seçin.</p>
@@ -91,17 +91,17 @@ export default function ModelInfoPage() {
                 selectedFamily.rules.map((rule, idx) => (
                   <div
                     key={idx}
-                    className="rule-card bg-zinc-950/60 border border-zinc-850 rounded-lg p-6 hover:bg-zinc-950/90 hover:border-zinc-700/50 hover:-translate-y-0.5 transition-all duration-200 shadow-md"
+                    className="rule-card bg-zinc-800/30 border border-zinc-700/60 rounded-lg p-6 hover:bg-zinc-800/45 hover:border-zinc-600/70 hover:-translate-y-0.5 transition-all duration-200 shadow-md"
                   >
-                    <div className="rule-info text-white text-sm font-medium leading-relaxed mb-4 flex gap-3 items-start select-all">
+                    <div className="rule-info text-zinc-100 text-sm font-medium leading-relaxed mb-4 flex gap-3 items-start">
                       <span className="text-amber-500 shrink-0 text-base">⚠️</span>
                       <span>{rule.info}</span>
                     </div>
-                    <div className="rule-models flex flex-wrap gap-2 pt-4 border-t border-dashed border-zinc-900">
+                    <div className="rule-models flex flex-wrap gap-2 pt-4 border-t border-dashed border-zinc-700/50">
                       {rule.models.map((m) => (
                         <span
                           key={m}
-                          className="model-badge bg-white/4 border border-zinc-850 text-zinc-400 font-mono text-[11px] px-3 py-1.5 rounded-full select-all"
+                          className="model-badge bg-zinc-800/50 border border-zinc-600/50 text-zinc-300 font-mono text-[11px] px-3 py-1.5 rounded-full"
                         >
                           {m}
                         </span>

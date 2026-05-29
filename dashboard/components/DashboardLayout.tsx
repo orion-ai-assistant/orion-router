@@ -52,9 +52,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-[#121212] flex items-center justify-center">
-        {/* Authentication dialog will be opened by AppProvider */}
-      </div>
+      <div className="fixed inset-0 z-0 overflow-hidden bg-[#121212]" aria-hidden="true" />
     );
   }
 

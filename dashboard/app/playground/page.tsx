@@ -469,7 +469,7 @@ export default function PlaygroundPage() {
             className={`px-4 py-1.5 rounded-md font-medium text-xs transition-all cursor-pointer ${
               activeTab === tab
                 ? 'bg-zinc-800 text-white shadow'
-                : 'text-zinc-400 hover:text-white'
+                : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-white'
             }`}
           >
             {tab === 'chat' ? 'Chat' : tab === 'tts' ? 'Text-to-Speech' : 'Embeddings'}
@@ -489,10 +489,10 @@ export default function PlaygroundPage() {
                 <select
                   value={chatModel}
                   onChange={(e) => setChatModel(e.target.value)}
-                  className="w-full bg-black/45 border border-zinc-850 text-white rounded px-2.5 py-2 text-xs appearance-none cursor-pointer outline-none focus:border-purple-500"
+                  className="orion-native-select orion-native-select-sm"
                 >
                   {getRouteOptions('chat').map((route) => (
-                    <option key={route.value} value={route.value} className="bg-zinc-950 text-white">
+                    <option key={route.value} value={route.value}>
                       {route.label}
                     </option>
                   ))}
@@ -584,10 +584,10 @@ export default function PlaygroundPage() {
                 <select
                   value={ttsModel}
                   onChange={(e) => setTtsModel(e.target.value)}
-                  className="w-full bg-black/45 border border-zinc-850 text-white rounded px-2.5 py-2 text-xs appearance-none cursor-pointer outline-none focus:border-purple-500"
+                  className="orion-native-select orion-native-select-sm"
                 >
                   {getRouteOptions('tts').map((route) => (
-                    <option key={route.value} value={route.value} className="bg-zinc-950 text-white">
+                    <option key={route.value} value={route.value}>
                       {route.label}
                     </option>
                   ))}
@@ -600,10 +600,10 @@ export default function PlaygroundPage() {
                 <select
                   value={ttsVoice}
                   onChange={(e) => setTtsVoice(e.target.value)}
-                  className="w-full bg-black/45 border border-zinc-850 text-white rounded px-2.5 py-2 text-xs appearance-none cursor-pointer outline-none focus:border-purple-500"
+                  className="orion-native-select orion-native-select-sm"
                 >
                   {voices.map((v) => (
-                    <option key={v} value={v} className="bg-zinc-950 text-white">
+                    <option key={v} value={v}>
                       {v}
                     </option>
                   ))}
@@ -680,10 +680,10 @@ export default function PlaygroundPage() {
                 <select
                   value={embedModel}
                   onChange={(e) => setEmbedModel(e.target.value)}
-                  className="w-full bg-black/45 border border-zinc-850 text-white rounded px-2.5 py-2 text-xs appearance-none cursor-pointer outline-none focus:border-purple-500"
+                  className="orion-native-select orion-native-select-sm"
                 >
                   {getRouteOptions('embed').map((route) => (
-                    <option key={route.value} value={route.value} className="bg-zinc-950 text-white">
+                    <option key={route.value} value={route.value}>
                       {route.label}
                     </option>
                   ))}

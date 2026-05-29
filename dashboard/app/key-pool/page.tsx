@@ -327,10 +327,10 @@ export default function KeyPoolPage() {
                   value={addForm.provider}
                   onChange={(e) => setAddForm({ ...addForm, provider: e.target.value })}
                   required
-                  className="w-full bg-black/45 border border-zinc-850 text-white rounded px-4 py-3 appearance-none cursor-pointer outline-none focus:border-purple-500"
+                  className="orion-native-select"
                 >
                   {providers.map((name) => (
-                    <option key={name} value={name} className="bg-zinc-950 text-white">
+                    <option key={name} value={name}>
                       {name}
                     </option>
                   ))}
@@ -408,10 +408,10 @@ export default function KeyPoolPage() {
                   value={editingKey.provider}
                   onChange={(e) => setEditingKey({ ...editingKey, provider: e.target.value })}
                   required
-                  className="w-full bg-black/45 border border-zinc-850 text-white rounded px-4 py-3 appearance-none cursor-pointer outline-none focus:border-purple-500"
+                  className="orion-native-select"
                 >
                   {providers.map((name) => (
-                    <option key={name} value={name} className="bg-zinc-950 text-white">
+                    <option key={name} value={name}>
                       {name}
                     </option>
                   ))}

@@ -436,10 +436,10 @@ export default function ModelsPage() {
                   value={addForm.provider}
                   onChange={(e) => setAddForm({ ...addForm, provider: e.target.value })}
                   required
-                  className="w-full bg-black/45 border border-zinc-850 text-white rounded px-4 py-3 appearance-none cursor-pointer outline-none focus:border-purple-500"
+                  className="orion-native-select"
                 >
                   {providers.map((name) => (
-                    <option key={name} value={name} className="bg-zinc-950 text-white">
+                    <option key={name} value={name}>
                       {name}
                     </option>
                   ))}
@@ -459,11 +459,11 @@ export default function ModelsPage() {
                       temperature: (e.target.value === 'chat' || e.target.value === 'tts') ? addForm.temperature : '',
                     })
                   }
-                  className="w-full bg-black/45 border border-zinc-850 text-white rounded px-4 py-3 appearance-none cursor-pointer outline-none focus:border-purple-500"
+                  className="orion-native-select"
                 >
-                  <option value="chat" className="bg-zinc-950 text-white">chat</option>
-                  <option value="tts" className="bg-zinc-950 text-white">tts</option>
-                  <option value="embed" className="bg-zinc-950 text-white">embed</option>
+                  <option value="chat">chat</option>
+                  <option value="tts">tts</option>
+                  <option value="embed">embed</option>
                 </select>
               </div>
             </div>
@@ -579,10 +579,10 @@ export default function ModelsPage() {
                   value={editingModel.provider}
                   onChange={(e) => setEditingModel({ ...editingModel, provider: e.target.value })}
                   required
-                  className="w-full bg-black/45 border border-zinc-850 text-white rounded px-4 py-3 appearance-none cursor-pointer outline-none focus:border-purple-500"
+                  className="orion-native-select"
                 >
                   {providers.map((name) => (
-                    <option key={name} value={name} className="bg-zinc-950 text-white">
+                    <option key={name} value={name}>
                       {name}
                     </option>
                   ))}
@@ -602,11 +602,11 @@ export default function ModelsPage() {
                       temperature: (e.target.value === 'chat' || e.target.value === 'tts') ? editingModel.temperature : null,
                     })
                   }
-                  className="w-full bg-black/45 border border-zinc-850 text-white rounded px-4 py-3 appearance-none cursor-pointer outline-none focus:border-purple-500"
+                  className="orion-native-select"
                 >
-                  <option value="chat" className="bg-zinc-950 text-white">chat</option>
-                  <option value="tts" className="bg-zinc-950 text-white">tts</option>
-                  <option value="embed" className="bg-zinc-950 text-white">embed</option>
+                  <option value="chat">chat</option>
+                  <option value="tts">tts</option>
+                  <option value="embed">embed</option>
                 </select>
               </div>
             </div>

@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { adminFetch } from '@/lib/api';
+import { runFlipUpdate } from '@/lib/list-flip';
 import { useApp } from '@/components/AppContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,6 +37,60 @@ interface ModelItem {
   is_active: boolean;
 }
 
+function reorderGroupItemsInState(
+  groups: ModelGroup[],
+  groupId: string,
+  fromIndex: number,
+  toIndex: number
+): ModelGroup[] {
+  if (fromIndex === toIndex) return groups;
+  return groups.map((g) => {
+    if (g.id !== groupId) return g;
+    const items = [...g.items];
+    const [moved] = items.splice(fromIndex, 1);
+    items.splice(toIndex, 0, moved);
+    return { ...g, items };
+  });
+}
+
+/** Gap 0 = before first row; gap n = after last row */
+function gapIndexFromPointer(clientY: number, rows: NodeListOf<Element>): number {
+  const count = rows.length;
+  if (count === 0) return 0;
+
+  for (let i = 0; i < count; i++) {
+    const rect = rows[i].getBoundingClientRect();
+    if (clientY < rect.top + rect.height / 2) {
+      return i;
+    }
+  }
+  return count;
+}
+
+function insertIndexFromGap(sourceIndex: number, gapIndex: number): number {
+  return sourceIndex < gapIndex ? gapIndex - 1 : gapIndex;
+}
+
+function isValidDropGap(sourceIndex: number, gapIndex: number): boolean {
+  return gapIndex !== sourceIndex && gapIndex !== sourceIndex + 1;
+}
+
+async function persistGroupPriorities(groupId: string, items: GroupItem[]): Promise<void> {
+  for (let i = 0; i < items.length; i++) {
+    const newPriority = i + 1;
+    if (items[i].priority !== newPriority) {
+      const res = await adminFetch(`/dashboard/api/model-groups/${groupId}/items/${items[i].id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ priority: newPriority }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || 'Failed to update priority');
+      }
+    }
+  }
+}
+
 export default function GroupsPage() {
   const { showToast, confirmAction } = useApp();
   const [groups, setGroups] = useState<ModelGroup[]>([]);
@@ -62,8 +117,81 @@ export default function GroupsPage() {
   const [selectedModelId, setSelectedModelId] = useState<string>('');
   
   // Drag and Drop state
-  const [draggedItem, setDraggedItem] = useState<{ groupId: string; itemIndex: number } | null>(null);
-  const [dragOverItem, setDragOverItem] = useState<{ groupId: string; itemIndex: number } | null>(null);
+  const [draggedItem, setDraggedItem] = useState<{
+    groupId: string;
+    itemId: string;
+    sourceIndex: number;
+  } | null>(null);
+  const [dragOverGap, setDragOverGap] = useState<{ groupId: string; gapIndex: number } | null>(null);
+  const draggedItemRef = useRef(draggedItem);
+  const dragOverGapRef = useRef(dragOverGap);
+  const dropHandledRef = useRef(false);
+
+  useEffect(() => {
+    draggedItemRef.current = draggedItem;
+  }, [draggedItem]);
+
+  useEffect(() => {
+    dragOverGapRef.current = dragOverGap;
+  }, [dragOverGap]);
+
+  const getGroupItemsContainer = (groupId: string) =>
+    document.getElementById(`group-items-${groupId}`);
+
+  const getGroupRows = (groupId: string) => {
+    const container = getGroupItemsContainer(groupId);
+    return container?.querySelectorAll('.group-item-row') ?? null;
+  };
+
+  const resolveDropGap = (clientY: number, groupId: string): number => {
+    const rows = getGroupRows(groupId);
+    if (!rows) return 0;
+    return gapIndexFromPointer(clientY, rows);
+  };
+
+  const applyGroupItemReorder = async (
+    groupId: string,
+    sourceIndex: number,
+    targetIndex: number
+  ) => {
+    if (sourceIndex === targetIndex) return;
+
+    let reordered: GroupItem[] = [];
+    const container = getGroupItemsContainer(groupId);
+    runFlipUpdate(container, () => {
+      setGroups((prev) => {
+        const next = reorderGroupItemsInState(prev, groupId, sourceIndex, targetIndex);
+        const group = next.find((g) => g.id === groupId);
+        if (group) reordered = group.items;
+        return next;
+      });
+    });
+
+    if (reordered.length === 0) return;
+
+    try {
+      await persistGroupPriorities(groupId, reordered);
+      setGroups((prev) =>
+        prev.map((g) =>
+          g.id === groupId
+            ? {
+                ...g,
+                items: reordered.map((it, i) => ({ ...it, priority: i + 1 })),
+              }
+            : g
+        )
+      );
+    } catch (err) {
+      console.error(err);
+      showToast(err instanceof Error ? err.message : 'Failed to update order', 'error');
+      await loadGroups();
+    }
+  };
+
+  const finishDragSession = () => {
+    setDraggedItem(null);
+    setDragOverGap(null);
+  };
 
   const loadModels = async () => {
     try {
@@ -107,6 +235,22 @@ export default function GroupsPage() {
       window.removeEventListener('orion-authenticated', handleAuth);
     };
   }, []);
+
+  useEffect(() => {
+    if (!draggedItem) return;
+    const keepMoveCursor = (e: DragEvent) => {
+      e.preventDefault();
+      if (e.dataTransfer) {
+        e.dataTransfer.dropEffect = 'move';
+      }
+    };
+    document.addEventListener('dragover', keepMoveCursor);
+    document.body.classList.add('group-drag-active');
+    return () => {
+      document.removeEventListener('dragover', keepMoveCursor);
+      document.body.classList.remove('group-drag-active');
+    };
+  }, [draggedItem]);
 
   const handleCreateGroup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -257,112 +401,80 @@ export default function GroupsPage() {
   };
 
   const handleMoveGroupItem = async (group: ModelGroup, index: number, direction: number) => {
-    const items = [...group.items];
     const targetIndex = index + direction;
-    if (targetIndex < 0 || targetIndex >= items.length) return;
-
-    // Shift in array
-    const [moved] = items.splice(index, 1);
-    items.splice(targetIndex, 0, moved);
-
-    try {
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        const newPriority = i + 1;
-        if (item.priority !== newPriority) {
-          const res = await adminFetch(`/dashboard/api/model-groups/${group.id}/items/${item.id}`, {
-            method: 'PUT',
-            body: JSON.stringify({ priority: newPriority }),
-          });
-          if (!res.ok) {
-            const err = await res.json();
-            showToast('Error updating priority: ' + (err.detail || 'Failed'), 'error');
-            return;
-          }
-        }
-      }
-      await loadGroups();
-      showToast('Model group order updated!');
-    } catch (err) {
-      console.error(err);
-      showToast('Failed to update order', 'error');
-    }
+    if (targetIndex < 0 || targetIndex >= group.items.length) return;
+    await applyGroupItemReorder(group.id, index, targetIndex);
   };
 
-  const handleDragStart = (e: React.DragEvent, groupId: string, itemIndex: number) => {
-    setDraggedItem({ groupId, itemIndex });
+  const handleDragStart = (e: React.DragEvent, group: ModelGroup, itemIndex: number) => {
+    dropHandledRef.current = false;
+    setDragOverGap(null);
+    setDraggedItem({
+      groupId: group.id,
+      itemId: group.items[itemIndex].id,
+      sourceIndex: itemIndex,
+    });
     e.dataTransfer.effectAllowed = 'move';
-    setTimeout(() => {
-      if (e.target instanceof HTMLElement) {
-        e.target.classList.add('opacity-40', 'border-dashed', 'border-purple-500/50');
-      }
-    }, 0);
   };
 
-  const handleDragEnd = (e: React.DragEvent) => {
-    setDraggedItem(null);
-    setDragOverItem(null);
-    if (e.target instanceof HTMLElement) {
-      e.target.classList.remove('opacity-40', 'border-dashed', 'border-purple-500/50');
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent, groupId: string, itemIndex: number) => {
+  const updateDropTarget = (e: React.DragEvent, groupId: string) => {
     e.preventDefault();
-    if (draggedItem && draggedItem.groupId === groupId) {
-      e.dataTransfer.dropEffect = 'move';
-      if (!dragOverItem || dragOverItem.groupId !== groupId || dragOverItem.itemIndex !== itemIndex) {
-        setDragOverItem({ groupId, itemIndex });
-      }
+    const drag = draggedItemRef.current;
+    if (!drag || drag.groupId !== groupId) return;
+
+    e.dataTransfer.dropEffect = 'move';
+    const gapIndex = resolveDropGap(e.clientY, groupId);
+
+    if (!isValidDropGap(drag.sourceIndex, gapIndex)) {
+      setDragOverGap(null);
+      return;
     }
+
+    setDragOverGap((prev) =>
+      prev?.groupId === groupId && prev.gapIndex === gapIndex ? prev : { groupId, gapIndex }
+    );
   };
 
-  const handleDrop = async (e: React.DragEvent, group: ModelGroup, targetItemIndex: number) => {
-    e.preventDefault();
-    setDragOverItem(null);
-    if (!draggedItem) return;
-    if (draggedItem.groupId !== group.id) return;
-    if (draggedItem.itemIndex === targetItemIndex) return;
-
-    const items = [...group.items];
-    const srcIndex = draggedItem.itemIndex;
-    const destIndex = targetItemIndex;
-
-    const [moved] = items.splice(srcIndex, 1);
-    items.splice(destIndex, 0, moved);
-
-    // Optimistic UI update
-    setGroups(prev => prev.map(g => {
-      if (g.id === group.id) {
-        return { ...g, items };
+  const handleDragEnd = async () => {
+    if (!dropHandledRef.current) {
+      const drag = draggedItemRef.current;
+      const over = dragOverGapRef.current;
+      if (
+        drag &&
+        over &&
+        drag.groupId === over.groupId &&
+        isValidDropGap(drag.sourceIndex, over.gapIndex)
+      ) {
+        dropHandledRef.current = true;
+        await applyGroupItemReorder(
+          drag.groupId,
+          drag.sourceIndex,
+          insertIndexFromGap(drag.sourceIndex, over.gapIndex)
+        );
       }
-      return g;
-    }));
-
-    try {
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        const newPriority = i + 1;
-        if (item.priority !== newPriority) {
-          const res = await adminFetch(`/dashboard/api/model-groups/${group.id}/items/${item.id}`, {
-            method: 'PUT',
-            body: JSON.stringify({ priority: newPriority }),
-          });
-          if (!res.ok) {
-            const err = await res.json();
-            showToast('Error updating priority: ' + (err.detail || 'Failed'), 'error');
-            await loadGroups();
-            return;
-          }
-          item.priority = newPriority;
-        }
-      }
-      showToast('Model group order updated!');
-    } catch (err) {
-      console.error(err);
-      showToast('Failed to update order', 'error');
-      await loadGroups();
     }
+    dropHandledRef.current = false;
+    finishDragSession();
+  };
+
+  const handleGroupDrop = async (e: React.DragEvent, groupId: string) => {
+    e.preventDefault();
+    const drag = draggedItemRef.current;
+    if (!drag || drag.groupId !== groupId) return;
+
+    const gapIndex = resolveDropGap(e.clientY, groupId);
+    if (!isValidDropGap(drag.sourceIndex, gapIndex)) {
+      finishDragSession();
+      return;
+    }
+
+    dropHandledRef.current = true;
+    await applyGroupItemReorder(
+      groupId,
+      drag.sourceIndex,
+      insertIndexFromGap(drag.sourceIndex, gapIndex)
+    );
+    finishDragSession();
   };
 
   const openEditGroupModal = (group: ModelGroup) => {
@@ -370,8 +482,13 @@ export default function GroupsPage() {
     setShowEditGroupModal(true);
   };
 
-  const getModelsByCapability = (capability: string) => {
-    return models.filter((m) => m.capability === capability && m.is_active);
+  const getModelsByCapability = (capability: string, excludeModelIds: string[] = []) => {
+    return models.filter(
+      (m) =>
+        m.capability === capability &&
+        m.is_active &&
+        !excludeModelIds.includes(m.id)
+    );
   };
 
   return (
@@ -432,36 +549,42 @@ export default function GroupsPage() {
               </div>
 
               {/* Group Items / Fallback Chain List */}
-              <div className="group-items flex flex-col gap-2">
+              <div
+                id={`group-items-${group.id}`}
+                className={`group-items flex flex-col gap-2 ${draggedItem?.groupId === group.id ? 'select-none' : ''}`}
+                onDragOver={(e) => updateDropTarget(e, group.id)}
+                onDrop={(e) => void handleGroupDrop(e, group.id)}
+              >
                 {group.items.length === 0 ? (
                   <div className="text-zinc-500 text-xs py-4 text-center border border-dashed border-zinc-850 rounded bg-black/10">
                     No models in this group fallback chain. Click "+ Add Model" to add one.
                   </div>
                 ) : (
-                  group.items.map((item, index) => (
-                    <React.Fragment key={item.id}>
-                      {/* Top Drop Indicator (dragging upwards) */}
-                      {draggedItem && dragOverItem && dragOverItem.groupId === group.id && dragOverItem.itemIndex === index && draggedItem.itemIndex > index && (
-                        <div className="h-1.5 bg-gradient-to-r from-purple-500 via-pink-500 to-indigo-500 rounded-full my-1 shadow-[0_0_10px_rgba(168,85,247,0.6)] animate-pulse" />
+                  <>
+                    {draggedItem?.groupId === group.id &&
+                      dragOverGap?.groupId === group.id &&
+                      dragOverGap.gapIndex === 0 && (
+                        <div className="group-drop-indicator" aria-hidden="true" />
                       )}
-
-                      <div
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, group.id, index)}
-                        onDragEnd={handleDragEnd}
-                        onDragOver={(e) => handleDragOver(e, group.id, index)}
-                        onDrop={(e) => handleDrop(e, group, index)}
-                        className={`group-item-row bg-black/20 border rounded px-4 py-3 min-h-[52px] flex justify-between items-center transition-all duration-200 hover:bg-black/40 ${
-                          draggedItem && draggedItem.groupId === group.id && draggedItem.itemIndex === index
-                            ? 'opacity-40 border-dashed border-purple-500/50'
-                            : 'border-zinc-850 hover:border-zinc-700/80'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3 flex-1">
-                          <span className="inline-flex items-center justify-center w-5.5 h-5.5 bg-purple-950/20 border border-purple-500/20 rounded-full text-purple-400 text-[11px] font-bold">
+                    {group.items.map((item, index) => (
+                      <React.Fragment key={item.id}>
+                        <div
+                          data-flip-id={item.id}
+                          className={`group-item-row bg-black/20 border border-zinc-850 rounded px-4 py-3 min-h-[52px] flex justify-between items-center ${
+                            draggedItem?.groupId === group.id
+                              ? ''
+                              : 'hover:border-zinc-600 hover:bg-black/35'
+                          } ${
+                            draggedItem?.groupId === group.id && draggedItem.itemId === item.id
+                              ? 'is-dragging'
+                              : ''
+                          }`}
+                        >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] bg-zinc-800 border border-zinc-600 rounded-full text-zinc-300 text-[11px] font-bold">
                             {index + 1}
                           </span>
-                          <span className="font-medium text-sm text-white font-mono select-all">
+                          <span className="font-medium text-sm text-white font-mono truncate">
                             {item.name}
                           </span>
                           <Badge className="bg-blue-500/10 text-blue-300 border border-blue-500/20 text-[9px] font-normal tracking-wide rounded uppercase px-1.5 py-0 capitalize">
@@ -471,10 +594,13 @@ export default function GroupsPage() {
 
                         <div className="flex items-center gap-1.5 ml-4">
                           <div
-                            className="text-zinc-500 hover:text-zinc-300 cursor-grab active:cursor-grabbing p-1.5 mr-1 hover:bg-zinc-800/50 rounded"
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, group, index)}
+                            onDragEnd={handleDragEnd}
+                            className="text-zinc-500 hover:text-zinc-300 cursor-grab active:cursor-grabbing p-1.5 mr-1 hover:bg-zinc-800/50 rounded touch-none"
                             title="Drag to reorder"
                           >
-                            <Move className="w-4 h-4" />
+                            <Move className="w-4 h-4 pointer-events-none" />
                           </div>
                           <Button
                             variant="outline"
@@ -504,12 +630,14 @@ export default function GroupsPage() {
                         </div>
                       </div>
 
-                      {/* Bottom Drop Indicator (dragging downwards) */}
-                      {draggedItem && dragOverItem && dragOverItem.groupId === group.id && dragOverItem.itemIndex === index && draggedItem.itemIndex < index && (
-                        <div className="h-1.5 bg-gradient-to-r from-purple-500 via-pink-500 to-indigo-500 rounded-full my-1 shadow-[0_0_10px_rgba(168,85,247,0.6)] animate-pulse" />
-                      )}
-                    </React.Fragment>
-                  ))
+                        {draggedItem?.groupId === group.id &&
+                          dragOverGap?.groupId === group.id &&
+                          dragOverGap.gapIndex === index + 1 && (
+                            <div className="group-drop-indicator" aria-hidden="true" />
+                          )}
+                      </React.Fragment>
+                    ))}
+                  </>
                 )}
               </div>
             </div>
@@ -542,11 +670,11 @@ export default function GroupsPage() {
                 <select
                   value={groupForm.capability}
                   onChange={(e) => setGroupForm({ ...groupForm, capability: e.target.value as any })}
-                  className="w-full bg-black/45 border border-zinc-850 text-white rounded px-4 py-3 appearance-none cursor-pointer outline-none focus:border-purple-500"
+                  className="orion-native-select"
                 >
-                  <option value="chat" className="bg-zinc-950 text-white">chat</option>
-                  <option value="tts" className="bg-zinc-950 text-white">tts</option>
-                  <option value="embed" className="bg-zinc-950 text-white">embed</option>
+                  <option value="chat">chat</option>
+                  <option value="tts">tts</option>
+                  <option value="embed">embed</option>
                 </select>
               </div>
             </div>
@@ -595,7 +723,7 @@ export default function GroupsPage() {
                 <select
                   value={editingGroup.capability}
                   disabled
-                  className="w-full bg-black/40 border border-zinc-850 text-zinc-500 rounded px-4 py-3 appearance-none cursor-not-allowed outline-none"
+                  className="orion-native-select"
                 >
                   <option value="chat">chat</option>
                   <option value="tts">tts</option>
@@ -606,14 +734,14 @@ export default function GroupsPage() {
 
             <div
               onClick={() => setEditingGroup({ ...editingGroup, is_active: !editingGroup.is_active })}
-              className={`flex items-center justify-between p-4 rounded-lg cursor-pointer border transition-all duration-200 ${
+              className={`flex items-center justify-between p-4 rounded-lg cursor-pointer border transition-all duration-200 hover:border-zinc-600 ${
                 editingGroup.is_active
-                  ? 'bg-purple-950/10 border-purple-500/25'
-                  : 'bg-white/3 border-zinc-800'
+                  ? 'bg-emerald-500/10 border-emerald-500/25'
+                  : 'bg-white/3 border-zinc-800 hover:bg-white/5'
               }`}
             >
               <div className="flex flex-col gap-0.5">
-                <span className={`font-semibold text-sm ${editingGroup.is_active ? 'text-purple-400' : 'text-white'}`}>Active Status</span>
+                <span className={`font-semibold text-sm ${editingGroup.is_active ? 'text-emerald-400' : 'text-white'}`}>Active Status</span>
                 <span className="text-zinc-400 text-xs">Enable group for routing</span>
               </div>
               <Switch
@@ -661,24 +789,35 @@ export default function GroupsPage() {
           <form onSubmit={handleAddGroupItem} className="flex flex-col gap-4 my-2">
             <div className="flex flex-col gap-2">
               <label className="text-zinc-400 text-sm font-medium">Select Model</label>
-              <div className="custom-select-wrapper select-wrapper w-full">
-                <select
-                  value={selectedModelId}
-                  onChange={(e) => setSelectedModelId(e.target.value)}
-                  required
-                  className="w-full bg-black/45 border border-zinc-850 text-white rounded px-4 py-3 appearance-none cursor-pointer outline-none focus:border-purple-500"
-                >
-                  <option value="" className="bg-zinc-950 text-zinc-400">
-                    -- Choose a model --
-                  </option>
-                  {activeGroupForItems &&
-                    getModelsByCapability(activeGroupForItems.capability).map((model) => (
-                      <option key={model.id} value={model.id} className="bg-zinc-950 text-white">
-                        {model.name} ({model.provider})
-                      </option>
-                    ))}
-                </select>
-              </div>
+              {activeGroupForItems &&
+              getModelsByCapability(
+                activeGroupForItems.capability,
+                activeGroupForItems.items.map((i) => i.model_id)
+              ).length === 0 ? (
+                <p className="text-zinc-500 text-sm py-3 px-4 rounded border border-dashed border-zinc-800 bg-black/20">
+                  No available models for this capability. Register a model first or remove duplicates from the group.
+                </p>
+              ) : (
+                <div className="custom-select-wrapper select-wrapper w-full">
+                  <select
+                    value={selectedModelId}
+                    onChange={(e) => setSelectedModelId(e.target.value)}
+                    required
+                    className="orion-native-select"
+                  >
+                    <option value="">-- Choose a model --</option>
+                    {activeGroupForItems &&
+                      getModelsByCapability(
+                        activeGroupForItems.capability,
+                        activeGroupForItems.items.map((i) => i.model_id)
+                      ).map((model) => (
+                        <option key={model.id} value={model.id}>
+                          {model.name} ({model.provider})
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             <DialogFooter className="mt-4 flex gap-3 justify-end">
@@ -692,7 +831,14 @@ export default function GroupsPage() {
               </Button>
               <Button
                 type="submit"
-                className="bg-white text-black hover:bg-zinc-200 rounded font-medium"
+                disabled={
+                  !activeGroupForItems ||
+                  getModelsByCapability(
+                    activeGroupForItems.capability,
+                    activeGroupForItems.items.map((i) => i.model_id)
+                  ).length === 0
+                }
+                className="bg-white text-black hover:bg-zinc-200 rounded font-medium disabled:opacity-50"
               >
                 Add Model
               </Button>
