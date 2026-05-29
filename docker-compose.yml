@@ -1,11 +1,12 @@
 services:
   router:
+    image: orion-router:latest
     build:
       context: .
-    container_name: orion-router
+    container_name: router
     restart: unless-stopped
     ports:
-      - "20128:20128"
+      - "${ROUTER_PORT:-20128}:${ROUTER_PORT:-20128}"
     environment:
       - POSTGRES_HOST=router-db
       - POSTGRES_PORT=5432
@@ -13,11 +14,8 @@ services:
       - POSTGRES_USER=router_user
       - POSTGRES_PASSWORD=router_pass
     env_file:
-      - .env
-    volumes:
-      - .:/app
-      - /app/dashboard/out
-    command: ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "20128", "--reload"]
+      - path: .env
+        required: false
     networks:
       - orion-network
     depends_on:

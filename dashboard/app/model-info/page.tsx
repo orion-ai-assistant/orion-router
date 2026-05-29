@@ -1,7 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { adminFetch } from '@/lib/api';
+import { useState, useEffect } from 'react';
 import { useApp } from '@/components/AppContext';
 
 interface ModelRule {

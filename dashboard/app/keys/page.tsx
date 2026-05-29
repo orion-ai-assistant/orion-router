@@ -231,11 +231,10 @@ export default function VirtualKeysPage() {
                   </TableCell>
                   <TableCell className="text-center py-4">
                     <Badge
-                      className={`text-[10px] font-semibold tracking-wide uppercase px-2.5 py-0.5 rounded-full ${
-                        key.is_active
-                          ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
-                          : 'bg-red-500/10 text-red-500 border border-red-500/20'
-                      }`}
+                      className={`text-[10px] font-semibold tracking-wide uppercase px-2.5 py-0.5 rounded-full ${key.is_active
+                        ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+                        : 'bg-red-500/10 text-red-500 border border-red-500/20'
+                        }`}
                     >
                       {key.is_active ? 'Active' : 'Inactive'}
                     </Badge>
@@ -340,11 +339,10 @@ export default function VirtualKeysPage() {
 
             <div
               onClick={() => setEditingVirtualKey({ ...editingVirtualKey, is_active: !editingVirtualKey.is_active })}
-              className={`flex items-center justify-between p-4 rounded-lg cursor-pointer border transition-all duration-200 ${
-                editingVirtualKey.is_active
-                  ? 'bg-purple-950/10 border-purple-500/25'
-                  : 'bg-white/3 border-zinc-800'
-              }`}
+              className={`flex items-center justify-between p-4 rounded-lg cursor-pointer border transition-all duration-200 ${editingVirtualKey.is_active
+                ? 'bg-purple-950/10 border-purple-500/25'
+                : 'bg-white/3 border-zinc-800'
+                }`}
             >
               <div className="flex flex-col gap-0.5">
                 <span className={`font-semibold text-sm ${editingVirtualKey.is_active ? 'text-purple-400' : 'text-white'}`}>Active Status</span>

@@ -12,4 +12,3 @@ __pycache__
 venv
 ENV
 db.sqlite3
-data/

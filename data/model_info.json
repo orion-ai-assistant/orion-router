@@ -43,6 +43,17 @@
           ]
         }
       ]
+    }, {
+      "id": "gpt-x",
+      "name": "GPT-x",
+      "rules": [
+        {
+          "info": "x bütçesinde bir alt sınır yoktur, bütçe 1 bile ayarlansa model stabil çalışmaya devam edebilir.",
+          "models": [
+            "gpt-oss-20bx"
+          ]
+        }
+      ]
     }
   ]
 }

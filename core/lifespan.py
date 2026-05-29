@@ -13,7 +13,7 @@ from fastapi import FastAPI
 
 from database import db_manager
 from dynamic_router import DynamicLLMRouter
-from core.config import MODEL_PRICING_PATH, MODEL_INFO_PATH
+from core.config import MODEL_PRICING_PATH, MODEL_INFO_PATH, ROUTER_PORT
 
 logger = logging.getLogger("service-router")
 
@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI):
     logger.info("Starting up Orion Custom Service Router")
     print("\n" + "="*60)
     print("🚀 Orion Router başarıyla başlatıldı!")
-    print("👉 Yönetim Paneli: http://localhost:20128/dashboard")
+    print(f"👉 Yönetim Paneli: http://localhost:{ROUTER_PORT}/dashboard")
     print("="*60 + "\n")
     await db_manager.init_db()
 
@@ -54,25 +54,10 @@ async def lifespan(app: FastAPI):
             with open(MODEL_INFO_PATH, "r", encoding="utf-8") as f:
                 info_data = json.load(f)
 
-            existing_info = await db_manager.get_config("model_info")
-            if existing_info and isinstance(existing_info, dict):
-                # JSON ve DB'deki model ailelerini birleştiriyoruz
-                json_families = info_data.get("families", [])
-                db_families = existing_info.get("families", [])
-
-                # DB'dekileri ID'ye göre indeksleyelim
-                merged_families = {f["id"]: f for f in db_families if "id" in f}
-                # JSON'dakileri üzerine yazalım (ekleyelim veya güncelleyelim)
-                for f in json_families:
-                    if "id" in f:
-                        merged_families[f["id"]] = f
-
-                # Birleşmiş listeyi atayalım
-                info_data["families"] = list(merged_families.values())
-
-            # DB'ye güncel birleşik halini yazıyoruz
+            # JSON dosyasındaki verilerin tam yetkili olmasını (DB'yi tamamen ezmesini) istiyoruz.
+            # Böylece JSON'da yapılan tüm silme/güncelleme/ekleme işlemleri anında aktif olur.
             await db_manager.upsert_config("model_info", json.dumps(info_data))
-            logger.info("Synced model_info from JSON to DB (matched families updated, others preserved).")
+            logger.info("Synced model_info from JSON to DB (JSON is source of truth).")
         except Exception as e:
             logger.error(f"Error seeding model_info: {e}")
 

@@ -25,11 +25,13 @@ RUN pip install --no-cache-dir uv
 COPY . /app/
 
 # 2. Copy the compiled Next.js static files from Stage 1
-COPY --from=frontend-builder /build/dashboard/out /app/dashboard/out
+COPY --from=frontend-builder /build/dashboard/out /dashboard_out
+ENV DASHBOARD_OUT_DIR=/dashboard_out
 
 # 3. Install backend packages and dependencies
 RUN uv pip install --system --no-cache-dir .
 
+ENV ROUTER_PORT=20128
 EXPOSE 20128
 
-CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "20128", "--log-level", "warning"]
+CMD ["python", "main.py"]

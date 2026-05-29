@@ -7,7 +7,8 @@ import httpx
 import logging
 
 from providers.base import BaseTTS
-from core.config import OPENAI_BASE_URL
+
+_BASE_URL = "https://api.openai.com"
 
 logger = logging.getLogger("service-router.openai.tts")
 
@@ -34,7 +35,7 @@ class OpenAITTSProvider(BaseTTS):
             raise ValueError("OpenAI TTS Error: Model name is required.")
 
         voice_name = voice or self.get_voices()[0]
-        url = f"{OPENAI_BASE_URL}/v1/audio/speech"
+        url = f"{_BASE_URL}/v1/audio/speech"
 
         headers = {
             "Authorization": f"Bearer {api_key}",

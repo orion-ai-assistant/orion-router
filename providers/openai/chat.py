@@ -9,7 +9,8 @@ import httpx
 from typing import AsyncGenerator, Any
 
 from providers.base import BaseChat
-from core.config import OPENAI_BASE_URL
+
+_BASE_URL = "https://api.openai.com"
 
 
 class OpenAIChatProvider(BaseChat):
@@ -23,8 +24,7 @@ class OpenAIChatProvider(BaseChat):
         **kwargs,
     ) -> AsyncGenerator[Any, None]:
 
-        base_url = OPENAI_BASE_URL
-        url = f"{base_url}/v1/chat/completions"
+        url = f"{_BASE_URL}/v1/chat/completions"
 
         if not api_key:
             raise ValueError("OpenAI Error: No API key provided.")

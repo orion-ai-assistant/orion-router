@@ -54,12 +54,14 @@ docker compose up -d
 ```
 *(Eğer eski bir Docker sürümü kullanıyorsanız `docker-compose up -d` komutunu çalıştırabilirsiniz.)*
 
+`.env` dosyası yoksa uygulama ilk açılışta `.env.example` dosyasından otomatik oluşturur; elle kopyalamanız gerekmez. Sağlayıcı API anahtarlarını Dashboard → **Key Pool** üzerinden ekleyin (`.env`'de tutulmaz).
+
 Bu komut:
 1. Gerekli PostgreSQL veritabanını (`router-db`) başlatır.
-2. Router uygulamasını başlatır ve **20128** portundan yayına alır.
+2. Router uygulamasını başlatır (varsayılan port `.env` içindeki `ROUTER_PORT=20128`).
 
 Sistem ayağa kalktıktan sonra Gateway Dashboard'una şu adresten ulaşabilirsiniz:
-👉 **[http://localhost:20128/dashboard](http://localhost:20128/dashboard)**
+👉 **http://localhost:20128/dashboard** (portu `.env` ile değiştirdiyseniz buna göre güncelleyin)
 
 ### 1. `main.py`
 Uygulamanın ana giriş noktasıdır.
@@ -83,7 +85,7 @@ Gateway'in beynidir.
 ### 4. `providers/` (Pluginler)
 Her sağlayıcı `BaseLLMProvider` interface'ine (`stream_chat` metodu) uymak zorundadır.
 - **`base.py`:** Eklenti standartlarını belirleyen abstract sınıftır.
-- **`openai.py`:** Sadece doğrudan OpenAI (`api.openai.com`) hedeflerine gider. Gelen `sk-orion-` ile başlayan sanal anahtarları süzerek sunucu tarafındaki `OPENAI_API_KEY`'i kullanır.
+- **`openai.py`:** Sadece doğrudan OpenAI (`api.openai.com`) hedeflerine gider. Gelen `sk-orion-` sanal anahtarlarını süzer; gerçek upstream anahtarı Key Pool veya DB'den gelir.
 - **`openrouter.py`:** OpenRouter hedefine (`openrouter.ai`) gider. OpenRouter'ın sıralama algoritmalarında kullanması için `HTTP-Referer` ve `X-OpenRouter-Title` başlıklarını otomatik enjekte eder.
 - **`gemini.py`:** Google'ın OpenAI uyumlu API endpoint'ine yönlendirme yapar.
 - **`local.py`:** Ollama veya Llama.cpp gibi yerel motorlara istek atar. Gelişmiş akış şablonu (state machine) ile metin içindeki `<think>...</think>` bloklarını ayıklar ve istemciye düşünme (`thinking`) ile asıl içerik (`content`) olarak ayrı ayrı (SSE event'i şeklinde) gönderir.
@@ -128,7 +130,7 @@ class AnthropicProvider(BaseLLMProvider):
         elif api_key and not api_key.startswith("sk-orion-"):
             final_key = api_key
         else:
-            final_key = os.getenv("ANTHROPIC_API_KEY")
+            final_key = api_key  # Key Pool / router tarafından iletilen upstream anahtar
             
         # 2. HTTP isteğini oluştur ve akış yap (HTTPX client)
         # 3. Gelen veriyi yield et:

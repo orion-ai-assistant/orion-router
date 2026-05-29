@@ -246,22 +246,11 @@ async def get_admin_stats():
 
 @router.get("/api/provider-keys", dependencies=[Depends(verify_admin)])
 async def get_provider_keys():
-    """Provider API key'lerini maskeli şekilde döner."""
+    """Provider API key'lerini maskeli şekilde döner (yalnızca DB)."""
     try:
         raw_keys = await db_manager.get_config("provider_api_keys") or {}
-        
-        # Dinamik olarak config içindeki *_API_KEY değişkenlerini bul ve ekle
-        from core import config
-        for attr in dir(config):
-            if attr.endswith("_API_KEY"):
-                provider = attr.replace("_API_KEY", "").lower()
-                env_val = getattr(config, attr)
-                # Eğer veritabanında bu sağlayıcının key'i yoksa ve env'de varsa onu kullan
-                if not raw_keys.get(provider) and env_val:
-                    raw_keys[provider] = env_val
-                # Eğer sağlayıcı veritabanında hiç yoksa (env boş bile olsa) UI'da görünmesi için ekle
-                elif provider not in raw_keys:
-                    raw_keys[provider] = env_val or ""
+        if not isinstance(raw_keys, dict):
+            raw_keys = {}
 
         masked_keys = {}
         for provider, key in raw_keys.items():
@@ -281,18 +270,10 @@ async def update_provider_keys(request: Request):
         body = await request.json()
         keys_to_update = body.get("keys", {})
         
-        # Mevcut keyleri al
         current_keys = await db_manager.get_config("provider_api_keys") or {}
-        
-        # Mevcut durumu dinamik olarak env ile birleştir (maskeyi doğru çözmek için gerekli)
-        from core import config
-        for attr in dir(config):
-            if attr.endswith("_API_KEY"):
-                provider = attr.replace("_API_KEY", "").lower()
-                env_val = getattr(config, attr)
-                if not current_keys.get(provider) and env_val:
-                    current_keys[provider] = env_val
-        
+        if not isinstance(current_keys, dict):
+            current_keys = {}
+
         for provider, new_key in keys_to_update.items():
             if new_key and not new_key.endswith("***") and "*" not in new_key:
                 current_keys[provider] = new_key
@@ -704,7 +685,8 @@ async def get_admin_ui(path: str = ""):
     if path.startswith("api/") or path == "api":
         raise HTTPException(status_code=404, detail="Not Found")
         
-    out_dir = os.path.join(_DASHBOARD_DIR, "out")
+    from core.config import DASHBOARD_OUT_DIR
+    out_dir = DASHBOARD_OUT_DIR
     
     # 1. Clean up the path (remove leading slashes if any)
     safe_path = path.lstrip("/")
@@ -736,7 +718,10 @@ async def get_admin_ui(path: str = ""):
         return FileResponse(old_index, media_type="text/html")
         
     return Response(
-        content="Admin UI not found. Please build the Next.js project.",
+        content=(
+            "Admin UI not found. Please build the Next.js project. "
+            "Dev mode: use http://localhost:3001/dashboard for the UI."
+        ),
         status_code=404,
     )
 

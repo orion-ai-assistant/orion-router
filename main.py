@@ -38,14 +38,30 @@ logging.getLogger("uvicorn.access").setLevel(logging.INFO)
 app = FastAPI(title="Orion Custom Service Router", lifespan=lifespan)
 
 # Dashboard UI statik dosyaları
+from core.config import DASHBOARD_OUT_DIR
+
 _dashboard_dir = os.path.join(os.path.dirname(__file__), "dashboard")
-if os.path.exists(_dashboard_dir):
-    app.mount("/dashboard/static", StaticFiles(directory=_dashboard_dir), name="dashboard_static")
-    
-    # Next.js SPA assets mount
-    _next_dir = os.path.join(_dashboard_dir, "out", "_next")
-    if os.path.exists(_next_dir):
-        app.mount("/dashboard/_next", StaticFiles(directory=_next_dir), name="dashboard_next")
+_public_static_dir = os.path.join(_dashboard_dir, "public", "static")
+_out_dashboard_dir = os.path.join(DASHBOARD_OUT_DIR, "dashboard")
+
+_static_candidates = [
+    os.path.join(_out_dashboard_dir, "static"),
+    os.path.join(DASHBOARD_OUT_DIR, "static"),
+    _public_static_dir,
+]
+_static_dir = next((p for p in _static_candidates if os.path.exists(p)), None)
+if _static_dir:
+    app.mount("/dashboard/static", StaticFiles(directory=_static_dir), name="dashboard_static")
+
+# Next.js SPA assets mount
+_next_candidates = [
+    os.path.join(_out_dashboard_dir, "_next"),
+    os.path.join(DASHBOARD_OUT_DIR, "_next"),
+]
+_next_dir = next((p for p in _next_candidates if os.path.exists(p)), None)
+if _next_dir:
+    app.mount("/dashboard/_next", StaticFiles(directory=_next_dir), name="dashboard_next")
+
 
 # ---------------------------------------------------------------------------
 #  Router'ları bağla
@@ -66,3 +82,22 @@ async def health():
 @app.get("/", include_in_schema=False)
 async def root():
     return RedirectResponse(url="/dashboard")
+
+
+# ---------------------------------------------------------------------------
+#  CLI entry (Docker CMD, local: python main.py)
+# ---------------------------------------------------------------------------
+if __name__ == "__main__":
+    import uvicorn
+
+    from core.config import ROUTER_HOST, ROUTER_PORT
+
+    reload = os.getenv("UVICORN_RELOAD", "").lower() in ("1", "true", "yes")
+    uvicorn.run(
+        "main:app",
+        host=ROUTER_HOST,
+        port=int(ROUTER_PORT),
+        log_level=os.getenv("UVICORN_LOG_LEVEL", "warning"),
+        reload=reload,
+        reload_dirs=["data"] if reload else None,
+    )

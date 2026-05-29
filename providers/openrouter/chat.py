@@ -9,7 +9,8 @@ import httpx
 from typing import AsyncGenerator, Any
 
 from providers.base import BaseChat
-from core.config import OPENROUTER_BASE_URL
+
+_BASE_URL = "https://openrouter.ai"
 
 
 class OpenRouterChatProvider(BaseChat):
@@ -23,8 +24,7 @@ class OpenRouterChatProvider(BaseChat):
         **kwargs,
     ) -> AsyncGenerator[Any, None]:
 
-        base_url = OPENROUTER_BASE_URL
-        url = f"{base_url.rstrip('/')}/api/v1/chat/completions"
+        url = f"{_BASE_URL.rstrip('/')}/api/v1/chat/completions"
 
         if not api_key:
             raise ValueError("OpenRouter Error: No API key provided.")
