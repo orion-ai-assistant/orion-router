@@ -15,6 +15,7 @@ import os
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 from core.lifespan import lifespan
 from api import admin, chat, embeddings, files, speech
@@ -36,6 +37,15 @@ logging.getLogger("uvicorn.access").setLevel(logging.INFO)
 #  Uygulama
 # ---------------------------------------------------------------------------
 app = FastAPI(title="Orion Custom Service Router", lifespan=lifespan)
+
+# CORS ayarları: frontend geliştirme sunucusunun (localhost:3001) API'ye doğrudan erişebilmesi için
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Dashboard UI statik dosyaları
 from core.config import DASHBOARD_OUT_DIR

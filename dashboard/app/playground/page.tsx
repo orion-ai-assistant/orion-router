@@ -165,6 +165,17 @@ export default function PlaygroundPage() {
     return options;
   };
 
+  const getApiBaseUrl = () => {
+    if (process.env.NODE_ENV === 'development') {
+      const port = process.env.NEXT_PUBLIC_ROUTER_PORT || '20129';
+      if (typeof window !== 'undefined') {
+        return `http://${window.location.hostname}:${port}`;
+      }
+      return `http://localhost:${port}`;
+    }
+    return '';
+  };
+
   const escapeHtml = (text: string): string => {
     if (!text) return '';
     return text
@@ -211,9 +222,10 @@ export default function PlaygroundPage() {
     }
 
     const adminKey = getAdminKey();
+    const apiBaseUrl = getApiBaseUrl();
 
     try {
-      const res = await fetch('/v1/chat/completions', {
+      const res = await fetch(`${apiBaseUrl}/v1/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -367,6 +379,7 @@ export default function PlaygroundPage() {
     setTtsUrl('');
 
     const adminKey = getAdminKey();
+    const apiBaseUrl = getApiBaseUrl();
     const payload: any = { model: ttsModel, input: text, voice: ttsVoice };
     
     const parsedTemp = parseFloat(ttsTemp);
@@ -375,7 +388,7 @@ export default function PlaygroundPage() {
     }
 
     try {
-      const res = await fetch('/v1/audio/speech', {
+      const res = await fetch(`${apiBaseUrl}/v1/audio/speech`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -410,9 +423,10 @@ export default function PlaygroundPage() {
     setEmbedJson('');
 
     const adminKey = getAdminKey();
+    const apiBaseUrl = getApiBaseUrl();
 
     try {
-      const res = await fetch('/v1/embeddings', {
+      const res = await fetch(`${apiBaseUrl}/v1/embeddings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

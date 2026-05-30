@@ -42,7 +42,7 @@ export default function LogsPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [payloadDialogOpen, setPayloadDialogOpen] = useState(false);
   const [activeLogDetails, setActiveLogDetails] = useState<LogDetails | null>(null);
-  
+
   // Copies tracking
   const [copiedReq, setCopiedReq] = useState(false);
   const [copiedRes, setCopiedRes] = useState(false);
@@ -106,7 +106,7 @@ export default function LogsPage() {
       capability: 'chat',
       ttsAudio: null,
     });
-    
+
     try {
       const res = await adminFetch(`/dashboard/api/logs/${logId}`);
       if (res.ok) {
@@ -171,12 +171,12 @@ export default function LogsPage() {
           <TableHeader className="bg-black/25">
             <TableRow className="border-b border-zinc-850 hover:bg-transparent">
               <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 pl-6 w-[80px]">Key</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 w-[260px]">Model</TableHead>
+              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 w-[240px]">Model</TableHead>
               <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 w-[100px]">Provider</TableHead>
               <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 w-[90px]">Capability</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[150px]">Tokens</TableHead>
+              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[140px]">Tokens</TableHead>
               <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[80px]">Cost</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[80px]">Status</TableHead>
+              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[100px]">Status</TableHead>
               <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[130px]">Time</TableHead>
               <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-right pr-6 w-[70px]">Details</TableHead>
             </TableRow>
@@ -200,7 +200,7 @@ export default function LogsPage() {
                   <TableCell className="font-medium text-sm py-4 pl-6 text-zinc-300">
                     {log.key_name || 'Admin'}
                   </TableCell>
-                  <TableCell className="py-4 font-mono text-xs text-white max-w-[260px] truncate">
+                  <TableCell className="py-4 font-mono text-xs text-white max-w-[240px] truncate">
                     {log.requested_model}
                   </TableCell>
                   <TableCell className="py-4">
@@ -219,7 +219,7 @@ export default function LogsPage() {
                         <span className="pricing-label text-[8px] font-semibold text-zinc-500 uppercase tracking-wider scale-90 mb-0.5">in</span>
                         <span className="pricing-value text-xs font-mono">{log.prompt_tokens || 0}</span>
                       </div>
-                      
+
                       {log.capability !== 'embed' && (
                         <div className="pricing-item relative flex flex-col items-center py-1">
                           <span className="pricing-label text-[8px] font-semibold text-zinc-500 uppercase tracking-wider scale-90 mb-0.5">out</span>
@@ -246,16 +246,15 @@ export default function LogsPage() {
                     {log.cost === null || log.cost === undefined
                       ? '-'
                       : Number(log.cost) === 0
-                      ? '$0.00'
-                      : money(log.cost, 6)}
+                        ? '$0.00'
+                        : money(log.cost, 6)}
                   </TableCell>
                   <TableCell className="py-4 text-center">
                     <Badge
-                      className={`text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full ${
-                        log.success
+                      className={`text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full ${log.success
                           ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
                           : 'bg-red-500/10 text-red-500 border border-red-500/20'
-                      }`}
+                        }`}
                     >
                       {log.success ? 'Success' : 'Failed'}
                     </Badge>

@@ -4,6 +4,14 @@ import asyncpg
 from typing import Optional
 import json
 
+from core.config import (
+    POSTGRES_HOST,
+    POSTGRES_PORT,
+    POSTGRES_DB,
+    POSTGRES_USER,
+    POSTGRES_PASSWORD,
+)
+
 logger = logging.getLogger("service-router.db")
 
 class DatabaseManager:
@@ -11,13 +19,8 @@ class DatabaseManager:
         self.pool: Optional[asyncpg.Pool] = None
 
     def get_postgres_url(self) -> str:
-        """Read Postgres connection parameters from environment variables."""
-        user = os.environ.get("POSTGRES_USER", "orion_user")
-        password = os.environ.get("POSTGRES_PASSWORD", "orion_pass")
-        host = os.environ.get("POSTGRES_HOST", "postgres")
-        port = os.environ.get("POSTGRES_PORT", "5432")
-        db = os.environ.get("POSTGRES_DB", "orion_db")
-        return f"postgresql://{user}:{password}@{host}:{port}/{db}"
+        """Read Postgres connection parameters from config."""
+        return f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
 
     async def _ensure_tables(self, conn: asyncpg.Connection) -> None:
         """Create router-specific tables if they don't exist."""

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { adminFetch } from '@/lib/api';
 import { money } from '@/lib/utils';
 import { useApp } from '@/components/AppContext';
@@ -145,6 +145,20 @@ export default function ModelsPage() {
       window.removeEventListener('orion-authenticated', handleAuth);
     };
   }, []);
+
+  // Grouped models by provider, sorted alphabetically by name
+  const groupedModels = useMemo(() => {
+    const groups: Record<string, ModelItem[]> = {};
+    models.forEach(m => {
+      if (!groups[m.provider]) groups[m.provider] = [];
+      groups[m.provider].push(m);
+    });
+    // Sort each group by name
+    Object.keys(groups).forEach(p => {
+      groups[p].sort((a, b) => a.name.localeCompare(b.name));
+    });
+    return groups;
+  }, [models]);
 
   const normalizeTemperature = (value: string | number | null | undefined): number | null => {
     if (value === '' || value === null || value === undefined) return null;
@@ -312,102 +326,104 @@ export default function ModelsPage() {
         </Button>
       </header>
 
-      {/* Table List */}
-      <div className="table-container glass-panel bg-[#18181b] border border-zinc-800 rounded-md overflow-hidden shadow-xl">
-        <Table>
-          <TableHeader className="bg-black/25">
-            <TableRow className="border-b border-zinc-850 hover:bg-transparent">
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 pl-6 w-[260px]">Name</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 w-[100px]">Provider</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 w-[90px]">Capability</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 w-[110px]">Temperature</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[260px]">Pricing (1M)</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[80px]">Status</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-right pr-6 w-[90px]">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={7} className="text-center text-zinc-400 py-8">
-                  Loading models registry...
-                </TableCell>
-              </TableRow>
-            ) : models.length === 0 ? (
-              <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={7} className="text-center text-zinc-400 py-8">
-                  No registered models found. Add one to start routing.
-                </TableCell>
-              </TableRow>
-            ) : (
-              models.map((model) => (
-                <TableRow key={model.id} className="border-b border-zinc-900 hover:bg-white/[0.015] transition-colors">
-                  <TableCell className="font-semibold text-sm py-4 pl-6 font-mono text-white select-all">{model.name}</TableCell>
-                  <TableCell className="py-4">
-                    <Badge className="bg-blue-500/10 text-blue-300 border border-blue-500/20 text-[10px] font-medium tracking-wide rounded uppercase px-2.5 py-0.5 capitalize">
-                      {model.provider}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="py-4">
-                    <Badge className="bg-zinc-800 text-zinc-300 border border-zinc-700/50 text-[10px] tracking-wide rounded uppercase px-2.5 py-0.5">
-                      {model.capability}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="py-4 font-mono text-xs text-zinc-400">
-                    {model.temperature !== null ? model.temperature.toFixed(1) : '-'}
-                  </TableCell>
-                  <TableCell className="py-4">
-                    <div className="pricing-container flex items-center justify-center gap-4">
-                      {/* Input pricing */}
+      {/* Provider Group List */}
+      <div className="group-list flex flex-col gap-6">
+        {loading ? (
+          <div className="glass-panel p-8 text-center text-zinc-400">Loading models registry...</div>
+        ) : Object.keys(groupedModels).length === 0 ? (
+          <div className="glass-panel p-8 text-center text-zinc-400">
+            No registered models found. Add one to start routing.
+          </div>
+        ) : (
+          Object.entries(groupedModels).map(([provider, providerModels]) => (
+            <div key={provider} className="glass-panel group-card p-6 bg-[#18181b] border border-zinc-800 rounded-md shadow-xl">
+              <div className="group-card-header mb-5">
+                <div className="group-card-title-section flex items-center gap-3 w-full">
+                  <Badge className="bg-blue-500/10 text-blue-300 border border-blue-500/20 text-[10px] font-medium tracking-wide rounded uppercase px-2.5 py-0.5 capitalize">
+                    {provider}
+                  </Badge>
+                  <h3 className="font-heading text-lg font-semibold text-white capitalize">{provider} Models</h3>
+                  <div className="flex gap-2 ml-auto items-center text-xs text-zinc-500">
+                    {providerModels.length} {providerModels.length === 1 ? 'model' : 'models'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="group-items flex flex-col gap-2">
+                {providerModels.map((model) => (
+                  <div
+                    key={model.id}
+                    className="model-item-row bg-black/20 border border-zinc-850 rounded px-4 py-3 min-h-[52px] grid grid-cols-[minmax(180px,260px)_80px_80px_90px_1fr_auto] gap-4 items-center hover:border-zinc-600 hover:bg-black/35"
+                  >
+                    <div className="font-semibold text-sm font-mono text-white select-all truncate">
+                      {model.name}
+                    </div>
+                    
+                    <div className="flex items-center">
+                      <Badge className="bg-zinc-800 text-zinc-300 border border-zinc-700/50 text-[10px] tracking-wide rounded uppercase px-2.5 py-0.5">
+                        {model.capability}
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-center">
+                      {!model.is_active && (
+                        <Badge className="bg-red-500/10 text-red-500 border border-red-500/20 text-[9px] font-semibold tracking-wide uppercase px-1.5 py-0 rounded-full">
+                          Inactive
+                        </Badge>
+                      )}
+                    </div>
+                    
+                    <div className="flex flex-col items-center justify-center gap-0.5">
+                      <span className="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold">Temp</span>
+                      <span className="font-mono text-xs text-zinc-300">
+                        {model.temperature !== null ? model.temperature.toFixed(1) : '-'}
+                      </span>
+                    </div>
+                    
+                    <div className="pricing-container flex items-center gap-4">
                       {(model.capability === 'chat' || model.capability === 'tts' || model.capability === 'embed') && (
-                        <div className="pricing-item relative flex flex-col items-center py-1">
-                          <span className="pricing-label text-[8px] font-semibold text-zinc-500 uppercase tracking-wider scale-90 mb-0.5">in</span>
-                          <span className="pricing-value text-xs font-mono">{money(model.input_price)}</span>
+                        <div className="flex flex-col items-center justify-center gap-0.5">
+                          <span className="text-[9px] font-semibold text-zinc-500 uppercase tracking-wider">in</span>
+                          <span className="text-xs font-mono text-zinc-300">{money(model.input_price)}</span>
                         </div>
                       )}
-
-                      {/* Output pricing */}
                       {(model.capability === 'chat' || model.capability === 'tts') && (
-                        <div className="pricing-item relative flex flex-col items-center py-1">
-                          <span className="pricing-label text-[8px] font-semibold text-zinc-500 uppercase tracking-wider scale-90 mb-0.5">out</span>
-                          <span className="pricing-value text-xs font-mono">{money(model.output_price)}</span>
+                        <div className="flex flex-col items-center justify-center gap-0.5">
+                          <span className="text-[9px] font-semibold text-zinc-500 uppercase tracking-wider">out</span>
+                          <span className="text-xs font-mono text-zinc-300">{money(model.output_price)}</span>
                         </div>
                       )}
-
-                      {/* Think pricing */}
                       {model.capability === 'chat' && model.think_price > 0 && (
-                        <div className="pricing-item relative flex flex-col items-center py-1">
-                          <span className="pricing-label text-[8px] font-semibold text-zinc-500 uppercase tracking-wider scale-90 mb-0.5">think</span>
-                          <span className="pricing-value text-xs font-mono">{money(model.think_price)}</span>
+                        <div className="flex flex-col items-center justify-center gap-0.5">
+                          <span className="text-[9px] font-semibold text-zinc-500 uppercase tracking-wider">think</span>
+                          <span className="text-xs font-mono text-zinc-300">{money(model.think_price)}</span>
                         </div>
                       )}
                     </div>
-                  </TableCell>
-                  <TableCell className="text-center py-4">
-                    <Badge
-                      className={`text-[10px] font-semibold tracking-wide uppercase px-2.5 py-0.5 rounded-full ${
-                        model.is_active
-                          ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
-                          : 'bg-red-500/10 text-red-500 border border-red-500/20'
-                      }`}
-                    >
-                      {model.is_active ? 'Active' : 'Inactive'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right py-4 pr-6">
-                    <Button
-                      variant="outline"
-                      onClick={() => openEditModal(model)}
-                      className="border-zinc-800 text-white hover:bg-zinc-800 text-xs px-3 py-1 h-auto rounded"
-                    >
-                      Edit
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+
+                    <div className="flex items-center justify-end gap-1.5">
+                      <Button
+                        variant="outline"
+                        onClick={() => openEditModal(model)}
+                        className="border-zinc-850 text-white hover:bg-zinc-800/50 hover:text-white text-xs px-3 py-1 h-8 rounded"
+                        title="Edit Model"
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        onClick={() => handleDelete(model.id)}
+                        className="bg-transparent border border-red-500/10 text-red-400/80 hover:bg-red-500/10 hover:text-red-500 p-1.5 h-8 w-8 rounded ml-1"
+                        title="Delete Model"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       {/* Add Model Dialog */}
@@ -579,6 +595,7 @@ export default function ModelsPage() {
                   value={editingModel.provider}
                   onChange={(e) => setEditingModel({ ...editingModel, provider: e.target.value })}
                   required
+                  disabled
                   className="orion-native-select"
                 >
                   {providers.map((name) => (

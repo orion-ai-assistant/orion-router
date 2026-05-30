@@ -521,15 +521,11 @@ export default function GroupsPage() {
                     {group.capability}
                   </Badge>
                   <h3 className="font-heading text-lg font-semibold text-white">{group.name}</h3>
-                  <Badge
-                    className={`text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full ${
-                      group.is_active
-                        ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
-                        : 'bg-red-500/10 text-red-500 border border-red-500/20'
-                    }`}
-                  >
-                    {group.is_active ? 'Active' : 'Inactive'}
-                  </Badge>
+                  {!group.is_active && (
+                    <Badge className="text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full bg-red-500/10 text-red-500 border border-red-500/20">
+                      Inactive
+                    </Badge>
+                  )}
                   <div className="flex gap-2 ml-auto items-center">
                     <Button
                       onClick={() => openAddGroupItem(group)}
@@ -566,69 +562,85 @@ export default function GroupsPage() {
                       dragOverGap.gapIndex === 0 && (
                         <div className="group-drop-indicator" aria-hidden="true" />
                       )}
-                    {group.items.map((item, index) => (
-                      <React.Fragment key={item.id}>
-                        <div
-                          data-flip-id={item.id}
-                          className={`group-item-row bg-black/20 border border-zinc-850 rounded px-4 py-3 min-h-[52px] flex justify-between items-center ${
-                            draggedItem?.groupId === group.id
-                              ? ''
-                              : 'hover:border-zinc-600 hover:bg-black/35'
-                          } ${
-                            draggedItem?.groupId === group.id && draggedItem.itemId === item.id
-                              ? 'is-dragging'
-                              : ''
-                          }`}
-                        >
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] bg-zinc-800 border border-zinc-600 rounded-full text-zinc-300 text-[11px] font-bold">
-                            {index + 1}
-                          </span>
-                          <span className="font-medium text-sm text-white font-mono truncate">
-                            {item.name}
-                          </span>
-                          <Badge className="bg-blue-500/10 text-blue-300 border border-blue-500/20 text-[9px] font-normal tracking-wide rounded uppercase px-1.5 py-0 capitalize">
-                            {item.provider}
-                          </Badge>
-                        </div>
+                    {group.items.map((item, index) => {
+                      const underlyingModel = models.find((m) => m.id === item.model_id);
+                      const isModelInactive = underlyingModel ? !underlyingModel.is_active : false;
 
-                        <div className="flex items-center gap-1.5 ml-4">
+                      return (
+                        <React.Fragment key={item.id}>
                           <div
-                            draggable
-                            onDragStart={(e) => handleDragStart(e, group, index)}
-                            onDragEnd={handleDragEnd}
-                            className="text-zinc-500 hover:text-zinc-300 cursor-grab active:cursor-grabbing p-1.5 mr-1 hover:bg-zinc-800/50 rounded touch-none"
-                            title="Drag to reorder"
+                            data-flip-id={item.id}
+                            className={`group-item-row bg-black/20 border border-zinc-850 rounded px-4 py-3 min-h-[52px] grid grid-cols-[36px_minmax(120px,250px)_100px_1fr_auto] gap-4 items-center ${
+                              draggedItem?.groupId === group.id
+                                ? ''
+                                : 'hover:border-zinc-600 hover:bg-black/35'
+                            } ${
+                              draggedItem?.groupId === group.id && draggedItem.itemId === item.id
+                                ? 'is-dragging'
+                                : ''
+                            }`}
                           >
-                            <Move className="w-4 h-4 pointer-events-none" />
+                            <div className="flex items-center justify-start">
+                              <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] bg-zinc-800 border border-zinc-600 rounded-full text-zinc-300 text-[11px] font-bold">
+                                {index + 1}
+                              </span>
+                            </div>
+
+                            <div className="font-semibold text-sm text-white font-mono truncate select-all" title={item.name}>
+                              {item.name}
+                            </div>
+
+                            <div className="flex items-center">
+                              <Badge className="bg-blue-500/10 text-blue-300 border border-blue-500/20 text-[9px] font-normal tracking-wide rounded uppercase px-1.5 py-0 capitalize">
+                                {item.provider}
+                              </Badge>
+                            </div>
+
+                            <div className="flex items-center">
+                              {isModelInactive && (
+                                <Badge className="bg-red-500/10 text-red-500 border border-red-500/20 text-[9px] font-semibold tracking-wide uppercase px-1.5 py-0 rounded">
+                                  Inactive
+                                </Badge>
+                              )}
+                            </div>
+
+                            <div className="flex items-center justify-end gap-1.5">
+                              <div
+                                draggable
+                                onDragStart={(e) => handleDragStart(e, group, index)}
+                                onDragEnd={handleDragEnd}
+                                className="text-zinc-500 hover:text-zinc-300 cursor-grab active:cursor-grabbing p-1.5 mr-1 hover:bg-zinc-800/50 rounded touch-none"
+                                title="Drag to reorder"
+                              >
+                                <Move className="w-4 h-4 pointer-events-none" />
+                              </div>
+                              <Button
+                                variant="outline"
+                                onClick={() => handleMoveGroupItem(group, index, -1)}
+                                disabled={index === 0}
+                                className="border-zinc-850 text-zinc-400 hover:bg-zinc-800/50 hover:text-white p-1.5 h-8 w-8 rounded disabled:opacity-30 disabled:cursor-not-allowed"
+                                title="Move Up"
+                              >
+                                <ChevronUp className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                onClick={() => handleMoveGroupItem(group, index, 1)}
+                                disabled={index === group.items.length - 1}
+                                className="border-zinc-850 text-zinc-400 hover:bg-zinc-800/50 hover:text-white p-1.5 h-8 w-8 rounded disabled:opacity-30 disabled:cursor-not-allowed"
+                                title="Move Down"
+                              >
+                                <ChevronDown className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                onClick={() => handleDeleteGroupItem(group, item.id)}
+                                className="bg-transparent border border-red-500/10 text-red-400/80 hover:bg-red-500/10 hover:text-red-500 p-1.5 h-8 w-8 rounded ml-5"
+                                title="Remove from Group"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
-                          <Button
-                            variant="outline"
-                            onClick={() => handleMoveGroupItem(group, index, -1)}
-                            disabled={index === 0}
-                            className="border-zinc-850 text-zinc-400 hover:bg-zinc-800/50 hover:text-white p-1.5 h-8 w-8 rounded disabled:opacity-30 disabled:cursor-not-allowed"
-                            title="Move Up"
-                          >
-                            <ChevronUp className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onClick={() => handleMoveGroupItem(group, index, 1)}
-                            disabled={index === group.items.length - 1}
-                            className="border-zinc-850 text-zinc-400 hover:bg-zinc-800/50 hover:text-white p-1.5 h-8 w-8 rounded disabled:opacity-30 disabled:cursor-not-allowed"
-                            title="Move Down"
-                          >
-                            <ChevronDown className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            onClick={() => handleDeleteGroupItem(group, item.id)}
-                            className="bg-transparent border border-red-500/10 text-red-400/80 hover:bg-red-500/10 hover:text-red-500 p-1.5 h-8 w-8 rounded"
-                            title="Remove from Group"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
 
                         {draggedItem?.groupId === group.id &&
                           dragOverGap?.groupId === group.id &&
@@ -636,7 +648,7 @@ export default function GroupsPage() {
                             <div className="group-drop-indicator" aria-hidden="true" />
                           )}
                       </React.Fragment>
-                    ))}
+                    )})}
                   </>
                 )}
               </div>

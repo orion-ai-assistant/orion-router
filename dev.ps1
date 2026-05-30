@@ -81,6 +81,7 @@ $env:POSTGRES_DB       = "orion_router_dev"
 $env:POSTGRES_USER     = "router_user_dev"
 $env:POSTGRES_PASSWORD = "router_pass_dev"
 $env:BACKEND_URL       = "http://localhost:$routerPort"
+$env:NEXT_PUBLIC_ROUTER_PORT = $routerPort
 
 # --- 5. Launch all services ---
 Write-Host ""

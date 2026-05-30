@@ -1,15 +1,15 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { adminFetch } from '@/lib/api';
+import { runFlipUpdate } from '@/lib/list-flip';
 import { useApp } from '@/components/AppContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Trash2 } from 'lucide-react';
+import { Trash2, ChevronUp, ChevronDown, Move } from 'lucide-react';
 
 interface ProviderKey {
   id: string;
@@ -27,6 +27,26 @@ interface ProviderKey {
   };
 }
 
+function gapIndexFromPointer(clientY: number, rows: NodeListOf<Element>): number {
+  const count = rows.length;
+  if (count === 0) return 0;
+  for (let i = 0; i < count; i++) {
+    const rect = rows[i].getBoundingClientRect();
+    if (clientY < rect.top + rect.height / 2) {
+      return i;
+    }
+  }
+  return count;
+}
+
+function insertIndexFromGap(sourceIndex: number, gapIndex: number): number {
+  return sourceIndex < gapIndex ? gapIndex - 1 : gapIndex;
+}
+
+function isValidDropGap(sourceIndex: number, gapIndex: number): boolean {
+  return gapIndex !== sourceIndex && gapIndex !== sourceIndex + 1;
+}
+
 export default function KeyPoolPage() {
   const { showToast, confirmAction } = useApp();
   const [keyPool, setKeyPool] = useState<ProviderKey[]>([]);
@@ -38,7 +58,7 @@ export default function KeyPoolPage() {
   const [showEditModal, setShowEditModal] = useState<boolean>(false);
 
   // Form states
-  const [addForm, setAddForm] = useState({ provider: '', label: '', api_key: '', priority: 100 });
+  const [addForm, setAddForm] = useState({ provider: '', label: '', api_key: '' });
   const [editingKey, setEditingKey] = useState<ProviderKey>({
     id: '',
     provider: '',
@@ -47,6 +67,25 @@ export default function KeyPoolPage() {
     is_active: true,
     api_key: '',
   });
+
+  // Drag and Drop state
+  const [draggedItem, setDraggedItem] = useState<{
+    provider: string;
+    itemId: string;
+    sourceIndex: number;
+  } | null>(null);
+  const [dragOverGap, setDragOverGap] = useState<{ provider: string; gapIndex: number } | null>(null);
+  const draggedItemRef = useRef(draggedItem);
+  const dragOverGapRef = useRef(dragOverGap);
+  const dropHandledRef = useRef(false);
+
+  useEffect(() => {
+    draggedItemRef.current = draggedItem;
+  }, [draggedItem]);
+
+  useEffect(() => {
+    dragOverGapRef.current = dragOverGap;
+  }, [dragOverGap]);
 
   const loadProviders = async () => {
     try {
@@ -108,21 +147,138 @@ export default function KeyPoolPage() {
     };
   }, []);
 
+  // Grouped keys by provider, sorted by priority
+  const groupedKeys = useMemo(() => {
+    const groups: Record<string, ProviderKey[]> = {};
+    keyPool.forEach(k => {
+      if (!groups[k.provider]) groups[k.provider] = [];
+      groups[k.provider].push(k);
+    });
+    // Sort each group by priority
+    Object.keys(groups).forEach(p => {
+      groups[p].sort((a, b) => a.priority - b.priority);
+    });
+    return groups;
+  }, [keyPool]);
+
+  const getGroupItemsContainer = (provider: string) =>
+    document.getElementById(`provider-keys-${provider}`);
+
+  const getGroupRows = (provider: string) => {
+    const container = getGroupItemsContainer(provider);
+    return container?.querySelectorAll('.key-item-row') ?? null;
+  };
+
+  const resolveDropGap = (clientY: number, provider: string): number => {
+    const rows = getGroupRows(provider);
+    if (!rows) return 0;
+    return gapIndexFromPointer(clientY, rows);
+  };
+
+  const persistPriorities = async (keysToUpdate: ProviderKey[]) => {
+    for (const key of keysToUpdate) {
+      const res = await adminFetch(`/dashboard/api/provider-key-pool/${key.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          provider: key.provider,
+          label: key.label,
+          priority: key.priority,
+          is_active: key.is_active,
+        }),
+      });
+      if (!res.ok) {
+        throw new Error('Failed to update priority');
+      }
+    }
+  };
+
+  const applyKeyReorder = async (
+    provider: string,
+    sourceIndex: number,
+    targetIndex: number
+  ) => {
+    if (sourceIndex === targetIndex) return;
+
+    let keysToUpdate: ProviderKey[] = [];
+    const container = getGroupItemsContainer(provider);
+    
+    runFlipUpdate(container, () => {
+      setKeyPool((prev) => {
+        const pKeys = [...(groupedKeys[provider] || [])];
+        const [moved] = pKeys.splice(sourceIndex, 1);
+        pKeys.splice(targetIndex, 0, moved);
+        
+        const reordered = pKeys.map((k, idx) => ({
+          ...k,
+          priority: idx + 1
+        }));
+
+        keysToUpdate = reordered.filter(k => k.priority !== k._original?.priority);
+
+        return prev.map(k => {
+          if (k.provider === provider) {
+            const found = reordered.find(r => r.id === k.id);
+            if (found) {
+              return {
+                ...found,
+                _original: found._original ? {
+                  ...found._original,
+                  priority: found.priority
+                } : undefined
+              };
+            }
+          }
+          return k;
+        });
+      });
+    });
+
+    if (keysToUpdate.length === 0) return;
+
+    try {
+      await persistPriorities(keysToUpdate);
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to update order', 'error');
+      await loadKeyPool();
+    }
+  };
+
+  const finishDragSession = () => {
+    setDraggedItem(null);
+    setDragOverGap(null);
+  };
+
+  useEffect(() => {
+    if (!draggedItem) return;
+    const keepMoveCursor = (e: DragEvent) => {
+      e.preventDefault();
+      if (e.dataTransfer) {
+        e.dataTransfer.dropEffect = 'move';
+      }
+    };
+    document.addEventListener('dragover', keepMoveCursor);
+    document.body.classList.add('group-drag-active');
+    return () => {
+      document.removeEventListener('dragover', keepMoveCursor);
+      document.body.classList.remove('group-drag-active');
+    };
+  }, [draggedItem]);
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     const provider = addForm.provider.trim();
     const label = addForm.label.trim();
     const api_key = addForm.api_key.trim();
-    const priority = parseInt(addForm.priority.toString());
 
     if (!provider || !label || !api_key) {
       showToast('Please fill out all fields.', 'error');
       return;
     }
-    if (isNaN(priority) || priority <= 0) {
-      showToast('Priority must be a positive integer.', 'error');
-      return;
-    }
+
+    // Auto-calculate priority: bottom of the list
+    const pKeys = groupedKeys[provider] || [];
+    const priority = pKeys.length + 1;
 
     try {
       const res = await adminFetch('/dashboard/api/provider-key-pool', {
@@ -130,7 +286,7 @@ export default function KeyPoolPage() {
         body: JSON.stringify({ provider, label, api_key, priority, is_active: true }),
       });
       if (res.ok) {
-        setAddForm({ provider: providers[0] || '', label: '', api_key: '', priority: 100 });
+        setAddForm({ provider: providers[0] || '', label: '', api_key: '' });
         setShowAddModal(false);
         showToast('Provider key added successfully!');
         await loadKeyPool();
@@ -146,16 +302,10 @@ export default function KeyPoolPage() {
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    const provider = editingKey.provider.trim();
     const label = editingKey.label.trim();
-    const priority = parseInt(editingKey.priority.toString());
 
-    if (!provider || !label) {
-      showToast('Provider and label cannot be empty.', 'error');
-      return;
-    }
-    if (isNaN(priority) || priority <= 0) {
-      showToast('Priority must be a positive integer.', 'error');
+    if (!label) {
+      showToast('Label cannot be empty.', 'error');
       return;
     }
 
@@ -163,10 +313,10 @@ export default function KeyPoolPage() {
       const res = await adminFetch(`/dashboard/api/provider-key-pool/${editingKey.id}`, {
         method: 'PUT',
         body: JSON.stringify({
-          provider,
+          provider: editingKey.provider, // keep original
           label,
           api_key: editingKey.api_key || '', // blank keeps original
-          priority,
+          priority: editingKey.priority, // keep original
           is_active: !!editingKey.is_active,
         }),
       });
@@ -211,11 +361,8 @@ export default function KeyPoolPage() {
 
   const isKeyDirty = (key: ProviderKey) => {
     if (!key || !key._original) return false;
-    const priority = Number.isFinite(Number(key.priority)) ? Number(key.priority) : 0;
     return (
-      key.provider !== key._original.provider ||
       key.label !== key._original.label ||
-      priority !== key._original.priority ||
       !!key.is_active !== key._original.is_active ||
       !!(key.api_key && key.api_key.trim())
     );
@@ -227,6 +374,84 @@ export default function KeyPoolPage() {
       api_key: '', // clear for modal input
     });
     setShowEditModal(true);
+  };
+
+  const handleDragStart = (e: React.DragEvent, provider: string, itemIndex: number, keyId: string) => {
+    dropHandledRef.current = false;
+    setDragOverGap(null);
+    setDraggedItem({
+      provider,
+      itemId: keyId,
+      sourceIndex: itemIndex,
+    });
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const updateDropTarget = (e: React.DragEvent, provider: string) => {
+    e.preventDefault();
+    const drag = draggedItemRef.current;
+    if (!drag || drag.provider !== provider) return;
+
+    e.dataTransfer.dropEffect = 'move';
+    const gapIndex = resolveDropGap(e.clientY, provider);
+
+    if (!isValidDropGap(drag.sourceIndex, gapIndex)) {
+      setDragOverGap(null);
+      return;
+    }
+
+    setDragOverGap((prev) =>
+      prev?.provider === provider && prev.gapIndex === gapIndex ? prev : { provider, gapIndex }
+    );
+  };
+
+  const handleDragEnd = async () => {
+    if (!dropHandledRef.current) {
+      const drag = draggedItemRef.current;
+      const over = dragOverGapRef.current;
+      if (
+        drag &&
+        over &&
+        drag.provider === over.provider &&
+        isValidDropGap(drag.sourceIndex, over.gapIndex)
+      ) {
+        dropHandledRef.current = true;
+        await applyKeyReorder(
+          drag.provider,
+          drag.sourceIndex,
+          insertIndexFromGap(drag.sourceIndex, over.gapIndex)
+        );
+      }
+    }
+    dropHandledRef.current = false;
+    finishDragSession();
+  };
+
+  const handleProviderDrop = async (e: React.DragEvent, provider: string) => {
+    e.preventDefault();
+    const drag = draggedItemRef.current;
+    if (!drag || drag.provider !== provider) return;
+
+    const gapIndex = resolveDropGap(e.clientY, provider);
+    if (!isValidDropGap(drag.sourceIndex, gapIndex)) {
+      finishDragSession();
+      return;
+    }
+
+    dropHandledRef.current = true;
+    await applyKeyReorder(
+      provider,
+      drag.sourceIndex,
+      insertIndexFromGap(drag.sourceIndex, gapIndex)
+    );
+    finishDragSession();
+  };
+
+  const handleMoveKey = async (provider: string, index: number, direction: number) => {
+    const pKeys = groupedKeys[provider] || [];
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= pKeys.length) return;
+    await applyKeyReorder(provider, index, targetIndex);
   };
 
   return (
@@ -244,72 +469,141 @@ export default function KeyPoolPage() {
         </Button>
       </header>
 
-      {/* Table List */}
-      <div className="table-container glass-panel bg-[#18181b] border border-zinc-800 rounded-md overflow-hidden shadow-xl">
-        <Table>
-          <TableHeader className="bg-black/25">
-            <TableRow className="border-b border-zinc-850 hover:bg-transparent">
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 pl-6 w-[160px]">Label</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 w-[120px]">Provider</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4">Key</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[90px]">Priority</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[80px]">Status</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-right pr-6 w-[90px]">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={6} className="text-center text-zinc-400 py-8">
-                  Loading provider keys...
-                </TableCell>
-              </TableRow>
-            ) : keyPool.length === 0 ? (
-              <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={6} className="text-center text-zinc-400 py-8">
-                  No provider keys configured yet.
-                </TableCell>
-              </TableRow>
-            ) : (
-              keyPool.map((key) => (
-                <TableRow key={key.id} className="border-b border-zinc-900 hover:bg-white/[0.015] transition-colors">
-                  <TableCell className="font-medium text-sm py-4 pl-6">{key.label}</TableCell>
-                  <TableCell className="py-4">
-                    <Badge className="bg-blue-500/10 text-blue-300 border border-blue-500/20 text-[10px] font-medium tracking-wide rounded uppercase px-2.5 py-0.5 capitalize">
-                      {key.provider}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="py-4 font-mono text-xs text-zinc-400">
-                    {key.masked_key || '••••••••••••••••'}
-                  </TableCell>
-                  <TableCell className="text-center py-4 font-mono text-xs">
-                    {key.priority}
-                  </TableCell>
-                  <TableCell className="text-center py-4">
-                    <Badge
-                      className={`text-[10px] font-semibold tracking-wide uppercase px-2.5 py-0.5 rounded-full ${
-                        key.is_active
-                          ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
-                          : 'bg-red-500/10 text-red-500 border border-red-500/20'
-                      }`}
-                    >
-                      {key.is_active ? 'Active' : 'Inactive'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right py-4 pr-6">
-                    <Button
-                      variant="outline"
-                      onClick={() => openEditModal(key)}
-                      className="border-zinc-800 text-white hover:bg-zinc-800 text-xs px-3 py-1 h-auto rounded"
-                    >
-                      Edit
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+      {/* Provider Group List */}
+      <div className="group-list flex flex-col gap-6">
+        {loading ? (
+          <div className="glass-panel p-8 text-center text-zinc-400">Loading provider keys...</div>
+        ) : Object.keys(groupedKeys).length === 0 ? (
+          <div className="glass-panel p-8 text-center text-zinc-400">
+            No provider keys configured yet.
+          </div>
+        ) : (
+          Object.entries(groupedKeys).map(([provider, keys]) => (
+            <div key={provider} className="glass-panel group-card p-6 bg-[#18181b] border border-zinc-800 rounded-md shadow-xl">
+              <div className="group-card-header mb-5">
+                <div className="group-card-title-section flex items-center gap-3 w-full">
+                  <Badge className="bg-blue-500/10 text-blue-300 border border-blue-500/20 text-[10px] font-medium tracking-wide rounded uppercase px-2.5 py-0.5 capitalize">
+                    {provider}
+                  </Badge>
+                  <h3 className="font-heading text-lg font-semibold text-white capitalize">{provider} Keys</h3>
+                  <div className="flex gap-2 ml-auto items-center text-xs text-zinc-500">
+                    {keys.length} {keys.length === 1 ? 'key' : 'keys'}
+                  </div>
+                </div>
+              </div>
+
+              <div
+                id={`provider-keys-${provider}`}
+                className={`group-items flex flex-col gap-2 ${draggedItem?.provider === provider ? 'select-none' : ''}`}
+                onDragOver={(e) => updateDropTarget(e, provider)}
+                onDrop={(e) => void handleProviderDrop(e, provider)}
+              >
+                {keys.length === 0 ? (
+                  <div className="text-zinc-500 text-xs py-4 text-center border border-dashed border-zinc-850 rounded bg-black/10">
+                    No keys. Add one above.
+                  </div>
+                ) : (
+                  <>
+                    {draggedItem?.provider === provider &&
+                      dragOverGap?.provider === provider &&
+                      dragOverGap.gapIndex === 0 && (
+                        <div className="group-drop-indicator" aria-hidden="true" />
+                      )}
+                    {keys.map((key, index) => (
+                      <React.Fragment key={key.id}>
+                        <div
+                          data-flip-id={key.id}
+                          className={`key-item-row bg-black/20 border border-zinc-850 rounded px-4 py-3 min-h-[52px] grid grid-cols-[36px_minmax(120px,220px)_minmax(150px,280px)_1fr_auto] gap-4 items-center ${
+                            draggedItem?.provider === provider
+                              ? ''
+                              : 'hover:border-zinc-600 hover:bg-black/35'
+                          } ${
+                            draggedItem?.provider === provider && draggedItem.itemId === key.id
+                              ? 'is-dragging'
+                              : ''
+                          }`}
+                        >
+                          <div className="flex items-center justify-start">
+                            <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] bg-zinc-800 border border-zinc-600 rounded-full text-zinc-300 text-[11px] font-bold">
+                              {index + 1}
+                            </span>
+                          </div>
+
+                          <div className="font-semibold text-sm text-white font-mono truncate select-all" title={key.label}>
+                            {key.label}
+                          </div>
+
+                          <div className="font-mono text-xs text-zinc-500 truncate select-all">
+                            {key.masked_key || '••••••••••••••••'}
+                          </div>
+
+                          <div className="flex items-center">
+                            {!key.is_active && (
+                              <Badge className="bg-red-500/10 text-red-500 border border-red-500/20 text-[9px] font-semibold tracking-wide uppercase px-1.5 py-0 rounded-full">
+                                Inactive
+                              </Badge>
+                            )}
+                          </div>
+
+                          <div className="flex items-center justify-end gap-1.5">
+                            <div
+                              draggable
+                              onDragStart={(e) => handleDragStart(e, provider, index, key.id)}
+                              onDragEnd={handleDragEnd}
+                              className="text-zinc-500 hover:text-zinc-300 cursor-grab active:cursor-grabbing p-1.5 mr-1 hover:bg-zinc-800/50 rounded touch-none"
+                              title="Drag to reorder"
+                            >
+                              <Move className="w-4 h-4 pointer-events-none" />
+                            </div>
+                            <Button
+                              variant="outline"
+                              onClick={() => handleMoveKey(provider, index, -1)}
+                              disabled={index === 0}
+                              className="border-zinc-850 text-zinc-400 hover:bg-zinc-800/50 hover:text-white p-1.5 h-8 w-8 rounded disabled:opacity-30 disabled:cursor-not-allowed"
+                              title="Move Up"
+                            >
+                              <ChevronUp className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={() => handleMoveKey(provider, index, 1)}
+                              disabled={index === keys.length - 1}
+                              className="border-zinc-850 text-zinc-400 hover:bg-zinc-800/50 hover:text-white p-1.5 h-8 w-8 rounded disabled:opacity-30 disabled:cursor-not-allowed"
+                              title="Move Down"
+                            >
+                              <ChevronDown className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={() => openEditModal(key)}
+                              className="border-zinc-850 text-white hover:bg-zinc-800/50 hover:text-white text-xs px-3 py-1 h-8 rounded ml-5"
+                              title="Edit Key"
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              onClick={() => handleDelete(key.id)}
+                              className="bg-transparent border border-red-500/10 text-red-400/80 hover:bg-red-500/10 hover:text-red-500 p-1.5 h-8 w-8 rounded ml-1"
+                              title="Delete Key"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        {draggedItem?.provider === provider &&
+                          dragOverGap?.provider === provider &&
+                          dragOverGap.gapIndex === index + 1 && (
+                            <div className="group-drop-indicator" aria-hidden="true" />
+                          )}
+                      </React.Fragment>
+                    ))}
+                  </>
+                )}
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       {/* Add Upstream Key Dialog */}
@@ -361,18 +655,6 @@ export default function KeyPoolPage() {
               />
             </div>
 
-            <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">Priority (lower is higher priority)</label>
-              <Input
-                type="number"
-                min="1"
-                value={addForm.priority}
-                onChange={(e) => setAddForm({ ...addForm, priority: parseInt(e.target.value) || 0 })}
-                required
-                className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
-              />
-            </div>
-
             <DialogFooter className="mt-4 flex gap-3 justify-end">
               <Button
                 variant="outline"
@@ -402,24 +684,6 @@ export default function KeyPoolPage() {
 
           <form onSubmit={handleUpdate} className="flex flex-col gap-4 my-2">
             <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">Provider</label>
-              <div className="custom-select-wrapper select-wrapper w-full">
-                <select
-                  value={editingKey.provider}
-                  onChange={(e) => setEditingKey({ ...editingKey, provider: e.target.value })}
-                  required
-                  className="orion-native-select"
-                >
-                  {providers.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2">
               <label className="text-zinc-400 text-sm font-medium">Label</label>
               <Input
                 value={editingKey.label}
@@ -436,18 +700,6 @@ export default function KeyPoolPage() {
                 value={editingKey.api_key}
                 onChange={(e) => setEditingKey({ ...editingKey, api_key: e.target.value })}
                 placeholder="leave blank to keep existing key"
-                className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">Priority</label>
-              <Input
-                type="number"
-                min="1"
-                value={editingKey.priority}
-                onChange={(e) => setEditingKey({ ...editingKey, priority: parseInt(e.target.value) || 0 })}
-                required
                 className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
               />
             </div>

@@ -13,6 +13,9 @@ services:
       - POSTGRES_DB=orion_router
       - POSTGRES_USER=router_user
       - POSTGRES_PASSWORD=router_pass
+      - LLM_HOST=llama-cpp
+      - EMBED_HOST=llama-cpp-embed
+      - TTS_HOST=tts
     env_file:
       - path: .env
         required: false

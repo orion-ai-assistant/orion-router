@@ -199,11 +199,11 @@ export default function VirtualKeysPage() {
         <Table>
           <TableHeader className="bg-black/25">
             <TableRow className="border-b border-zinc-850 hover:bg-transparent">
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 pl-6 w-[260px]">Name</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[120px]">Budget</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[120px]">Used</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[80px]">Status</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[160px]">Created</TableHead>
+              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 pl-6 w-[200px]">Name</TableHead>
+              <TableHead className="w-[140px] px-0"></TableHead>
+              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[130px]">Budget</TableHead>
+              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[130px] pl-10">Used</TableHead>
+              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center">Created</TableHead>
               <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-right pr-6 w-[90px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -223,24 +223,21 @@ export default function VirtualKeysPage() {
             ) : (
               virtualKeys.map((key) => (
                 <TableRow key={key.id} className="border-b border-zinc-900 hover:bg-white/[0.015] transition-colors">
-                  <TableCell className="font-medium text-sm py-4 pl-6">{key.name}</TableCell>
+                  <TableCell className="font-medium text-sm py-4 pl-6 max-w-[200px] truncate" title={key.name}>{key.name}</TableCell>
+                  <TableCell className="py-4 px-0">
+                    {!key.is_active && (
+                      <Badge className="bg-red-500/10 text-red-500 border border-red-500/20 text-[10px] font-semibold tracking-wide uppercase px-2.5 py-0.5 rounded-full">
+                        Inactive
+                      </Badge>
+                    )}
+                  </TableCell>
                   <TableCell className="text-center py-4 font-mono text-xs">
                     {key.budget > 0 ? money(key.budget, 2) : 'Unlimited'}
                   </TableCell>
-                  <TableCell className="text-center py-4 font-mono text-xs">
+                  <TableCell className="text-center py-4 font-mono text-xs pl-10">
                     {(!key.used_amount || Number(key.used_amount) === 0)
                       ? '$0.00'
                       : money(key.used_amount, 4)}
-                  </TableCell>
-                  <TableCell className="text-center py-4">
-                    <Badge
-                      className={`text-[10px] font-semibold tracking-wide uppercase px-2.5 py-0.5 rounded-full ${key.is_active
-                        ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
-                        : 'bg-red-500/10 text-red-500 border border-red-500/20'
-                        }`}
-                    >
-                      {key.is_active ? 'Active' : 'Inactive'}
-                    </Badge>
                   </TableCell>
                   <TableCell className="text-center py-4 font-mono text-xs text-zinc-400">
                     {dateTime(key.created_at)}
