@@ -6,8 +6,17 @@ const nextConfig: NextConfig = {
   output: isDev ? undefined : "export",
   basePath: "/dashboard",
   images: {
-    unoptimized: true, // Required for static export
+    unoptimized: true, 
   },
+  
+  // Olası tüm giriş yöntemlerine izin veriyoruz:
+  allowedDevOrigins: [
+    "localhost",
+    "127.0.0.1",
+    "192.168.1.105",
+    "*.trycloudflare.com"
+  ],
+
   async rewrites() {
     const backendUrl =
       process.env.BACKEND_URL ||

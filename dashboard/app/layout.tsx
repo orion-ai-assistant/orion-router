@@ -6,6 +6,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Orion AI Gateway - Admin Dashboard",
   description: "Enterprise Service Router and Key Management Panel",
+  icons: {
+    icon: "/dashboard/favicon.svg",
+  },
 };
 
 export default function RootLayout({
@@ -14,7 +17,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full">
+    <html lang="en" className="h-full" suppressHydrationWarning>
       <body className="h-full bg-[#121212] text-[#fafafa]">
         <AppProvider>
           <DashboardLayout>
