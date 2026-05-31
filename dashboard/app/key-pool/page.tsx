@@ -581,13 +581,6 @@ export default function KeyPoolPage() {
                             >
                               Edit
                             </Button>
-                            <Button
-                              onClick={() => handleDelete(key.id)}
-                              className="bg-transparent border border-red-500/10 text-red-400/80 hover:bg-red-500/10 hover:text-red-500 p-1.5 h-8 w-8 rounded ml-1"
-                              title="Delete Key"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
                           </div>
                         </div>
 
@@ -608,7 +601,7 @@ export default function KeyPoolPage() {
 
       {/* Add Upstream Key Dialog */}
       <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
-        <DialogContent className="max-w-[440px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
+        <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-heading font-semibold text-white">Add Upstream Key</DialogTitle>
           </DialogHeader>
@@ -677,7 +670,7 @@ export default function KeyPoolPage() {
 
       {/* Edit Upstream Key Dialog */}
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
-        <DialogContent className="max-w-[440px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
+        <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-heading font-semibold text-white">Edit Upstream Key</DialogTitle>
           </DialogHeader>
@@ -714,7 +707,6 @@ export default function KeyPoolPage() {
             >
               <div className="flex flex-col gap-0.5">
                 <span className={`font-semibold text-sm ${editingKey.is_active ? 'text-purple-400' : 'text-white'}`}>Active Status</span>
-                <span className="text-zinc-400 text-xs">Enable for routing</span>
               </div>
               <Switch
                 checked={editingKey.is_active}

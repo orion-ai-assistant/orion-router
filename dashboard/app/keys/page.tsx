@@ -261,7 +261,7 @@ export default function VirtualKeysPage() {
 
       {/* Create Key Dialog */}
       <Dialog open={showKeyModal} onOpenChange={setShowKeyModal}>
-        <DialogContent className="max-w-[440px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
+        <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-heading font-semibold text-white">Create New API Key</DialogTitle>
           </DialogHeader>
@@ -310,7 +310,7 @@ export default function VirtualKeysPage() {
 
       {/* Edit Key Dialog */}
       <Dialog open={showEditKeyModal} onOpenChange={setShowEditKeyModal}>
-        <DialogContent className="max-w-[440px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
+        <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-heading font-semibold text-white">Edit Virtual Key</DialogTitle>
           </DialogHeader>
@@ -347,7 +347,6 @@ export default function VirtualKeysPage() {
             >
               <div className="flex flex-col gap-0.5">
                 <span className={`font-semibold text-sm ${editingVirtualKey.is_active ? 'text-purple-400' : 'text-white'}`}>Active Status</span>
-                <span className="text-zinc-400 text-xs">Enable key for gateway routing</span>
               </div>
               <Switch
                 checked={editingVirtualKey.is_active}
@@ -390,7 +389,7 @@ export default function VirtualKeysPage() {
           if (!open) setNewRawKey('');
         }}
       >
-        <DialogContent className="max-w-[440px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl text-center">
+        <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl text-center">
           <DialogHeader>
             <DialogTitle className="text-xl font-heading font-semibold text-white">API Key Created</DialogTitle>
             <DialogDescription className="text-zinc-400 text-sm mt-2">

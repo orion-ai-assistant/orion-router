@@ -471,13 +471,6 @@ export default function ModelsPage() {
                       >
                         Edit
                       </Button>
-                      <Button
-                        onClick={() => handleDelete(model.id)}
-                        className="bg-transparent border border-red-500/10 text-red-400/80 hover:bg-red-500/10 hover:text-red-500 p-1.5 h-8 w-8 rounded ml-1"
-                        title="Delete Model"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
                     </div>
                   </div>
                 ))}
@@ -489,7 +482,7 @@ export default function ModelsPage() {
 
       {/* Add Model Dialog */}
       <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
-        <DialogContent className="max-w-[440px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl overflow-y-auto max-h-[90vh]">
+        <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl overflow-y-auto max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="text-xl font-heading font-semibold text-white">Register New Model</DialogTitle>
           </DialogHeader>
@@ -545,15 +538,35 @@ export default function ModelsPage() {
               </div>
             </div>
 
-            {(addForm.capability === 'chat') && (
-              <div className="flex flex-col gap-2">
-                <label className="text-zinc-400 text-sm font-medium">Default Think (Thinking Level)</label>
-                <Input
-                  value={addForm.thinking_level}
-                  onChange={(e) => setAddForm({ ...addForm, thinking_level: e.target.value })}
-                  placeholder="optional (e.g. low, high, or tokens count)"
-                  className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
-                />
+            {((addForm.capability === 'chat') || (addForm.capability === 'tts')) && (
+              <div className="flex gap-3">
+                {addForm.capability === 'chat' && (
+                  <div className="flex-1 flex flex-col gap-1.5">
+                    <span className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider">Thinking Level</span>
+                    <Input
+                      value={addForm.thinking_level}
+                      onChange={(e) => setAddForm({ ...addForm, thinking_level: e.target.value })}
+                      placeholder="Optional (low, 1024)"
+                      className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-[9.5px]"
+                    />
+                  </div>
+                )}
+
+                {(addForm.capability === 'chat' || addForm.capability === 'tts') && (
+                  <div className="flex-1 flex flex-col gap-1.5">
+                    <span className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider">Temperature</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      value={addForm.temperature}
+                      onChange={(e) => setAddForm({ ...addForm, temperature: e.target.value })}
+                      placeholder="Optional (0-2)"
+                      className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-[9.5px]"
+                    />
+                  </div>
+                )}
               </div>
             )}
 
@@ -564,23 +577,7 @@ export default function ModelsPage() {
                   value={addForm.system_prompt || ''}
                   onChange={(e) => setAddForm({ ...addForm, system_prompt: e.target.value })}
                   placeholder="Optional system instructions..."
-                  className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3 h-24 resize-none custom-scrollbar overflow-y-auto no-field-sizing"
-                />
-              </div>
-            )}
-
-            {(addForm.capability === 'chat' || addForm.capability === 'tts') && (
-              <div className="flex flex-col gap-2">
-                <label className="text-zinc-400 text-sm font-medium">Default Temperature (0.0 to 2.0)</label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="2"
-                  step="0.1"
-                  value={addForm.temperature}
-                  onChange={(e) => setAddForm({ ...addForm, temperature: e.target.value })}
-                  placeholder="optional (e.g. 0.7)"
-                  className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
+                  className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3 h-14 resize-none custom-scrollbar overflow-y-auto no-field-sizing"
                 />
               </div>
             )}
@@ -598,7 +595,7 @@ export default function ModelsPage() {
                       value={addForm.input_price}
                       onChange={(e) => setAddForm({ ...addForm, input_price: cleanNumberInput(e.target.value) })}
                       placeholder="0.0"
-                      className="bg-black/40 border border-zinc-855 text-white text-xs px-3 py-2"
+                      className="bg-black/40 border border-zinc-855 text-white text-xs px-3 py-2 rounded"
                     />
                   </div>
                 )}
@@ -613,7 +610,7 @@ export default function ModelsPage() {
                       value={addForm.output_price}
                       onChange={(e) => setAddForm({ ...addForm, output_price: cleanNumberInput(e.target.value) })}
                       placeholder="0.0"
-                      className="bg-black/40 border border-zinc-855 text-white text-xs px-3 py-2"
+                      className="bg-black/40 border border-zinc-855 text-white text-xs px-3 py-2 rounded"
                     />
                   </div>
                 )}
@@ -628,7 +625,7 @@ export default function ModelsPage() {
                       value={addForm.think_price}
                       onChange={(e) => setAddForm({ ...addForm, think_price: cleanNumberInput(e.target.value) })}
                       placeholder="0.0"
-                      className="bg-black/40 border border-zinc-855 text-white text-xs px-3 py-2"
+                      className="bg-black/40 border border-zinc-855 text-white text-xs px-3 py-2 rounded"
                     />
                   </div>
                 )}
@@ -657,7 +654,7 @@ export default function ModelsPage() {
 
       {/* Edit Model Dialog */}
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
-        <DialogContent className="max-w-[440px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl overflow-y-auto max-h-[90vh]">
+        <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl overflow-y-auto max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="text-xl font-heading font-semibold text-white">Edit Registered Model</DialogTitle>
           </DialogHeader>
@@ -713,15 +710,35 @@ export default function ModelsPage() {
               </div>
             </div>
 
-            {(editingModel.capability === 'chat') && (
-              <div className="flex flex-col gap-2">
-                <label className="text-zinc-400 text-sm font-medium">Default Think (Thinking Level)</label>
-                <Input
-                  value={editingModel.thinking_level || ''}
-                  onChange={(e) => setEditingModel({ ...editingModel, thinking_level: e.target.value })}
-                  placeholder="optional (e.g. low, high, or tokens count)"
-                  className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
-                />
+            {((editingModel.capability === 'chat') || (editingModel.capability === 'tts')) && (
+              <div className="flex gap-3">
+                {editingModel.capability === 'chat' && (
+                  <div className="flex-1 flex flex-col gap-1.5">
+                    <span className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider">Thinking Level</span>
+                    <Input
+                      value={editingModel.thinking_level || ''}
+                      onChange={(e) => setEditingModel({ ...editingModel, thinking_level: e.target.value })}
+                      placeholder="Optional (low, 1024)"
+                      className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-[9.5px]"
+                    />
+                  </div>
+                )}
+
+                {(editingModel.capability === 'chat' || editingModel.capability === 'tts') && (
+                  <div className="flex-1 flex flex-col gap-1.5">
+                    <span className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider">Temperature</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      value={editingModel.temperature === null ? '' : editingModel.temperature}
+                      onChange={(e) => setEditingModel({ ...editingModel, temperature: e.target.value === '' ? null : parseFloat(e.target.value) })}
+                      placeholder="Optional (0-2)"
+                      className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-[9.5px]"
+                    />
+                  </div>
+                )}
               </div>
             )}
 
@@ -732,23 +749,7 @@ export default function ModelsPage() {
                   value={editingModel.system_prompt || ''}
                   onChange={(e) => setEditingModel({ ...editingModel, system_prompt: e.target.value })}
                   placeholder="Optional system instructions..."
-                  className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3 h-24 resize-none custom-scrollbar overflow-y-auto no-field-sizing"
-                />
-              </div>
-            )}
-
-            {(editingModel.capability === 'chat' || editingModel.capability === 'tts') && (
-              <div className="flex flex-col gap-2">
-                <label className="text-zinc-400 text-sm font-medium">Default Temperature (0.0 to 2.0)</label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="2"
-                  step="0.1"
-                  value={editingModel.temperature === null ? '' : editingModel.temperature}
-                  onChange={(e) => setEditingModel({ ...editingModel, temperature: e.target.value === '' ? null : parseFloat(e.target.value) })}
-                  placeholder="optional"
-                  className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
+                  className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3 h-14 resize-none custom-scrollbar overflow-y-auto no-field-sizing"
                 />
               </div>
             )}
@@ -766,7 +767,7 @@ export default function ModelsPage() {
                       value={editingModel.input_price ?? ''}
                       onChange={(e) => setEditingModel({ ...editingModel, input_price: cleanNumberInput(e.target.value) })}
                       placeholder="0.0"
-                      className="bg-black/40 border border-zinc-855 text-white text-xs px-3 py-2"
+                      className="bg-black/40 border border-zinc-855 text-white text-xs px-3 py-2 rounded"
                     />
                   </div>
                 )}
@@ -781,7 +782,7 @@ export default function ModelsPage() {
                       value={editingModel.output_price ?? ''}
                       onChange={(e) => setEditingModel({ ...editingModel, output_price: cleanNumberInput(e.target.value) })}
                       placeholder="0.0"
-                      className="bg-black/40 border border-zinc-855 text-white text-xs px-3 py-2"
+                      className="bg-black/40 border border-zinc-855 text-white text-xs px-3 py-2 rounded"
                     />
                   </div>
                 )}
@@ -796,7 +797,7 @@ export default function ModelsPage() {
                       value={editingModel.think_price ?? ''}
                       onChange={(e) => setEditingModel({ ...editingModel, think_price: cleanNumberInput(e.target.value) })}
                       placeholder="0.0"
-                      className="bg-black/40 border border-zinc-855 text-white text-xs px-3 py-2"
+                      className="bg-black/40 border border-zinc-855 text-white text-xs px-3 py-2 rounded"
                     />
                   </div>
                 )}
@@ -813,7 +814,6 @@ export default function ModelsPage() {
             >
               <div className="flex flex-col gap-0.5">
                 <span className={`font-semibold text-sm ${editingModel.is_active ? 'text-purple-400' : 'text-white'}`}>Active Status</span>
-                <span className="text-zinc-400 text-xs">Enable for routing</span>
               </div>
               <Switch
                 checked={editingModel.is_active}

@@ -136,7 +136,7 @@ export default function SettingsPage() {
 
       {/* Confirm Clear Logs Dialog */}
       <Dialog open={showClearLogsModal} onOpenChange={setShowClearLogsModal}>
-        <DialogContent className="max-w-[440px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
+        <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-heading font-semibold text-white">Confirm Log Deletion</DialogTitle>
             <DialogDescription className="text-zinc-400 text-sm mt-2">

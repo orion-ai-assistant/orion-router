@@ -442,6 +442,7 @@ export default function GroupsPage() {
         method: 'DELETE',
       });
       if (res.ok) {
+        setShowEditGroupItemModal(false);
         showToast('Model removed from group successfully!');
         await loadGroups();
       } else {
@@ -704,13 +705,6 @@ export default function GroupsPage() {
                               >
                                 Edit
                               </Button>
-                              <Button
-                                onClick={() => handleDeleteGroupItem(group, item.id)}
-                                className="bg-transparent border border-red-500/10 text-red-400/80 hover:bg-red-500/10 hover:text-red-500 p-1.5 h-8 w-8 rounded ml-1"
-                                title="Remove from Group"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
                             </div>
                           </div>
 
@@ -731,7 +725,7 @@ export default function GroupsPage() {
 
       {/* Add Group Dialog */}
       <Dialog open={showAddGroupModal} onOpenChange={setShowAddGroupModal}>
-        <DialogContent className="max-w-[440px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
+        <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-heading font-semibold text-white">Create Model Group</DialogTitle>
           </DialogHeader>
@@ -785,7 +779,7 @@ export default function GroupsPage() {
 
       {/* Edit Group Dialog */}
       <Dialog open={showEditGroupModal} onOpenChange={setShowEditGroupModal}>
-        <DialogContent className="max-w-[440px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
+        <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-heading font-semibold text-white">Edit Model Group</DialogTitle>
           </DialogHeader>
@@ -826,7 +820,6 @@ export default function GroupsPage() {
             >
               <div className="flex flex-col gap-0.5">
                 <span className={`font-semibold text-sm ${editingGroup.is_active ? 'text-purple-400' : 'text-white'}`}>Active Status</span>
-                <span className="text-zinc-400 text-xs">Enable group for routing</span>
               </div>
               <Switch
                 checked={editingGroup.is_active}
@@ -865,7 +858,7 @@ export default function GroupsPage() {
 
       {/* Add Model to Group Dialog */}
       <Dialog open={showAddGroupItemModal} onOpenChange={setShowAddGroupItemModal}>
-        <DialogContent className="max-w-[440px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
+        <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-heading font-semibold text-white">Add Model to Group</DialogTitle>
           </DialogHeader>
@@ -906,24 +899,24 @@ export default function GroupsPage() {
 
             {activeGroupForItems?.capability === 'chat' && (
               <div className="flex flex-col gap-2">
-                <label className="text-zinc-400 text-sm font-medium">Think Override (Optional)</label>
+                <label className="text-zinc-400 text-sm font-medium">Thinking Level</label>
                 <Input
                   value={selectedThinkingLevel}
                   onChange={(e) => setSelectedThinkingLevel(e.target.value)}
-                  placeholder="e.g. low, high, or tokens count"
-                  className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
+                  placeholder="Optional (low, 1024)"
+                  className="bg-black/40 border border-zinc-850 text-white rounded px-3 py-2 text-xs"
                 />
               </div>
             )}
 
             {activeGroupForItems?.capability === 'chat' && (
               <div className="flex flex-col gap-2">
-                <label className="text-zinc-400 text-sm font-medium">System Prompt Override (Optional)</label>
+                <label className="text-zinc-400 text-sm font-medium">System Prompt</label>
                 <Textarea
                   value={selectedSystemPrompt}
                   onChange={(e) => setSelectedSystemPrompt(e.target.value)}
                   placeholder="Optional system instructions..."
-                  className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3 h-24 resize-none custom-scrollbar overflow-y-auto no-field-sizing"
+                  className="bg-black/40 border border-zinc-850 text-white rounded px-3 py-2 text-xs h-14 resize-none custom-scrollbar overflow-y-auto no-field-sizing"
                 />
               </div>
             )}
@@ -957,7 +950,7 @@ export default function GroupsPage() {
 
       {/* Edit Group Item Dialog */}
       <Dialog open={showEditGroupItemModal} onOpenChange={setShowEditGroupItemModal}>
-        <DialogContent className="max-w-[440px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
+        <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-heading font-semibold text-white">Edit Group Item</DialogTitle>
           </DialogHeader>
@@ -972,40 +965,54 @@ export default function GroupsPage() {
               </div>
 
               <div className="flex flex-col gap-2">
-                <label className="text-zinc-400 text-sm font-medium">Think Override (Optional)</label>
+                <label className="text-zinc-400 text-sm font-medium">Thinking Level</label>
                 <Input
                   value={editingGroupItem.thinking_level}
                   onChange={(e) => setEditingGroupItem({ ...editingGroupItem, thinking_level: e.target.value })}
-                  placeholder="e.g. low, high, or tokens count"
-                  className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
+                  placeholder="Optional (low, 1024)"
+                  className="bg-black/40 border border-zinc-850 text-white rounded px-3 py-2 text-xs"
                 />
               </div>
 
               <div className="flex flex-col gap-2">
-                <label className="text-zinc-400 text-sm font-medium">System Prompt Override (Optional)</label>
+                <label className="text-zinc-400 text-sm font-medium">System Prompt</label>
                 <Textarea
                   value={editingGroupItem.system_prompt}
                   onChange={(e) => setEditingGroupItem({ ...editingGroupItem, system_prompt: e.target.value })}
                   placeholder="Optional system instructions..."
-                  className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3 h-24 resize-none custom-scrollbar overflow-y-auto no-field-sizing"
+                  className="bg-black/40 border border-zinc-850 text-white rounded px-3 py-2 text-xs h-14 resize-none custom-scrollbar overflow-y-auto no-field-sizing"
                 />
               </div>
 
-              <DialogFooter className="mt-4 flex gap-3 justify-end">
+              <DialogFooter className="mt-4 flex justify-between w-full gap-3">
                 <Button
-                  variant="outline"
+                  onClick={() => {
+                    const group = groups.find((g) => g.id === editingGroupItem.groupId);
+                    if (group) {
+                      handleDeleteGroupItem(group, editingGroupItem.itemId);
+                    }
+                  }}
                   type="button"
-                  onClick={() => setShowEditGroupItemModal(false)}
-                  className="border-zinc-800 text-white hover:bg-zinc-900 rounded font-medium"
+                  className="bg-transparent border border-red-500/20 text-red-500 hover:bg-red-500/10 rounded font-medium flex items-center gap-1.5"
                 >
-                  Cancel
+                  <Trash2 className="w-4 h-4" /> Delete
                 </Button>
-                <Button
-                  type="submit"
-                  className="bg-white text-black hover:bg-zinc-200 rounded font-medium"
-                >
-                  Save Changes
-                </Button>
+                <div className="flex gap-3 justify-end">
+                  <Button
+                    variant="outline"
+                    type="button"
+                    onClick={() => setShowEditGroupItemModal(false)}
+                    className="border-zinc-800 text-white hover:bg-zinc-900 rounded font-medium"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="bg-white text-black hover:bg-zinc-200 rounded font-medium"
+                  >
+                    Save Changes
+                  </Button>
+                </div>
               </DialogFooter>
             </form>
           )}
