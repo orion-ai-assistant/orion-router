@@ -47,12 +47,18 @@ async def check_is_default_password():
 async def update_admin_secret(request: Request):
     try:
         body = await request.json()
-        new_secret = (body.get("admin_secret") or "").strip()
+        old_secret = (body.get("old_secret") or "").strip()
+        new_secret = (body.get("new_secret") or body.get("admin_secret") or "").strip()
+        
+        from core import config
+        if not old_secret:
+            raise HTTPException(status_code=400, detail="Current admin secret is required")
+        if old_secret != config.ADMIN_SECRET:
+            raise HTTPException(status_code=400, detail="Incorrect current admin secret")
         if not new_secret:
-            raise HTTPException(status_code=400, detail="Admin secret cannot be empty")
+            raise HTTPException(status_code=400, detail="New admin secret cannot be empty")
         
         # Update in memory
-        from core import config
         config.ADMIN_SECRET = new_secret
         
         # Update in .env file

@@ -9,30 +9,54 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 
 export default function SettingsPage() {
   const { showToast, updateAdminKey } = useApp();
-  const [adminSecret, setAdminSecret] = useState<string>('');
+  
+  // Change Admin Secret states
+  const [showChangeKeyModal, setShowChangeKeyModal] = useState<boolean>(false);
+  const [currentSecret, setCurrentSecret] = useState<string>( '');
+  const [newSecret, setNewSecret] = useState<string>('');
+  const [confirmNewSecret, setConfirmNewSecret] = useState<string>('');
+  const [updatingKey, setUpdatingKey] = useState<boolean>(false);
   
   // Clear logs states
   const [showClearLogsModal, setShowClearLogsModal] = useState<boolean>(false);
   const [confirmAdminKey, setConfirmAdminKey] = useState<string>('');
   const [clearing, setClearing] = useState<boolean>(false);
 
-  const handleSaveSettings = async (e: React.FormEvent) => {
+  const handleChangeAdminSecret = async (e: React.FormEvent) => {
     e.preventDefault();
-    const secret = adminSecret.trim();
-    if (!secret) {
-      showToast('Admin secret cannot be empty', 'error');
+    const currentSec = currentSecret.trim();
+    const newSec = newSecret.trim();
+    const confirmNewSec = confirmNewSecret.trim();
+
+    if (!currentSec) {
+      showToast('Current admin secret is required', 'error');
+      return;
+    }
+    if (!newSec) {
+      showToast('New admin secret cannot be empty', 'error');
+      return;
+    }
+    if (newSec !== confirmNewSec) {
+      showToast('New secrets do not match', 'error');
       return;
     }
 
+    setUpdatingKey(true);
     try {
       const res = await adminFetch('/dashboard/api/settings/admin-secret', {
         method: 'PUT',
-        body: JSON.stringify({ admin_secret: secret }),
+        body: JSON.stringify({
+          old_secret: currentSec,
+          new_secret: newSec,
+        }),
       });
       if (res.ok) {
         showToast('Admin secret updated successfully!');
-        updateAdminKey(secret);
-        setAdminSecret('');
+        updateAdminKey(newSec);
+        setShowChangeKeyModal(false);
+        setCurrentSecret('');
+        setNewSecret('');
+        setConfirmNewSecret('');
       } else {
         const data = await res.json().catch(() => ({}));
         showToast(data.detail || 'Failed to update admin secret', 'error');
@@ -40,6 +64,8 @@ export default function SettingsPage() {
     } catch (err) {
       console.error(err);
       showToast('Network error updating admin secret', 'error');
+    } finally {
+      setUpdatingKey(false);
     }
   };
 
@@ -94,26 +120,15 @@ export default function SettingsPage() {
         <h2 className="font-heading text-lg font-semibold text-white mb-2">Admin Authentication</h2>
         <p className="text-zinc-400 text-sm mb-6">Change the admin secret used to access this dashboard.</p>
         
-        <form onSubmit={handleSaveSettings} className="max-w-md flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <label className="text-zinc-450 text-sm font-medium">New Admin Secret</label>
-            <Input
-              type="password"
-              value={adminSecret}
-              onChange={(e) => setAdminSecret(e.target.value)}
-              placeholder="Enter new secret"
-              className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
-            />
-          </div>
-          <div className="mt-2 flex">
-            <Button
-              type="submit"
-              className="bg-white text-black hover:bg-zinc-200 font-semibold px-6 py-2.5 rounded transition-all duration-200 shadow-md"
-            >
-              Save Changes
-            </Button>
-          </div>
-        </form>
+        <div className="flex">
+          <Button
+            type="button"
+            onClick={() => setShowChangeKeyModal(true)}
+            className="bg-white text-black hover:bg-zinc-200 font-semibold px-6 py-2.5 rounded transition-all duration-200 shadow-md"
+          >
+            Change Admin Secret
+          </Button>
+        </div>
       </div>
 
       {/* Danger Zone */}
@@ -176,6 +191,80 @@ export default function SettingsPage() {
                 className="bg-red-600 hover:bg-red-700 text-white rounded font-medium border border-red-700/30 flex items-center justify-center min-w-[120px]"
               >
                 {clearing ? 'Clearing...' : 'Confirm & Delete'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Admin Secret Dialog */}
+      <Dialog open={showChangeKeyModal} onOpenChange={setShowChangeKeyModal}>
+        <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-heading font-semibold text-white">Change Admin Secret</DialogTitle>
+            <DialogDescription className="text-zinc-400 text-sm mt-2">
+              To change your admin secret, please enter your current secret, then enter the new secret twice to confirm.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleChangeAdminSecret} className="flex flex-col gap-4 my-4">
+            <div className="flex flex-col gap-2">
+              <label className="text-zinc-450 text-sm font-medium">Current Admin Secret</label>
+              <Input
+                type="password"
+                value={currentSecret}
+                onChange={(e) => setCurrentSecret(e.target.value)}
+                placeholder="Enter current secret"
+                className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
+                required
+              />
+            </div>
+            
+            <div className="flex flex-col gap-2">
+              <label className="text-zinc-450 text-sm font-medium">New Admin Secret</label>
+              <Input
+                type="password"
+                value={newSecret}
+                onChange={(e) => setNewSecret(e.target.value)}
+                placeholder="Enter new secret"
+                className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
+                required
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-zinc-450 text-sm font-medium">Confirm New Admin Secret</label>
+              <Input
+                type="password"
+                value={confirmNewSecret}
+                onChange={(e) => setConfirmNewSecret(e.target.value)}
+                placeholder="Re-enter new secret"
+                className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
+                required
+              />
+            </div>
+            
+            <DialogFooter className="mt-4 flex gap-3 justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={updatingKey}
+                onClick={() => {
+                  setShowChangeKeyModal(false);
+                  setCurrentSecret('');
+                  setNewSecret('');
+                  setConfirmNewSecret('');
+                }}
+                className="border-zinc-800 text-white hover:bg-zinc-900 rounded font-medium"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={updatingKey}
+                className="bg-white text-black hover:bg-zinc-200 rounded font-medium flex items-center justify-center min-w-[120px]"
+              >
+                {updatingKey ? 'Updating...' : 'Change Secret'}
               </Button>
             </DialogFooter>
           </form>
