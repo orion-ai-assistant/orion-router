@@ -103,10 +103,37 @@ def kill_port(port: int) -> None:
             if f":{port} " in line and "LISTENING" in line:
                 pid = line.split()[-1]
                 if pid.isdigit() and pid != "0":
-                    run_silent(["taskkill", "/f", "/pid", pid])
+                    run_silent(["taskkill", "/f", "/t", "/pid", pid])
                     dim(f"    Port {port} → PID {pid} kapatildi")
     except Exception:
         pass
+
+def kill_portable_postgres() -> None:
+    """Kill all postgres.exe processes running from the portable tools directory."""
+    if sys.platform != "win32":
+        return
+    try:
+        target_path = str(PG_BIN / "postgres.exe")
+        escaped_path = target_path.replace("'", "''")
+        cmd = [
+            "powershell",
+            "-Command",
+            f"Get-Process -Name postgres -ErrorAction SilentlyContinue | "
+            f"Where-Object {{ $_.Path -eq '{escaped_path}' }} | "
+            f"Stop-Process -Force"
+        ]
+        run_silent(cmd)
+    except Exception:
+        pass
+
+    # Clean up stale postmaster.pid
+    pid_file = PG_DATA / "postmaster.pid"
+    if pid_file.exists():
+        try:
+            pid_file.unlink(missing_ok=True)
+            dim("    Stale postmaster.pid silindi")
+        except Exception:
+            pass
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -142,6 +169,7 @@ def free_ports(router_port: str) -> None:
     info(f"Portlar temizleniyor: {router_port}, {PG_PORT}...")
     for port in [int(router_port), PG_PORT]:
         kill_port(port)
+    kill_portable_postgres()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -196,7 +224,7 @@ def start_postgres() -> None:
         str(PG_CTL),
         "-D", str(PG_DATA),
         "-l", str(PG_LOG),
-        "-o", f"-p {PG_PORT}",
+        "-o", f"-p {PG_PORT} -F",
         "start",
     ])
 
@@ -265,6 +293,7 @@ def set_env(router_port: str) -> None:
     os.environ["NEXT_PUBLIC_ROUTER_PORT"] = router_port
     os.environ["UVICORN_RELOAD"]          = "0"
     os.environ["ROUTER_PORT"]             = router_port
+    os.environ["ROUTER_HOST"]             = "0.0.0.0"
 
 
 # ─────────────────────────────────────────────────────────────────────────────

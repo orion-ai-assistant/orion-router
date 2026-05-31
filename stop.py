@@ -52,10 +52,39 @@ def kill_port(port: int):
             if f":{port} " in line and "LISTENING" in line:
                 pid = line.split()[-1]
                 if pid.isdigit() and pid != "0":
-                    run_silent(["taskkill", "/f", "/pid", pid])
+                    run_silent(["taskkill", "/f", "/t", "/pid", pid])
                     dim(f"    Port {port} → PID {pid} kapatildi")
     except Exception:
         pass
+
+def kill_portable_postgres():
+    if sys.platform != "win32":
+        return
+    try:
+        target_path = str(PG_BIN / "postgres.exe")
+        escaped_path = target_path.replace("'", "''")
+        subprocess.run(
+            [
+                "powershell",
+                "-Command",
+                f"Get-Process -Name postgres -ErrorAction SilentlyContinue | "
+                f"Where-Object {{ $_.Path -eq '{escaped_path}' }} | "
+                f"Stop-Process -Force"
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+    except Exception:
+        pass
+
+    for data_dir in [DEV_DATA, PROD_DATA]:
+        pid_file = data_dir / "postmaster.pid"
+        if pid_file.exists():
+            try:
+                pid_file.unlink(missing_ok=True)
+                dim(f"    Stale postmaster.pid silindi ({data_dir.name})")
+            except Exception:
+                pass
 
 def main():
     line = "═" * 55
@@ -69,6 +98,8 @@ def main():
     info(f"Portlar temizleniyor: {', '.join(map(str, PORTS))}...")
     for port in PORTS:
         kill_port(port)
+    
+    kill_portable_postgres()
 
     print()
     ok("Tum servisler ve portlar temizlendi.")

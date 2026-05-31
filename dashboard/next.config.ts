@@ -1,6 +1,24 @@
 import type { NextConfig } from "next";
+import os from "os";
 
 const isDev = process.env.NODE_ENV !== "production";
+
+// Sistemdeki tüm yerel IP adreslerini dinamik olarak alıyoruz
+const getLocalIPs = (): string[] => {
+  const ips: string[] = [];
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    const ifaces = interfaces[name];
+    if (ifaces) {
+      for (const iface of ifaces) {
+        if (iface.family === "IPv4") {
+          ips.push(iface.address);
+        }
+      }
+    }
+  }
+  return ips;
+};
 
 const nextConfig: NextConfig = {
   output: isDev ? undefined : "export",
@@ -9,12 +27,12 @@ const nextConfig: NextConfig = {
     unoptimized: true, 
   },
   
-  // Olası tüm giriş yöntemlerine izin veriyoruz:
+  // Olası tüm giriş yöntemlerine (dinamik IP'ler dahil) izin veriyoruz:
   allowedDevOrigins: [
     "localhost",
     "127.0.0.1",
-    "192.168.1.105",
-    "*.trycloudflare.com"
+    "*.trycloudflare.com",
+    ...getLocalIPs()
   ],
 
   async rewrites() {
@@ -30,6 +48,17 @@ const nextConfig: NextConfig = {
       {
         source: "/api/:path*",
         destination: `${backendUrl}/dashboard/api/:path*`,
+      },
+    ];
+  },
+
+  async redirects() {
+    return [
+      {
+        source: "/",
+        destination: "/dashboard",
+        permanent: true,
+        basePath: false,
       },
     ];
   },

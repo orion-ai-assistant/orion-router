@@ -18,6 +18,17 @@ from core.config import MODEL_PRICING_PATH, MODEL_INFO_PATH, ROUTER_PORT
 logger = logging.getLogger("service-router")
 
 
+def get_local_ip() -> str:
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # ------------------------------------------------------------------ #
@@ -27,16 +38,18 @@ async def lifespan(app: FastAPI):
 
     import os
     env_mode = "Dev" if os.environ.get("UVICORN_RELOAD") == "1" else "Prod"
+    local_ip = get_local_ip()
     
     print("\n" + "═" * 55)
     print(f"║{'Orion Router — Bütün Servisler Aktif':^53}║")
     print("╠" + "═" * 53 + "╣")
     
     if env_mode == "Dev":
-        print(f"║  Dashboard       http://localhost:3001/dashboard")
-        print(f"║  Backend API     http://localhost:{ROUTER_PORT}")
+        print(f"║  Dashboard       http://localhost:3001")
+        print(f"║  Yerel Ağ (Tel)  http://{local_ip}:3001")
     else:
-        print(f"║  Dashboard + API http://localhost:{ROUTER_PORT}/dashboard")
+        print(f"║  Dashboard       http://localhost:{ROUTER_PORT}")
+        print(f"║  Yerel Ağ (Tel)  http://{local_ip}:{ROUTER_PORT}")
         
     print("╠" + "═" * 53 + "╣")
     print(f"║{'Durdurmak icin CTRL+C':^53}║")
