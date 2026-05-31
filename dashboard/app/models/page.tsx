@@ -20,9 +20,9 @@ interface ModelItem {
   capability: 'chat' | 'tts' | 'embed';
   temperature: number | null;
   is_active: boolean;
-  input_price: number;
-  output_price: number;
-  think_price: number;
+  input_price: number | string;
+  output_price: number | string;
+  think_price: number | string;
   thinking_level?: string | null;
   system_prompt?: string | null;
   _original?: {
@@ -38,6 +38,29 @@ interface ModelItem {
     system_prompt?: string | null;
   };
 }
+
+const formatPriceForInput = (val: number | string | null | undefined): string => {
+  if (val === null || val === undefined || val === '') return '';
+  const num = Number(val);
+  if (isNaN(num)) return '';
+  if (num === 0) return '0';
+  const str = num.toString();
+  if (str.includes('e') || str.includes('E')) {
+    return num.toFixed(20).replace(/\.?0+$/, '');
+  }
+  return str;
+};
+
+const cleanNumberInput = (val: string): string => {
+  if (val === '') return '';
+  if (val.includes('e') || val.includes('E')) {
+    const num = Number(val);
+    if (!isNaN(num)) {
+      return num.toFixed(20).replace(/\.?0+$/, '');
+    }
+  }
+  return val;
+};
 
 export default function ModelsPage() {
   const { showToast, confirmAction } = useApp();
@@ -55,9 +78,9 @@ export default function ModelsPage() {
     provider: '',
     capability: 'chat' as 'chat' | 'tts' | 'embed',
     temperature: '' as string | number,
-    input_price: 0,
-    output_price: 0,
-    think_price: 0,
+    input_price: '0' as string | number,
+    output_price: '0' as string | number,
+    think_price: '0' as string | number,
     thinking_level: '',
     system_prompt: '',
   });
@@ -69,9 +92,9 @@ export default function ModelsPage() {
     capability: 'chat',
     temperature: null,
     is_active: true,
-    input_price: 0,
-    output_price: 0,
-    think_price: 0,
+    input_price: '0',
+    output_price: '0',
+    think_price: '0',
     thinking_level: null,
     system_prompt: null,
   });
@@ -207,9 +230,9 @@ export default function ModelsPage() {
           capability,
           temperature: tempVal,
           is_active: true,
-          input_price: addForm.input_price || 0,
-          output_price: addForm.output_price || 0,
-          think_price: addForm.think_price || 0,
+          input_price: parseFloat(addForm.input_price as string) || 0,
+          output_price: parseFloat(addForm.output_price as string) || 0,
+          think_price: parseFloat(addForm.think_price as string) || 0,
           thinking_level: addForm.thinking_level || null,
           system_prompt: addForm.system_prompt || null,
         }),
@@ -220,9 +243,9 @@ export default function ModelsPage() {
           provider: providers[0] || '',
           capability: 'chat',
           temperature: '',
-          input_price: 0,
-          output_price: 0,
-          think_price: 0,
+          input_price: '0',
+          output_price: '0',
+          think_price: '0',
           thinking_level: '',
           system_prompt: '',
         });
@@ -264,9 +287,9 @@ export default function ModelsPage() {
           capability: editingModel.capability,
           temperature: tempVal,
           is_active: !!editingModel.is_active,
-          input_price: editingModel.input_price || 0,
-          output_price: editingModel.output_price || 0,
-          think_price: editingModel.think_price || 0,
+          input_price: parseFloat(editingModel.input_price as string) || 0,
+          output_price: parseFloat(editingModel.output_price as string) || 0,
+          think_price: parseFloat(editingModel.think_price as string) || 0,
           thinking_level: editingModel.thinking_level || null,
           system_prompt: editingModel.system_prompt || null,
         }),
@@ -330,6 +353,9 @@ export default function ModelsPage() {
     setEditingModel({
       ...model,
       temperature: model.temperature === null ? '' : (model.temperature as any),
+      input_price: formatPriceForInput(model.input_price),
+      output_price: formatPriceForInput(model.output_price),
+      think_price: formatPriceForInput(model.think_price),
     });
     setShowEditModal(true);
   };
@@ -393,7 +419,7 @@ export default function ModelsPage() {
                       )}
                       {model.system_prompt && (
                         <Badge className="bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-[9px] font-normal tracking-wide rounded uppercase px-1.5 py-0">
-                          Sys Prompt
+                          System Prompt
                         </Badge>
                       )}
                     </div>
@@ -428,7 +454,7 @@ export default function ModelsPage() {
                           <span className="text-xs font-mono text-zinc-300">{money(model.output_price)}</span>
                         </div>
                       )}
-                      {model.capability === 'chat' && model.think_price > 0 && (
+                      {model.capability === 'chat' && Number(model.think_price) > 0 && (
                         <div className="flex flex-col items-center justify-center gap-0.5">
                           <span className="text-[9px] font-semibold text-zinc-500 uppercase tracking-wider">think</span>
                           <span className="text-xs font-mono text-zinc-300">{money(model.think_price)}</span>
@@ -468,7 +494,7 @@ export default function ModelsPage() {
             <DialogTitle className="text-xl font-heading font-semibold text-white">Register New Model</DialogTitle>
           </DialogHeader>
 
-          <form onSubmit={handleCreate} className="flex flex-col gap-4 my-2">
+          <form onSubmit={handleCreate} noValidate className="flex flex-col gap-4 my-2">
             <div className="flex flex-col gap-2">
               <label className="text-zinc-400 text-sm font-medium">Model ID / Name</label>
               <Input
@@ -568,9 +594,9 @@ export default function ModelsPage() {
                     <Input
                       type="number"
                       min="0"
-                      step="0.00000001"
-                      value={addForm.input_price || ''}
-                      onChange={(e) => setAddForm({ ...addForm, input_price: parseFloat(e.target.value) || 0 })}
+                      step="0.01"
+                      value={addForm.input_price}
+                      onChange={(e) => setAddForm({ ...addForm, input_price: cleanNumberInput(e.target.value) })}
                       placeholder="0.0"
                       className="bg-black/40 border border-zinc-855 text-white text-xs px-3 py-2"
                     />
@@ -583,9 +609,9 @@ export default function ModelsPage() {
                     <Input
                       type="number"
                       min="0"
-                      step="0.00000001"
-                      value={addForm.output_price || ''}
-                      onChange={(e) => setAddForm({ ...addForm, output_price: parseFloat(e.target.value) || 0 })}
+                      step="0.01"
+                      value={addForm.output_price}
+                      onChange={(e) => setAddForm({ ...addForm, output_price: cleanNumberInput(e.target.value) })}
                       placeholder="0.0"
                       className="bg-black/40 border border-zinc-855 text-white text-xs px-3 py-2"
                     />
@@ -598,9 +624,9 @@ export default function ModelsPage() {
                     <Input
                       type="number"
                       min="0"
-                      step="0.00000001"
-                      value={addForm.think_price || ''}
-                      onChange={(e) => setAddForm({ ...addForm, think_price: parseFloat(e.target.value) || 0 })}
+                      step="0.01"
+                      value={addForm.think_price}
+                      onChange={(e) => setAddForm({ ...addForm, think_price: cleanNumberInput(e.target.value) })}
                       placeholder="0.0"
                       className="bg-black/40 border border-zinc-855 text-white text-xs px-3 py-2"
                     />
@@ -636,7 +662,7 @@ export default function ModelsPage() {
             <DialogTitle className="text-xl font-heading font-semibold text-white">Edit Registered Model</DialogTitle>
           </DialogHeader>
 
-          <form onSubmit={handleUpdate} className="flex flex-col gap-4 my-2">
+          <form onSubmit={handleUpdate} noValidate className="flex flex-col gap-4 my-2">
             <div className="flex flex-col gap-2">
               <label className="text-zinc-400 text-sm font-medium">Model ID / Name</label>
               <Input
@@ -736,9 +762,9 @@ export default function ModelsPage() {
                     <Input
                       type="number"
                       min="0"
-                      step="0.00000001"
-                      value={editingModel.input_price || ''}
-                      onChange={(e) => setEditingModel({ ...editingModel, input_price: parseFloat(e.target.value) || 0 })}
+                      step="0.01"
+                      value={editingModel.input_price ?? ''}
+                      onChange={(e) => setEditingModel({ ...editingModel, input_price: cleanNumberInput(e.target.value) })}
                       placeholder="0.0"
                       className="bg-black/40 border border-zinc-855 text-white text-xs px-3 py-2"
                     />
@@ -751,9 +777,9 @@ export default function ModelsPage() {
                     <Input
                       type="number"
                       min="0"
-                      step="0.00000001"
-                      value={editingModel.output_price || ''}
-                      onChange={(e) => setEditingModel({ ...editingModel, output_price: parseFloat(e.target.value) || 0 })}
+                      step="0.01"
+                      value={editingModel.output_price ?? ''}
+                      onChange={(e) => setEditingModel({ ...editingModel, output_price: cleanNumberInput(e.target.value) })}
                       placeholder="0.0"
                       className="bg-black/40 border border-zinc-855 text-white text-xs px-3 py-2"
                     />
@@ -766,9 +792,9 @@ export default function ModelsPage() {
                     <Input
                       type="number"
                       min="0"
-                      step="0.00000001"
-                      value={editingModel.think_price || ''}
-                      onChange={(e) => setEditingModel({ ...editingModel, think_price: parseFloat(e.target.value) || 0 })}
+                      step="0.01"
+                      value={editingModel.think_price ?? ''}
+                      onChange={(e) => setEditingModel({ ...editingModel, think_price: cleanNumberInput(e.target.value) })}
                       placeholder="0.0"
                       className="bg-black/40 border border-zinc-855 text-white text-xs px-3 py-2"
                     />

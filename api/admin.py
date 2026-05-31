@@ -218,6 +218,22 @@ async def get_admin_log_details(log_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.delete("/api/logs", dependencies=[Depends(verify_admin)])
+async def delete_all_logs():
+    """Tüm istek loglarını siler ve sanal anahtarların kullanılan bütçe tutarlarını sıfırlar."""
+    try:
+        pool = await db_manager.get_db_pool()
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                # 1. Delete request logs
+                await conn.execute("DELETE FROM router_request_logs")
+                # 2. Reset virtual key usage statistics
+                await conn.execute("UPDATE router_virtual_keys SET used_amount = 0.0")
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/api/stats", dependencies=[Depends(verify_admin)])
 async def get_admin_stats():
     """Toplam maliyet, token ve anahtar sayısını döner."""

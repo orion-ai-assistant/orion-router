@@ -655,7 +655,7 @@ export default function GroupsPage() {
                               )}
                               {item.system_prompt && (
                                 <Badge className="bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-[9px] font-normal tracking-wide rounded uppercase px-1.5 py-0">
-                                  Sys Prompt
+                                  System Prompt
                                 </Badge>
                               )}
                             </div>
