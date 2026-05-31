@@ -61,7 +61,14 @@ async def _log_usage(app_state, key_id: str | None, provider: str, model: str, u
         cost = None
         p_cost, c_cost, t_cost = 0.0, 0.0, 0.0
 
-        if success is True and usage is not None:
+        should_calculate = False
+        if usage is not None:
+            if capability in ("tts", "embed"):
+                should_calculate = success is True
+            else:
+                should_calculate = success is True or (c or 0) > 0 or (t or 0) > 0
+
+        if should_calculate:
             pricing_cache = app_state.pricing_cache if hasattr(app_state, "pricing_cache") else {}
             if model in pricing_cache:
                 prices = pricing_cache[model]
@@ -71,6 +78,8 @@ async def _log_usage(app_state, key_id: str | None, provider: str, model: str, u
                 cost = p_cost + c_cost + t_cost
         else:
             cost = 0.0
+            p, c, t = None, None, None
+            tokens_used = None
 
         await db_manager.log_request(
             key_id=key_id,

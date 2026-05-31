@@ -343,7 +343,7 @@ class DatabaseManager:
                     """,
                     key_id, provider, model, tokens_used, prompt_tokens, completion_tokens, thoughts_tokens, cost, success, request_json, response_json, upstream_key_id, capability, prompt_cost, completion_cost, thoughts_cost
                 )
-                if key_id and cost is not None and success:
+                if key_id and cost is not None and (success or cost > 0):
                     await conn.execute(
                         "UPDATE router_virtual_keys SET used_amount = used_amount + $1 WHERE id = $2",
                         cost, key_id
