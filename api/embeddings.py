@@ -4,6 +4,7 @@ api/embeddings.py
 Embedding endpoint'i. Yönlendirme mantığı tamamen DynamicLLMRouter'a delege edilir.
 Hardcoded provider kontrolü yoktur; yeni provider eklemek için api/ dosyasına dokunmak gerekmez.
 """
+import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -15,6 +16,21 @@ logger = logging.getLogger("service-router.embeddings")
 
 router = APIRouter(tags=["Embeddings"])
 
+async def run_with_disconnect_check(request: Request, coro):
+    task = asyncio.create_task(coro)
+    
+    async def check_disconnect():
+        while True:
+            if await request.is_disconnected():
+                task.cancel()
+                return
+            await asyncio.sleep(0.1)
+            
+    checker = asyncio.create_task(check_disconnect())
+    try:
+        return await task
+    finally:
+        checker.cancel()
 
 @router.post("/v1/embeddings")
 async def embeddings(
@@ -48,13 +64,16 @@ async def embeddings(
         )
 
     try:
-        result = await dynamic_router.run_embeddings(
-            provider=provider,
-            model=model,
-            input_text=input_text,
-            api_key=api_key,
-            auth_header=auth_header,
-            key_id=key_info.get("key_id") if key_info else None,
+        result = await run_with_disconnect_check(
+            request,
+            dynamic_router.run_embeddings(
+                provider=provider,
+                model=model,
+                input_text=input_text,
+                api_key=api_key,
+                auth_header=auth_header,
+                key_id=key_info.get("key_id") if key_info else None,
+            )
         )
         return result
     except Exception as e:

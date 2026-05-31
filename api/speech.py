@@ -3,6 +3,7 @@ api/speech.py
 -------------
 OpenAI-compatible text-to-speech endpoint.
 """
+import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -15,6 +16,21 @@ logger = logging.getLogger("service-router.speech")
 
 router = APIRouter(tags=["Speech"])
 
+async def run_with_disconnect_check(request: Request, coro):
+    task = asyncio.create_task(coro)
+    
+    async def check_disconnect():
+        while True:
+            if await request.is_disconnected():
+                task.cancel()
+                return
+            await asyncio.sleep(0.1)
+            
+    checker = asyncio.create_task(check_disconnect())
+    try:
+        return await task
+    finally:
+        checker.cancel()
 
 @router.post("/v1/audio/speech")
 async def audio_speech(
@@ -41,15 +57,18 @@ async def audio_speech(
     dynamic_router: DynamicLLMRouter = request.app.state.dynamic_router
 
     try:
-        audio_bytes, content_type = await dynamic_router.run_speech(
-            provider=provider,
-            model=model,
-            input_text=input_text,
-            voice=voice,
-            api_key=api_key,
-            auth_header=auth_header,
-            key_id=auth.get("key_id") if auth else None,
-            temperature=temperature,
+        audio_bytes, content_type = await run_with_disconnect_check(
+            request,
+            dynamic_router.run_speech(
+                provider=provider,
+                model=model,
+                input_text=input_text,
+                voice=voice,
+                api_key=api_key,
+                auth_header=auth_header,
+                key_id=auth.get("key_id") if auth else None,
+                temperature=temperature,
+            )
         )
         return Response(
             content=audio_bytes,

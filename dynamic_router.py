@@ -536,75 +536,94 @@ class DynamicLLMRouter:
             "input": input_text,
         }
 
+        p_provider = provider
+        p_model = model
         last_err = None
-        for route in routes:
-            p_provider = route["provider"]
-            p_model = route["name"]
-            
-            plugin = self.embed_providers.get(p_provider)
-            if not plugin:
-                last_err = ValueError(f"Embed provider not available: {p_provider}")
-                continue
+        try:
+            for route in routes:
+                p_provider = route["provider"]
+                p_model = route["name"]
                 
-            keys_to_try = await self._get_keys_for_provider(p_provider, api_key or auth_header)
-            
-            for key_val, key_pool_id in keys_to_try:
-                logger.info(f"Routing embeddings to {p_provider} (model={p_model}) using key {key_pool_id or 'default'}")
-                try:
-                    result = await plugin.generate_embeddings(
-                        model=p_model,
-                        input_text=input_text,
-                        api_key=key_val,
-                        auth_header=auth_header if not key_val else None,
-                    )
+                plugin = self.embed_providers.get(p_provider)
+                if not plugin:
+                    last_err = ValueError(f"Embed provider not available: {p_provider}")
+                    continue
                     
-                    # Log success — store vector dimension in completion_tokens
-                    p_tokens = 0
-                    vector_dim = 0
-                    if isinstance(result, dict):
-                        if "usage" in result:
-                            p_tokens = result["usage"].get("prompt_tokens", 0)
-                        try:
-                            vector_dim = len(result["data"][0]["embedding"])
-                        except Exception:
-                            pass
-                    
-                    usage = {"prompt_tokens": p_tokens, "completion_tokens": vector_dim, "thoughts_tokens": 0}
-                    asyncio.create_task(
-                        _log_usage(
-                            self.app_state,
-                            key_id,
-                            p_provider,
-                            p_model,
-                            usage,
-                            request_json=json.dumps(req_data, ensure_ascii=False),
-                            response_json=json.dumps(result, ensure_ascii=False),
-                            success=True,
-                            capability='embed'
+                keys_to_try = await self._get_keys_for_provider(p_provider, api_key or auth_header)
+                
+                for key_val, key_pool_id in keys_to_try:
+                    logger.info(f"Routing embeddings to {p_provider} (model={p_model}) using key {key_pool_id or 'default'}")
+                    try:
+                        result = await plugin.generate_embeddings(
+                            model=p_model,
+                            input_text=input_text,
+                            api_key=key_val,
+                            auth_header=auth_header if not key_val else None,
                         )
-                    )
-                    return result
-                except Exception as e:
-                    logger.error(f"Embed route {p_provider}/{p_model} failed: {e}")
-                    if key_pool_id:
-                        await db_manager.mark_provider_key_error(key_pool_id, str(e))
-                    last_err = e
-                    
-                    # Log attempt failure
-                    res_err = {"error": str(e)}
-                    asyncio.create_task(
-                        _log_usage(
-                            self.app_state,
-                            key_id,
-                            p_provider,
-                            p_model,
-                            None,
-                            request_json=json.dumps(req_data, ensure_ascii=False),
-                            response_json=json.dumps(res_err, ensure_ascii=False),
-                            success=False,
-                            capability='embed'
+                        
+                        # Log success — store vector dimension in completion_tokens
+                        p_tokens = 0
+                        vector_dim = 0
+                        if isinstance(result, dict):
+                            if "usage" in result:
+                                p_tokens = result["usage"].get("prompt_tokens", 0)
+                            try:
+                                vector_dim = len(result["data"][0]["embedding"])
+                            except Exception:
+                                pass
+                        
+                        usage = {"prompt_tokens": p_tokens, "completion_tokens": vector_dim, "thoughts_tokens": 0}
+                        asyncio.create_task(
+                            _log_usage(
+                                self.app_state,
+                                key_id,
+                                p_provider,
+                                p_model,
+                                usage,
+                                request_json=json.dumps(req_data, ensure_ascii=False),
+                                response_json=json.dumps(result, ensure_ascii=False),
+                                success=True,
+                                capability='embed'
+                            )
                         )
-                    )
+                        return result
+                    except Exception as e:
+                        logger.error(f"Embed route {p_provider}/{p_model} failed: {e}")
+                        if key_pool_id:
+                            await db_manager.mark_provider_key_error(key_pool_id, str(e))
+                        last_err = e
+                        
+                        # Log attempt failure
+                        res_err = {"error": str(e)}
+                        asyncio.create_task(
+                            _log_usage(
+                                self.app_state,
+                                key_id,
+                                p_provider,
+                                p_model,
+                                None,
+                                request_json=json.dumps(req_data, ensure_ascii=False),
+                                response_json=json.dumps(res_err, ensure_ascii=False),
+                                success=False,
+                                capability='embed'
+                            )
+                        )
+        except asyncio.CancelledError:
+            res_err = {"error": "Client disconnected / Request Cancelled"}
+            asyncio.create_task(
+                _log_usage(
+                    self.app_state,
+                    key_id,
+                    p_provider,
+                    p_model,
+                    None,
+                    request_json=json.dumps(req_data, ensure_ascii=False),
+                    response_json=json.dumps(res_err, ensure_ascii=False),
+                    success=None,
+                    capability='embed'
+                )
+            )
+            raise
                     
         raise last_err or ValueError(f"Could not resolve embed route for model: {model}")
 
@@ -640,86 +659,105 @@ class DynamicLLMRouter:
             **kwargs
         }
 
+        p_provider = provider
+        p_model = model
         last_err = None
-        for route in routes:
-            p_provider = route["provider"]
-            p_model = route["name"]
-            p_temp = route.get("temperature")
-            
-            route_kwargs = {**kwargs}
-            if p_temp is not None and route_kwargs.get("temperature") is None:
-                try:
-                    route_kwargs["temperature"] = float(p_temp)
-                except Exception:
-                    pass
-            
-            plugin = self.tts_providers.get(p_provider)
-            if not plugin:
-                last_err = ValueError(f"TTS provider not available: {p_provider}")
-                continue
+        try:
+            for route in routes:
+                p_provider = route["provider"]
+                p_model = route["name"]
+                p_temp = route.get("temperature")
                 
-            keys_to_try = await self._get_keys_for_provider(p_provider, api_key or auth_header)
-            
-            for key_val, key_pool_id in keys_to_try:
-                logger.info(f"Routing TTS to {p_provider} (model={p_model}, voice={voice}) using key {key_pool_id or 'default'}, kwargs={route_kwargs}")
-                try:
-                    audio_bytes, content_type, usage_meta = await plugin.generate_speech(
-                        model=p_model,
-                        input_text=input_text,
-                        voice=voice,
-                        api_key=key_val,
-                        auth_header=auth_header if not key_val else None,
-                        **route_kwargs
-                    )
+                route_kwargs = {**kwargs}
+                if p_temp is not None and route_kwargs.get("temperature") is None:
+                    try:
+                        route_kwargs["temperature"] = float(p_temp)
+                    except Exception:
+                        pass
+                
+                plugin = self.tts_providers.get(p_provider)
+                if not plugin:
+                    last_err = ValueError(f"TTS provider not available: {p_provider}")
+                    continue
                     
-                    # Log success — store audio tokens
-                    import base64
-                    audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
-                    prompt_tokens = usage_meta.get("prompt_tokens", 0)
-                    completion_tokens = usage_meta.get("completion_tokens", 0)
-                    usage = {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens, "thoughts_tokens": 0}
-                    res_success = {
-                        "detail": "Audio generation successful",
-                        "content_type": content_type,
-                        "size_bytes": len(audio_bytes),
-                        "estimated_duration_seconds": completion_tokens / 25.0,
-                        "audio_base64": audio_b64
-                    }
-                    asyncio.create_task(
-                        _log_usage(
-                            self.app_state,
-                            key_id,
-                            p_provider,
-                            p_model,
-                            usage,
-                            request_json=json.dumps(req_data, ensure_ascii=False),
-                            response_json=json.dumps(res_success, ensure_ascii=False),
-                            success=True,
-                            capability='tts'
+                keys_to_try = await self._get_keys_for_provider(p_provider, api_key or auth_header)
+                
+                for key_val, key_pool_id in keys_to_try:
+                    logger.info(f"Routing TTS to {p_provider} (model={p_model}, voice={voice}) using key {key_pool_id or 'default'}, kwargs={route_kwargs}")
+                    try:
+                        audio_bytes, content_type, usage_meta = await plugin.generate_speech(
+                            model=p_model,
+                            input_text=input_text,
+                            voice=voice,
+                            api_key=key_val,
+                            auth_header=auth_header if not key_val else None,
+                            **route_kwargs
                         )
-                    )
-                    return audio_bytes, content_type
-                except Exception as e:
-                    logger.error(f"TTS route {p_provider}/{p_model} failed: {e}")
-                    if key_pool_id:
-                        await db_manager.mark_provider_key_error(key_pool_id, str(e))
-                    last_err = e
-                    
-                    # Log attempt failure
-                    res_err = {"error": str(e)}
-                    asyncio.create_task(
-                        _log_usage(
-                            self.app_state,
-                            key_id,
-                            p_provider,
-                            p_model,
-                            None,
-                            request_json=json.dumps(req_data, ensure_ascii=False),
-                            response_json=json.dumps(res_err, ensure_ascii=False),
-                            success=False,
-                            capability='tts'
+                        
+                        # Log success — store audio tokens
+                        import base64
+                        audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
+                        prompt_tokens = usage_meta.get("prompt_tokens", 0)
+                        completion_tokens = usage_meta.get("completion_tokens", 0)
+                        usage = {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens, "thoughts_tokens": 0}
+                        res_success = {
+                            "detail": "Audio generation successful",
+                            "content_type": content_type,
+                            "size_bytes": len(audio_bytes),
+                            "estimated_duration_seconds": completion_tokens / 25.0,
+                            "audio_base64": audio_b64
+                        }
+                        asyncio.create_task(
+                            _log_usage(
+                                self.app_state,
+                                key_id,
+                                p_provider,
+                                p_model,
+                                usage,
+                                request_json=json.dumps(req_data, ensure_ascii=False),
+                                response_json=json.dumps(res_success, ensure_ascii=False),
+                                success=True,
+                                capability='tts'
+                            )
                         )
-                    )
+                        return audio_bytes, content_type
+                    except Exception as e:
+                        logger.error(f"TTS route {p_provider}/{p_model} failed: {e}")
+                        if key_pool_id:
+                            await db_manager.mark_provider_key_error(key_pool_id, str(e))
+                        last_err = e
+                        
+                        # Log attempt failure
+                        res_err = {"error": str(e)}
+                        asyncio.create_task(
+                            _log_usage(
+                                self.app_state,
+                                key_id,
+                                p_provider,
+                                p_model,
+                                None,
+                                request_json=json.dumps(req_data, ensure_ascii=False),
+                                response_json=json.dumps(res_err, ensure_ascii=False),
+                                success=False,
+                                capability='tts'
+                            )
+                        )
+        except asyncio.CancelledError:
+            res_err = {"error": "Client disconnected / Request Cancelled"}
+            asyncio.create_task(
+                _log_usage(
+                    self.app_state,
+                    key_id,
+                    p_provider,
+                    p_model,
+                    None,
+                    request_json=json.dumps(req_data, ensure_ascii=False),
+                    response_json=json.dumps(res_err, ensure_ascii=False),
+                    success=None,
+                    capability='tts'
+                )
+            )
+            raise
                     
         raise last_err or ValueError(f"Could not resolve TTS route for model: {model}")
 

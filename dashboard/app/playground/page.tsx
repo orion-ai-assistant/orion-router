@@ -62,6 +62,8 @@ export default function PlaygroundPage() {
   const [ttsInput, setTtsInput] = useState('');
   const [ttsUrl, setTtsUrl] = useState('');
   const [ttsError, setTtsError] = useState('');
+  const [isGeneratingTTS, setIsGeneratingTTS] = useState(false);
+  const ttsAbortControllerRef = useRef<AbortController | null>(null);
 
   // Embed State
   const [embedModel, setEmbedModel] = useState(getSavedState('pg_embedModel', ''));
@@ -70,6 +72,8 @@ export default function PlaygroundPage() {
   const [embedPreview, setEmbedPreview] = useState('');
   const [embedDim, setEmbedDim] = useState('');
   const [embedJson, setEmbedJson] = useState('');
+  const [isGeneratingEmbed, setIsGeneratingEmbed] = useState(false);
+  const embedAbortControllerRef = useRef<AbortController | null>(null);
 
   const loadModels = async () => {
     try {
@@ -192,6 +196,62 @@ export default function PlaygroundPage() {
       chatMessagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [chatMessages]);
+
+  const getResolvedDefaults = () => {
+    if (!chatModel) return { temperature: null, thinking_level: null, system_prompt: null };
+
+    // Check if it's a group
+    const group = groups.find((g) => g.name === chatModel && g.capability === 'chat');
+    if (group) {
+      const primaryItem = group.items?.[0];
+      if (primaryItem) {
+        const modelDetail = models.find((m) => m.name === primaryItem.name && m.capability === 'chat');
+        return {
+          temperature: modelDetail?.temperature ?? null,
+          thinking_level: primaryItem.thinking_level || modelDetail?.thinking_level || null,
+          system_prompt: primaryItem.system_prompt || modelDetail?.system_prompt || null,
+        };
+      }
+      return { temperature: null, thinking_level: null, system_prompt: null };
+    }
+
+    // Check if it's a single model
+    const model = models.find((m) => m.name === chatModel && m.capability === 'chat');
+    if (model) {
+      return {
+        temperature: model.temperature ?? null,
+        thinking_level: model.thinking_level || null,
+        system_prompt: model.system_prompt || null,
+      };
+    }
+
+    return { temperature: null, thinking_level: null, system_prompt: null };
+  };
+
+  const getResolvedTtsDefaults = () => {
+    if (!ttsModel) return { temperature: null };
+
+    const group = groups.find((g) => g.name === ttsModel && g.capability === 'tts');
+    if (group) {
+      const primaryItem = group.items?.[0];
+      if (primaryItem) {
+        const modelDetail = models.find((m) => m.name === primaryItem.name && m.capability === 'tts');
+        return {
+          temperature: modelDetail?.temperature ?? null,
+        };
+      }
+      return { temperature: null };
+    }
+
+    const model = models.find((m) => m.name === ttsModel && m.capability === 'tts');
+    if (model) {
+      return {
+        temperature: model.temperature ?? null,
+      };
+    }
+
+    return { temperature: null };
+  };
 
   const getRouteOptions = (capability: string): RouteOption[] => {
     const options: RouteOption[] = [];
@@ -462,6 +522,9 @@ export default function PlaygroundPage() {
     }
 
     try {
+      setIsGeneratingTTS(true);
+      ttsAbortControllerRef.current = new AbortController();
+
       const res = await fetch(`${apiBaseUrl}/v1/audio/speech`, {
         method: 'POST',
         headers: {
@@ -469,6 +532,7 @@ export default function PlaygroundPage() {
           Authorization: `Bearer ${adminKey}`,
         },
         body: JSON.stringify(payload),
+        signal: ttsAbortControllerRef.current.signal,
       });
 
       if (!res.ok) {
@@ -480,7 +544,12 @@ export default function PlaygroundPage() {
       setTtsUrl(URL.createObjectURL(blob));
       showToast('Audio synthesized successfully!');
     } catch (e: any) {
-      setTtsError('❌ Error: ' + e.message);
+      if (e.name !== 'AbortError') {
+        setTtsError('❌ Error: ' + e.message);
+      }
+    } finally {
+      setIsGeneratingTTS(false);
+      ttsAbortControllerRef.current = null;
     }
   };
 
@@ -500,6 +569,9 @@ export default function PlaygroundPage() {
     const apiBaseUrl = getApiBaseUrl();
 
     try {
+      setIsGeneratingEmbed(true);
+      embedAbortControllerRef.current = new AbortController();
+
       const res = await fetch(`${apiBaseUrl}/v1/embeddings`, {
         method: 'POST',
         headers: {
@@ -507,6 +579,7 @@ export default function PlaygroundPage() {
           Authorization: `Bearer ${adminKey}`,
         },
         body: JSON.stringify({ model: embedModel, input: text }),
+        signal: embedAbortControllerRef.current.signal,
       });
 
       if (!res.ok) {
@@ -535,9 +608,22 @@ export default function PlaygroundPage() {
       setEmbedJson(JSON.stringify(truncated, null, 2));
       showToast('Embedding vector generated!');
     } catch (e: any) {
-      setEmbedError('❌ Error: ' + e.message);
+      if (e.name !== 'AbortError') {
+        setEmbedError('❌ Error: ' + e.message);
+      }
+    } finally {
+      setIsGeneratingEmbed(false);
+      embedAbortControllerRef.current = null;
     }
   };
+
+  const resolvedDefaults = getResolvedDefaults();
+  const resolvedTtsDefaults = getResolvedTtsDefaults();
+
+  const hasTempOverride = chatTemp !== '';
+  const hasThinkingOverride = chatThinking !== '';
+  const hasSystemPromptOverride = chatSystemPrompt !== '';
+  const hasTtsTempOverride = ttsTemp !== '';
 
   return (
     <section id="playground" className="tab-content active block pt-4">
@@ -549,12 +635,12 @@ export default function PlaygroundPage() {
       </header>
 
       {/* Segmented Controls for Sub-tabs */}
-      <div className="pg-segmented-control flex gap-1 bg-[#18181b] border border-zinc-800 p-0.5 rounded-lg mb-4 max-w-max">
+      <div className="pg-segmented-control flex gap-1 bg-[#18181b] border border-zinc-800 p-0.5 rounded-md mb-4 max-w-max">
         {(['chat', 'tts', 'embed'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-1.5 rounded-md font-medium text-xs transition-all cursor-pointer ${
+            className={`px-4 py-1.5 rounded-[8px] font-medium text-xs transition-all cursor-pointer ${
               activeTab === tab
                 ? 'bg-zinc-800 text-white shadow'
                 : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-white'
@@ -588,7 +674,24 @@ export default function PlaygroundPage() {
               </div>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-zinc-400 text-[10px] font-semibold uppercase">Temperature</label>
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-zinc-400 text-[10px] font-semibold uppercase">Temperature</label>
+                {resolvedDefaults.temperature !== null ? (
+                  <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all ${
+                    hasTempOverride 
+                      ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50' 
+                      : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
+                  }`} title={hasTempOverride ? "Default is overridden by your input" : "Database default value for this model"}>
+                    Default: {resolvedDefaults.temperature}
+                  </span>
+                ) : (
+                  <span className={`text-[9px] font-medium transition-all ${
+                    hasTempOverride ? 'text-zinc-700 line-through opacity-50' : 'text-zinc-500'
+                  }`}>
+                    Default: Provider choice
+                  </span>
+                )}
+              </div>
               <Input
                 type="number"
                 min="0"
@@ -597,25 +700,65 @@ export default function PlaygroundPage() {
                 value={chatTemp}
                 onChange={(e) => setChatTemp(e.target.value)}
                 placeholder="optional (e.g. 0.7)"
-                className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs"
+                className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs placeholder:text-zinc-600"
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-zinc-400 text-[10px] font-semibold uppercase">Thinking Config</label>
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-zinc-400 text-[10px] font-semibold uppercase">Thinking</label>
+                {resolvedDefaults.thinking_level ? (
+                  <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all ${
+                    hasThinkingOverride 
+                      ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50' 
+                      : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
+                  }`} title={hasThinkingOverride ? "Default is overridden by your input" : "Database default value for this model"}>
+                    Default: {resolvedDefaults.thinking_level}
+                  </span>
+                ) : (
+                  <span className={`text-[9px] font-medium transition-all ${
+                    hasThinkingOverride ? 'text-zinc-700 line-through opacity-50' : 'text-zinc-500'
+                  }`}>
+                    Default: None
+                  </span>
+                )}
+              </div>
               <Input
                 value={chatThinking}
                 onChange={(e) => setChatThinking(e.target.value)}
-                placeholder="none, 1024, high"
-                className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs"
+                placeholder="optional (e.g. low, 1024)"
+                className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs placeholder:text-zinc-600"
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-zinc-400 text-[10px] font-semibold uppercase">System Prompt (Override)</label>
+              <div className="flex justify-between items-center mb-1 relative group">
+                <label className="text-zinc-400 text-[10px] font-semibold uppercase">System Prompt</label>
+                {resolvedDefaults.system_prompt ? (
+                  <>
+                    <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all cursor-help truncate max-w-[120px] block ${
+                      hasSystemPromptOverride 
+                        ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50' 
+                        : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
+                    }`}>
+                      Default: {resolvedDefaults.system_prompt.length > 15 ? resolvedDefaults.system_prompt.slice(0, 15) + '...' : resolvedDefaults.system_prompt}
+                    </span>
+                    <div className="absolute top-full left-0 right-0 mt-1 hidden group-hover:block z-50 bg-[#242427]/98 border border-zinc-700/60 text-zinc-200 text-[10px] p-3 rounded shadow-xl whitespace-pre-wrap max-h-40 overflow-y-auto custom-scrollbar pointer-events-none">
+                      <div className="font-semibold text-[9px] text-purple-400 mb-1 uppercase tracking-wide">Default:</div>
+                      {resolvedDefaults.system_prompt}
+                    </div>
+                  </>
+                ) : (
+                  <span className={`text-[9px] font-medium transition-all ${
+                    hasSystemPromptOverride ? 'text-zinc-700 line-through opacity-50' : 'text-zinc-500'
+                  }`}>
+                    Default: None
+                  </span>
+                )}
+              </div>
               <Textarea
                 value={chatSystemPrompt}
                 onChange={(e) => setChatSystemPrompt(e.target.value)}
                 placeholder="Enter system instructions..."
-                className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs h-20 resize-none custom-scrollbar overflow-y-auto no-field-sizing"
+                className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs h-20 resize-none custom-scrollbar overflow-y-auto no-field-sizing placeholder:text-zinc-600"
               />
             </div>
           </div>
@@ -726,7 +869,24 @@ export default function PlaygroundPage() {
               </div>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-zinc-400 text-[10px] font-semibold uppercase">Temperature</label>
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-zinc-400 text-[10px] font-semibold uppercase">Temperature</label>
+                {resolvedTtsDefaults.temperature !== null ? (
+                  <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all ${
+                    hasTtsTempOverride 
+                      ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50' 
+                      : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
+                  }`} title={hasTtsTempOverride ? "Default is overridden by your input" : "Database default value for this model"}>
+                    Default: {resolvedTtsDefaults.temperature}
+                  </span>
+                ) : (
+                  <span className={`text-[9px] font-medium transition-all ${
+                    hasTtsTempOverride ? 'text-zinc-700 line-through opacity-50' : 'text-zinc-500'
+                  }`}>
+                    Default: Provider choice
+                  </span>
+                )}
+              </div>
               <Input
                 type="number"
                 min="0"
@@ -735,7 +895,7 @@ export default function PlaygroundPage() {
                 value={ttsTemp}
                 onChange={(e) => setTtsTemp(e.target.value)}
                 placeholder="optional"
-                className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs"
+                className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs placeholder:text-zinc-600"
               />
             </div>
           </div>
@@ -753,12 +913,21 @@ export default function PlaygroundPage() {
             </div>
             
             <div className="flex justify-end">
-              <Button
-                onClick={handleGenerateTTS}
-                className="bg-white text-black hover:bg-zinc-200 font-semibold px-5 py-2 rounded-lg text-xs"
-              >
-                Generate Audio
-              </Button>
+              {isGeneratingTTS ? (
+                <Button
+                  onClick={() => ttsAbortControllerRef.current?.abort()}
+                  className="bg-red-600 text-white hover:bg-red-700 font-semibold px-5 py-2 rounded-lg text-xs min-w-[70px]"
+                >
+                  Stop
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleGenerateTTS}
+                  className="bg-white text-black hover:bg-zinc-200 font-semibold px-5 py-2 rounded-lg text-xs"
+                >
+                  Generate Audio
+                </Button>
+              )}
             </div>
 
             {ttsError && (
@@ -820,12 +989,21 @@ export default function PlaygroundPage() {
             </div>
             
             <div className="flex justify-end">
-              <Button
-                onClick={handleGenerateEmbedding}
-                className="bg-white text-black hover:bg-zinc-200 font-semibold px-5 py-2 rounded-lg text-xs"
-              >
-                Generate Vector
-              </Button>
+              {isGeneratingEmbed ? (
+                <Button
+                  onClick={() => embedAbortControllerRef.current?.abort()}
+                  className="bg-red-600 text-white hover:bg-red-700 font-semibold px-5 py-2 rounded-lg text-xs min-w-[70px]"
+                >
+                  Stop
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleGenerateEmbedding}
+                  className="bg-white text-black hover:bg-zinc-200 font-semibold px-5 py-2 rounded-lg text-xs"
+                >
+                  Generate Vector
+                </Button>
+              )}
             </div>
 
             {embedError && (
