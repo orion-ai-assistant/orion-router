@@ -2,8 +2,8 @@
 providers/local/chat.py
 -----------------------
 llama-cpp sunucusuna streaming chat yönlendirmesi.
+Thinking desteklidir. API reasoning_tokens vermezse karakter bazlı tahminle ayırır.
 """
-import os
 import json
 import httpx
 from typing import AsyncGenerator, Any
@@ -24,9 +24,7 @@ class LocalChatProvider(BaseChat):
         **kwargs,
     ) -> AsyncGenerator[Any, None]:
 
-        llm_host = LLM_HOST
-        llm_port = LLM_PORT
-        url = f"http://{llm_host}:{llm_port}/v1/chat/completions"
+        url = f"http://{LLM_HOST}:{LLM_PORT}/v1/chat/completions"
 
         payload = {
             "model": "local-model",
@@ -52,10 +50,7 @@ class LocalChatProvider(BaseChat):
             if tool_choice:
                 payload["tool_choice"] = tool_choice
 
-        # Fallback token tahmini (sunucu usage döndürmezse kullanılır)
-        prompt_chars = sum(len(m.get("content", "")) for m in messages)
-        est_prompt = max(1, prompt_chars // 4)
-        out_chars = 0
+        # Kaç karakter reasoning (think) geldi — API breakdown vermezse tahmin için
         thought_chars = 0
 
         async with httpx.AsyncClient(timeout=None) as client:
@@ -66,27 +61,38 @@ class LocalChatProvider(BaseChat):
                     err = await response.aread()
                     raise RuntimeError(f"Local HTTP Error {response.status_code}: {err.decode(errors='ignore')}")
 
-                got_usage = False
                 async for data in self._iter_sse_lines(response):
+                    # ── Usage chunk ────────────────────────────────────────────────────
                     if data.get("usage"):
-                        got_usage = True
                         usage = data["usage"]
                         raw_completion = usage.get("completion_tokens", 0) or 0
+
+                        # API reasoning_tokens breakdown veriyorsa kullan
                         details = usage.get("completion_tokens_details") or {}
-                        r = details.get("reasoning_tokens", 0) or 0
-                        if r:
-                            # API reasoning_tokens döndü; output = toplam - reasoning
-                            usage["thoughts_tokens"] = r
-                            usage["completion_tokens"] = max(0, raw_completion - r)
+                        api_reasoning = details.get("reasoning_tokens", 0) or 0
+
+                        if api_reasoning:
+                            # API net breakdown verdi
+                            usage["thoughts_tokens"] = api_reasoning
+                            usage["completion_tokens"] = max(0, raw_completion - api_reasoning)
                         elif thought_chars > 0:
-                            # API detay vermedi ama thinking stream'i geldi;
-                            # kısa output'u char'dan tahmin et, thinking'i farktan bul
-                            est_output = max(1, out_chars // 4) if out_chars else 0
-                            usage["completion_tokens"] = est_output
-                            usage["thoughts_tokens"] = max(0, raw_completion - est_output)
+                            # API vermedi ama think stream'i geldi → char oranıyla böl
+                            # raw_completion = toplam output (think + text)
+                            # think oranı = thought_chars / (thought_chars + out_chars)
+                            # Burada out_chars'ı bilmiyoruz, ama orantıyı kullanabiliriz:
+                            # think_tokens ≈ raw_completion * (thought_chars / total_chars)
+                            # total_chars hesabı yapamıyoruz burada, basit yaklaşım:
+                            # think_tokens ≈ thought_chars // 4 (char/token oranı)
+                            est_think = thought_chars // 4
+                            est_think = min(est_think, raw_completion)  # toplam aşmasın
+                            usage["thoughts_tokens"] = est_think
+                            usage["completion_tokens"] = max(0, raw_completion - est_think)
+                        # else: API breakdown yok, think yok → tüm completion_tokens out'ta kalır
+
                         yield {"internal_usage": usage}
                         continue
 
+                    # ── Content chunks ─────────────────────────────────────────────────
                     delta = (data.get("choices") or [{}])[0].get("delta", {})
 
                     if delta.get("reasoning_content"):
@@ -96,19 +102,7 @@ class LocalChatProvider(BaseChat):
 
                     if delta.get("content"):
                         c = delta["content"]
-                        out_chars += len(c)
                         yield f'data: {{"choices":[{{"delta":{{"content":{json.dumps(c, ensure_ascii=False)}}}}}]}}\n\n'
 
                     if delta.get("tool_calls"):
                         yield f'data: {{"choices":[{{"delta":{{"tool_calls":{json.dumps(delta["tool_calls"], ensure_ascii=False)}}}}}]}}\n\n'
-
-                if not got_usage:
-                    est_out = max(1, out_chars // 4)
-                    yield {
-                        "internal_usage": {
-                            "prompt_tokens": est_prompt,
-                            "completion_tokens": est_out,
-                            "thoughts_tokens": max(0, thought_chars // 4),
-                            "total_tokens": est_prompt + est_out,
-                        }
-                    }

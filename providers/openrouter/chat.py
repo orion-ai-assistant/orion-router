@@ -41,7 +41,6 @@ class OpenRouterChatProvider(BaseChat):
             "messages": messages,
             "stream": True,
             "stream_options": {"include_usage": True},
-            "include_reasoning": True,
         }
         if kwargs.get("temperature") is not None:
             payload["temperature"] = float(kwargs["temperature"])
@@ -49,6 +48,7 @@ class OpenRouterChatProvider(BaseChat):
         thinking_level = kwargs.get("thinking_level")
         if thinking_level is not None:
             payload["reasoning_effort"] = thinking_level
+            payload["include_reasoning"] = True  # only request reasoning when thinking is active
 
         tools = kwargs.get("tools")
         if tools:

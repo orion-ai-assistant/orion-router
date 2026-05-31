@@ -54,7 +54,6 @@ async def chat_completions(
     }
 
     dynamic_router: DynamicLLMRouter = request.app.state.dynamic_router
-
     return StreamingResponse(
         dynamic_router.run_combo(
             provider=provider,

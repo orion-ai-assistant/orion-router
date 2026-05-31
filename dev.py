@@ -236,6 +236,22 @@ def start_postgres() -> None:
         "start",
     ])
 
+def wait_for_postgres(timeout: float = 15.0) -> None:
+    info("PostgreSQL'in hazir olmasi bekleniyor...")
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        try:
+            import socket
+            with socket.create_connection(("127.0.0.1", PG_PORT), timeout=1.0):
+                res = psql("-c", "SELECT 1")
+                if res.returncode == 0:
+                    ok("PostgreSQL hazir ve baglantilari kabul ediyor.")
+                    return
+        except Exception:
+            pass
+        time.sleep(0.5)
+    warn("PostgreSQL hazir olma zaman asimina ugradi, yine de devam ediliyor...")
+
 def stop_postgres() -> None:
     run_silent([str(PG_CTL), "-D", str(PG_DATA), "stop"])
 
@@ -375,6 +391,7 @@ def main() -> None:
     download_postgres()
     init_database()
     start_postgres()
+    wait_for_postgres()
     setup_db_and_user()
     print()
 

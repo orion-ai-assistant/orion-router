@@ -241,10 +241,12 @@ export default function PlaygroundPage() {
     setChatMessages((prev) => [...prev, userMsg]);
     setChatInput('');
 
-    const newMessagesForPayload = [...chatMessages, userMsg].map((m) => ({
-      role: m.role,
-      content: m.html.replace(/<br \/>/g, '\n').replace(/🤔 /g, ''),
-    }));
+    const newMessagesForPayload = [...chatMessages, userMsg]
+      .filter((m) => !m.id.startsWith('err-') && m.type !== 'thinking')
+      .map((m) => ({
+        role: m.role,
+        content: m.html.replace(/<br \/>/g, '\n').replace(/🤔 /g, ''),
+      }));
 
     const payload: any = {
       model: chatModel,
@@ -324,15 +326,22 @@ export default function PlaygroundPage() {
             ? data.error
             : data.error.message || JSON.stringify(data.error);
           
-          setChatMessages((prev) => [
-            ...prev,
-            {
-              id: 'err-' + Date.now() + '-' + Math.random(),
-              role: 'assistant',
-              type: 'content',
-              html: `<span class="text-red-500 font-semibold">Error:</span> <pre class="whitespace-pre-wrap text-[10px] mt-1 bg-red-950/20 border border-red-500/30 p-2 rounded">${escapeHtml(errMsg)}</pre>`,
-            },
-          ]);
+          setChatMessages((prev) => {
+            const updated = [...prev];
+            const lastUserIdx = updated.map(m => m.id).lastIndexOf(userMsg.id);
+            if (lastUserIdx !== -1) {
+              updated[lastUserIdx] = { ...updated[lastUserIdx], id: 'err-user-' + updated[lastUserIdx].id };
+            }
+            return [
+              ...updated,
+              {
+                id: 'err-' + Date.now() + '-' + Math.random(),
+                role: 'assistant',
+                type: 'content',
+                html: `<span class="text-red-500 font-semibold">Error:</span> <pre class="whitespace-pre-wrap text-[10px] mt-1 bg-red-950/20 border border-red-500/30 p-2 rounded">${escapeHtml(errMsg)}</pre>`,
+              },
+            ];
+          });
           abortControllerRef.current?.abort();
           return;
         }
@@ -403,15 +412,22 @@ export default function PlaygroundPage() {
       }
     } catch (e: any) {
       if (e.name !== 'AbortError') {
-        setChatMessages((prev) => [
-          ...prev,
-          {
-            id: 'err-' + Date.now() + '-' + Math.random(),
-            role: 'assistant',
-            type: 'content',
-            html: '<span class="text-red-500 font-semibold">Connection error:</span> ' + escapeHtml(e.message),
-          },
-        ]);
+        setChatMessages((prev) => {
+          const updated = [...prev];
+          const lastUserIdx = updated.map(m => m.id).lastIndexOf(userMsg.id);
+          if (lastUserIdx !== -1) {
+            updated[lastUserIdx] = { ...updated[lastUserIdx], id: 'err-user-' + updated[lastUserIdx].id };
+          }
+          return [
+            ...updated,
+            {
+              id: 'err-' + Date.now() + '-' + Math.random(),
+              role: 'assistant',
+              type: 'content',
+              html: '<span class="text-red-500 font-semibold">Connection error:</span> ' + escapeHtml(e.message),
+            },
+          ];
+        });
       }
     } finally {
       setIsGenerating(false);

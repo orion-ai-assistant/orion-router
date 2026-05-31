@@ -22,7 +22,7 @@ interface LogItem {
   completion_tokens: number;
   thoughts_tokens: number;
   cost: number | null;
-  success: boolean;
+  success: boolean | null;
   capability: string;
   created_at: string;
 }
@@ -217,27 +217,27 @@ export default function LogsPage() {
                     <div className="pricing-container flex items-center justify-center gap-4">
                       <div className="pricing-item relative flex flex-col items-center py-1">
                         <span className="pricing-label text-[8px] font-semibold text-zinc-500 uppercase tracking-wider scale-90 mb-0.5">in</span>
-                        <span className="pricing-value text-xs font-mono">{log.prompt_tokens || 0}</span>
+                        <span className="pricing-value text-xs font-mono">{log.prompt_tokens ?? '-'}</span>
                       </div>
 
                       {log.capability !== 'embed' && (
                         <div className="pricing-item relative flex flex-col items-center py-1">
                           <span className="pricing-label text-[8px] font-semibold text-zinc-500 uppercase tracking-wider scale-90 mb-0.5">out</span>
-                          <span className="pricing-value text-xs font-mono">{log.completion_tokens || 0}</span>
+                          <span className="pricing-value text-xs font-mono">{log.completion_tokens ?? '-'}</span>
                         </div>
                       )}
 
                       {log.capability === 'embed' && (
                         <div className="pricing-item relative flex flex-col items-center py-1">
                           <span className="pricing-label text-[8px] font-semibold text-zinc-500 uppercase tracking-wider scale-90 mb-0.5">dim</span>
-                          <span className="pricing-value text-xs font-mono">{log.completion_tokens || 0}</span>
+                          <span className="pricing-value text-xs font-mono">{log.completion_tokens ?? '-'}</span>
                         </div>
                       )}
 
                       {log.capability !== 'tts' && log.capability !== 'embed' && (
                         <div className="pricing-item relative flex flex-col items-center py-1">
                           <span className="pricing-label text-[8px] font-semibold text-zinc-500 uppercase tracking-wider scale-90 mb-0.5">think</span>
-                          <span className="pricing-value text-xs font-mono">{log.thoughts_tokens || 0}</span>
+                          <span className="pricing-value text-xs font-mono">{log.thoughts_tokens ?? '-'}</span>
                         </div>
                       )}
                     </div>
@@ -251,12 +251,15 @@ export default function LogsPage() {
                   </TableCell>
                   <TableCell className="py-4 text-center">
                     <Badge
-                      className={`text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full ${log.success
+                      className={`text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full ${
+                        log.success === true
                           ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
-                          : 'bg-red-500/10 text-red-500 border border-red-500/20'
+                          : log.success === false
+                          ? 'bg-red-500/10 text-red-500 border border-red-500/20'
+                          : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
                         }`}
                     >
-                      {log.success ? 'Success' : 'Failed'}
+                      {log.success === true ? 'Success' : log.success === false ? 'Failed' : 'Interrupted'}
                     </Badge>
                   </TableCell>
                   <TableCell className="py-4 text-center font-mono text-xs text-zinc-400">

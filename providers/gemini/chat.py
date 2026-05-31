@@ -4,14 +4,22 @@ providers/gemini/chat.py
 Google Gemini streaming chat provider.
 OpenAI-style mesaj formatını Gemini içerik formatına çevirir.
 Thinking (reasoning) desteklidir.
+
+Token sayım kuralı:
+  candidates_token_count = out + think (toplam output)
+  thoughts_token_count   = sadece think
+  → completion_tokens (out) = candidates - thoughts
 """
 import json
+import logging
 from typing import AsyncGenerator, Any
 
 from google import genai
 from google.genai import types
 
 from providers.base import BaseChat
+
+logger = logging.getLogger("service-router.gemini")
 
 
 class GeminiChatProvider(BaseChat):
@@ -174,6 +182,7 @@ class GeminiChatProvider(BaseChat):
                 model=model, contents=contents, config=config
             )
             final_usage = None
+
             async for chunk in stream:
                 if hasattr(chunk, "usage_metadata") and chunk.usage_metadata:
                     final_usage = chunk.usage_metadata
@@ -221,12 +230,25 @@ class GeminiChatProvider(BaseChat):
                         yield f'data: {{"choices":[{{"delta":{{"content":{json.dumps(part.text, ensure_ascii=False)}}}}}]}}\n\n'
 
             if final_usage:
+                # Gemini'de candidates ve thoughts birbirine dahil DEĞİLDİR (tamamen ayrı hesaplanır).
+                # total_token_count = prompt + candidates + thoughts
+                # O yüzden completion_tokens = candidates, thoughts_tokens = thoughts olur.
+                candidates = getattr(final_usage, "candidates_token_count", 0) or 0
+                thoughts   = getattr(final_usage, "thoughts_token_count", 0) or 0
+                prompt     = getattr(final_usage, "prompt_token_count", 0) or 0
+                total      = getattr(final_usage, "total_token_count", 0) or 0
+
+                logger.info(
+                    f"Gemini usage: prompt={prompt} candidates={candidates} "
+                    f"thoughts={thoughts} total={total}"
+                )
+
                 yield {
                     "internal_usage": {
-                        "prompt_tokens": getattr(final_usage, "prompt_token_count", 0) or 0,
-                        "completion_tokens": getattr(final_usage, "candidates_token_count", 0) or 0,
-                        "thoughts_tokens": getattr(final_usage, "thoughts_token_count", 0) or 0,
-                        "total_tokens": getattr(final_usage, "total_token_count", 0) or 0,
+                        "prompt_tokens": prompt,
+                        "completion_tokens": candidates,
+                        "thoughts_tokens": thoughts,
+                        "total_tokens": total,
                     }
                 }
         except Exception as e:

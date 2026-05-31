@@ -5,6 +5,7 @@ FastAPI uygulama yaşam döngüsü (startup / shutdown).
 Veritabanını başlatır, JSON seed dosyalarını DB'ye senkronize eder
 ve uygulama state'ini (pricing cache, model info cache, dynamic router) hazırlar.
 """
+import asyncio
 import json
 import logging
 from contextlib import asynccontextmanager
@@ -55,7 +56,19 @@ async def lifespan(app: FastAPI):
     print(f"║{'Durdurmak icin CTRL+C':^53}║")
     print("╚" + "═" * 55 + "╝\n")
 
-    await db_manager.init_db()
+    # PostgreSQL tam hazır olmadan önce FastAPI başlayabilir; retry ile bekle
+    max_retries = 10
+    for attempt in range(1, max_retries + 1):
+        try:
+            await db_manager.init_db()
+            break
+        except Exception as e:
+            if attempt == max_retries:
+                logger.error(f"DB başlatılamadı ({max_retries} deneme sonrası): {e}")
+                raise
+            wait = min(attempt * 0.8, 5)
+            logger.warning(f"DB bağlantısı başarısız (deneme {attempt}/{max_retries}), {wait:.1f}s bekleniyor... ({e})")
+            await asyncio.sleep(wait)
 
     # --- Fiyatlandırmayı seed et ---
     if MODEL_PRICING_PATH.exists():

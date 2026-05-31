@@ -46,22 +46,28 @@ def _pool_key_on_quota_cooldown(pool_key: dict) -> bool:
 #  İç Yardımcılar
 # ---------------------------------------------------------------------------
 
-async def _log_usage(app_state, key_id: str | None, provider: str, model: str, usage: dict, request_json: str | None = None, response_json: str | None = None, success: bool = True, capability: str = 'chat'):
+async def _log_usage(app_state, key_id: str | None, provider: str, model: str, usage: dict | None, request_json: str | None = None, response_json: str | None = None, success: bool | None = True, capability: str = 'chat', is_estimated: bool = False):
     """Arka plan görevi: token kullanımını ve request/response JSON verilerini DB'ye kaydeder."""
     try:
-        p = usage.get("prompt_tokens", 0)
-        c = usage.get("completion_tokens", 0)
-        t = usage.get("thoughts_tokens", 0)
+        if usage is None:
+            p, c, t = None, None, None
+            tokens_used = None
+        else:
+            p = usage.get("prompt_tokens")
+            c = usage.get("completion_tokens")
+            t = usage.get("thoughts_tokens")
+            tokens_used = (p or 0) + (c or 0) + (t or 0)
+
         cost = None
 
-        if success:
+        if success is True and usage is not None:
             pricing_cache = app_state.pricing_cache if hasattr(app_state, "pricing_cache") else {}
             if model in pricing_cache:
                 prices = pricing_cache[model]
                 cost = (
-                    (p * prices.get("input", 0.0))
-                    + (c * prices.get("output", 0.0))
-                    + (t * prices.get("think", 0.0))
+                    ((p or 0) * prices.get("input", 0.0))
+                    + ((c or 0) * prices.get("output", 0.0))
+                    + ((t or 0) * prices.get("think", 0.0))
                 )
         else:
             cost = 0.0
@@ -70,7 +76,7 @@ async def _log_usage(app_state, key_id: str | None, provider: str, model: str, u
             key_id=key_id,
             provider=provider,
             model=model,
-            tokens_used=p + c + t,
+            tokens_used=tokens_used,
             prompt_tokens=p,
             completion_tokens=c,
             thoughts_tokens=t,
@@ -233,7 +239,9 @@ class DynamicLLMRouter:
         accumulated_tool_calls: list[dict] = []
         usage = None
         has_error = False
+        status_val = True
         error_details = None
+        is_estimated = False
         
         logger.info(f"Starting chat stream: provider={provider}, model={model}, kwargs={kwargs}")
         
@@ -253,6 +261,7 @@ class DynamicLLMRouter:
                         if '"error":' in chunk:
                             logger.error(f"[{provider}] API Error chunk: {chunk.strip()}")
                             has_error = True
+                            status_val = False
                             error_details = chunk.strip()
                         # Accumulate content and reasoning content from JSON chunk
                         try:
@@ -285,8 +294,15 @@ class DynamicLLMRouter:
                         except Exception:
                             pass
                     yield chunk
+        except asyncio.CancelledError:
+            has_error = True
+            status_val = None
+            error_details = "Client disconnected / Request Cancelled"
+            logger.info(f"[{provider}] Stream Cancelled")
+            raise
         except Exception as e:
             has_error = True
+            status_val = False
             error_details = str(e)
             if isinstance(e, RuntimeError):
                 logger.error(f"[{provider}] Stream Exception: {e}")
@@ -296,35 +312,43 @@ class DynamicLLMRouter:
             err_msg = f"Provider Exception ({provider}): {str(e)}"
             yield f'data: {json.dumps({"error": {"message": err_msg, "type": "api_error"}}, ensure_ascii=False)}\n\n'
         finally:
-            if usage is None:
+            # API'den usage sadece stream sonunda gelir.
+            # Eğer API stream_options: include_usage desteklemiyorsa veya kullanıcı erkenden keserse usage boş kalır.
+            # Bu durumda tahmini token kullanımını hesapla ki harcanan miktar bilinsin.
+            if usage is None and status_val in (True, None):
                 usage = {
-                    "prompt_tokens": len(json.dumps(messages)) // 4,
-                    "completion_tokens": len(accumulated_content) // 4,
-                    "thoughts_tokens": len(accumulated_reasoning) // 4
+                    "prompt_tokens": max(1, len(json.dumps(messages)) // 4),
+                    "completion_tokens": max(1, len(accumulated_content) // 4) if accumulated_content else 0,
+                    "thoughts_tokens": max(1, len(accumulated_reasoning) // 4) if accumulated_reasoning else 0
                 }
+                is_estimated = True
 
             # Provider'dan gelen usage'ı kontrol et, 0 ise ücret yansımamış demektir, sadece uyar
-            if accumulated_content and usage.get("completion_tokens", 0) == 0:
+            if usage and accumulated_content and usage.get("completion_tokens", 0) == 0:
                 logger.warning(f"[{provider}] API reported 0 completion_tokens despite generating {len(accumulated_content)} chars.")
-            if accumulated_reasoning and usage.get("thoughts_tokens", 0) == 0:
+            if usage and accumulated_reasoning and usage.get("thoughts_tokens", 0) == 0:
                 logger.warning(f"[{provider}] API reported 0 thoughts_tokens despite generating {len(accumulated_reasoning)} reasoning chars.")
                 
             req_data = {
                 "model": model,
                 "messages": messages,
-                **kwargs
             }
-            if has_error:
-                res_data = {
-                    "error": error_details or "Unknown error"
-                }
+            for k, v in kwargs.items():
+                if v is not None:
+                    req_data[k] = v
+
+            if status_val is False:
+                res_data = {"error": error_details}
             else:
                 msg_data: dict[str, Any] = {
                     "role": "assistant",
                     "content": accumulated_content,
                 }
+                
+                # Kullanıcı düşünce kısmını loglarda (response_json'da) görmek istiyor
                 if accumulated_reasoning:
                     msg_data["reasoning_content"] = accumulated_reasoning
+                
                 if accumulated_tool_calls:
                     msg_data["tool_calls"] = accumulated_tool_calls
                 res_data = {"choices": [{"message": msg_data}]}
@@ -336,9 +360,10 @@ class DynamicLLMRouter:
                     provider,
                     model,
                     usage,
-                    request_json=json.dumps(req_data, ensure_ascii=False),
-                    response_json=json.dumps(res_data, ensure_ascii=False),
-                    success=not has_error
+                    request_json=json.dumps(req_data, ensure_ascii=False) if req_data else None,
+                    response_json=json.dumps(res_data, ensure_ascii=False) if res_data else None,
+                    success=status_val,
+                    is_estimated=is_estimated
                 )
             )
 
@@ -543,7 +568,6 @@ class DynamicLLMRouter:
                     last_err = e
                     
                     # Log attempt failure
-                    usage = {"prompt_tokens": 0, "completion_tokens": 0, "thoughts_tokens": 0}
                     res_err = {"error": str(e)}
                     asyncio.create_task(
                         _log_usage(
@@ -551,7 +575,7 @@ class DynamicLLMRouter:
                             key_id,
                             p_provider,
                             p_model,
-                            usage,
+                            None,
                             request_json=json.dumps(req_data, ensure_ascii=False),
                             response_json=json.dumps(res_err, ensure_ascii=False),
                             success=False,
@@ -659,7 +683,6 @@ class DynamicLLMRouter:
                     last_err = e
                     
                     # Log attempt failure
-                    usage = {"prompt_tokens": len(input_text), "completion_tokens": 0, "thoughts_tokens": 0}
                     res_err = {"error": str(e)}
                     asyncio.create_task(
                         _log_usage(
@@ -667,7 +690,7 @@ class DynamicLLMRouter:
                             key_id,
                             p_provider,
                             p_model,
-                            usage,
+                            None,
                             request_json=json.dumps(req_data, ensure_ascii=False),
                             response_json=json.dumps(res_err, ensure_ascii=False),
                             success=False,

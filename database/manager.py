@@ -84,6 +84,13 @@ class DatabaseManager:
         await conn.execute("ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS upstream_key_id TEXT;")
         await conn.execute("ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS capability TEXT DEFAULT 'chat';")
         
+        # Allow NULL for token columns (no estimation, only real API values) and success (None = Interrupted)
+        await conn.execute("ALTER TABLE router_request_logs ALTER COLUMN tokens_used DROP DEFAULT;")
+        await conn.execute("ALTER TABLE router_request_logs ALTER COLUMN prompt_tokens DROP DEFAULT;")
+        await conn.execute("ALTER TABLE router_request_logs ALTER COLUMN completion_tokens DROP DEFAULT;")
+        await conn.execute("ALTER TABLE router_request_logs ALTER COLUMN thoughts_tokens DROP DEFAULT;")
+        await conn.execute("ALTER TABLE router_request_logs ALTER COLUMN success DROP DEFAULT;")
+        
         # 4. Model Pricing
         await conn.execute(
             """
