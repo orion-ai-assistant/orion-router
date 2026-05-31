@@ -35,7 +35,7 @@ export default function PlaygroundPage() {
   const [groups, setGroups] = useState<any[]>([]);
   const [voicesByProvider, setVoicesByProvider] = useState<Record<string, string[]>>({});
   const [voices, setVoices] = useState<string[]>([]);
-  
+
   // Chat State
   const [chatModel, setChatModel] = useState(getSavedState('pg_chatModel', ''));
   const [chatTemp, setChatTemp] = useState(getSavedState('pg_chatTemp', ''));
@@ -45,7 +45,7 @@ export default function PlaygroundPage() {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('pg_chatMessages');
       if (saved) {
-        try { return JSON.parse(saved); } catch (e) {}
+        try { return JSON.parse(saved); } catch (e) { }
       }
     }
     return [];
@@ -367,7 +367,7 @@ export default function PlaygroundPage() {
       const reader = res.body.getReader();
       const decoder = new TextDecoder('utf-8');
       let buffer = '';
-      
+
       const thinkingMsgId = 'think-' + Date.now() + '-' + Math.random();
       const contentMsgId = 'content-' + Date.now() + '-' + Math.random();
 
@@ -392,7 +392,7 @@ export default function PlaygroundPage() {
           const errMsg = typeof data.error === 'string'
             ? data.error
             : data.error.message || JSON.stringify(data.error);
-          
+
           setChatMessages((prev) => {
             const updated = [...prev];
             const lastUserIdx = updated.map(m => m.id).lastIndexOf(userMsg.id);
@@ -515,7 +515,7 @@ export default function PlaygroundPage() {
     const adminKey = getAdminKey();
     const apiBaseUrl = getApiBaseUrl();
     const payload: any = { model: ttsModel, input: text, voice: ttsVoice };
-    
+
     const parsedTemp = parseFloat(ttsTemp);
     if (!isNaN(parsedTemp)) {
       payload.temperature = parsedTemp;
@@ -640,11 +640,10 @@ export default function PlaygroundPage() {
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-1.5 rounded-[8px] font-medium text-xs transition-all cursor-pointer ${
-              activeTab === tab
+            className={`px-4 py-1.5 rounded-[8px] font-medium text-xs transition-all cursor-pointer ${activeTab === tab
                 ? 'bg-zinc-800 text-white shadow'
                 : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-white'
-            }`}
+              }`}
           >
             {tab === 'chat' ? 'Chat' : tab === 'tts' ? 'Text-to-Speech' : 'Embeddings'}
           </button>
@@ -677,17 +676,15 @@ export default function PlaygroundPage() {
               <div className="flex justify-between items-center mb-1">
                 <label className="text-zinc-400 text-[10px] font-semibold uppercase">Temperature</label>
                 {resolvedDefaults.temperature !== null ? (
-                  <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all ${
-                    hasTempOverride 
-                      ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50' 
+                  <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all ${hasTempOverride
+                      ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
                       : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
-                  }`} title={hasTempOverride ? "Default is overridden by your input" : "Database default value for this model"}>
+                    }`} title={hasTempOverride ? "Default is overridden by your input" : "Database default value for this model"}>
                     Default: {resolvedDefaults.temperature}
                   </span>
                 ) : (
-                  <span className={`text-[9px] font-medium transition-all ${
-                    hasTempOverride ? 'text-zinc-700 line-through opacity-50' : 'text-zinc-500'
-                  }`}>
+                  <span className={`text-[9px] font-medium transition-all ${hasTempOverride ? 'text-zinc-700 line-through opacity-50' : 'text-zinc-500'
+                    }`}>
                     Default: Provider choice
                   </span>
                 )}
@@ -707,17 +704,15 @@ export default function PlaygroundPage() {
               <div className="flex justify-between items-center mb-1">
                 <label className="text-zinc-400 text-[10px] font-semibold uppercase">Thinking</label>
                 {resolvedDefaults.thinking_level ? (
-                  <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all ${
-                    hasThinkingOverride 
-                      ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50' 
+                  <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all ${hasThinkingOverride
+                      ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
                       : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
-                  }`} title={hasThinkingOverride ? "Default is overridden by your input" : "Database default value for this model"}>
+                    }`} title={hasThinkingOverride ? "Default is overridden by your input" : "Database default value for this model"}>
                     Default: {resolvedDefaults.thinking_level}
                   </span>
                 ) : (
-                  <span className={`text-[9px] font-medium transition-all ${
-                    hasThinkingOverride ? 'text-zinc-700 line-through opacity-50' : 'text-zinc-500'
-                  }`}>
+                  <span className={`text-[9px] font-medium transition-all ${hasThinkingOverride ? 'text-zinc-700 line-through opacity-50' : 'text-zinc-500'
+                    }`}>
                     Default: None
                   </span>
                 )}
@@ -734,11 +729,10 @@ export default function PlaygroundPage() {
                 <label className="text-zinc-400 text-[10px] font-semibold uppercase">System Prompt</label>
                 {resolvedDefaults.system_prompt ? (
                   <>
-                    <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all cursor-help truncate max-w-[120px] block ${
-                      hasSystemPromptOverride 
-                        ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50' 
+                    <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all cursor-help truncate max-w-[120px] block ${hasSystemPromptOverride
+                        ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
                         : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
-                    }`}>
+                      }`}>
                       Default: {resolvedDefaults.system_prompt.length > 15 ? resolvedDefaults.system_prompt.slice(0, 15) + '...' : resolvedDefaults.system_prompt}
                     </span>
                     <div className="absolute top-full left-0 right-0 mt-1 hidden group-hover:block z-50 bg-[#242427]/98 border border-zinc-700/60 text-zinc-200 text-[10px] p-3 rounded shadow-xl whitespace-pre-wrap max-h-40 overflow-y-auto custom-scrollbar pointer-events-none">
@@ -747,9 +741,8 @@ export default function PlaygroundPage() {
                     </div>
                   </>
                 ) : (
-                  <span className={`text-[9px] font-medium transition-all ${
-                    hasSystemPromptOverride ? 'text-zinc-700 line-through opacity-50' : 'text-zinc-500'
-                  }`}>
+                  <span className={`text-[9px] font-medium transition-all ${hasSystemPromptOverride ? 'text-zinc-700 line-through opacity-50' : 'text-zinc-500'
+                    }`}>
                     Default: None
                   </span>
                 )}
@@ -774,13 +767,12 @@ export default function PlaygroundPage() {
                 chatMessages.map((msg) => (
                   <div
                     key={msg.id}
-                    className={`max-w-[85%] rounded-lg p-3 text-xs leading-relaxed ${
-                      msg.role === 'user'
+                    className={`max-w-[85%] rounded-lg p-3 text-xs leading-relaxed ${msg.role === 'user'
                         ? 'bg-zinc-800 text-white self-end rounded-br-none'
                         : msg.type === 'thinking'
-                        ? 'bg-purple-950/20 border border-purple-500/10 text-purple-300 self-start rounded-bl-none font-mono text-xs'
-                        : 'bg-black/30 border border-zinc-850 text-zinc-100 self-start rounded-bl-none'
-                    }`}
+                          ? 'bg-purple-950/20 border border-purple-500/10 text-purple-300 self-start rounded-bl-none font-mono text-xs'
+                          : 'bg-black/30 border border-zinc-850 text-zinc-100 self-start rounded-bl-none'
+                      }`}
                     dangerouslySetInnerHTML={{ __html: msg.html }}
                   />
                 ))
@@ -872,17 +864,15 @@ export default function PlaygroundPage() {
               <div className="flex justify-between items-center mb-1">
                 <label className="text-zinc-400 text-[10px] font-semibold uppercase">Temperature</label>
                 {resolvedTtsDefaults.temperature !== null ? (
-                  <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all ${
-                    hasTtsTempOverride 
-                      ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50' 
+                  <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all ${hasTtsTempOverride
+                      ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
                       : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
-                  }`} title={hasTtsTempOverride ? "Default is overridden by your input" : "Database default value for this model"}>
+                    }`} title={hasTtsTempOverride ? "Default is overridden by your input" : "Database default value for this model"}>
                     Default: {resolvedTtsDefaults.temperature}
                   </span>
                 ) : (
-                  <span className={`text-[9px] font-medium transition-all ${
-                    hasTtsTempOverride ? 'text-zinc-700 line-through opacity-50' : 'text-zinc-500'
-                  }`}>
+                  <span className={`text-[9px] font-medium transition-all ${hasTtsTempOverride ? 'text-zinc-700 line-through opacity-50' : 'text-zinc-500'
+                    }`}>
                     Default: Provider choice
                   </span>
                 )}
@@ -911,7 +901,7 @@ export default function PlaygroundPage() {
                 className="flex-1 bg-black/40 border border-zinc-850 text-white rounded p-3 text-xs min-h-[120px] max-h-[220px]"
               />
             </div>
-            
+
             <div className="flex justify-end">
               {isGeneratingTTS ? (
                 <Button
@@ -987,7 +977,7 @@ export default function PlaygroundPage() {
                 className="flex-1 bg-black/40 border border-zinc-850 text-white rounded p-3 text-xs min-h-[120px] max-h-[220px]"
               />
             </div>
-            
+
             <div className="flex justify-end">
               {isGeneratingEmbed ? (
                 <Button

@@ -223,17 +223,66 @@ async def get_admin_stats():
     """Toplam maliyet, token ve anahtar sayısını döner."""
     try:
         total_cost_row = await db_manager.fetchrow(
-            "SELECT SUM(cost) as total FROM router_request_logs"
+            """
+            SELECT 
+                SUM(cost) as total,
+                SUM(prompt_cost) as prompt_cost,
+                SUM(completion_cost) as completion_cost,
+                SUM(thoughts_cost) as thoughts_cost
+            FROM router_request_logs
+            """
         )
-        total_tokens_row = await db_manager.fetchrow(
-            "SELECT SUM(tokens_used) as total FROM router_request_logs"
+        tokens_row = await db_manager.fetchrow(
+            """
+            SELECT 
+                SUM(tokens_used) as total,
+                SUM(prompt_tokens) as prompt,
+                SUM(completion_tokens) as completion,
+                SUM(thoughts_tokens) as thoughts
+            FROM router_request_logs
+            """
         )
         total_keys = await db_manager.fetchval(
             "SELECT COUNT(*) FROM router_virtual_keys"
         )
+        
+        total_tokens = 0
+        prompt_tokens = 0
+        completion_tokens = 0
+        thoughts_tokens = 0
+        if tokens_row:
+            total_tokens = tokens_row["total"] or 0
+            prompt_tokens = tokens_row["prompt"] or 0
+            completion_tokens = tokens_row["completion"] or 0
+            thoughts_tokens = tokens_row["thoughts"] or 0
+
+        total_cost = 0.0
+        prompt_cost = 0.0
+        completion_cost = 0.0
+        thoughts_cost = 0.0
+        if total_cost_row:
+            total_cost = float(total_cost_row["total"] or 0.0)
+            prompt_cost = float(total_cost_row["prompt_cost"] or 0.0)
+            completion_cost = float(total_cost_row["completion_cost"] or 0.0)
+            thoughts_cost = float(total_cost_row["thoughts_cost"] or 0.0)
+
+            # Fallback for legacy logs: approximate based on token proportions
+            # Use sum of individual token columns since tokens_used may be NULL in old logs
+            tracked_tokens = prompt_tokens + completion_tokens + thoughts_tokens
+            if total_cost > 0 and prompt_cost == 0 and completion_cost == 0 and thoughts_cost == 0 and tracked_tokens > 0:
+                prompt_cost = total_cost * (prompt_tokens / tracked_tokens)
+                completion_cost = total_cost * (completion_tokens / tracked_tokens)
+                thoughts_cost = total_cost * (thoughts_tokens / tracked_tokens)
+
         return {
-            "total_cost": total_cost_row["total"] or 0,
-            "total_tokens": total_tokens_row["total"] or 0,
+            "total_cost": total_cost,
+            "prompt_cost": prompt_cost,
+            "completion_cost": completion_cost,
+            "thoughts_cost": thoughts_cost,
+            "total_tokens": total_tokens,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "thoughts_tokens": thoughts_tokens,
             "total_keys": total_keys or 0,
         }
     except Exception as e:
@@ -468,6 +517,15 @@ async def create_model(request: Request):
     )
     await db_manager.upsert_pricing(name, input_price, output_price, think_price)
 
+    # Refresh pricing cache dynamically
+    if hasattr(request.app.state, "pricing_cache"):
+        request.app.state.pricing_cache[name] = {
+            "input": input_price,
+            "output": output_price,
+            "think": think_price
+        }
+
+
     item = dict(row)
     item["temperature"] = float(item["temperature"]) if item["temperature"] is not None else None
     item["input_price"] = input_price
@@ -522,6 +580,15 @@ async def update_model(model_id: str, request: Request):
         system_prompt,
     )
     await db_manager.upsert_pricing(name, input_price, output_price, think_price)
+
+    # Refresh pricing cache dynamically
+    if hasattr(request.app.state, "pricing_cache"):
+        request.app.state.pricing_cache[name] = {
+            "input": input_price,
+            "output": output_price,
+            "think": think_price
+        }
+
 
     item = dict(row)
     item["temperature"] = float(item["temperature"]) if item["temperature"] is not None else None

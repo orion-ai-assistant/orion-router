@@ -79,6 +79,10 @@ class DatabaseManager:
         await conn.execute("ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS completion_tokens INTEGER DEFAULT 0;")
         await conn.execute("ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS thoughts_tokens INTEGER DEFAULT 0;")
         
+        await conn.execute("ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS prompt_cost NUMERIC(10, 6) DEFAULT 0.0;")
+        await conn.execute("ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS completion_cost NUMERIC(10, 6) DEFAULT 0.0;")
+        await conn.execute("ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS thoughts_cost NUMERIC(10, 6) DEFAULT 0.0;")
+        
         await conn.execute("ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS request_json JSONB;")
         await conn.execute("ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS response_json JSONB;")
         await conn.execute("ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS upstream_key_id TEXT;")
@@ -326,7 +330,7 @@ class DatabaseManager:
                 return json.loads(val)
             return None
 
-    async def log_request(self, key_id, provider, model, tokens_used, prompt_tokens, completion_tokens, thoughts_tokens, cost, request_json=None, response_json=None, upstream_key_id=None, success=True, capability='chat'):
+    async def log_request(self, key_id, provider, model, tokens_used, prompt_tokens, completion_tokens, thoughts_tokens, cost, request_json=None, response_json=None, upstream_key_id=None, success=True, capability='chat', prompt_cost=0.0, completion_cost=0.0, thoughts_cost=0.0):
         pool = await self.get_db_pool()
         async with pool.acquire() as conn:
             async with conn.transaction():
@@ -334,10 +338,10 @@ class DatabaseManager:
                     """
                     INSERT INTO router_request_logs
                         (key_id, provider, requested_model, tokens_used,
-                         prompt_tokens, completion_tokens, thoughts_tokens, cost, success, request_json, response_json, upstream_key_id, capability)
-                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13)
+                         prompt_tokens, completion_tokens, thoughts_tokens, cost, success, request_json, response_json, upstream_key_id, capability, prompt_cost, completion_cost, thoughts_cost)
+                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13,$14,$15,$16)
                     """,
-                    key_id, provider, model, tokens_used, prompt_tokens, completion_tokens, thoughts_tokens, cost, success, request_json, response_json, upstream_key_id, capability
+                    key_id, provider, model, tokens_used, prompt_tokens, completion_tokens, thoughts_tokens, cost, success, request_json, response_json, upstream_key_id, capability, prompt_cost, completion_cost, thoughts_cost
                 )
                 if key_id and cost is not None and success:
                     await conn.execute(

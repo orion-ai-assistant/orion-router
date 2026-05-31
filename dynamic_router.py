@@ -59,16 +59,16 @@ async def _log_usage(app_state, key_id: str | None, provider: str, model: str, u
             tokens_used = (p or 0) + (c or 0) + (t or 0)
 
         cost = None
+        p_cost, c_cost, t_cost = 0.0, 0.0, 0.0
 
         if success is True and usage is not None:
             pricing_cache = app_state.pricing_cache if hasattr(app_state, "pricing_cache") else {}
             if model in pricing_cache:
                 prices = pricing_cache[model]
-                cost = (
-                    ((p or 0) * prices.get("input", 0.0))
-                    + ((c or 0) * prices.get("output", 0.0))
-                    + ((t or 0) * prices.get("think", 0.0))
-                )
+                p_cost = (p or 0) * prices.get("input", 0.0)
+                c_cost = (c or 0) * prices.get("output", 0.0)
+                t_cost = (t or 0) * prices.get("think", 0.0)
+                cost = p_cost + c_cost + t_cost
         else:
             cost = 0.0
 
@@ -84,9 +84,12 @@ async def _log_usage(app_state, key_id: str | None, provider: str, model: str, u
             request_json=request_json,
             response_json=response_json,
             success=success,
-            capability=capability
+            capability=capability,
+            prompt_cost=p_cost,
+            completion_cost=c_cost,
+            thoughts_cost=t_cost
         )
-        logger.info(f"Logged usage for {provider}/{model} [{capability}]: (In:{p} Out:{c} Think:{t}) Success: {success}")
+        logger.info(f"Logged usage for {provider}/{model} [{capability}]: (In:{p} Out:{c} Think:{t}) | Costs: (In:{p_cost:.4f} Out:{c_cost:.4f} Think:{t_cost:.4f}) | Success: {success}")
     except Exception as e:
         logger.error(f"Failed to log usage: {e}")
 

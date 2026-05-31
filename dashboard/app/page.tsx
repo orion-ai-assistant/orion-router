@@ -7,14 +7,26 @@ import { Coins, Cpu, Key } from 'lucide-react';
 
 interface Stats {
   total_cost: number;
+  prompt_cost?: number;
+  completion_cost?: number;
+  thoughts_cost?: number;
   total_tokens: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  thoughts_tokens: number;
   total_keys: number;
 }
 
 export default function OverviewPage() {
   const [stats, setStats] = useState<Stats>({
     total_cost: 0,
+    prompt_cost: 0,
+    completion_cost: 0,
+    thoughts_cost: 0,
     total_tokens: 0,
+    prompt_tokens: 0,
+    completion_tokens: 0,
+    thoughts_tokens: 0,
     total_keys: 0,
   });
 
@@ -25,7 +37,13 @@ export default function OverviewPage() {
         const data = await res.json();
         setStats({
           total_cost: data.total_cost || 0,
+          prompt_cost: data.prompt_cost || 0,
+          completion_cost: data.completion_cost || 0,
+          thoughts_cost: data.thoughts_cost || 0,
           total_tokens: data.total_tokens || 0,
+          prompt_tokens: data.prompt_tokens || 0,
+          completion_tokens: data.completion_tokens || 0,
+          thoughts_tokens: data.thoughts_tokens || 0,
           total_keys: data.total_keys || 0,
         });
       }
@@ -65,10 +83,38 @@ export default function OverviewPage() {
           <div className="stat-icon text-blue-400 bg-blue-500/10 border border-blue-500/20 w-14 h-14 flex items-center justify-center rounded-xl">
             <Coins className="w-6 h-6 stroke-[1.8]" />
           </div>
-          <div className="stat-details">
+          <div className="stat-details relative group">
             <h3 className="text-zinc-400 text-xs font-medium mb-1">Total Cost</h3>
             <div className="value val-cost font-heading text-3xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
               {money(stats.total_cost, 4)}
+            </div>
+
+            {/* Elegant Hover Tooltip */}
+            <div className="absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 hidden group-hover:block z-50 bg-[#18181b]/95 border border-zinc-800 text-zinc-200 p-3 rounded-lg shadow-2xl pointer-events-none backdrop-blur-md">
+              <div className="font-semibold text-[10px] text-zinc-400 mb-2.5 uppercase tracking-wider border-b border-zinc-800/80 pb-1.5 text-center">Cost Breakdown</div>
+              <div className="flex flex-col gap-1.5 font-mono text-xs">
+                <div className="flex items-center justify-between gap-6">
+                  <span className="text-zinc-400 font-sans">Input</span>
+                  <div className="flex items-center">
+                    <span className="text-zinc-500 w-8 text-right">%{stats.total_cost > 0 ? Math.round(((stats.prompt_cost || 0) / stats.total_cost) * 100) : 0}</span>
+                    <span className="text-zinc-200 font-medium w-[70px] text-right">{money(stats.prompt_cost || 0, 4)}</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-6">
+                  <span className="text-zinc-400 font-sans">Thinking</span>
+                  <div className="flex items-center">
+                    <span className="text-zinc-500 w-8 text-right">%{stats.total_cost > 0 ? Math.round(((stats.thoughts_cost || 0) / stats.total_cost) * 100) : 0}</span>
+                    <span className="text-zinc-200 font-medium w-[70px] text-right">{money(stats.thoughts_cost || 0, 4)}</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-6">
+                  <span className="text-zinc-400 font-sans">Output</span>
+                  <div className="flex items-center">
+                    <span className="text-zinc-500 w-8 text-right">%{stats.total_cost > 0 ? Math.round(((stats.completion_cost || 0) / stats.total_cost) * 100) : 0}</span>
+                    <span className="text-zinc-200 font-medium w-[70px] text-right">{money(stats.completion_cost || 0, 4)}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -78,10 +124,38 @@ export default function OverviewPage() {
           <div className="stat-icon text-sky-400 bg-sky-500/10 border border-sky-500/20 w-14 h-14 flex items-center justify-center rounded-xl">
             <Cpu className="w-6 h-6 stroke-[1.8]" />
           </div>
-          <div className="stat-details">
+          <div className="stat-details relative group">
             <h3 className="text-zinc-400 text-xs font-medium mb-1">Tokens Processed</h3>
             <div className="value val-tokens font-heading text-3xl font-bold bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent">
               {formatNumber(stats.total_tokens)}
+            </div>
+
+            {/* Elegant Hover Tooltip */}
+            <div className="absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 hidden group-hover:block z-50 bg-[#18181b]/95 border border-zinc-800 text-zinc-200 p-3 rounded-lg shadow-2xl pointer-events-none backdrop-blur-md">
+              <div className="font-semibold text-[10px] text-zinc-400 mb-2.5 uppercase tracking-wider border-b border-zinc-800/80 pb-1.5">Token Breakdown</div>
+              <div className="flex flex-col gap-1.5 font-mono text-xs">
+                <div className="flex items-center justify-between gap-6">
+                  <span className="text-zinc-400 font-sans">Input</span>
+                  <div className="flex items-center">
+                    <span className="text-zinc-500 w-8 text-right">%{stats.total_tokens > 0 ? Math.round((stats.prompt_tokens / stats.total_tokens) * 100) : 0}</span>
+                    <span className="text-zinc-200 font-medium w-16 text-right">{formatNumber(stats.prompt_tokens)}</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-6">
+                  <span className="text-zinc-400 font-sans">Thinking</span>
+                  <div className="flex items-center">
+                    <span className="text-zinc-500 w-8 text-right">%{stats.total_tokens > 0 ? Math.round((stats.thoughts_tokens / stats.total_tokens) * 100) : 0}</span>
+                    <span className="text-zinc-200 font-medium w-16 text-right">{formatNumber(stats.thoughts_tokens)}</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-6">
+                  <span className="text-zinc-400 font-sans">Output</span>
+                  <div className="flex items-center">
+                    <span className="text-zinc-500 w-8 text-right">%{stats.total_tokens > 0 ? Math.round((stats.completion_tokens / stats.total_tokens) * 100) : 0}</span>
+                    <span className="text-zinc-200 font-medium w-16 text-right">{formatNumber(stats.completion_tokens)}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
