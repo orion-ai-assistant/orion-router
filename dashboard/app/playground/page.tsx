@@ -40,9 +40,19 @@ export default function PlaygroundPage() {
   const [chatModel, setChatModel] = useState(getSavedState('pg_chatModel', ''));
   const [chatTemp, setChatTemp] = useState(getSavedState('pg_chatTemp', ''));
   const [chatThinking, setChatThinking] = useState(getSavedState('pg_chatThinking', ''));
-  const [chatMessages, setChatMessages] = useState<Message[]>([]);
-  const [chatInput, setChatInput] = useState('');
+  const [chatMessages, setChatMessages] = useState<Message[]>((() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('pg_chatMessages');
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) {}
+      }
+    }
+    return [];
+  })());
+  const [chatInput, setChatInput] = useState(getSavedState('pg_chatInput', ''));
+  const [isGenerating, setIsGenerating] = useState(false);
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // TTS State
   const [ttsModel, setTtsModel] = useState(getSavedState('pg_ttsModel', ''));
@@ -169,8 +179,10 @@ export default function PlaygroundPage() {
       localStorage.setItem('pg_ttsVoice', ttsVoice);
       localStorage.setItem('pg_ttsTemp', ttsTemp);
       localStorage.setItem('pg_embedModel', embedModel);
+      localStorage.setItem('pg_chatMessages', JSON.stringify(chatMessages));
+      localStorage.setItem('pg_chatInput', chatInput);
     }
-  }, [activeTab, chatModel, chatTemp, chatThinking, ttsModel, ttsVoice, ttsTemp, embedModel]);
+  }, [activeTab, chatModel, chatTemp, chatThinking, ttsModel, ttsVoice, ttsTemp, embedModel, chatMessages, chatInput]);
 
   // Scroll chat window to bottom on new messages
   useEffect(() => {
@@ -254,6 +266,9 @@ export default function PlaygroundPage() {
     const apiBaseUrl = getApiBaseUrl();
 
     try {
+      setIsGenerating(true);
+      abortControllerRef.current = new AbortController();
+
       const res = await fetch(`${apiBaseUrl}/v1/chat/completions`, {
         method: 'POST',
         headers: {
@@ -261,6 +276,7 @@ export default function PlaygroundPage() {
           Authorization: `Bearer ${adminKey}`,
         },
         body: JSON.stringify(payload),
+        signal: abortControllerRef.current.signal,
       });
 
       if (!res.ok) {
@@ -311,12 +327,13 @@ export default function PlaygroundPage() {
           setChatMessages((prev) => [
             ...prev,
             {
-              id: 'err-' + Date.now(),
+              id: 'err-' + Date.now() + '-' + Math.random(),
               role: 'assistant',
               type: 'content',
-              html: `Error: ${errMsg}`,
+              html: `<span class="text-red-500 font-semibold">Error:</span> <pre class="whitespace-pre-wrap text-[10px] mt-1 bg-red-950/20 border border-red-500/30 p-2 rounded">${escapeHtml(errMsg)}</pre>`,
             },
           ]);
+          abortControllerRef.current?.abort();
           return;
         }
 
@@ -385,15 +402,20 @@ export default function PlaygroundPage() {
         handleDataLine(buffer);
       }
     } catch (e: any) {
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          id: 'err-' + Date.now(),
-          role: 'assistant',
-          type: 'content',
-          html: 'Connection error: ' + e.message,
-        },
-      ]);
+      if (e.name !== 'AbortError') {
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            id: 'err-' + Date.now() + '-' + Math.random(),
+            role: 'assistant',
+            type: 'content',
+            html: '<span class="text-red-500 font-semibold">Connection error:</span> ' + escapeHtml(e.message),
+          },
+        ]);
+      }
+    } finally {
+      setIsGenerating(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -598,18 +620,36 @@ export default function PlaygroundPage() {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
-                    handleSendChat();
+                    if (!isGenerating) {
+                      handleSendChat();
+                    }
                   }
                 }}
                 placeholder="Type a message to the AI..."
                 className="flex-1 bg-black/40 border border-zinc-850 text-white rounded p-2.5 text-xs h-10 min-h-10 resize-none custom-scrollbar"
               />
               <Button
-                onClick={handleSendChat}
-                className="bg-white text-black hover:bg-zinc-200 font-semibold px-5 h-10 text-xs rounded-lg"
+                onClick={() => setChatMessages([])}
+                className="bg-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-700 font-medium px-4 h-10 text-xs rounded-lg"
+                title="Clear Chat"
               >
-                Send
+                Clear
               </Button>
+              {isGenerating ? (
+                <Button
+                  onClick={() => abortControllerRef.current?.abort()}
+                  className="bg-red-600 text-white hover:bg-red-700 font-semibold px-5 h-10 text-xs rounded-lg min-w-[70px]"
+                >
+                  Stop
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleSendChat}
+                  className="bg-white text-black hover:bg-zinc-200 font-semibold px-5 h-10 text-xs rounded-lg min-w-[70px]"
+                >
+                  Send
+                </Button>
+              )}
             </div>
           </div>
         </div>

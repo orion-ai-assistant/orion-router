@@ -364,6 +364,7 @@ class DynamicLLMRouter:
 
         if routes:
             success = False
+            last_error_chunk = None
             for route in routes:
                 p_provider = route["provider"]
                 p_model = route["name"]
@@ -412,6 +413,7 @@ class DynamicLLMRouter:
                                 if not yielded_any:
                                     logger.warning(f"Route {p_provider}/{p_model} failed with error chunk, trying fallback.")
                                     failed = True
+                                    last_error_chunk = chunk
                                     if key_pool_id:
                                         await db_manager.mark_provider_key_error(key_pool_id, "API returned error chunk")
                                     break
@@ -428,6 +430,7 @@ class DynamicLLMRouter:
                         if key_pool_id:
                             await db_manager.mark_provider_key_error(key_pool_id, str(e))
                         failed = True
+                        last_error_chunk = f'data: {json.dumps({"error": {"message": str(e), "type": "api_error"}}, ensure_ascii=False)}\n\n'
                         
                     if failed and yielded_any:
                         success = True # Stop attempting other fallbacks to prevent corrupted streams
@@ -435,6 +438,12 @@ class DynamicLLMRouter:
                         
                 if success:
                     break
+            
+            if not success and not yielded_any:
+                if last_error_chunk:
+                    yield last_error_chunk
+                else:
+                    yield f'data: {json.dumps({"error": {"message": "All routes and fallbacks failed.", "type": "api_error"}}, ensure_ascii=False)}\n\n'
             return
 
         # Backend Registry'de bulunamadıysa: Geriye uyumlu eski yönlendirme akışı (Direct routing)
