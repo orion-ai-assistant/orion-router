@@ -33,6 +33,9 @@ class LocalChatProvider(BaseChat):
             "stream_options": {"include_usage": True},
         }
 
+        if kwargs.get("temperature") is not None:
+            payload["temperature"] = float(kwargs["temperature"])
+
         thinking_level = kwargs.get("thinking_level")
         if thinking_level is not None:
             val = str(thinking_level).strip()
