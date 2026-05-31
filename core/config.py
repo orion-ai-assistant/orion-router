@@ -59,6 +59,23 @@ _ensure_env_file()
 _load_env_file()
 
 
+def _ensure_encryption_key() -> None:
+    if "ENCRYPTION_KEY" in os.environ:
+        return
+    try:
+        from cryptography.fernet import Fernet
+        new_key = Fernet.generate_key().decode("utf-8")
+        os.environ["ENCRYPTION_KEY"] = new_key
+        if _ENV_PATH.exists():
+            with open(_ENV_PATH, "a", encoding="utf-8") as f:
+                f.write(f'\nENCRYPTION_KEY="{new_key}"\n')
+        print("[orion-router] Yeni ENCRYPTION_KEY oluşturuldu ve .env dosyasına eklendi.", file=sys.stderr)
+    except Exception as e:
+        print(f"[orion-router] ENCRYPTION_KEY oluşturulamadı: {e}", file=sys.stderr)
+
+_ensure_encryption_key()
+
+
 # --- Router (bu servis) ---
 ROUTER_HOST = os.getenv("ROUTER_HOST")
 ROUTER_PORT = os.getenv("ROUTER_PORT")
@@ -74,8 +91,11 @@ TTS_HOST = os.getenv("TTS_HOST")
 TTS_PORT = os.getenv("TTS_PORT")
 
 # --- Admin Paneli ---
-# Admin paneline giriş için gereken şifre.
+# Admin paneline giriş için gereken şifre (sadece ilk seed işlemi için okunur, DB'ye aktarılır).
 ADMIN_SECRET = os.getenv("ADMIN_SECRET")
+
+# --- Şifreleme (API Keys vs) ---
+ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY")
 
 # --- Veritabanı (PostgreSQL) ---
 POSTGRES_HOST = os.getenv("POSTGRES_HOST")

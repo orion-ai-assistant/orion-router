@@ -37,54 +37,51 @@ def _require_text(value, field_name: str) -> str:
 
 
 
-@router.get("/api/settings/is-default-password")
-async def check_is_default_password():
+@router.get("/api/settings/is-default-password", dependencies=[Depends(verify_admin)])
+async def is_default_password():
+    from core.security import verify_secret
     from core import config
-    return {"is_default": config.ADMIN_SECRET == "orion-admin"}
+    hashed_db = await db_manager.get_config("admin_secret_hash")
+    if hashed_db:
+        is_default = verify_secret("orion-admin", hashed_db) or verify_secret("test", hashed_db)
+    else:
+        is_default = config.ADMIN_SECRET in ("orion-admin", "test")
+    return {"is_default": is_default}
 
 
 @router.put("/api/settings/admin-secret", dependencies=[Depends(verify_admin)])
 async def update_admin_secret(request: Request):
+    from core.security import verify_secret, hash_secret
+    import json
     try:
         body = await request.json()
         old_secret = (body.get("old_secret") or "").strip()
         new_secret = (body.get("new_secret") or body.get("admin_secret") or "").strip()
         
-        from core import config
         if not old_secret:
             raise HTTPException(status_code=400, detail="Current admin secret is required")
-        if old_secret != config.ADMIN_SECRET:
-            raise HTTPException(status_code=400, detail="Incorrect current admin secret")
         if not new_secret:
             raise HTTPException(status_code=400, detail="New admin secret cannot be empty")
-        
-        # Update in memory
-        config.ADMIN_SECRET = new_secret
-        
-        # Update in .env file
-        env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
-        lines = []
-        secret_found = False
-        if os.path.exists(env_path):
-            with open(env_path, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-        
-        for i, line in enumerate(lines):
-            if line.strip().startswith("ADMIN_SECRET="):
-                lines[i] = f'ADMIN_SECRET="{new_secret}"\n'
-                secret_found = True
-                break
-        
-        if not secret_found:
-            lines.append(f'\nADMIN_SECRET="{new_secret}"\n')
             
-        with open(env_path, "w", encoding="utf-8") as f:
-            f.writelines(lines)
-            
+        # Verify old secret
+        hashed_db = await db_manager.get_config("admin_secret_hash")
+        if hashed_db:
+            if not verify_secret(old_secret, hashed_db):
+                raise HTTPException(status_code=400, detail="Incorrect current admin secret")
+        else:
+            from core import config
+            if old_secret != config.ADMIN_SECRET:
+                raise HTTPException(status_code=400, detail="Incorrect current admin secret")
+        
+        # Hash and store new secret
+        hashed = hash_secret(new_secret)
+        await db_manager.upsert_config("admin_secret_hash", json.dumps(hashed))
+        
         return {"status": "success"}
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Error updating admin secret: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -397,6 +394,7 @@ async def get_admin_voices(request: Request):
 
 @router.get("/api/provider-key-pool", dependencies=[Depends(verify_admin)])
 async def list_provider_key_pool():
+    from core.security import decrypt
     rows = await db_manager.fetch(
         """
         SELECT id, provider, label, api_key, priority, is_active, last_error, last_error_at, created_at
@@ -407,17 +405,18 @@ async def list_provider_key_pool():
     keys = []
     for row in rows:
         item = dict(row)
-        item["masked_key"] = _mask_key(item.pop("api_key", ""))
+        item["masked_key"] = _mask_key(decrypt(item.pop("api_key", "")))
         keys.append(item)
     return {"keys": keys}
 
 
 @router.post("/api/provider-key-pool", dependencies=[Depends(verify_admin)])
 async def create_provider_key_pool_item(request: Request):
+    from core.security import encrypt
     body = await request.json()
     provider = _require_text(body.get("provider"), "provider").lower()
     label = _require_text(body.get("label"), "label")
-    api_key = _require_text(body.get("api_key"), "api_key")
+    api_key = encrypt(_require_text(body.get("api_key"), "api_key"))
     priority = int(body.get("priority", 100))
     is_active = bool(body.get("is_active", True))
 
@@ -438,6 +437,7 @@ async def create_provider_key_pool_item(request: Request):
 
 @router.put("/api/provider-key-pool/{key_id}", dependencies=[Depends(verify_admin)])
 async def update_provider_key_pool_item(key_id: str, request: Request):
+    from core.security import encrypt
     body = await request.json()
     existing = await db_manager.fetchrow(
         "SELECT provider, label, api_key, priority, is_active FROM router_provider_key_pool WHERE id = $1",
@@ -449,7 +449,7 @@ async def update_provider_key_pool_item(key_id: str, request: Request):
     provider = _require_text(body.get("provider", existing["provider"]), "provider").lower()
     label = _require_text(body.get("label", existing["label"]), "label")
     new_key = body.get("api_key", None)
-    api_key = existing["api_key"] if new_key in (None, "") else _require_text(new_key, "api_key")
+    api_key = existing["api_key"] if new_key in (None, "") else encrypt(_require_text(new_key, "api_key"))
     priority = int(body.get("priority", existing["priority"]))
     is_active = bool(body.get("is_active", existing["is_active"]))
 

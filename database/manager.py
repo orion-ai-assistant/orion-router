@@ -188,8 +188,38 @@ class DatabaseManager:
 
         await self._migrate_legacy_provider_keys(conn)
         await self._seed_default_models(conn)
+        await self._seed_admin_secret(conn)
+        await self._migrate_plaintext_keys(conn)
         
         logger.info("Database tables verified.")
+
+    async def _seed_admin_secret(self, conn: asyncpg.Connection) -> None:
+        """Seed admin secret into DB on first run."""
+        val = await conn.fetchval("SELECT config_value FROM router_configs WHERE config_key = 'admin_secret_hash'")
+        if not val:
+            from core.config import ADMIN_SECRET
+            if ADMIN_SECRET:
+                from core.security import hash_secret
+                hashed = hash_secret(ADMIN_SECRET)
+                await conn.execute(
+                    """
+                    INSERT INTO router_configs (config_key, config_value)
+                    VALUES ($1, $2::jsonb)
+                    ON CONFLICT (config_key) DO NOTHING
+                    """,
+                    'admin_secret_hash', json.dumps(hashed)
+                )
+
+    async def _migrate_plaintext_keys(self, conn: asyncpg.Connection) -> None:
+        """Encrypt any existing plaintext provider keys."""
+        from core.security import encrypt
+        rows = await conn.fetch("SELECT id, api_key FROM router_provider_key_pool WHERE api_key NOT LIKE 'gAAAAA%' AND api_key != ''")
+        for row in rows:
+            encrypted = encrypt(row["api_key"])
+            await conn.execute(
+                "UPDATE router_provider_key_pool SET api_key = $1 WHERE id = $2",
+                encrypted, row["id"]
+            )
 
     async def _migrate_legacy_provider_keys(self, conn: asyncpg.Connection) -> None:
         """Move existing provider_api_keys config entries into the new key pool once."""
@@ -205,6 +235,7 @@ class DatabaseManager:
             logger.warning("Skipping legacy provider key migration: config is not a JSON object")
             return
 
+        from core.security import encrypt
         for provider, api_key in legacy_keys.items():
             if not provider or not api_key:
                 continue
@@ -216,7 +247,7 @@ class DatabaseManager:
                 """,
                 str(provider).strip().lower(),
                 f"Migrated {str(provider).strip().lower()} key",
-                str(api_key).strip(),
+                encrypt(str(api_key).strip()),
             )
 
     async def _seed_default_models(self, conn: asyncpg.Connection) -> None:
@@ -350,6 +381,7 @@ class DatabaseManager:
                     )
 
     async def get_active_provider_keys(self, provider: str) -> list[dict]:
+        from core.security import decrypt
         rows = await self.fetch(
             """
             SELECT id, provider, label, api_key, priority, last_error, last_error_at
@@ -362,7 +394,12 @@ class DatabaseManager:
             """,
             provider,
         )
-        return [dict(r) for r in rows]
+        keys = []
+        for r in rows:
+            d = dict(r)
+            d["api_key"] = decrypt(d["api_key"])
+            keys.append(d)
+        return keys
 
     async def mark_provider_key_error(self, key_id: str | None, error: str) -> None:
         if not key_id:

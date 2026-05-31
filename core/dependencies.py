@@ -49,11 +49,7 @@ async def authenticate_request(request: Request) -> dict:
     if not token:
         raise HTTPException(status_code=401, detail="API key is required. Send via Authorization: Bearer <key>")
 
-    # --- 1. Admin Secret kontrolü ---
-    if token == config.ADMIN_SECRET:
-        return {"source": "system", "key_id": None}
-
-    # --- 2. Virtual Key kontrolü ---
+    # --- 1. Virtual Key kontrolü ---
     if token.startswith("sk-orion-"):
         key_hash = hashlib.sha256(token.encode()).hexdigest()
         try:
@@ -74,6 +70,18 @@ async def authenticate_request(request: Request) -> dict:
 
         return {"source": "virtual_key", "key_id": row["id"], "name": row["name"]}
 
+    # --- 2. Admin Secret kontrolü ---
+    hashed_db = await db_manager.get_config("admin_secret_hash")
+    if hashed_db:
+        from core.security import verify_secret
+        if verify_secret(token, hashed_db):
+            return {"source": "system", "key_id": None}
+    else:
+        if token == config.ADMIN_SECRET:
+            return {"source": "system", "key_id": None}
+
+
+
     # --- 3. Tanınmayan token: pass-through olarak işaretle ---
     # Playground'dan direkt provider key gönderiliyorsa bunu upstream'e iletmek için işaretle
     raise HTTPException(status_code=401, detail="Invalid API key")
@@ -81,6 +89,15 @@ async def authenticate_request(request: Request) -> dict:
 
 async def verify_admin(x_admin_key: str = Header(default=None)):
     """Dependency: Admin yetkisi kontrolü."""
-    if not x_admin_key or x_admin_key != config.ADMIN_SECRET:
+    if not x_admin_key:
         raise HTTPException(status_code=401, detail="Unauthorized admin access")
+    
+    hashed_db = await db_manager.get_config("admin_secret_hash")
+    if hashed_db:
+        from core.security import verify_secret
+        if not verify_secret(x_admin_key, hashed_db):
+            raise HTTPException(status_code=401, detail="Unauthorized admin access")
+    else:
+        if x_admin_key != config.ADMIN_SECRET:
+            raise HTTPException(status_code=401, detail="Unauthorized admin access")
     return True
