@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { adminFetch } from '@/lib/api';
 import { money, formatNumber } from '@/lib/utils';
+import { Coins, Cpu, Key } from 'lucide-react';
 
 interface Stats {
   total_cost: number;
@@ -60,9 +61,9 @@ export default function OverviewPage() {
 
       <div className="stats-grid grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Total Cost Card */}
-        <div className="stat-card glass-panel p-6 flex items-center gap-5 bg-[#131315] border border-white/5 rounded-md hover:translate-y-[-2px] hover:bg-[#18181b] hover:border-blue-500/35 hover:shadow-[0_8px_30px_rgba(59,130,246,0.12)] transition-all duration-200">
-          <div className="stat-icon text-2xl font-semibold text-[#60a5fa] bg-[#3b82f6]/8 border border-[#3b82f6]/18 w-16 h-16 flex items-center justify-center rounded">
-            $
+        <div className="stat-card glass-panel p-6 pl-10 flex items-center gap-6 bg-[#131315] border border-white/5 rounded-md hover:translate-y-[-2px] hover:bg-[#18181b] hover:border-blue-500/35 hover:shadow-[0_8px_30px_rgba(59,130,246,0.15)] transition-all duration-200">
+          <div className="stat-icon text-blue-400 bg-blue-500/10 border border-blue-500/20 w-14 h-14 flex items-center justify-center rounded-xl">
+            <Coins className="w-6 h-6 stroke-[1.8]" />
           </div>
           <div className="stat-details">
             <h3 className="text-zinc-400 text-xs font-medium mb-1">Total Cost</h3>
@@ -73,9 +74,9 @@ export default function OverviewPage() {
         </div>
 
         {/* Tokens Processed Card */}
-        <div className="stat-card glass-panel p-6 flex items-center gap-5 bg-[#131315] border border-white/5 rounded-md hover:translate-y-[-2px] hover:bg-[#18181b] hover:border-blue-500/35 hover:shadow-[0_8px_30px_rgba(59,130,246,0.12)] transition-all duration-200">
-          <div className="stat-icon text-2xl font-semibold text-[#60a5fa] bg-[#3b82f6]/8 border border-[#3b82f6]/18 w-16 h-16 flex items-center justify-center rounded">
-            T
+        <div className="stat-card glass-panel p-6 pl-10 flex items-center gap-6 bg-[#131315] border border-white/5 rounded-md hover:translate-y-[-2px] hover:bg-[#18181b] hover:border-sky-500/35 hover:shadow-[0_8px_30px_rgba(14,165,233,0.15)] transition-all duration-200">
+          <div className="stat-icon text-sky-400 bg-sky-500/10 border border-sky-500/20 w-14 h-14 flex items-center justify-center rounded-xl">
+            <Cpu className="w-6 h-6 stroke-[1.8]" />
           </div>
           <div className="stat-details">
             <h3 className="text-zinc-400 text-xs font-medium mb-1">Tokens Processed</h3>
@@ -86,9 +87,9 @@ export default function OverviewPage() {
         </div>
 
         {/* Virtual Keys Card */}
-        <div className="stat-card glass-panel p-6 flex items-center gap-5 bg-[#131315] border border-white/5 rounded-md hover:translate-y-[-2px] hover:bg-[#18181b] hover:border-blue-500/35 hover:shadow-[0_8px_30px_rgba(59,130,246,0.12)] transition-all duration-200">
-          <div className="stat-icon text-2xl font-semibold text-[#60a5fa] bg-[#3b82f6]/8 border border-[#3b82f6]/18 w-16 h-16 flex items-center justify-center rounded">
-            K
+        <div className="stat-card glass-panel p-6 pl-10 flex items-center gap-6 bg-[#131315] border border-white/5 rounded-md hover:translate-y-[-2px] hover:bg-[#18181b] hover:border-indigo-500/35 hover:shadow-[0_8px_30px_rgba(99,102,241,0.15)] transition-all duration-200">
+          <div className="stat-icon text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 w-14 h-14 flex items-center justify-center rounded-xl">
+            <Key className="w-6 h-6 stroke-[1.8]" />
           </div>
           <div className="stat-details">
             <h3 className="text-zinc-400 text-xs font-medium mb-1">Virtual Keys</h3>

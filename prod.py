@@ -159,7 +159,7 @@ def download_postgres() -> None:
     if PG_BIN.exists():
         return
     print()
-    info("PostgreSQL Portable bulunamadi — indiriliyor (~80 MB)...")
+    info("PostgreSQL Portable bulunamadi — indiriliyor")
     TOOLS_DIR.mkdir(parents=True, exist_ok=True)
     urllib.request.urlretrieve(PG_DOWNLOAD_URL, PG_ZIP, _download_progress)
     print()

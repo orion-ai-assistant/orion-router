@@ -61,7 +61,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Sidebar Navigation */}
       <aside className="sidebar w-[280px] pt-6 px-6 pb-3 glass-panel flex flex-col shrink-0 h-full">
         <div className="logo flex items-center gap-3.5 px-2 mb-6">
-          <div className="logo-icon"></div>
+          <img src="/dashboard/favicon.svg" alt="Orion Logo" className="w-9 h-9 shrink-0 object-contain" />
           <h2 className="font-heading text-xl font-semibold tracking-wide">
             Orion<span className="font-light text-zinc-400">Gateway</span>
           </h2>

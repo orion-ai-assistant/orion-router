@@ -2,7 +2,7 @@
 
 Geliştirme ve Canlı Ortam Rehberi
 
-Bu proje, Docker'a olan bağımlılığı ortadan kaldırarak tamamen yerel (native) Windows üzerinde çalışacak şekilde tasarlanmıştır. Veritabanı olarak **taşınabilir (portable) PostgreSQL** kullanır. Bilgisayarınıza hiçbir şey kurmanıza gerek yoktur; scriptler gerekli dosyaları (~80 MB) otomatik indirir ve izole bir klasörde çalıştırır.
+Bu proje, Docker'a olan bağımlılığı ortadan kaldırarak tamamen yerel (native) Windows üzerinde çalışacak şekilde tasarlanmıştır. Veritabanı olarak **taşınabilir (portable) PostgreSQL** kullanır. Bilgisayarınıza hiçbir şey kurmanıza gerek yoktur; scriptler gerekli dosyaları otomatik indirir ve izole bir klasörde çalıştırır.
 
 **Ön Koşullar:** Python 3.11+ ve Node.js kurulu olmalı.
 
