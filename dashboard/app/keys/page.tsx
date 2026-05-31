@@ -199,47 +199,48 @@ export default function VirtualKeysPage() {
         <Table>
           <TableHeader className="bg-black/25">
             <TableRow className="border-b border-zinc-850 hover:bg-transparent">
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 pl-6 w-[200px]">Name</TableHead>
-              <TableHead className="w-[140px] px-0"></TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[130px]">Budget</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[130px] pl-10">Used</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center">Created</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-right pr-6 w-[90px]">Actions</TableHead>
+              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 pl-6 text-left w-[25%]">Name</TableHead>
+              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-left w-[18%]">Budget</TableHead>
+              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-left w-[12%]">Used</TableHead>
+              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[20%]">Created</TableHead>
+              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-right pr-6 w-[25%]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={6} className="text-center text-zinc-400 py-8">
+                <TableCell colSpan={5} className="text-center text-zinc-400 py-8">
                   Loading virtual keys...
                 </TableCell>
               </TableRow>
             ) : virtualKeys.length === 0 ? (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={6} className="text-center text-zinc-400 py-8">
+                <TableCell colSpan={5} className="text-center text-zinc-400 py-8">
                   No virtual keys found. Create one to get started.
                 </TableCell>
               </TableRow>
             ) : (
               virtualKeys.map((key) => (
                 <TableRow key={key.id} className="border-b border-zinc-900 hover:bg-white/[0.015] transition-colors">
-                  <TableCell className="font-medium text-sm py-4 pl-6 max-w-[200px] truncate" title={key.name}>{key.name}</TableCell>
-                  <TableCell className="py-4 px-0">
-                    {!key.is_active && (
-                      <Badge className="bg-red-500/10 text-red-500 border border-red-500/20 text-[10px] font-semibold tracking-wide uppercase px-2.5 py-0.5 rounded-full">
-                        Inactive
-                      </Badge>
-                    )}
+                  <TableCell className="font-medium text-sm py-4 pl-6">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate max-w-[240px]" title={key.name}>{key.name}</span>
+                      {!key.is_active && (
+                        <Badge className="bg-red-500/10 text-red-500 border border-red-500/20 text-[10px] font-semibold tracking-wide uppercase px-2.5 py-0.5 rounded-full shrink-0">
+                          Inactive
+                        </Badge>
+                      )}
+                    </div>
                   </TableCell>
-                  <TableCell className="text-center py-4 font-mono text-xs">
+                  <TableCell className="py-4 text-left font-mono text-xs text-zinc-300">
                     {key.budget > 0 ? money(key.budget, 2) : 'Unlimited'}
                   </TableCell>
-                  <TableCell className="text-center py-4 font-mono text-xs pl-10">
+                  <TableCell className="py-4 text-left font-mono text-xs text-zinc-300">
                     {(!key.used_amount || Number(key.used_amount) === 0)
                       ? '$0.00'
                       : money(key.used_amount, 4)}
                   </TableCell>
-                  <TableCell className="text-center py-4 font-mono text-xs text-zinc-400">
+                  <TableCell className="py-4 text-center font-mono text-xs text-zinc-400">
                     {dateTime(key.created_at)}
                   </TableCell>
                   <TableCell className="text-right py-4 pr-6">
