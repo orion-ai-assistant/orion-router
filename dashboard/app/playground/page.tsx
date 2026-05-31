@@ -21,30 +21,39 @@ interface Message {
 
 export default function PlaygroundPage() {
   const { showToast } = useApp();
-  const [activeTab, setActiveTab] = useState<'chat' | 'tts' | 'embed'>('chat');
+  const getSavedState = (key: string, defaultVal: string) => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(key) || defaultVal;
+    }
+    return defaultVal;
+  };
+
+  const [activeTab, setActiveTab] = useState<'chat' | 'tts' | 'embed'>(
+    getSavedState('pg_activeTab', 'chat') as 'chat' | 'tts' | 'embed'
+  );
   const [models, setModels] = useState<any[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
   const [voicesByProvider, setVoicesByProvider] = useState<Record<string, string[]>>({});
   const [voices, setVoices] = useState<string[]>([]);
   
   // Chat State
-  const [chatModel, setChatModel] = useState('');
-  const [chatTemp, setChatTemp] = useState('');
-  const [chatThinking, setChatThinking] = useState('');
+  const [chatModel, setChatModel] = useState(getSavedState('pg_chatModel', ''));
+  const [chatTemp, setChatTemp] = useState(getSavedState('pg_chatTemp', ''));
+  const [chatThinking, setChatThinking] = useState(getSavedState('pg_chatThinking', ''));
   const [chatMessages, setChatMessages] = useState<Message[]>([]);
   const [chatInput, setChatInput] = useState('');
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
 
   // TTS State
-  const [ttsModel, setTtsModel] = useState('');
-  const [ttsVoice, setTtsVoice] = useState('alloy');
-  const [ttsTemp, setTtsTemp] = useState('');
+  const [ttsModel, setTtsModel] = useState(getSavedState('pg_ttsModel', ''));
+  const [ttsVoice, setTtsVoice] = useState(getSavedState('pg_ttsVoice', 'alloy'));
+  const [ttsTemp, setTtsTemp] = useState(getSavedState('pg_ttsTemp', ''));
   const [ttsInput, setTtsInput] = useState('');
   const [ttsUrl, setTtsUrl] = useState('');
   const [ttsError, setTtsError] = useState('');
 
   // Embed State
-  const [embedModel, setEmbedModel] = useState('');
+  const [embedModel, setEmbedModel] = useState(getSavedState('pg_embedModel', ''));
   const [embedInput, setEmbedInput] = useState('');
   const [embedError, setEmbedError] = useState('');
   const [embedPreview, setEmbedPreview] = useState('');
@@ -100,13 +109,19 @@ export default function PlaygroundPage() {
   useEffect(() => {
     if (models.length > 0 || groups.length > 0) {
       const chatOpts = getRouteOptions('chat');
-      if (chatOpts.length > 0 && !chatModel) setChatModel(chatOpts[0].value);
+      if (chatOpts.length > 0 && (!chatModel || !chatOpts.find(o => o.value === chatModel))) {
+        setChatModel(chatOpts[0].value);
+      }
 
       const ttsOpts = getRouteOptions('tts');
-      if (ttsOpts.length > 0 && !ttsModel) setTtsModel(ttsOpts[0].value);
+      if (ttsOpts.length > 0 && (!ttsModel || !ttsOpts.find(o => o.value === ttsModel))) {
+        setTtsModel(ttsOpts[0].value);
+      }
 
       const embedOpts = getRouteOptions('embed');
-      if (embedOpts.length > 0 && !embedModel) setEmbedModel(embedOpts[0].value);
+      if (embedOpts.length > 0 && (!embedModel || !embedOpts.find(o => o.value === embedModel))) {
+        setEmbedModel(embedOpts[0].value);
+      }
     }
   }, [models, groups]);
 
@@ -142,6 +157,20 @@ export default function PlaygroundPage() {
       }
     }
   }, [ttsModel, groups, models, voicesByProvider]);
+
+  // Save states to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('pg_activeTab', activeTab);
+      localStorage.setItem('pg_chatModel', chatModel);
+      localStorage.setItem('pg_chatTemp', chatTemp);
+      localStorage.setItem('pg_chatThinking', chatThinking);
+      localStorage.setItem('pg_ttsModel', ttsModel);
+      localStorage.setItem('pg_ttsVoice', ttsVoice);
+      localStorage.setItem('pg_ttsTemp', ttsTemp);
+      localStorage.setItem('pg_embedModel', embedModel);
+    }
+  }, [activeTab, chatModel, chatTemp, chatThinking, ttsModel, ttsVoice, ttsTemp, embedModel]);
 
   // Scroll chat window to bottom on new messages
   useEffect(() => {

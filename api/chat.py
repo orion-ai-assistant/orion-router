@@ -47,6 +47,12 @@ async def chat_completions(
     tools = body.get("tools")
     tool_choice = body.get("tool_choice")
 
+    # Pass remaining keys to dynamic router
+    kwargs = {
+        k: v for k, v in body.items()
+        if k not in ("stream", "messages", "model", "thinking_level", "tools", "tool_choice")
+    }
+
     dynamic_router: DynamicLLMRouter = request.app.state.dynamic_router
 
     return StreamingResponse(
@@ -60,6 +66,7 @@ async def chat_completions(
             thinking_level=thinking_level,
             tools=tools,
             tool_choice=tool_choice,
+            **kwargs
         ),
         media_type="text/event-stream",
         headers={

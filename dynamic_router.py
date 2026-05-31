@@ -356,6 +356,9 @@ class DynamicLLMRouter:
         routes = []
         try:
             routes = await db_manager.resolve_model_route("chat", model)
+        except ValueError as e:
+            yield f'data: {json.dumps({"error": {"message": str(e), "type": "api_error"}}, ensure_ascii=False)}\n\n'
+            return
         except Exception as e:
             logger.warning(f"Model route resolution failed for '{model}': {e}")
 
@@ -365,13 +368,22 @@ class DynamicLLMRouter:
                 p_provider = route["provider"]
                 p_model = route["name"]
                 p_temp = route.get("temperature")
+                p_think = route.get("thinking_level")
                 
                 route_kwargs = {**kwargs}
-                if p_temp is not None and "temperature" not in route_kwargs:
-                    try:
-                        route_kwargs["temperature"] = float(p_temp)
-                    except Exception:
-                        pass
+                
+                if p_temp is not None:
+                    incoming_temp = route_kwargs.get("temperature")
+                    if incoming_temp is None:
+                        try:
+                            route_kwargs["temperature"] = float(p_temp)
+                        except Exception:
+                            pass
+                        
+                if p_think is not None:
+                    incoming_think = route_kwargs.get("thinking_level")
+                    if incoming_think in (None, ""):
+                        route_kwargs["thinking_level"] = p_think
                 
                 plugin = self.chat_providers.get(p_provider)
                 if not plugin:

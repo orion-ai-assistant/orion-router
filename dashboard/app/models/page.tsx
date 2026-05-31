@@ -22,6 +22,7 @@ interface ModelItem {
   input_price: number;
   output_price: number;
   think_price: number;
+  thinking_level?: string | null;
   _original?: {
     name: string;
     provider: string;
@@ -31,6 +32,7 @@ interface ModelItem {
     input_price: number;
     output_price: number;
     think_price: number;
+    thinking_level?: string | null;
   };
 }
 
@@ -53,6 +55,7 @@ export default function ModelsPage() {
     input_price: 0,
     output_price: 0,
     think_price: 0,
+    thinking_level: '',
   });
 
   const [editingModel, setEditingModel] = useState<ModelItem>({
@@ -65,6 +68,7 @@ export default function ModelsPage() {
     input_price: 0,
     output_price: 0,
     think_price: 0,
+    thinking_level: null,
   });
 
   const loadProviders = async () => {
@@ -97,6 +101,7 @@ export default function ModelsPage() {
           const input_price = model.input_price || 0;
           const output_price = model.output_price || 0;
           const think_price = model.think_price || 0;
+          const thinking_level = model.thinking_level || null;
 
           return {
             ...model,
@@ -108,6 +113,7 @@ export default function ModelsPage() {
             input_price,
             output_price,
             think_price,
+            thinking_level,
             _original: {
               name,
               provider,
@@ -117,6 +123,7 @@ export default function ModelsPage() {
               input_price,
               output_price,
               think_price,
+              thinking_level,
             },
           };
         });
@@ -195,6 +202,7 @@ export default function ModelsPage() {
           input_price: addForm.input_price || 0,
           output_price: addForm.output_price || 0,
           think_price: addForm.think_price || 0,
+          thinking_level: addForm.thinking_level || null,
         }),
       });
       if (res.ok) {
@@ -206,6 +214,7 @@ export default function ModelsPage() {
           input_price: 0,
           output_price: 0,
           think_price: 0,
+          thinking_level: '',
         });
         setShowAddModal(false);
         showToast('Model added successfully!');
@@ -248,6 +257,7 @@ export default function ModelsPage() {
           input_price: editingModel.input_price || 0,
           output_price: editingModel.output_price || 0,
           think_price: editingModel.think_price || 0,
+          thinking_level: editingModel.thinking_level || null,
         }),
       });
       if (res.ok) {
@@ -299,7 +309,8 @@ export default function ModelsPage() {
       !!model.is_active !== model._original.is_active ||
       Number(model.input_price || 0) !== Number(model._original.input_price || 0) ||
       Number(model.output_price || 0) !== Number(model._original.output_price || 0) ||
-      Number(model.think_price || 0) !== Number(model._original.think_price || 0)
+      Number(model.think_price || 0) !== Number(model._original.think_price || 0) ||
+      (model.thinking_level || null) !== (model._original.thinking_level || null)
     );
   };
 
@@ -353,7 +364,7 @@ export default function ModelsPage() {
                 {providerModels.map((model) => (
                   <div
                     key={model.id}
-                    className="model-item-row bg-black/20 border border-zinc-850 rounded px-4 py-3 min-h-[52px] grid grid-cols-[minmax(180px,260px)_80px_80px_90px_1fr_auto] gap-4 items-center hover:border-zinc-600 hover:bg-black/35"
+                    className="model-item-row bg-black/20 border border-zinc-850 rounded px-4 py-3 min-h-[52px] grid grid-cols-[minmax(180px,260px)_80px_80px_130px_1fr_auto] gap-4 items-center hover:border-zinc-600 hover:bg-black/35"
                   >
                     <div className="font-semibold text-sm font-mono text-white select-all truncate">
                       {model.name}
@@ -373,11 +384,19 @@ export default function ModelsPage() {
                       )}
                     </div>
                     
-                    <div className="flex flex-col items-center justify-center gap-0.5">
-                      <span className="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold">Temp</span>
-                      <span className="font-mono text-xs text-zinc-300">
-                        {model.temperature !== null ? model.temperature.toFixed(1) : '-'}
-                      </span>
+                    <div className="flex items-center justify-center gap-5">
+                      <div className="flex flex-col items-center justify-center gap-0.5">
+                        <span className="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold">Temp</span>
+                        <span className="font-mono text-xs text-zinc-300">
+                          {model.temperature !== null ? model.temperature.toFixed(1) : '-'}
+                        </span>
+                      </div>
+                      <div className="flex flex-col items-center justify-center gap-0.5">
+                        <span className="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold">Think</span>
+                        <span className="font-mono text-xs text-zinc-300">
+                          {model.thinking_level || '-'}
+                        </span>
+                      </div>
                     </div>
                     
                     <div className="pricing-container flex items-center gap-4">
@@ -483,6 +502,18 @@ export default function ModelsPage() {
                 </select>
               </div>
             </div>
+
+            {(addForm.capability === 'chat') && (
+              <div className="flex flex-col gap-2">
+                <label className="text-zinc-400 text-sm font-medium">Default Think (Thinking Level)</label>
+                <Input
+                  value={addForm.thinking_level}
+                  onChange={(e) => setAddForm({ ...addForm, thinking_level: e.target.value })}
+                  placeholder="optional (e.g. low, high, or tokens count)"
+                  className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
+                />
+              </div>
+            )}
 
             {(addForm.capability === 'chat' || addForm.capability === 'tts') && (
               <div className="flex flex-col gap-2">
@@ -627,6 +658,18 @@ export default function ModelsPage() {
                 </select>
               </div>
             </div>
+
+            {(editingModel.capability === 'chat') && (
+              <div className="flex flex-col gap-2">
+                <label className="text-zinc-400 text-sm font-medium">Default Think (Thinking Level)</label>
+                <Input
+                  value={editingModel.thinking_level || ''}
+                  onChange={(e) => setEditingModel({ ...editingModel, thinking_level: e.target.value })}
+                  placeholder="optional (e.g. low, high, or tokens count)"
+                  className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
+                />
+              </div>
+            )}
 
             {(editingModel.capability === 'chat' || editingModel.capability === 'tts') && (
               <div className="flex flex-col gap-2">

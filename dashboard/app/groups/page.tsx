@@ -18,6 +18,7 @@ interface GroupItem {
   name: string;
   provider: string;
   capability: string;
+  thinking_level?: string | null;
 }
 
 interface ModelGroup {
@@ -101,6 +102,7 @@ export default function GroupsPage() {
   const [showAddGroupModal, setShowAddGroupModal] = useState<boolean>(false);
   const [showEditGroupModal, setShowEditGroupModal] = useState<boolean>(false);
   const [showAddGroupItemModal, setShowAddGroupItemModal] = useState<boolean>(false);
+  const [showEditGroupItemModal, setShowEditGroupItemModal] = useState<boolean>(false);
 
   // Form states
   const [groupForm, setGroupForm] = useState({ name: '', capability: 'chat' as 'chat' | 'tts' | 'embed' });
@@ -115,6 +117,8 @@ export default function GroupsPage() {
   
   const [activeGroupForItems, setActiveGroupForItems] = useState<ModelGroup | null>(null);
   const [selectedModelId, setSelectedModelId] = useState<string>('');
+  const [selectedThinkingLevel, setSelectedThinkingLevel] = useState<string>('');
+  const [editingGroupItem, setEditingGroupItem] = useState<{groupId: string, itemId: string, name: string, provider: string, priority: number, thinking_level: string} | null>(null);
   
   // Drag and Drop state
   const [draggedItem, setDraggedItem] = useState<{
@@ -345,6 +349,7 @@ export default function GroupsPage() {
   const openAddGroupItem = (group: ModelGroup) => {
     setActiveGroupForItems(group);
     setSelectedModelId('');
+    setSelectedThinkingLevel('');
     setShowAddGroupItemModal(true);
   };
 
@@ -360,7 +365,11 @@ export default function GroupsPage() {
     try {
       const res = await adminFetch(`/dashboard/api/model-groups/${activeGroupForItems.id}/items`, {
         method: 'POST',
-        body: JSON.stringify({ model_id: selectedModelId, priority }),
+        body: JSON.stringify({ 
+          model_id: selectedModelId, 
+          priority, 
+          thinking_level: selectedThinkingLevel || null 
+        }),
       });
       if (res.ok) {
         setShowAddGroupItemModal(false);
@@ -373,6 +382,44 @@ export default function GroupsPage() {
     } catch (err) {
       console.error(err);
       showToast('Failed to add model to group', 'error');
+    }
+  };
+
+  const openEditGroupItem = (group: ModelGroup, item: GroupItem) => {
+    setEditingGroupItem({
+      groupId: group.id,
+      itemId: item.id,
+      name: item.name,
+      provider: item.provider,
+      priority: item.priority,
+      thinking_level: item.thinking_level || '',
+    });
+    setShowEditGroupItemModal(true);
+  };
+
+  const handleUpdateGroupItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingGroupItem) return;
+
+    try {
+      const res = await adminFetch(`/dashboard/api/model-groups/${editingGroupItem.groupId}/items/${editingGroupItem.itemId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ 
+          priority: editingGroupItem.priority, 
+          thinking_level: editingGroupItem.thinking_level || null 
+        }),
+      });
+      if (res.ok) {
+        setShowEditGroupItemModal(false);
+        showToast('Model group item updated!');
+        await loadGroups();
+      } else {
+        const err = await res.json();
+        showToast('Error: ' + (err.detail || 'Failed to update item'), 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to update item', 'error');
     }
   };
 
@@ -590,10 +637,15 @@ export default function GroupsPage() {
                               {item.name}
                             </div>
 
-                            <div className="flex items-center">
+                            <div className="flex items-center gap-1.5">
                               <Badge className="bg-blue-500/10 text-blue-300 border border-blue-500/20 text-[9px] font-normal tracking-wide rounded uppercase px-1.5 py-0 capitalize">
                                 {item.provider}
                               </Badge>
+                              {item.thinking_level && (
+                                <Badge className="bg-purple-500/10 text-purple-300 border border-purple-500/20 text-[9px] font-normal tracking-wide rounded uppercase px-1.5 py-0">
+                                  Think: {item.thinking_level}
+                                </Badge>
+                              )}
                             </div>
 
                             <div className="flex items-center">
@@ -633,8 +685,16 @@ export default function GroupsPage() {
                                 <ChevronDown className="w-4 h-4" />
                               </Button>
                               <Button
+                                variant="outline"
+                                onClick={() => openEditGroupItem(group, item)}
+                                className="border-zinc-850 text-white hover:bg-zinc-800/50 hover:text-white text-xs px-3 py-1 h-8 rounded ml-5"
+                                title="Edit Item"
+                              >
+                                Edit
+                              </Button>
+                              <Button
                                 onClick={() => handleDeleteGroupItem(group, item.id)}
-                                className="bg-transparent border border-red-500/10 text-red-400/80 hover:bg-red-500/10 hover:text-red-500 p-1.5 h-8 w-8 rounded ml-5"
+                                className="bg-transparent border border-red-500/10 text-red-400/80 hover:bg-red-500/10 hover:text-red-500 p-1.5 h-8 w-8 rounded ml-1"
                                 title="Remove from Group"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -748,12 +808,12 @@ export default function GroupsPage() {
               onClick={() => setEditingGroup({ ...editingGroup, is_active: !editingGroup.is_active })}
               className={`flex items-center justify-between p-4 rounded-lg cursor-pointer border transition-all duration-200 hover:border-zinc-600 ${
                 editingGroup.is_active
-                  ? 'bg-emerald-500/10 border-emerald-500/25'
+                  ? 'bg-purple-950/10 border-purple-500/25'
                   : 'bg-white/3 border-zinc-800 hover:bg-white/5'
               }`}
             >
               <div className="flex flex-col gap-0.5">
-                <span className={`font-semibold text-sm ${editingGroup.is_active ? 'text-emerald-400' : 'text-white'}`}>Active Status</span>
+                <span className={`font-semibold text-sm ${editingGroup.is_active ? 'text-purple-400' : 'text-white'}`}>Active Status</span>
                 <span className="text-zinc-400 text-xs">Enable group for routing</span>
               </div>
               <Switch
@@ -832,6 +892,18 @@ export default function GroupsPage() {
               )}
             </div>
 
+            {activeGroupForItems?.capability === 'chat' && (
+              <div className="flex flex-col gap-2">
+                <label className="text-zinc-400 text-sm font-medium">Think Override (Optional)</label>
+                <Input
+                  value={selectedThinkingLevel}
+                  onChange={(e) => setSelectedThinkingLevel(e.target.value)}
+                  placeholder="e.g. low, high, or tokens count"
+                  className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
+                />
+              </div>
+            )}
+
             <DialogFooter className="mt-4 flex gap-3 justify-end">
               <Button
                 variant="outline"
@@ -856,6 +928,53 @@ export default function GroupsPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Group Item Dialog */}
+      <Dialog open={showEditGroupItemModal} onOpenChange={setShowEditGroupItemModal}>
+        <DialogContent className="max-w-[440px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-heading font-semibold text-white">Edit Group Item</DialogTitle>
+          </DialogHeader>
+
+          {editingGroupItem && (
+            <form onSubmit={handleUpdateGroupItem} className="flex flex-col gap-4 my-2">
+              <div className="flex flex-col gap-2">
+                <label className="text-zinc-400 text-sm font-medium">Model</label>
+                <div className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3 font-mono text-sm opacity-70">
+                  {editingGroupItem.name} ({editingGroupItem.provider})
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-zinc-400 text-sm font-medium">Think Override (Optional)</label>
+                <Input
+                  value={editingGroupItem.thinking_level}
+                  onChange={(e) => setEditingGroupItem({ ...editingGroupItem, thinking_level: e.target.value })}
+                  placeholder="e.g. low, high, or tokens count"
+                  className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
+                />
+              </div>
+
+              <DialogFooter className="mt-4 flex gap-3 justify-end">
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={() => setShowEditGroupItemModal(false)}
+                  className="border-zinc-800 text-white hover:bg-zinc-900 rounded font-medium"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="bg-white text-black hover:bg-zinc-200 rounded font-medium"
+                >
+                  Save Changes
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </section>

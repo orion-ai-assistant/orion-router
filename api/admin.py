@@ -414,7 +414,7 @@ async def delete_provider_key_pool_item(key_id: str):
 async def list_models():
     rows = await db_manager.fetch(
         """
-        SELECT m.id, m.name, m.provider, m.capability, m.temperature, m.is_active, m.created_at,
+        SELECT m.id, m.name, m.provider, m.capability, m.temperature, m.is_active, m.created_at, m.thinking_level,
                p.input_price, p.output_price, p.think_price
         FROM router_models m
         LEFT JOIN router_model_pricing p ON m.name = p.model_name
@@ -447,18 +447,21 @@ async def create_model(request: Request):
     input_price = float(body.get("input_price", 0.0) if body.get("input_price") not in (None, "") else 0.0)
     output_price = float(body.get("output_price", 0.0) if body.get("output_price") not in (None, "") else 0.0)
     think_price = float(body.get("think_price", 0.0) if body.get("think_price") not in (None, "") else 0.0)
+    thinking_level = body.get("thinking_level")
+    thinking_level = str(thinking_level).strip() if thinking_level not in (None, "") else None
 
     row = await db_manager.fetchrow(
         """
-        INSERT INTO router_models (name, provider, capability, temperature, is_active)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING id, name, provider, capability, temperature, is_active, created_at
+        INSERT INTO router_models (name, provider, capability, temperature, is_active, thinking_level)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id, name, provider, capability, temperature, is_active, thinking_level, created_at
         """,
         name,
         provider,
         capability,
         temperature,
         is_active,
+        thinking_level,
     )
     await db_manager.upsert_pricing(name, input_price, output_price, think_price)
 
@@ -474,7 +477,7 @@ async def create_model(request: Request):
 async def update_model(model_id: str, request: Request):
     body = await request.json()
     existing = await db_manager.fetchrow(
-        "SELECT name, provider, capability, temperature, is_active FROM router_models WHERE id = $1",
+        "SELECT name, provider, capability, temperature, is_active, thinking_level FROM router_models WHERE id = $1",
         model_id,
     )
     if not existing:
@@ -492,14 +495,17 @@ async def update_model(model_id: str, request: Request):
     input_price = float(body.get("input_price", 0.0) if body.get("input_price") not in (None, "") else 0.0)
     output_price = float(body.get("output_price", 0.0) if body.get("output_price") not in (None, "") else 0.0)
     think_price = float(body.get("think_price", 0.0) if body.get("think_price") not in (None, "") else 0.0)
+    
+    new_thinking = body.get("thinking_level", existing["thinking_level"])
+    thinking_level = str(new_thinking).strip() if new_thinking not in (None, "") else None
 
     row = await db_manager.fetchrow(
         """
         UPDATE router_models
         SET name = $2, provider = $3, capability = $4, temperature = $5,
-            is_active = $6, updated_at = NOW()
+            is_active = $6, thinking_level = $7, updated_at = NOW()
         WHERE id = $1
-        RETURNING id, name, provider, capability, temperature, is_active, created_at
+        RETURNING id, name, provider, capability, temperature, is_active, thinking_level, created_at
         """,
         model_id,
         name,
@@ -507,6 +513,7 @@ async def update_model(model_id: str, request: Request):
         capability,
         temperature,
         is_active,
+        thinking_level,
     )
     await db_manager.upsert_pricing(name, input_price, output_price, think_price)
 
@@ -540,7 +547,7 @@ async def list_model_groups():
     for group in groups:
         rows = await db_manager.fetch(
             """
-            SELECT i.id, i.model_id, i.priority, m.name, m.provider, m.capability
+            SELECT i.id, i.model_id, i.priority, i.thinking_level, m.name, m.provider, m.capability
             FROM router_model_group_items i
             JOIN router_models m ON m.id = i.model_id
             WHERE i.group_id = $1
@@ -618,6 +625,8 @@ async def add_model_group_item(group_id: str, request: Request):
     body = await request.json()
     model_id = _require_text(body.get("model_id"), "model_id")
     priority = int(body.get("priority", 100))
+    thinking_level = body.get("thinking_level")
+    thinking_level = str(thinking_level).strip() if thinking_level not in (None, "") else None
 
     group = await db_manager.fetchrow("SELECT capability FROM router_model_groups WHERE id = $1", group_id)
     model = await db_manager.fetchrow("SELECT capability FROM router_models WHERE id = $1", model_id)
@@ -628,13 +637,14 @@ async def add_model_group_item(group_id: str, request: Request):
 
     row = await db_manager.fetchrow(
         """
-        INSERT INTO router_model_group_items (group_id, model_id, priority)
-        VALUES ($1, $2, $3)
-        RETURNING id, group_id, model_id, priority, created_at
+        INSERT INTO router_model_group_items (group_id, model_id, priority, thinking_level)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id, group_id, model_id, priority, thinking_level, created_at
         """,
         group_id,
         model_id,
         priority,
+        thinking_level,
     )
     return dict(row)
 
@@ -643,16 +653,25 @@ async def add_model_group_item(group_id: str, request: Request):
 async def update_model_group_item(group_id: str, item_id: str, request: Request):
     body = await request.json()
     priority = int(body.get("priority", 100))
+    
+    existing = await db_manager.fetchrow("SELECT thinking_level FROM router_model_group_items WHERE id = $1 AND group_id = $2", item_id, group_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Group item not found")
+
+    new_thinking = body.get("thinking_level", existing["thinking_level"])
+    thinking_level = str(new_thinking).strip() if new_thinking not in (None, "") else None
+
     row = await db_manager.fetchrow(
         """
         UPDATE router_model_group_items
-        SET priority = $3
+        SET priority = $3, thinking_level = $4
         WHERE id = $1 AND group_id = $2
-        RETURNING id, group_id, model_id, priority, created_at
+        RETURNING id, group_id, model_id, priority, thinking_level, created_at
         """,
         item_id,
         group_id,
         priority,
+        thinking_level,
     )
     if not row:
         raise HTTPException(status_code=404, detail="Group item not found")

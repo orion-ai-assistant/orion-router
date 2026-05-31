@@ -144,6 +144,7 @@ class DatabaseManager:
             );
             """
         )
+        await conn.execute("ALTER TABLE router_models ADD COLUMN IF NOT EXISTS thinking_level TEXT;")
         await conn.execute(
             """
             CREATE TABLE IF NOT EXISTS router_model_groups (
@@ -170,6 +171,7 @@ class DatabaseManager:
             );
             """
         )
+        await conn.execute("ALTER TABLE router_model_group_items ADD COLUMN IF NOT EXISTS thinking_level TEXT;")
 
         await self._migrate_legacy_provider_keys(conn)
         await self._seed_default_models(conn)
@@ -401,7 +403,8 @@ class DatabaseManager:
             rows = await self.fetch(
                 """
                 SELECT m.id, m.name, m.provider, m.capability, m.temperature,
-                       g.name AS requested_name, i.priority
+                       g.name AS requested_name, i.priority,
+                       COALESCE(i.thinking_level, m.thinking_level) AS thinking_level
                 FROM router_model_group_items i
                 JOIN router_models m ON m.id = i.model_id
                 JOIN router_model_groups g ON g.id = i.group_id
@@ -411,11 +414,13 @@ class DatabaseManager:
                 group["id"],
                 capability,
             )
+            if not rows:
+                raise ValueError(f"Model group '{group['name']}' exists but has no active models.")
             return [dict(r) for r in rows]
 
         row = await self.fetchrow(
             """
-            SELECT id, name, provider, capability, temperature, name AS requested_name, 100 AS priority
+            SELECT id, name, provider, capability, temperature, name AS requested_name, 100 AS priority, thinking_level
             FROM router_models
             WHERE lower(name) = lower($1) AND capability = $2 AND is_active = true
             """,
