@@ -24,10 +24,24 @@ async def lifespan(app: FastAPI):
     #  STARTUP                                                             #
     # ------------------------------------------------------------------ #
     logger.info("Starting up Orion Custom Service Router")
-    print("\n" + "="*60)
-    print("🚀 Orion Router başarıyla başlatıldı!")
-    print(f"👉 Yönetim Paneli: http://localhost:{ROUTER_PORT}/dashboard")
-    print("="*60 + "\n")
+
+    import os
+    env_mode = "Dev" if os.environ.get("UVICORN_RELOAD") == "1" else "Prod"
+    
+    print("\n" + "═" * 55)
+    print(f"║{'Orion Router — Bütün Servisler Aktif':^53}║")
+    print("╠" + "═" * 53 + "╣")
+    
+    if env_mode == "Dev":
+        print(f"║  Dashboard       http://localhost:3001/dashboard")
+        print(f"║  Backend API     http://localhost:{ROUTER_PORT}")
+    else:
+        print(f"║  Dashboard + API http://localhost:{ROUTER_PORT}/dashboard")
+        
+    print("╠" + "═" * 53 + "╣")
+    print(f"║{'Durdurmak icin CTRL+C':^53}║")
+    print("╚" + "═" * 55 + "╝\n")
+
     await db_manager.init_db()
 
     # --- Fiyatlandırmayı seed et ---

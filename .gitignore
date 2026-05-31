@@ -31,3 +31,8 @@ venv.bak/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Native PostgreSQL Data & Tools
+.pgdata-dev/
+.pgdata-prod/
+tools/pgsql/

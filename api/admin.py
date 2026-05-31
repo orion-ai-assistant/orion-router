@@ -685,6 +685,15 @@ async def get_admin_ui(path: str = ""):
     if path.startswith("api/") or path == "api":
         raise HTTPException(status_code=404, detail="Not Found")
         
+    import os
+    from fastapi.responses import RedirectResponse
+    
+    # Dev mode: Next.js dev server'a (3001) otomatik yönlendir
+    if os.environ.get("UVICORN_RELOAD") == "1":
+        # path boşsa direkt 3001/dashboard, doluysa 3001/dashboard/path
+        target_url = f"http://localhost:3001/dashboard/{path}" if path else "http://localhost:3001/dashboard"
+        return RedirectResponse(url=target_url)
+
     from core.config import DASHBOARD_OUT_DIR
     out_dir = DASHBOARD_OUT_DIR
     
