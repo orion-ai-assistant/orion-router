@@ -395,6 +395,7 @@ class DynamicLLMRouter:
                 p_model = route["name"]
                 p_temp = route.get("temperature")
                 p_think = route.get("thinking_level")
+                p_system_prompt = route.get("system_prompt")
                 
                 route_kwargs = {**kwargs}
                 
@@ -410,11 +411,24 @@ class DynamicLLMRouter:
                     incoming_think = route_kwargs.get("thinking_level")
                     if incoming_think in (None, ""):
                         route_kwargs["thinking_level"] = p_think
+
+                if p_system_prompt is not None:
+                    incoming_system = route_kwargs.get("system_prompt")
+                    if incoming_system in (None, ""):
+                        route_kwargs["system_prompt"] = p_system_prompt
                 
                 plugin = self.chat_providers.get(p_provider)
                 if not plugin:
                     logger.warning(f"Provider plugin {p_provider} not loaded, skipping route.")
                     continue
+                
+                route_messages = list(messages)
+                final_system_prompt = route_kwargs.get("system_prompt")
+                if final_system_prompt:
+                    existing_sys = [m.get("content", "") for m in route_messages if m.get("role") == "system"]
+                    combined_sys = final_system_prompt + ("\n" + "\n".join(existing_sys) if existing_sys else "")
+                    route_messages = [{"role": "system", "content": combined_sys}] + [m for m in route_messages if m.get("role") != "system"]
+                route_kwargs.pop("system_prompt", None)
                 
                 keys_to_try = await self._get_keys_for_provider(p_provider, api_key or auth_header)
                 
@@ -429,7 +443,7 @@ class DynamicLLMRouter:
                             key_id=key_id,
                             provider=p_provider,
                             model=p_model,
-                            messages=messages,
+                            messages=route_messages,
                             api_key=key_val,
                             auth_header=auth_header if not key_val else None,
                             **route_kwargs
@@ -479,9 +493,18 @@ class DynamicLLMRouter:
             return
 
         db_key = self._get_db_key(provider)
+        
+        route_messages = list(messages)
+        final_system_prompt = kwargs.get("system_prompt")
+        if final_system_prompt:
+            existing_sys = [m.get("content", "") for m in route_messages if m.get("role") == "system"]
+            combined_sys = final_system_prompt + ("\n" + "\n".join(existing_sys) if existing_sys else "")
+            route_messages = [{"role": "system", "content": combined_sys}] + [m for m in route_messages if m.get("role") != "system"]
+        kwargs.pop("system_prompt", None)
+
         async for chunk in self._stream(
             self.chat_providers[provider], key_id, provider, model,
-            messages, db_key or api_key, auth_header, **kwargs
+            route_messages, db_key or api_key, auth_header, **kwargs
         ):
             yield chunk
 

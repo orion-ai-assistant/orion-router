@@ -6,6 +6,7 @@ import { money } from '@/lib/utils';
 import { useApp } from '@/components/AppContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -23,6 +24,7 @@ interface ModelItem {
   output_price: number;
   think_price: number;
   thinking_level?: string | null;
+  system_prompt?: string | null;
   _original?: {
     name: string;
     provider: string;
@@ -33,6 +35,7 @@ interface ModelItem {
     output_price: number;
     think_price: number;
     thinking_level?: string | null;
+    system_prompt?: string | null;
   };
 }
 
@@ -56,6 +59,7 @@ export default function ModelsPage() {
     output_price: 0,
     think_price: 0,
     thinking_level: '',
+    system_prompt: '',
   });
 
   const [editingModel, setEditingModel] = useState<ModelItem>({
@@ -69,6 +73,7 @@ export default function ModelsPage() {
     output_price: 0,
     think_price: 0,
     thinking_level: null,
+    system_prompt: null,
   });
 
   const loadProviders = async () => {
@@ -102,6 +107,7 @@ export default function ModelsPage() {
           const output_price = model.output_price || 0;
           const think_price = model.think_price || 0;
           const thinking_level = model.thinking_level || null;
+          const system_prompt = model.system_prompt || null;
 
           return {
             ...model,
@@ -114,6 +120,7 @@ export default function ModelsPage() {
             output_price,
             think_price,
             thinking_level,
+            system_prompt,
             _original: {
               name,
               provider,
@@ -124,6 +131,7 @@ export default function ModelsPage() {
               output_price,
               think_price,
               thinking_level,
+              system_prompt,
             },
           };
         });
@@ -203,6 +211,7 @@ export default function ModelsPage() {
           output_price: addForm.output_price || 0,
           think_price: addForm.think_price || 0,
           thinking_level: addForm.thinking_level || null,
+          system_prompt: addForm.system_prompt || null,
         }),
       });
       if (res.ok) {
@@ -215,6 +224,7 @@ export default function ModelsPage() {
           output_price: 0,
           think_price: 0,
           thinking_level: '',
+          system_prompt: '',
         });
         setShowAddModal(false);
         showToast('Model added successfully!');
@@ -258,6 +268,7 @@ export default function ModelsPage() {
           output_price: editingModel.output_price || 0,
           think_price: editingModel.think_price || 0,
           thinking_level: editingModel.thinking_level || null,
+          system_prompt: editingModel.system_prompt || null,
         }),
       });
       if (res.ok) {
@@ -310,7 +321,8 @@ export default function ModelsPage() {
       Number(model.input_price || 0) !== Number(model._original.input_price || 0) ||
       Number(model.output_price || 0) !== Number(model._original.output_price || 0) ||
       Number(model.think_price || 0) !== Number(model._original.think_price || 0) ||
-      (model.thinking_level || null) !== (model._original.thinking_level || null)
+      (model.thinking_level || null) !== (model._original.thinking_level || null) ||
+      (model.system_prompt || null) !== (model._original.system_prompt || null)
     );
   };
 
@@ -364,37 +376,41 @@ export default function ModelsPage() {
                 {providerModels.map((model) => (
                   <div
                     key={model.id}
-                    className="model-item-row bg-black/20 border border-zinc-850 rounded px-4 py-3 min-h-[52px] grid grid-cols-[minmax(180px,260px)_80px_80px_130px_1fr_auto] gap-4 items-center hover:border-zinc-600 hover:bg-black/35"
+                    className="model-item-row bg-black/20 border border-zinc-850 rounded px-4 py-3 min-h-[52px] grid grid-cols-[minmax(172px,302px)_250px_80px_100px_1fr_auto] gap-4 items-center hover:border-zinc-600 hover:bg-black/35"
                   >
                     <div className="font-semibold text-sm font-mono text-white select-all truncate">
                       {model.name}
                     </div>
                     
-                    <div className="flex items-center">
-                      <Badge className="bg-zinc-800 text-zinc-300 border border-zinc-700/50 text-[10px] tracking-wide rounded uppercase px-2.5 py-0.5">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <Badge className="bg-zinc-800 text-zinc-300 border border-zinc-700/50 text-[9px] font-normal tracking-wide rounded uppercase px-1.5 py-0">
                         {model.capability}
                       </Badge>
+                      {model.thinking_level && (
+                        <Badge className="bg-purple-500/10 text-purple-300 border border-purple-500/20 text-[9px] font-normal tracking-wide rounded uppercase px-1.5 py-0">
+                          Think: {model.thinking_level}
+                        </Badge>
+                      )}
+                      {model.system_prompt && (
+                        <Badge className="bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-[9px] font-normal tracking-wide rounded uppercase px-1.5 py-0">
+                          Sys Prompt
+                        </Badge>
+                      )}
                     </div>
 
                     <div className="flex items-center">
                       {!model.is_active && (
-                        <Badge className="bg-red-500/10 text-red-500 border border-red-500/20 text-[9px] font-semibold tracking-wide uppercase px-1.5 py-0 rounded-full">
+                        <Badge className="bg-red-500/10 text-red-500 border border-red-500/20 text-[9px] font-semibold tracking-wide uppercase px-1.5 py-0 rounded">
                           Inactive
                         </Badge>
                       )}
                     </div>
                     
-                    <div className="flex items-center justify-center gap-5">
+                    <div className="flex items-center justify-center">
                       <div className="flex flex-col items-center justify-center gap-0.5">
                         <span className="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold">Temp</span>
                         <span className="font-mono text-xs text-zinc-300">
                           {model.temperature !== null ? model.temperature.toFixed(1) : '-'}
-                        </span>
-                      </div>
-                      <div className="flex flex-col items-center justify-center gap-0.5">
-                        <span className="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold">Think</span>
-                        <span className="font-mono text-xs text-zinc-300">
-                          {model.thinking_level || '-'}
                         </span>
                       </div>
                     </div>
@@ -511,6 +527,18 @@ export default function ModelsPage() {
                   onChange={(e) => setAddForm({ ...addForm, thinking_level: e.target.value })}
                   placeholder="optional (e.g. low, high, or tokens count)"
                   className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
+                />
+              </div>
+            )}
+
+            {(addForm.capability === 'chat') && (
+              <div className="flex flex-col gap-2">
+                <label className="text-zinc-400 text-sm font-medium">System Prompt</label>
+                <Textarea
+                  value={addForm.system_prompt || ''}
+                  onChange={(e) => setAddForm({ ...addForm, system_prompt: e.target.value })}
+                  placeholder="Optional system instructions..."
+                  className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3 h-24 resize-none custom-scrollbar overflow-y-auto no-field-sizing"
                 />
               </div>
             )}
@@ -667,6 +695,18 @@ export default function ModelsPage() {
                   onChange={(e) => setEditingModel({ ...editingModel, thinking_level: e.target.value })}
                   placeholder="optional (e.g. low, high, or tokens count)"
                   className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
+                />
+              </div>
+            )}
+
+            {(editingModel.capability === 'chat') && (
+              <div className="flex flex-col gap-2">
+                <label className="text-zinc-400 text-sm font-medium">System Prompt</label>
+                <Textarea
+                  value={editingModel.system_prompt || ''}
+                  onChange={(e) => setEditingModel({ ...editingModel, system_prompt: e.target.value })}
+                  placeholder="Optional system instructions..."
+                  className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3 h-24 resize-none custom-scrollbar overflow-y-auto no-field-sizing"
                 />
               </div>
             )}

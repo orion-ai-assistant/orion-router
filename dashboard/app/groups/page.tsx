@@ -6,6 +6,7 @@ import { runFlipUpdate } from '@/lib/list-flip';
 import { useApp } from '@/components/AppContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +20,7 @@ interface GroupItem {
   provider: string;
   capability: string;
   thinking_level?: string | null;
+  system_prompt?: string | null;
 }
 
 interface ModelGroup {
@@ -118,7 +120,8 @@ export default function GroupsPage() {
   const [activeGroupForItems, setActiveGroupForItems] = useState<ModelGroup | null>(null);
   const [selectedModelId, setSelectedModelId] = useState<string>('');
   const [selectedThinkingLevel, setSelectedThinkingLevel] = useState<string>('');
-  const [editingGroupItem, setEditingGroupItem] = useState<{groupId: string, itemId: string, name: string, provider: string, priority: number, thinking_level: string} | null>(null);
+  const [selectedSystemPrompt, setSelectedSystemPrompt] = useState<string>('');
+  const [editingGroupItem, setEditingGroupItem] = useState<{groupId: string, itemId: string, name: string, provider: string, priority: number, thinking_level: string, system_prompt: string} | null>(null);
   
   // Drag and Drop state
   const [draggedItem, setDraggedItem] = useState<{
@@ -350,6 +353,7 @@ export default function GroupsPage() {
     setActiveGroupForItems(group);
     setSelectedModelId('');
     setSelectedThinkingLevel('');
+    setSelectedSystemPrompt('');
     setShowAddGroupItemModal(true);
   };
 
@@ -368,7 +372,8 @@ export default function GroupsPage() {
         body: JSON.stringify({ 
           model_id: selectedModelId, 
           priority, 
-          thinking_level: selectedThinkingLevel || null 
+          thinking_level: selectedThinkingLevel || null,
+          system_prompt: selectedSystemPrompt || null 
         }),
       });
       if (res.ok) {
@@ -393,6 +398,7 @@ export default function GroupsPage() {
       provider: item.provider,
       priority: item.priority,
       thinking_level: item.thinking_level || '',
+      system_prompt: item.system_prompt || '',
     });
     setShowEditGroupItemModal(true);
   };
@@ -406,7 +412,8 @@ export default function GroupsPage() {
         method: 'PUT',
         body: JSON.stringify({ 
           priority: editingGroupItem.priority, 
-          thinking_level: editingGroupItem.thinking_level || null 
+          thinking_level: editingGroupItem.thinking_level || null,
+          system_prompt: editingGroupItem.system_prompt || null
         }),
       });
       if (res.ok) {
@@ -637,13 +644,18 @@ export default function GroupsPage() {
                               {item.name}
                             </div>
 
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-2.5">
                               <Badge className="bg-blue-500/10 text-blue-300 border border-blue-500/20 text-[9px] font-normal tracking-wide rounded uppercase px-1.5 py-0 capitalize">
                                 {item.provider}
                               </Badge>
                               {item.thinking_level && (
                                 <Badge className="bg-purple-500/10 text-purple-300 border border-purple-500/20 text-[9px] font-normal tracking-wide rounded uppercase px-1.5 py-0">
                                   Think: {item.thinking_level}
+                                </Badge>
+                              )}
+                              {item.system_prompt && (
+                                <Badge className="bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-[9px] font-normal tracking-wide rounded uppercase px-1.5 py-0">
+                                  Sys Prompt
                                 </Badge>
                               )}
                             </div>
@@ -904,6 +916,18 @@ export default function GroupsPage() {
               </div>
             )}
 
+            {activeGroupForItems?.capability === 'chat' && (
+              <div className="flex flex-col gap-2">
+                <label className="text-zinc-400 text-sm font-medium">System Prompt Override (Optional)</label>
+                <Textarea
+                  value={selectedSystemPrompt}
+                  onChange={(e) => setSelectedSystemPrompt(e.target.value)}
+                  placeholder="Optional system instructions..."
+                  className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3 h-24 resize-none custom-scrollbar overflow-y-auto no-field-sizing"
+                />
+              </div>
+            )}
+
             <DialogFooter className="mt-4 flex gap-3 justify-end">
               <Button
                 variant="outline"
@@ -954,6 +978,16 @@ export default function GroupsPage() {
                   onChange={(e) => setEditingGroupItem({ ...editingGroupItem, thinking_level: e.target.value })}
                   placeholder="e.g. low, high, or tokens count"
                   className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-zinc-400 text-sm font-medium">System Prompt Override (Optional)</label>
+                <Textarea
+                  value={editingGroupItem.system_prompt}
+                  onChange={(e) => setEditingGroupItem({ ...editingGroupItem, system_prompt: e.target.value })}
+                  placeholder="Optional system instructions..."
+                  className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3 h-24 resize-none custom-scrollbar overflow-y-auto no-field-sizing"
                 />
               </div>
 

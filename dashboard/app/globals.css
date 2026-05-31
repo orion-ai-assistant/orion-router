@@ -118,6 +118,15 @@
   background: rgba(255, 255, 255, 0.2);
 }
 
+.no-field-sizing {
+  field-sizing: normal !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  word-break: break-all !important;
+  overflow-wrap: break-word !important;
+}
+
 /* Logo Animation / Styles */
 .logo-icon {
   width: 36px;

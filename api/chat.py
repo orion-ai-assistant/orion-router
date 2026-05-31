@@ -44,13 +44,14 @@ async def chat_completions(
     raw_model = body.get("model", "local-model")
     model = (raw_model or "local-model").strip()
     thinking_level = body.get("thinking_level")
+    system_prompt = body.get("system_prompt")
     tools = body.get("tools")
     tool_choice = body.get("tool_choice")
 
     # Pass remaining keys to dynamic router
     kwargs = {
         k: v for k, v in body.items()
-        if k not in ("stream", "messages", "model", "thinking_level", "tools", "tool_choice")
+        if k not in ("stream", "messages", "model", "thinking_level", "system_prompt", "tools", "tool_choice")
     }
 
     dynamic_router: DynamicLLMRouter = request.app.state.dynamic_router
@@ -63,6 +64,7 @@ async def chat_completions(
             auth_header=auth_header,
             key_id=key_info.get("key_id") if key_info else None,
             thinking_level=thinking_level,
+            system_prompt=system_prompt,
             tools=tools,
             tool_choice=tool_choice,
             **kwargs

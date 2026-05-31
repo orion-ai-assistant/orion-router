@@ -40,6 +40,7 @@ export default function PlaygroundPage() {
   const [chatModel, setChatModel] = useState(getSavedState('pg_chatModel', ''));
   const [chatTemp, setChatTemp] = useState(getSavedState('pg_chatTemp', ''));
   const [chatThinking, setChatThinking] = useState(getSavedState('pg_chatThinking', ''));
+  const [chatSystemPrompt, setChatSystemPrompt] = useState(getSavedState('pg_chatSystemPrompt', ''));
   const [chatMessages, setChatMessages] = useState<Message[]>((() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('pg_chatMessages');
@@ -175,6 +176,7 @@ export default function PlaygroundPage() {
       localStorage.setItem('pg_chatModel', chatModel);
       localStorage.setItem('pg_chatTemp', chatTemp);
       localStorage.setItem('pg_chatThinking', chatThinking);
+      localStorage.setItem('pg_chatSystemPrompt', chatSystemPrompt);
       localStorage.setItem('pg_ttsModel', ttsModel);
       localStorage.setItem('pg_ttsVoice', ttsVoice);
       localStorage.setItem('pg_ttsTemp', ttsTemp);
@@ -182,7 +184,7 @@ export default function PlaygroundPage() {
       localStorage.setItem('pg_chatMessages', JSON.stringify(chatMessages));
       localStorage.setItem('pg_chatInput', chatInput);
     }
-  }, [activeTab, chatModel, chatTemp, chatThinking, ttsModel, ttsVoice, ttsTemp, embedModel, chatMessages, chatInput]);
+  }, [activeTab, chatModel, chatTemp, chatThinking, chatSystemPrompt, ttsModel, ttsVoice, ttsTemp, embedModel, chatMessages, chatInput]);
 
   // Scroll chat window to bottom on new messages
   useEffect(() => {
@@ -262,6 +264,11 @@ export default function PlaygroundPage() {
     const trimmedThinking = chatThinking.trim();
     if (trimmedThinking && trimmedThinking.toLowerCase() !== 'none') {
       payload.thinking_level = trimmedThinking;
+    }
+
+    const trimmedSystemPrompt = chatSystemPrompt.trim();
+    if (trimmedSystemPrompt) {
+      payload.system_prompt = trimmedSystemPrompt;
     }
 
     const adminKey = getAdminKey();
@@ -600,6 +607,15 @@ export default function PlaygroundPage() {
                 onChange={(e) => setChatThinking(e.target.value)}
                 placeholder="none, 1024, high"
                 className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-zinc-400 text-[10px] font-semibold uppercase">System Prompt (Override)</label>
+              <Textarea
+                value={chatSystemPrompt}
+                onChange={(e) => setChatSystemPrompt(e.target.value)}
+                placeholder="Enter system instructions..."
+                className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs h-20 resize-none custom-scrollbar overflow-y-auto no-field-sizing"
               />
             </div>
           </div>
