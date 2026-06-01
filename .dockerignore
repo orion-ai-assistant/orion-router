@@ -1,14 +1,54 @@
+# Version Control
+.git
+.github
+.gitignore
+
+# Environments & Secrets
+.env
+.env.*
+!.env.example
+.venv
+venv
+ENV
+env
+env.bak
+venv.bak
+
+# Node & Next.js Build Artifacts
 dashboard/node_modules
 dashboard/.next
 dashboard/out
-.git
-.github
+
+# Python Cache & Bytecode
 __pycache__
 *.pyc
 *.pyo
 *.pyd
-.env
-.venv
-venv
-ENV
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Local Database & Lock files
 db.sqlite3
+.pgdata-dev
+.pgdata-prod
+.orion.dev.lock
+.orion.prod.lock
+*.log
+
+# Third-party Tools & Downloads
+tools/pgsql
+tools/postgresql.zip
+
+# Editor / IDE configuration
+.vscode
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS metadata
+.DS_Store
+Thumbs.db

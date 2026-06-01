@@ -53,6 +53,23 @@ def stop_pg(data_dir: Path, label: str):
         ok(f"{label} PostgreSQL durduruldu")
 
 def kill_port(port: int):
+    import shutil
+    import time
+    if shutil.which("docker"):
+        try:
+            # Docker uzerinde bu portu yayinlayan bir konteyner var mi bak
+            cmd = ["docker", "ps", "--filter", f"publish={port}", "--format", "{{.ID}}"]
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+            if res.returncode == 0:
+                container_ids = [line.strip() for line in res.stdout.splitlines() if line.strip()]
+                if container_ids:
+                    for cid in container_ids:
+                        dim(f"    Port {port} Docker tarafindan kullaniliyor. Konteyner ({cid}) durduruluyor...")
+                        subprocess.run(["docker", "stop", cid], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
+                    time.sleep(1.5) # Portun temizlenmesi icin kisa bir sure bekle
+        except Exception:
+            pass
+
     try:
         result = subprocess.run(["netstat", "-aon"], capture_output=True, text=True)
         for line in result.stdout.splitlines():

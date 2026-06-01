@@ -142,6 +142,23 @@ def read_env(key: str, default: str) -> str:
     return default
 
 def kill_port(port: int) -> None:
+    import shutil
+    import time
+    if shutil.which("docker"):
+        try:
+            # Docker uzerinde bu portu yayinlayan bir konteyner var mi bak
+            cmd = ["docker", "ps", "--filter", f"publish={port}", "--format", "{{.ID}}"]
+            res = run(cmd, capture_output=True, text=True, timeout=5)
+            if res.returncode == 0:
+                container_ids = [line.strip() for line in res.stdout.splitlines() if line.strip()]
+                if container_ids:
+                    for cid in container_ids:
+                        dim(f"    Port {port} Docker tarafindan kullaniliyor. Konteyner ({cid}) durduruluyor...")
+                        run_silent(["docker", "stop", cid], timeout=15)
+                    time.sleep(1.5) # Portun temizlenmesi icin kisa bir sure bekle
+        except Exception:
+            pass
+
     try:
         result = run(["netstat", "-aon"], capture_output=True, text=True)
         for line in result.stdout.splitlines():
@@ -358,6 +375,7 @@ def set_env(router_port: str) -> None:
     os.environ["UVICORN_RELOAD"]          = "0"
     os.environ["ROUTER_PORT"]             = router_port
     os.environ["ROUTER_HOST"]             = "0.0.0.0"
+    os.environ["ORION_NO_BANNER"]         = "1"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -415,28 +433,27 @@ def print_active_services_banner(router_port: str) -> None:
         except Exception:
             return "127.0.0.1"
     
+    BLUE = "\033[94m"
+
     local_ip = get_local_ip()
     dashboard_url = f"http://localhost:{router_port}"
     local_url = f"http://{local_ip}:{router_port}"
     
-    def format_line(prefix: str, content: str, content_color: str) -> str:
-        prefix_len = len(prefix)
-        content_padded = f"{content:<{55 - prefix_len}}"
-        return f"{GREEN}{BOLD}║{RESET}{prefix}{content_color}{content_padded}{RESET}{GREEN}{BOLD}║{RESET}"
-
-    def format_centered(text: str, text_color: str) -> str:
-        text_padded = f"{text:^55}"
-        return f"{GREEN}{BOLD}║{RESET}{text_color}{text_padded}{RESET}{GREEN}{BOLD}║{RESET}"
-
-    line = "═" * 55
-    print(f"\n{GREEN}{BOLD}╔{line}╗{RESET}")
-    print(format_centered("Orion Router — Bütün Servisler Aktif", GREEN + BOLD))
-    print(f"{GREEN}{BOLD}╠{'═' * 55}╣{RESET}")
-    print(format_line("  Dashboard:       ", dashboard_url, CYAN))
-    print(format_line("  Yerel Ağ (Tel):  ", local_url, CYAN))
-    print(f"{GREEN}{BOLD}╠{'═' * 55}╣{RESET}")
-    print(format_centered("Durdurmak için CTRL+C tuşlarına basın", YELLOW + BOLD))
-    print(f"{GREEN}{BOLD}╚{line}╝{RESET}\n", flush=True)
+    border_line = f"{GRAY}────────────────────────────────────────────────{RESET}"
+    title_colored = f"{BLUE}{BOLD}ORION ROUTER{RESET}"
+    dash_colored  = f"{BLUE}➜{RESET}  {BOLD}Dashboard:{RESET}   {CYAN}{dashboard_url}{RESET}"
+    ip_colored    = f"{BLUE}➜{RESET}  {BOLD}Yerel Ağ:{RESET}    {CYAN}{local_url}{RESET}"
+    
+    # Print the banner block with clean newlines to separate from surrounding logs
+    print()
+    print(border_line)
+    print(title_colored)
+    print()
+    print(dash_colored)
+    print(ip_colored)
+    print(border_line)
+    print(f"{GRAY}Durdurmak için CTRL+C tuşlarına basın{RESET}")
+    print()
 
 
 def main() -> None:

@@ -11,6 +11,7 @@ Sorumluluklar:
 """
 import logging
 import os
+import sys
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -23,15 +24,72 @@ from api import admin, chat, embeddings, files, speech
 # ---------------------------------------------------------------------------
 #  Logging
 # ---------------------------------------------------------------------------
+class ColouredFormatter(logging.Formatter):
+    GREY = "\033[90m"
+    BLUE = "\033[94m"
+    CYAN = "\033[96m"
+    GREEN = "\033[92m"
+    YELLOW = "\033[93m"
+    RED = "\033[91m"
+    BOLD_RED = "\033[1;31m"
+    RESET = "\033[0m"
+
+    LEVEL_COLORS = {
+        logging.DEBUG: GREY,
+        logging.INFO: GREEN,
+        logging.WARNING: YELLOW,
+        logging.ERROR: RED,
+        logging.CRITICAL: BOLD_RED,
+    }
+
+    def format(self, record):
+        log_color = self.LEVEL_COLORS.get(record.levelno, self.RESET)
+        levelname = f"{log_color}{record.levelname:<5}{self.RESET}"
+        name = f"{self.CYAN}{record.name}{self.RESET}"
+        message = record.getMessage()
+        
+        if record.exc_info:
+            if not record.exc_text:
+                record.exc_text = self.formatException(record.exc_info)
+        if record.exc_text:
+            if message[-1:] != "\n":
+                message = message + "\n"
+            message = message + record.exc_text
+        if record.stack_info:
+            if message[-1:] != "\n":
+                message = message + "\n"
+            message = message + self.formatStack(record.stack_info)
+            
+        if os.path.exists("/.dockerenv"):
+            return f"[{levelname}] {name}: {message}"
+        else:
+            asctime = self.formatTime(record, self.datefmt)
+            return f"{self.GREY}{asctime}{self.RESET} [{levelname}] {name}: {message}"
+
+if sys.platform == "win32":
+    os.system("")  # Enable ANSI support on Windows
+
+handler = logging.StreamHandler(sys.stdout)
+handler.setFormatter(ColouredFormatter())
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[handler],
 )
 logger = logging.getLogger("service-router")
 
 # Uvicorn loglarını --log-level warning ile başlattığımızda erişim logları (access) da kapanır.
 # Erişim loglarını tekrar açmak için manuel olarak INFO seviyesine çekiyoruz.
 logging.getLogger("uvicorn.access").setLevel(logging.INFO)
+
+class DockerLogFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        if "Press CTRL+C to quit" in record.getMessage():
+            return False
+        return True
+
+if os.path.exists("/.dockerenv"):
+    logging.getLogger("uvicorn.error").addFilter(DockerLogFilter())
+    logging.getLogger("uvicorn").addFilter(DockerLogFilter())
 
 # ---------------------------------------------------------------------------
 #  Uygulama
@@ -107,7 +165,8 @@ if __name__ == "__main__":
         "main:app",
         host=ROUTER_HOST,
         port=int(ROUTER_PORT),
-        log_level=os.getenv("UVICORN_LOG_LEVEL", "warning"),
+        log_level=os.getenv("UVICORN_LOG_LEVEL", "info"),
         reload=reload,
         reload_dirs=["data"] if reload else None,
+        use_colors=True,
     )

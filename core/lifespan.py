@@ -35,6 +35,49 @@ def get_local_ip() -> str:
         return "127.0.0.1"
 
 
+def print_active_services_banner(router_port: str | None) -> None:
+    # Terminal Colors (ANSI)
+    BLUE   = "\033[94m"
+    GREEN  = "\033[92m"
+    CYAN   = "\033[96m"
+    YELLOW = "\033[93m"
+    BOLD   = "\033[1m"
+    GRAY   = "\033[90m"
+    RESET  = "\033[0m"
+
+    port = router_port or "20128"
+    is_docker = os.path.exists("/.dockerenv")
+
+    # Try to resolve IP
+    local_ip = os.getenv("LOCAL_IP") or os.getenv("HOST_IP")
+    if not local_ip:
+        if is_docker:
+            local_ip = "192.168.x.x"  # Monospaced safe placeholder
+        else:
+            local_ip = get_local_ip()
+
+    dashboard_url = f"http://localhost:{port}"
+    local_url = f"http://{local_ip}:{port}"
+
+    border_line = f"{GRAY}────────────────────────────────────────────────{RESET}"
+    title_colored = f"{BLUE}{BOLD}ORION ROUTER{RESET}"
+    dash_colored  = f"{BLUE}➜{RESET}  {BOLD}Dashboard:{RESET}   {CYAN}{dashboard_url}{RESET}"
+    ip_colored    = f"{BLUE}➜{RESET}  {BOLD}Yerel Ağ:{RESET}    {CYAN}{local_url}{RESET}"
+
+    # Print the banner block with clean newlines to separate from surrounding logs
+    print()
+    print(border_line)
+    print(title_colored)
+    print()
+    print(dash_colored)
+    print(ip_colored)
+    print(border_line)
+    
+    if not is_docker:
+        print(f"{GRAY}Durdurmak için CTRL+C tuşlarına basın{RESET}")
+    print()
+
+
 def _restart_postgres() -> None:
     """Restarts the portable PostgreSQL instance if it is in use and pg_ctl exists."""
     if sys.platform != "win32":
@@ -169,6 +212,18 @@ async def lifespan(app: FastAPI):
     app.state.provider_keys = raw_keys if isinstance(raw_keys, dict) else {}
 
     app.state.dynamic_router = DynamicLLMRouter(app.state)
+
+    if os.getenv("ORION_NO_BANNER") != "1":
+        if sys.platform == "win32":
+            os.system("")
+
+        async def _show_banner_after_startup():
+            # Uvicorn'un 'Application startup complete.' logunu basması için
+            # çok kısa (50ms), bloklamayan bir arka plan beklemesi yaparız.
+            await asyncio.sleep(0.05)
+            print_active_services_banner(ROUTER_PORT)
+
+        asyncio.create_task(_show_banner_after_startup())
 
     yield
 
