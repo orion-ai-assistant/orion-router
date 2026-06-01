@@ -1,35 +1,134 @@
-# Orion Custom Service Router (AI Gateway)
+# Orion Custom Service Router — AI Gateway
 
 Bu servis, Orion projesinin **AI Gateway (Router)** katmanıdır. Worker'lardan ve istemcilerden gelen tüm yapay zeka (LLM, Embedding vb.) isteklerini karşılar, kimlik doğrulaması yapar, bütçe kontrollerini gerçekleştirir ve ilgili API sağlayıcısına (OpenAI, OpenRouter, Gemini, Local) dinamik olarak yönlendirir.
 
+![Orion Router Dashboard](assets/img/dashboard.png)
+
 ---
 
-## 🏛️ Mimari Yapı ve Akış (Flow)
+## 🚀 Nasıl Çalıştırılır?
 
-İsteklerin gateway üzerindeki akış sırası şu şekildedir:
+Bu proje Docker'a olan bağımlılığı ortadan kaldırarak tamamen **yerel (native)** olarak çalışacak şekilde tasarlanmıştır. Veritabanı olarak **taşınabilir (portable) PostgreSQL** kullanır; hiçbir şey kurmanız gerekmez, scriptler gerekli dosyaları otomatik indirir.
 
-```mermaid
-graph TD
-    Client[İstemci / UI] -->|POST /v1/chat/completions + x-orion-api-key| Main[main.py / FastAPI]
-    Main -->|authenticate_request| DB_Check{DB Key & Bütçe Kontrolü}
-    DB_Check -->|Geçersiz / Bütçe Yetersiz| Err[403 / 402 Hata]
-    DB_Check -->|Geçerli| Router[dynamic_router.py]
-    Router -->|1. Adım: Combo Route Sorgula| Combo{Yönlendirme Tablosu}
-    Combo -->|Eşleşti| ProviderCall[İlgili Plugin / stream_chat]
-    Combo -->|Eşleşmedi| DirectCall[Direkt Sağlayıcı / stream_chat]
-    ProviderCall -->|Akış Tamamlandı| BgTask[asyncio.create_task]
-    BgTask -->|Arka Planda| LogDB[(Veritabanı Log & Bütçe Düşümü)]
+**Ön Koşullar:** Python 3.11+ ve Node.js kurulu olmalıdır.
+
+Tüm komutlar proje kök dizininde `orion.py` üzerinden çalışır:
+
+```powershell
+python orion.py <komut>
 ```
 
+| Komut | Açıklama |
+|-------|----------|
+| `dev` | Geliştirme ortamını başlatır (hot-reload aktif) |
+| `prod` | Üretim ortamını derleyip yerel olarak başlatır |
+| `stop` | Çalışan tüm servisleri ve portları temizler |
+
 ---
 
-## 📂 Klasör Yapısı ve Kod Analizi
+### 1. Geliştirme (Development) Ortamı
 
-Orion Router artık ana projeden ayrılarak bağımsız bir depo (repository) haline getirilmiştir. 
+Kod yazarken anlık güncellemeleri (hot-reload) görmek için bu modu kullanın:
+
+```powershell
+python orion.py dev
+```
+
+Bu komut sırasıyla şunları yapar:
+
+1. **PostgreSQL Portable** — İlk seferde otomatik indirilir, `.pgdata-dev/` klasöründe **Port 5444** üzerinde başlatılır.
+2. **Backend (FastAPI)** — `.env` içindeki `ROUTER_DEV_PORT` (varsayılan `20129`) üzerinde hot-reload ile çalışır.
+3. **Frontend (Next.js)** — `http://localhost:3001` adresinde hot-reload ile çalışır.
+
+Servisler hazır olduğunda terminalde aşağıdaki gibi bir banner görürsünüz:
+
+![Dev ortamı banner](assets/img/dev_banner.png)
+
+---
+
+### 2. Üretim (Production) Ortamı
+
+Docker gerektirmez. Projenin son halini yerel olarak derleyip çalıştırmak için:
+
+```powershell
+python orion.py prod
+```
+
+Bu komut sırasıyla şunları yapar:
+
+1. **PostgreSQL Portable** — `.pgdata-prod/` klasöründe **Port 5433** üzerinde başlatılır.
+2. **Dashboard Build** — Next.js projesi `npm run build` ile derlenir, `out/` klasörüne statik dosyalar çıkarılır.
+3. **Tek Port** — FastAPI, Dashboard statik dosyalarını kendi üzerinden sunar. Dashboard ve API, `.env` içindeki `ROUTER_PORT` (varsayılan `20128`) üzerinde birlikte çalışır.
+
+Servis hazır olduğunda Gateway Dashboard'una şu adresten ulaşabilirsiniz:
+👉 **`http://localhost:20128/dashboard`**
+
+---
+
+### 3. Acil Durdurma
+
+`CTRL+C` normalde her şeyi temiz kapatır. Arka planda takılı kalan bir süreç varsa:
+
+```powershell
+python orion.py stop
+```
+
+Bu script tüm portları (`3001`, `20128`, `20129`, `5433`, `5444`) boşaltır ve her iki PostgreSQL örneğini (dev + prod) durdurur.
+
+---
+
+## 🐳 Docker ile Çalıştırma
+
+### A) Hazır Image'ı Çekip Kullanma (Önerilen)
+
+Projeyi bilgisayarınıza klonlamadan (sadece Docker kullanarak) çalıştırmak için tek ihtiyacınız olan `docker-compose.ghcr.yml` dosyasıdır. Terminalinizde sırasıyla şu komutları çalıştırarak kurabilirsiniz:
+
+```bash
+# 1. Proje için bir klasör oluşturun ve içine girin
+mkdir orion-router && cd orion-router
+
+# 2. Hazır compose dosyasını indirin
+curl -O https://raw.githubusercontent.com/krstalacam/orion-router/main/docker-compose.ghcr.yml
+
+# 3. Docker ağını oluşturun
+docker network create orion-network
+
+# 4. Servisi başlatın
+docker compose -f docker-compose.ghcr.yml up -d
+```
+
+Bu komut, GitHub Container Registry'den `ghcr.io/krstalacam/orion-router:latest` imajını ve PostgreSQL veritabanını otomatik indirip ayağa kaldırır.
+
+> **💡 Güncelleme Notu:** `docker-compose.ghcr.yml` dosyasında `pull_policy: always` tanımlı olduğu için `docker compose up -d` komutunu her çalıştırdığınızda Docker en güncel imajı otomatik olarak çeker. Eğer çalışan bir sistemi manuel olarak güncellemek isterseniz şu komutları kullanabilirsiniz:
+> ```bash
+> docker compose -f docker-compose.ghcr.yml pull
+> docker compose -f docker-compose.ghcr.yml up -d
+> ```
+
+### B) Repodan Build Ederek Çalıştırma
+
+Eğer kodlarda değişiklik yapacaksanız veya kendiniz build etmek isterseniz repoyu klonlayıp çalıştırabilirsiniz:
+
+```bash
+docker network create orion-network
+docker compose up -d
+```
+
+`.env` dosyası yoksa uygulama ilk açılışta `.env.example` dosyasından otomatik oluşturur; elle kopyalamanız gerekmez. Sağlayıcı API anahtarlarını Dashboard → **Key Pool** üzerinden ekleyin (`.env`'de tutulmaz).
+
+---
+
+## 📂 Proje Yapısı
 
 ```text
 .
-├── dashboard/          # SPA Dashboard (HTML/CSS/JS)
+├── assets/             # Görseller ve statik varlıklar
+│   └── img/            # README ve dokümantasyon görselleri
+├── bin/                # Çalıştırma scriptleri
+│   ├── dev.py          # Development ortamı (PostgreSQL + FastAPI + Next.js)
+│   ├── prod.py         # Production ortamı (PostgreSQL + FastAPI, statik dashboard)
+│   └── stop.py         # Acil durdurma ve port temizleme
+├── dashboard/          # SPA Dashboard (Next.js)
 ├── providers/          # Sağlayıcı Eklentileri (Plugins)
 │   ├── __init__.py
 │   ├── base.py         # Sağlayıcı Arayüzü (Base Interface)
@@ -40,69 +139,55 @@ Orion Router artık ana projeden ayrılarak bağımsız bir depo (repository) ha
 ├── database.py         # asyncpg DB Bağlantı Havuzu ve Tablolar
 ├── dynamic_router.py   # Dinamik Yükleyici (Auto-Discovery) & Maliyet Hesaplama
 ├── main.py             # Uvicorn FastAPI Uygulama Girişi ve Dashboard API'leri
+├── orion.py            # CLI Entrypoint (dev / prod / stop)
 ├── pyproject.toml      # Paket Yönetim ve Bağımlılık Yapılandırması
 ├── docker-compose.yml  # Docker Compose Yapılandırması
 └── Dockerfile          # Bağımsız Docker İmajı Oluşturucu
 ```
 
-## 🐳 Docker Compose ile Çalıştırma
+---
 
-Projenin Docker imajı artık Docker Hub üzerinden çekilebilmektedir. Tüm servisi (Veritabanı + Router) tek komutta ayağa kaldırmak için terminalde şu komutu çalıştırın:
+## ⚙️ Teknik Detaylar
 
-```bash
-docker compose up -d
-```
-*(Eğer eski bir Docker sürümü kullanıyorsanız `docker-compose up -d` komutunu çalıştırabilirsiniz.)*
-
-`.env` dosyası yoksa uygulama ilk açılışta `.env.example` dosyasından otomatik oluşturur; elle kopyalamanız gerekmez. Sağlayıcı API anahtarlarını Dashboard → **Key Pool** üzerinden ekleyin (`.env`'de tutulmaz).
-
-Bu komut:
-1. Gerekli PostgreSQL veritabanını (`router-db`) başlatır.
-2. Router uygulamasını başlatır (varsayılan port `.env` içindeki `ROUTER_PORT=20128`).
-
-Sistem ayağa kalktıktan sonra Gateway Dashboard'una şu adresten ulaşabilirsiniz:
-👉 **http://localhost:20128/dashboard** (portu `.env` ile değiştirdiyseniz buna göre güncelleyin)
-
-### 1. `main.py`
+### `main.py`
 Uygulamanın ana giriş noktasıdır.
 - **FastAPI Lifespan:** Uygulama başlarken veritabanı bağlantı havuzunu başlatır (`init_db`) ve dinamik yönlendiriciyi ayağa kaldırır. Kapanırken havuzu kapatır.
-- **`authenticate_request` (Dependency):** Gelen `Authorization: Bearer <key>` veya `x-orion-api-key` değerini alır, SHA-256 ile hash'ini kontrol eder. Sanal anahtarın aktiflik durumunu ve bütçe sınırını (`budget` ve `used_amount`) sorgular. Sanal anahtarı doğrular ancak **asla gerçek OpenAI/OpenRouter anahtarlarını istemciye sızdırmaz.**
-- **`/v1/chat/completions`:** İstemcinin standard sohbet isteklerini karşılayıp `DynamicLLMRouter.run_combo` fonksiyonuna aktarır ve yanıtı `StreamingResponse` (SSE) olarak döner.
+- **`authenticate_request` (Dependency):** Gelen `Authorization: Bearer <key>` veya `x-orion-api-key` değerini alır, SHA-256 ile hash'ini kontrol eder. Sanal anahtarın aktiflik durumunu ve bütçe sınırını (`budget` ve `used_amount`) sorgular. Gerçek upstream anahtarlarını **asla istemciye sızdırmaz.**
+- **`/v1/chat/completions`:** İstemcinin standart sohbet isteklerini `DynamicLLMRouter.run_combo` fonksiyonuna aktarır ve `StreamingResponse` (SSE) olarak döner.
 - **Dashboard API'leri (`/dashboard/api/...`):** Sanal anahtar listeleme/oluşturma, canlı kullanım istatistikleri (`/stats`) ve log izleme uç noktalarını sunar.
 
-### 2. `database.py`
+### `database.py`
 PostgreSQL ile asenkron bağlantıları yönetir.
-- **`asyncpg` Pool:** Performans odaklı, ham SQL bağlantı havuzudur.
-- **Otomatik Şema Doğrulama:** `_ensure_tables` fonksiyonu, veritabanında `router_virtual_keys` (sanal anahtarlar), `router_combo_routes` (akıllı yönlendirme kuralları) ve `router_request_logs` (istek geçmişi) tablolarını kontrol eder, yoksa oluşturur.
-- **Canlı Güncelleme:** Eski şemalarda `name` kolonu eksikse veya `id` varsayılan değeri (UUID) tanımlı değilse, başlangıçta `ALTER TABLE` ile otomatik günceller.
+- **`asyncpg` Pool:** Performans odaklı ham SQL bağlantı havuzudur.
+- **Otomatik Şema Doğrulama:** `_ensure_tables` fonksiyonu `router_virtual_keys`, `router_combo_routes` ve `router_request_logs` tablolarını kontrol eder, yoksa oluşturur.
+- **Canlı Güncelleme:** Eski şemalarda eksik kolonlar `ALTER TABLE` ile otomatik güncellenir.
 
-### 3. `dynamic_router.py`
+### `dynamic_router.py`
 Gateway'in beynidir.
-- **Auto-Discovery (Eklenti Tespiti):** Başlangıçta `pkgutil` ve `importlib` kullanarak `providers/` altındaki tüm Python dosyalarını tarar ve `BaseLLMProvider` sınıfından türetilen tüm sınıfları belleğe yükler.
-- **`run_combo`:** İsteği doğrudan veya veritabanındaki yönlendirme kurallarına (`combo_routes`) göre ilgili sağlayıcı eklentisine paslar. Primary sağlayıcı çökerse veritabanında tanımlı olan `fallback_provider` ve `fallback_model` devreye girer.
-- **Asenkron Loglama:** İstek yanıtlanırken akış tamamlandığında, arka planda (`asyncio.create_task`) asenkron olarak `log_request_background` çalıştırılır. Token miktarları (`prompt` ve `completion`) üzerinden maliyet hesaplanır (`calculate_cost`) ve bütçeden düşülür. Bu işlem ana istemci akışını (stream) geciktirmez.
+- **Auto-Discovery (Eklenti Tespiti):** `providers/` altındaki tüm Python dosyalarını tarar ve `BaseLLMProvider` sınıfından türetilen sınıfları belleğe yükler.
+- **`run_combo`:** İsteği doğrudan veya veritabanındaki yönlendirme kurallarına (`combo_routes`) göre ilgili sağlayıcı eklentisine paslar. Primary sağlayıcı çökerse `fallback_provider` ve `fallback_model` devreye girer.
+- **Asenkron Loglama:** Akış tamamlandığında arka planda (`asyncio.create_task`) token miktarları üzerinden maliyet hesaplanır ve bütçeden düşülür. Ana istemci akışını **geciktirmez.**
 
-### 4. `providers/` (Pluginler)
+### `providers/` (Pluginler)
 Her sağlayıcı `BaseLLMProvider` interface'ine (`stream_chat` metodu) uymak zorundadır.
-- **`base.py`:** Eklenti standartlarını belirleyen abstract sınıftır.
-- **`openai.py`:** Sadece doğrudan OpenAI (`api.openai.com`) hedeflerine gider. Gelen `sk-orion-` sanal anahtarlarını süzer; gerçek upstream anahtarı Key Pool veya DB'den gelir.
-- **`openrouter.py`:** OpenRouter hedefine (`openrouter.ai`) gider. OpenRouter'ın sıralama algoritmalarında kullanması için `HTTP-Referer` ve `X-OpenRouter-Title` başlıklarını otomatik enjekte eder.
-- **`gemini.py`:** Google'ın OpenAI uyumlu API endpoint'ine yönlendirme yapar.
-- **`local.py`:** Ollama veya Llama.cpp gibi yerel motorlara istek atar. Gelişmiş akış şablonu (state machine) ile metin içindeki `<think>...</think>` bloklarını ayıklar ve istemciye düşünme (`thinking`) ile asıl içerik (`content`) olarak ayrı ayrı (SSE event'i şeklinde) gönderir.
+- **`openai.py`:** Doğrudan OpenAI (`api.openai.com`) hedeflerine gider.
+- **`openrouter.py`:** OpenRouter hedefine gider; `HTTP-Referer` ve `X-OpenRouter-Title` başlıklarını otomatik enjekte eder.
+- **`gemini.py`:** Google'ın OpenAI uyumlu API endpoint'ine yönlendirir.
+- **`local.py`:** Ollama veya Llama.cpp gibi yerel motorlara istek atar. Gelişmiş state machine ile `<think>...</think>` bloklarını ayıklayarak istemciye ayrı SSE event'leri olarak gönderir.
 
-### 5. `dashboard/` (Kullanıcı Arayüzü)
-- **Tek Sayfa Uygulaması (SPA):** Sunucu dışına hiçbir bağımlılığı yoktur, doğrudan FastAPI (`StaticFiles`) tarafından `/dashboard` adresinde sunulur.
-- **Teknolojiler:** Premium karanlık tema, Glassmorphic buzlu cam tasarımı, CSS HSL renk değişkenleri ve Vanilla JS.
-- **Playground Sekmesi:** Yeni üretilen sanal anahtarı girip OpenRouter, OpenAI, Gemini veya Local sağlayıcıları üzerinden canlı olarak modellerle sohbet edip test etmenize olanak tanır.
+### `dashboard/`
+- **Tek Sayfa Uygulaması (SPA):** Doğrudan FastAPI (`StaticFiles`) tarafından `/dashboard` adresinde sunulur.
+- **Teknolojiler:** Premium karanlık tema, Glassmorphic buzlu cam tasarımı, CSS HSL renk değişkenleri, Vanilla JS.
+- **Playground Sekmesi:** Sanal anahtarı girip OpenRouter, OpenAI, Gemini veya Local sağlayıcıları üzerinden canlı test etmenizi sağlar.
 
 ---
 
-## 🚀 Yeni Bir Eklenti (Provider) Nasıl Eklenir?
+## 🔌 Yeni Bir Eklenti (Provider) Nasıl Eklenir?
 
-Yeni bir sağlayıcı (örneğin Anthropic) eklemek son derece basittir ve hiçbir yönlendirici kodunu değiştirmenizi gerektirmez:
+Yeni bir sağlayıcı (örneğin Anthropic) eklemek son derece basittir ve **hiçbir mevcut kodu değiştirmeniz gerekmez:**
 
-1. `providers/` klasörünün altında `anthropic.py` adında bir dosya oluşturun.
-2. Aşağıdaki gibi sınıfı tanımlayın:
+1. `providers/` klasörü altında `anthropic.py` adında bir dosya oluşturun.
+2. Aşağıdaki şablonu kullanarak sınıfı tanımlayın:
 
 ```python
 import os
@@ -112,7 +197,7 @@ from typing import AsyncGenerator, Any
 from .base import BaseLLMProvider
 
 class AnthropicProvider(BaseLLMProvider):
-    provider_name = "anthropic" # Bu isim yönlendirmelerde (x-orion-provider) kullanılacaktır.
+    provider_name = "anthropic"  # x-orion-provider başlığında kullanılacak isim
 
     async def stream_chat(
         self,
@@ -123,7 +208,7 @@ class AnthropicProvider(BaseLLMProvider):
         **kwargs
     ) -> AsyncGenerator[Any, None]:
         
-        # 1. API Anahtarı Ayarı (Sanal anahtarları süz)
+        # 1. API Anahtarı Ayarı (sanal anahtarları süz)
         final_key = None
         if auth_header and not auth_header.startswith("Bearer sk-orion-"):
             final_key = auth_header
@@ -134,10 +219,13 @@ class AnthropicProvider(BaseLLMProvider):
             
         # 2. HTTP isteğini oluştur ve akış yap (HTTPX client)
         # 3. Gelen veriyi yield et:
-        #    - Düşünme adımları için: yield 'data: {"type": "thinking", "text": "..."}\n\n'
-        #    - İçerik adımları için: yield 'data: {"type": "content", "text": "..."}\n\n'
-        #    - İstatistikleri bildirmek için en son adımda: yield {"internal_usage": {"prompt_tokens": 10, "completion_tokens": 20}}
+        #    - Düşünme adımları: yield 'data: {"type": "thinking", "text": "..."}\n\n'
+        #    - İçerik adımları:  yield 'data: {"type": "content", "text": "..."}\n\n'
+        #    - İstatistikler:    yield {"internal_usage": {"prompt_tokens": 10, "completion_tokens": 20}}
         pass
 ```
 
-3. Gateway yeniden başladığında dosyanızı otomatik olarak keşfedip (`Loaded provider plugin: anthropic`) yükleyecektir!
+3. Gateway yeniden başlatıldığında dosyayı otomatik olarak keşfedip yükler:
+   ```
+   Loaded provider plugin: anthropic
+   ```

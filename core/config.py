@@ -113,5 +113,19 @@ MODEL_INFO_PATH = _DATA_DIR / "model_info.json"
 # --- Dashboard UI ---
 # Next.js static build directory (out)
 _dash_val = os.getenv("DASHBOARD_OUT_DIR")
-DASHBOARD_OUT_DIR = str(_ROOT / _dash_val) if _dash_val and not pathlib.Path(_dash_val).is_absolute() else _dash_val
+if _dash_val:
+    if pathlib.Path(_dash_val).is_absolute():
+        DASHBOARD_OUT_DIR = _dash_val
+    else:
+        # Check if the relative path exists
+        _rel_path = _ROOT / _dash_val
+        if _rel_path.exists():
+            DASHBOARD_OUT_DIR = str(_rel_path)
+        elif os.path.exists("/dashboard_out"):
+            # Fallback to container path if relative path doesn't exist but container path does
+            DASHBOARD_OUT_DIR = "/dashboard_out"
+        else:
+            DASHBOARD_OUT_DIR = str(_rel_path)
+else:
+    DASHBOARD_OUT_DIR = "/dashboard_out" if os.path.exists("/dashboard_out") else str(_ROOT / "dashboard/out")
 
