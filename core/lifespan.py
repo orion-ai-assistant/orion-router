@@ -37,25 +37,6 @@ async def lifespan(app: FastAPI):
     # ------------------------------------------------------------------ #
     logger.info("Starting up Orion Custom Service Router")
 
-    import os
-    env_mode = "Dev" if os.environ.get("UVICORN_RELOAD") == "1" else "Prod"
-    local_ip = get_local_ip()
-    
-    print("\n" + "═" * 55)
-    print(f"║{'Orion Router — Bütün Servisler Aktif':^53}║")
-    print("╠" + "═" * 53 + "╣")
-    
-    if env_mode == "Dev":
-        print(f"║  Dashboard       http://localhost:3001")
-        print(f"║  Yerel Ağ (Tel)  http://{local_ip}:3001")
-    else:
-        print(f"║  Dashboard       http://localhost:{ROUTER_PORT}")
-        print(f"║  Yerel Ağ (Tel)  http://{local_ip}:{ROUTER_PORT}")
-        
-    print("╠" + "═" * 53 + "╣")
-    print(f"║{'Durdurmak icin CTRL+C':^53}║")
-    print("╚" + "═" * 55 + "╝\n")
-
     # PostgreSQL tam hazır olmadan önce FastAPI başlayabilir; retry ile bekle
     max_retries = 10
     for attempt in range(1, max_retries + 1):

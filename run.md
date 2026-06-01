@@ -15,7 +15,7 @@ Kod yazarken, anında güncellemeleri (Hot-Reload) görmek için bu ortamı kull
 **Nasıl Çalıştırılır?**
 
 ```powershell
-python dev.py
+python orion.py dev
 ```
 
 Bu komut şunları yapar:
@@ -32,7 +32,7 @@ Projenin son halini Docker olmadan yerel Windows'ta çalıştırmak için.
 **Nasıl Çalıştırılır?**
 
 ```powershell
-python prod.py
+python orion.py prod
 ```
 
 Bu komut şunları yapar:
@@ -47,7 +47,7 @@ Bu komut şunları yapar:
 `CTRL+C` normalde her şeyi temiz kapatır. Arka planda takılı kalan bir süreç varsa:
 
 ```powershell
-python stop.py
+python orion.py stop
 ```
 
 Bu script tüm portları (3001, 20128, 20129, 5433, 5444) boşaltır ve PostgreSQL'i durdurur.

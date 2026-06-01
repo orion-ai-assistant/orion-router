@@ -16,6 +16,11 @@ from pathlib import Path
 
 if sys.platform == "win32":
     os.system("")
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
 
 RESET = "\033[0m"; BOLD = "\033[1m"; CYAN = "\033[96m"
 GREEN = "\033[92m"; YELLOW = "\033[93m"; RED = "\033[91m"; GRAY = "\033[90m"
@@ -26,7 +31,9 @@ def info(m): _p("→", m, CYAN)
 def warn(m): _p("⚠", m, YELLOW)
 def dim(m):  _p(" ", m, GRAY)
 
-ROOT    = Path(__file__).parent.resolve()
+ROOT    = Path(__file__).parent.parent.resolve()
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 PG_BIN  = ROOT / "tools" / "pgsql" / "bin"
 PG_CTL  = PG_BIN / "pg_ctl.exe"
 

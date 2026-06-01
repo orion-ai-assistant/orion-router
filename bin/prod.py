@@ -18,6 +18,7 @@ import time
 import subprocess
 import urllib.request
 import zipfile
+import threading
 from pathlib import Path
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -25,6 +26,11 @@ from pathlib import Path
 # ─────────────────────────────────────────────────────────────────────────────
 if sys.platform == "win32":
     os.system("")
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
 
 RESET  = "\033[0m"
 BOLD   = "\033[1m"
@@ -48,7 +54,9 @@ def dim(msg: str)  -> None: _p(" ", msg, GRAY)
 # ─────────────────────────────────────────────────────────────────────────────
 # Paths & Constants
 # ─────────────────────────────────────────────────────────────────────────────
-ROOT      = Path(__file__).parent.resolve()
+ROOT      = Path(__file__).parent.parent.resolve()
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 TOOLS_DIR = ROOT / "tools"
 PG_BIN    = TOOLS_DIR / "pgsql" / "bin"
 PG_DATA   = ROOT / ".pgdata-prod"
@@ -69,6 +77,43 @@ PG_DOWNLOAD_URL = (
     "postgresql-16.3-1-windows-x64-binaries.zip"
 )
 PG_ZIP = TOOLS_DIR / "postgresql.zip"
+LOCK_FILE_HANDLE = None
+
+def acquire_lock() -> bool:
+    global LOCK_FILE_HANDLE
+    lock_path = ROOT / ".orion.prod.lock"
+    
+    try:
+        LOCK_FILE_HANDLE = open(lock_path, "w")
+        if sys.platform == "win32":
+            import msvcrt
+            msvcrt.locking(LOCK_FILE_HANDLE.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(LOCK_FILE_HANDLE.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            
+        LOCK_FILE_HANDLE.write(str(os.getpid()))
+        LOCK_FILE_HANDLE.flush()
+        return True
+    except (OSError, IOError):
+        if LOCK_FILE_HANDLE:
+            try:
+                LOCK_FILE_HANDLE.close()
+            except Exception:
+                pass
+            LOCK_FILE_HANDLE = None
+        return False
+
+def release_lock() -> None:
+    global LOCK_FILE_HANDLE
+    if LOCK_FILE_HANDLE:
+        try:
+            LOCK_FILE_HANDLE.close()
+            (ROOT / ".orion.prod.lock").unlink(missing_ok=True)
+        except Exception:
+            pass
+        finally:
+            LOCK_FILE_HANDLE = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -78,8 +123,8 @@ PG_ZIP = TOOLS_DIR / "postgresql.zip"
 def run(cmd: list, **kwargs) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, **kwargs)
 
-def run_silent(cmd: list) -> subprocess.CompletedProcess:
-    return run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+def run_silent(cmd: list, **kwargs) -> subprocess.CompletedProcess:
+    return run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **kwargs)
 
 def psql(*args) -> subprocess.CompletedProcess:
     base = [str(PSQL), "-U", PG_USER, "-p", str(PG_PORT), "-d", "postgres"]
@@ -352,13 +397,50 @@ def shutdown(procs: list) -> None:
 def banner() -> None:
     line = "═" * 55
     print(f"\n{CYAN}{BOLD}╔{line}╗{RESET}")
-    print(f"{CYAN}{BOLD}║{'Orion Router — Production Environment':^55}║{RESET}")
+    print(f"{CYAN}{BOLD}║{'Orion Router':^55}║{RESET}")
     print(f"{CYAN}{BOLD}╚{line}╝{RESET}\n")
 
+def print_active_services_banner(router_port: str) -> None:
+    import socket
+    def get_local_ip() -> str:
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except Exception:
+            return "127.0.0.1"
+    
+    local_ip = get_local_ip()
+    dashboard_url = f"http://localhost:{router_port}"
+    local_url = f"http://{local_ip}:{router_port}"
+    
+    def format_line(prefix: str, content: str, content_color: str) -> str:
+        prefix_len = len(prefix)
+        content_padded = f"{content:<{55 - prefix_len}}"
+        return f"{GREEN}{BOLD}║{RESET}{prefix}{content_color}{content_padded}{RESET}{GREEN}{BOLD}║{RESET}"
 
+    def format_centered(text: str, text_color: str) -> str:
+        text_padded = f"{text:^55}"
+        return f"{GREEN}{BOLD}║{RESET}{text_color}{text_padded}{RESET}{GREEN}{BOLD}║{RESET}"
+
+    line = "═" * 55
+    print(f"\n{GREEN}{BOLD}╔{line}╗{RESET}")
+    print(format_centered("Orion Router — Bütün Servisler Aktif", GREEN + BOLD))
+    print(f"{GREEN}{BOLD}╠{'═' * 55}╣{RESET}")
+    print(format_line("  Dashboard:       ", dashboard_url, CYAN))
+    print(format_line("  Yerel Ağ (Tel):  ", local_url, CYAN))
+    print(f"{GREEN}{BOLD}╠{'═' * 55}╣{RESET}")
+    print(format_centered("Durdurmak için CTRL+C tuşlarına basın", YELLOW + BOLD))
+    print(f"{GREEN}{BOLD}╚{line}╝{RESET}\n", flush=True)
 
 
 def main() -> None:
+    if not acquire_lock():
+        err("Hata: Baska bir Orion Router instancesi calisiyor (Portlar kullanimda olabilir).")
+        sys.exit(1)
+
     banner()
 
     info("Sistem kontrolleri yapiliyor...")
@@ -366,7 +448,7 @@ def main() -> None:
     check_python_deps()
     print()
 
-    run_silent([sys.executable, "-c", "import core.config"])
+    run_silent([sys.executable, "-c", "import core.config"], cwd=ROOT)
     router_port = read_env("ROUTER_PORT", "20128")
 
     free_ports(router_port)
@@ -385,6 +467,25 @@ def main() -> None:
     set_env(router_port)
     procs = launch(router_port)
 
+    # ── Print Banner when server is ready ───────
+    def wait_for_server_and_print_banner(port: str) -> None:
+        url = f"http://127.0.0.1:{port}/health"
+        start_time = time.time()
+        while time.time() - start_time < 30:
+            try:
+                with urllib.request.urlopen(url, timeout=1.0) as resp:
+                    if resp.status == 200:
+                        time.sleep(2.0)
+                        print_active_services_banner(port)
+                        return
+            except Exception:
+                pass
+            time.sleep(0.5)
+
+    t = threading.Thread(target=wait_for_server_and_print_banner, args=[router_port])
+    t.daemon = True
+    t.start()
+
     try:
         while True:
             alive = [p for _, p in procs if p.poll() is None]
@@ -396,6 +497,7 @@ def main() -> None:
         pass
     finally:
         shutdown(procs)
+        release_lock()
 
 
 if __name__ == "__main__":

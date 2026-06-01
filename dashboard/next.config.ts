@@ -34,8 +34,10 @@ const nextConfig: NextConfig = {
     "*.trycloudflare.com",
     ...getLocalIPs()
   ],
+};
 
-  async rewrites() {
+if (isDev) {
+  nextConfig.rewrites = async () => {
     const backendUrl =
       process.env.BACKEND_URL ||
       `http://localhost:${process.env.ROUTER_PORT || "20128"}`;
@@ -50,9 +52,9 @@ const nextConfig: NextConfig = {
         destination: `${backendUrl}/dashboard/api/:path*`,
       },
     ];
-  },
+  };
 
-  async redirects() {
+  nextConfig.redirects = async () => {
     return [
       {
         source: "/",
@@ -61,7 +63,7 @@ const nextConfig: NextConfig = {
         basePath: false,
       },
     ];
-  },
-};
+  };
+}
 
 export default nextConfig;
