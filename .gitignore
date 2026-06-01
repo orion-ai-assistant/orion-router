@@ -36,3 +36,7 @@ Thumbs.db
 .pgdata-dev/
 .pgdata-prod/
 tools/pgsql/
+
+# Orion lock files
+.orion.dev.lock
+.orion.prod.lock

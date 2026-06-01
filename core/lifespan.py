@@ -8,6 +8,10 @@ ve uygulama state'ini (pricing cache, model info cache, dynamic router) hazırla
 import asyncio
 import json
 import logging
+import os
+import sys
+import subprocess
+from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -30,6 +34,74 @@ def get_local_ip() -> str:
     except Exception:
         return "127.0.0.1"
 
+
+def _restart_postgres() -> None:
+    """Restarts the portable PostgreSQL instance if it is in use and pg_ctl exists."""
+    if sys.platform != "win32":
+        return
+
+    root = Path(__file__).parent.parent.resolve()
+    pg_bin = root / "tools" / "pgsql" / "bin"
+    pg_ctl = pg_bin / "pg_ctl.exe"
+
+    if not pg_ctl.exists():
+        logger.warning("Portable pg_ctl.exe not found. Cannot restart database automatically.")
+        return
+
+    postgres_port = os.getenv("POSTGRES_PORT")
+    if postgres_port == "5444":
+        data_dir = root / ".pgdata-dev"
+    elif postgres_port == "5433":
+        data_dir = root / ".pgdata-prod"
+    else:
+        logger.warning(f"Unknown POSTGRES_PORT ({postgres_port}), skipping auto-restart.")
+        return
+
+    if not data_dir.exists():
+        logger.warning(f"Data directory {data_dir} does not exist. Skipping auto-restart.")
+        return
+
+    logger.info(f"Attempting to auto-restart PostgreSQL database ({data_dir.name})...")
+    
+    # 1. Stop PG
+    try:
+        subprocess.run(
+            [str(pg_ctl), "-D", str(data_dir), "stop"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=10
+        )
+    except Exception as e:
+        logger.debug(f"Error stopping postgres during restart: {e}")
+
+    # 2. Remove stale pid
+    pid_file = data_dir / "postmaster.pid"
+    if pid_file.exists():
+        try:
+            pid_file.unlink(missing_ok=True)
+            logger.info(f"Removed stale postmaster.pid from {data_dir.name}")
+        except Exception as e:
+            logger.warning(f"Failed to remove stale postmaster.pid: {e}")
+
+    # 3. Start PG
+    try:
+        subprocess.run(
+            [
+                str(pg_ctl),
+                "-D", str(data_dir),
+                "-l", str(data_dir / "pg.log"),
+                "-o", f"-p {postgres_port} -F",
+                "start",
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=10
+        )
+        logger.info("PostgreSQL restart command executed successfully.")
+    except Exception as e:
+        logger.error(f"Failed to start postgres during restart: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # ------------------------------------------------------------------ #
@@ -38,18 +110,24 @@ async def lifespan(app: FastAPI):
     logger.info("Starting up Orion Custom Service Router")
 
     # PostgreSQL tam hazır olmadan önce FastAPI başlayabilir; retry ile bekle
-    max_retries = 10
+    max_retries = 3
     for attempt in range(1, max_retries + 1):
         try:
             await db_manager.init_db()
             break
         except Exception as e:
             if attempt == max_retries:
-                logger.error(f"DB başlatılamadı ({max_retries} deneme sonrası): {e}")
+                logger.error(f"DB bağlantısı {max_retries}. denemede de başarısız oldu. Program durduruluyor. Hata: {e}")
                 raise
-            wait = min(attempt * 0.8, 5)
-            logger.warning(f"DB bağlantısı başarısız (deneme {attempt}/{max_retries}), {wait:.1f}s bekleniyor... ({e})")
-            await asyncio.sleep(wait)
+            
+            logger.warning(
+                f"DB bağlantısı başarısız (deneme {attempt}/{max_retries}). "
+                f"Veritabanı yeniden başlatılıyor... Hata: {e}"
+            )
+            try:
+                _restart_postgres()
+            except Exception as restart_err:
+                logger.error(f"PostgreSQL otomatik yeniden başlatma sırasında hata oluştu: {restart_err}")
 
     # --- Fiyatlandırmayı seed et ---
     if MODEL_PRICING_PATH.exists():

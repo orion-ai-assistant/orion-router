@@ -68,15 +68,18 @@ def kill_portable_postgres():
     if sys.platform != "win32":
         return
     try:
-        target_path = str(PG_BIN / "postgres.exe")
-        escaped_path = target_path.replace("'", "''")
+        target_path = str(PG_BIN / "postgres.exe").lower().replace("\\", "/")
+        target_escaped = target_path.replace("'", "''")
         subprocess.run(
             [
                 "powershell",
                 "-Command",
-                f"Get-Process -Name postgres -ErrorAction SilentlyContinue | "
-                f"Where-Object {{ $_.Path -eq '{escaped_path}' }} | "
-                f"Stop-Process -Force"
+                f"Get-CimInstance Win32_Process -Filter \"Name = 'postgres.exe'\" | "
+                f"Where-Object {{ "
+                f"  ($_.ExecutablePath -and $_.ExecutablePath.ToLower().Replace('\\', '/') -eq '{target_escaped}') -or "
+                f"  ($_.CommandLine -and $_.CommandLine.ToLower().Contains('{target_escaped}')) "
+                f"}} | "
+                f"ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }}"
             ],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
