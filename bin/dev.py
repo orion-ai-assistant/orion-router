@@ -525,8 +525,9 @@ def main() -> None:
     try:
         while True:
             alive = [p for _, p in procs if p.poll() is None]
-            if not alive:
-                warn("Tum servisler beklenmedik sekilde kapandi.")
+            if len(alive) < len(procs):
+                dead_names = [name for name, p in procs if p.poll() is not None]
+                warn(f"Servislerden biri beklenmedik sekilde kapandi: {', '.join(dead_names)}")
                 break
             time.sleep(1)
     except KeyboardInterrupt:
