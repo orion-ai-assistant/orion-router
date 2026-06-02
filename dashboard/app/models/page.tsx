@@ -402,7 +402,7 @@ export default function ModelsPage() {
                 {providerModels.map((model) => (
                   <div
                     key={model.id}
-                    className="model-item-row bg-black/20 border border-zinc-850 rounded px-4 py-3 min-h-[52px] grid grid-cols-[minmax(172px,302px)_250px_80px_100px_1fr_auto] gap-4 items-center hover:border-zinc-600 hover:bg-black/35"
+                    className="model-item-row bg-black/20 border border-zinc-850 rounded px-4 py-3 min-h-[52px] grid grid-cols-[minmax(172px,302px)_280px_80px_1fr_auto] gap-4 items-center hover:border-zinc-600 hover:bg-black/35"
                   >
                     <div className="font-semibold text-sm font-mono text-white select-all truncate">
                       {model.name}
@@ -422,6 +422,11 @@ export default function ModelsPage() {
                           System Prompt
                         </Badge>
                       )}
+                      {model.temperature !== null && (
+                        <Badge className="bg-orange-500/10 text-orange-300 border border-orange-500/20 text-[9px] font-normal tracking-wide rounded uppercase px-1.5 py-0">
+                          Temp: {model.temperature}
+                        </Badge>
+                      )}
                     </div>
 
                     <div className="flex items-center">
@@ -430,15 +435,6 @@ export default function ModelsPage() {
                           Inactive
                         </Badge>
                       )}
-                    </div>
-                    
-                    <div className="flex items-center justify-center">
-                      <div className="flex flex-col items-center justify-center gap-0.5">
-                        <span className="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold">Temp</span>
-                        <span className="font-mono text-xs text-zinc-300">
-                          {model.temperature !== null ? model.temperature.toFixed(1) : '-'}
-                        </span>
-                      </div>
                     </div>
                     
                     <div className="pricing-container flex items-center gap-4">

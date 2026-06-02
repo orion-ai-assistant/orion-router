@@ -185,6 +185,7 @@ class DatabaseManager:
         )
         await conn.execute("ALTER TABLE router_model_group_items ADD COLUMN IF NOT EXISTS thinking_level TEXT;")
         await conn.execute("ALTER TABLE router_model_group_items ADD COLUMN IF NOT EXISTS system_prompt TEXT;")
+        await conn.execute("ALTER TABLE router_model_group_items ADD COLUMN IF NOT EXISTS temperature NUMERIC(5, 2);")
 
         await self._migrate_legacy_provider_keys(conn)
         await self._seed_default_models(conn)
@@ -452,7 +453,8 @@ class DatabaseManager:
         if group:
             rows = await self.fetch(
                 """
-                SELECT m.id, m.name, m.provider, m.capability, m.temperature,
+                SELECT m.id, m.name, m.provider, m.capability,
+                       COALESCE(i.temperature, m.temperature) AS temperature,
                        g.name AS requested_name, i.priority,
                        COALESCE(i.thinking_level, m.thinking_level) AS thinking_level,
                        COALESCE(i.system_prompt, m.system_prompt) AS system_prompt

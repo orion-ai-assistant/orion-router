@@ -645,7 +645,7 @@ async def list_model_groups():
     for group in groups:
         rows = await db_manager.fetch(
             """
-            SELECT i.id, i.model_id, i.priority, i.thinking_level, i.system_prompt, m.name, m.provider, m.capability
+            SELECT i.id, i.model_id, i.priority, i.thinking_level, i.system_prompt, i.temperature, m.name, m.provider, m.capability
             FROM router_model_group_items i
             JOIN router_models m ON m.id = i.model_id
             WHERE i.group_id = $1
@@ -653,7 +653,12 @@ async def list_model_groups():
             """,
             group["id"],
         )
-        group["items"] = [dict(r) for r in rows]
+        items = []
+        for r in rows:
+            d = dict(r)
+            d["temperature"] = float(d["temperature"]) if d.get("temperature") is not None else None
+            items.append(d)
+        group["items"] = items
     return {"groups": groups}
 
 
@@ -727,6 +732,8 @@ async def add_model_group_item(group_id: str, request: Request):
     thinking_level = str(thinking_level).strip() if thinking_level not in (None, "") else None
     system_prompt = body.get("system_prompt")
     system_prompt = str(system_prompt).strip() if system_prompt not in (None, "") else None
+    temperature = body.get("temperature")
+    temperature = float(temperature) if temperature not in (None, "") else None
 
     group = await db_manager.fetchrow("SELECT capability FROM router_model_groups WHERE id = $1", group_id)
     model = await db_manager.fetchrow("SELECT capability FROM router_models WHERE id = $1", model_id)
@@ -737,17 +744,20 @@ async def add_model_group_item(group_id: str, request: Request):
 
     row = await db_manager.fetchrow(
         """
-        INSERT INTO router_model_group_items (group_id, model_id, priority, thinking_level, system_prompt)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING id, group_id, model_id, priority, thinking_level, system_prompt, created_at
+        INSERT INTO router_model_group_items (group_id, model_id, priority, thinking_level, system_prompt, temperature)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id, group_id, model_id, priority, thinking_level, system_prompt, temperature, created_at
         """,
         group_id,
         model_id,
         priority,
         thinking_level,
         system_prompt,
+        temperature,
     )
-    return dict(row)
+    item = dict(row)
+    item["temperature"] = float(item["temperature"]) if item.get("temperature") is not None else None
+    return item
 
 
 @router.put("/api/model-groups/{group_id}/items/{item_id}", dependencies=[Depends(verify_admin)])
@@ -755,7 +765,7 @@ async def update_model_group_item(group_id: str, item_id: str, request: Request)
     body = await request.json()
     priority = int(body.get("priority", 100))
     
-    existing = await db_manager.fetchrow("SELECT thinking_level, system_prompt FROM router_model_group_items WHERE id = $1 AND group_id = $2", item_id, group_id)
+    existing = await db_manager.fetchrow("SELECT thinking_level, system_prompt, temperature FROM router_model_group_items WHERE id = $1 AND group_id = $2", item_id, group_id)
     if not existing:
         raise HTTPException(status_code=404, detail="Group item not found")
 
@@ -763,23 +773,28 @@ async def update_model_group_item(group_id: str, item_id: str, request: Request)
     thinking_level = str(new_thinking).strip() if new_thinking not in (None, "") else None
     new_system_prompt = body.get("system_prompt", existing["system_prompt"])
     system_prompt = str(new_system_prompt).strip() if new_system_prompt not in (None, "") else None
+    new_temperature = body.get("temperature", existing["temperature"])
+    temperature = float(new_temperature) if new_temperature not in (None, "") else None
 
     row = await db_manager.fetchrow(
         """
         UPDATE router_model_group_items
-        SET priority = $3, thinking_level = $4, system_prompt = $5
+        SET priority = $3, thinking_level = $4, system_prompt = $5, temperature = $6
         WHERE id = $1 AND group_id = $2
-        RETURNING id, group_id, model_id, priority, thinking_level, system_prompt, created_at
+        RETURNING id, group_id, model_id, priority, thinking_level, system_prompt, temperature, created_at
         """,
         item_id,
         group_id,
         priority,
         thinking_level,
         system_prompt,
+        temperature,
     )
     if not row:
         raise HTTPException(status_code=404, detail="Group item not found")
-    return dict(row)
+    item = dict(row)
+    item["temperature"] = float(item["temperature"]) if item.get("temperature") is not None else None
+    return item
 
 
 @router.delete("/api/model-groups/{group_id}/items/{item_id}", dependencies=[Depends(verify_admin)])

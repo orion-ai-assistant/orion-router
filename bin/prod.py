@@ -173,21 +173,32 @@ def kill_port(port: int) -> None:
 def kill_portable_postgres() -> None:
     """Sadece bu ortama ait (PG_DATA) postgres sureclerini temizler."""
     pid_file = PG_DATA / "postmaster.pid"
+
+    # 1. Adim: pg_ctl stop ile nazikce kapat (en temiz yol)
+    if PG_DATA.exists() and PG_CTL.exists():
+        run_silent([str(PG_CTL), "-D", str(PG_DATA), "-m", "fast", "stop"])
+
+    # 2. Adim: postmaster.pid'den PID oku, hala calisiyor mu kontrol et
     if pid_file.exists():
         try:
             lines = pid_file.read_text().splitlines()
             if lines and lines[0].isdigit():
                 pid = lines[0]
-                run_silent(["taskkill", "/f", "/t", "/pid", pid])
-                dim(f"    Eski PostgreSQL sureci (PID {pid}) sonlandirildi")
+                # Surecin gercekten bitip bitmedigini kontrol et
+                check = run_silent(["tasklist", "/fi", f"PID eq {pid}", "/fo", "csv", "/nh"])
+                if check.returncode == 0:
+                    run_silent(["taskkill", "/f", "/t", "/pid", pid])
+                    dim(f"    Eski PostgreSQL sureci (PID {pid}) zorla kapatildi")
         except Exception:
             pass
         finally:
             try:
                 pid_file.unlink(missing_ok=True)
-                dim("    Stale postmaster.pid silindi")
             except Exception:
                 pass
+
+    # 3. Adim: OS'un tum dosya kilidlerini birakmasi icin bekle
+    time.sleep(1.5)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -221,9 +232,9 @@ def check_python_deps() -> None:
 
 def free_ports(router_port: str) -> None:
     info(f"Portlar temizleniyor: {router_port}, {PG_PORT}...")
+    kill_portable_postgres()
     for port in [int(router_port), PG_PORT]:
         kill_port(port)
-    kill_portable_postgres()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -274,6 +285,36 @@ def init_database() -> None:
 
 def start_postgres() -> None:
     info("PostgreSQL baslatiliyor...")
+    # Onceki oturumdan kalan kilitli log dosyasini temizle (retry dongusu)
+    deadline = time.time() + 5.0
+    while time.time() < deadline:
+        try:
+            if PG_LOG.exists():
+                PG_LOG.unlink()
+            break  # Basarili — dongudan cik
+        except OSError:
+            time.sleep(0.4)  # Hala kilitli, biraz bekle
+    else:
+        # 5 saniye sonra hala kilitli — farkli isimle log kullan
+        import datetime
+        ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        PG_LOG_ALT = PG_DATA / f"pg_{ts}.log"
+        warn(f"    pg.log serbest birakilamadi, alternatif kullaniliyor: {PG_LOG_ALT.name}")
+        run([
+            str(PG_CTL),
+            "-D", str(PG_DATA),
+            "-l", str(PG_LOG_ALT),
+            "-o", f"-p {PG_PORT} -F",
+            "start",
+        ])
+        return
+
+    # Temiz log dosyasi olustur
+    try:
+        PG_LOG.parent.mkdir(parents=True, exist_ok=True)
+        PG_LOG.touch()
+    except Exception:
+        pass
     run([
         str(PG_CTL),
         "-D", str(PG_DATA),

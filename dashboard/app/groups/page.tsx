@@ -21,6 +21,7 @@ interface GroupItem {
   capability: string;
   thinking_level?: string | null;
   system_prompt?: string | null;
+  temperature?: number | null;
 }
 
 interface ModelGroup {
@@ -121,7 +122,8 @@ export default function GroupsPage() {
   const [selectedModelId, setSelectedModelId] = useState<string>('');
   const [selectedThinkingLevel, setSelectedThinkingLevel] = useState<string>('');
   const [selectedSystemPrompt, setSelectedSystemPrompt] = useState<string>('');
-  const [editingGroupItem, setEditingGroupItem] = useState<{groupId: string, itemId: string, name: string, provider: string, priority: number, thinking_level: string, system_prompt: string} | null>(null);
+  const [selectedTemperature, setSelectedTemperature] = useState<string>('');
+  const [editingGroupItem, setEditingGroupItem] = useState<{groupId: string, itemId: string, name: string, provider: string, priority: number, thinking_level: string, system_prompt: string, temperature: string} | null>(null);
   
   // Drag and Drop state
   const [draggedItem, setDraggedItem] = useState<{
@@ -354,6 +356,7 @@ export default function GroupsPage() {
     setSelectedModelId('');
     setSelectedThinkingLevel('');
     setSelectedSystemPrompt('');
+    setSelectedTemperature('');
     setShowAddGroupItemModal(true);
   };
 
@@ -366,6 +369,12 @@ export default function GroupsPage() {
     }
     const priority = activeGroupForItems.items.length + 1;
 
+    const tempVal = selectedTemperature === '' ? null : parseFloat(selectedTemperature);
+    if (tempVal !== null && (tempVal < 0 || tempVal > 2)) {
+      showToast('Temperature must be a number between 0.0 and 2.0', 'error');
+      return;
+    }
+
     try {
       const res = await adminFetch(`/dashboard/api/model-groups/${activeGroupForItems.id}/items`, {
         method: 'POST',
@@ -373,7 +382,8 @@ export default function GroupsPage() {
           model_id: selectedModelId, 
           priority, 
           thinking_level: selectedThinkingLevel || null,
-          system_prompt: selectedSystemPrompt || null 
+          system_prompt: selectedSystemPrompt || null,
+          temperature: tempVal
         }),
       });
       if (res.ok) {
@@ -399,6 +409,7 @@ export default function GroupsPage() {
       priority: item.priority,
       thinking_level: item.thinking_level || '',
       system_prompt: item.system_prompt || '',
+      temperature: item.temperature !== undefined && item.temperature !== null ? item.temperature.toString() : '',
     });
     setShowEditGroupItemModal(true);
   };
@@ -407,13 +418,20 @@ export default function GroupsPage() {
     e.preventDefault();
     if (!editingGroupItem) return;
 
+    const tempVal = editingGroupItem.temperature === '' ? null : parseFloat(editingGroupItem.temperature);
+    if (tempVal !== null && (tempVal < 0 || tempVal > 2)) {
+      showToast('Temperature must be a number between 0.0 and 2.0', 'error');
+      return;
+    }
+
     try {
       const res = await adminFetch(`/dashboard/api/model-groups/${editingGroupItem.groupId}/items/${editingGroupItem.itemId}`, {
         method: 'PUT',
         body: JSON.stringify({ 
           priority: editingGroupItem.priority, 
           thinking_level: editingGroupItem.thinking_level || null,
-          system_prompt: editingGroupItem.system_prompt || null
+          system_prompt: editingGroupItem.system_prompt || null,
+          temperature: tempVal
         }),
       });
       if (res.ok) {
@@ -657,6 +675,11 @@ export default function GroupsPage() {
                               {item.system_prompt && (
                                 <Badge className="bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-[9px] font-normal tracking-wide rounded uppercase px-1.5 py-0">
                                   System Prompt
+                                </Badge>
+                              )}
+                              {item.temperature !== undefined && item.temperature !== null && (
+                                <Badge className="bg-orange-500/10 text-orange-300 border border-orange-500/20 text-[9px] font-normal tracking-wide rounded uppercase px-1.5 py-0">
+                                  Temp: {item.temperature}
                                 </Badge>
                               )}
                             </div>
@@ -904,7 +927,23 @@ export default function GroupsPage() {
                   value={selectedThinkingLevel}
                   onChange={(e) => setSelectedThinkingLevel(e.target.value)}
                   placeholder="Optional (low, 1024)"
-                  className="bg-black/40 border border-zinc-850 text-white rounded px-3 py-2 text-xs"
+                  className="bg-black/40 border border-zinc-855 text-white rounded px-3 py-2 text-xs"
+                />
+              </div>
+            )}
+
+            {activeGroupForItems && (activeGroupForItems.capability === 'chat' || activeGroupForItems.capability === 'tts') && (
+              <div className="flex flex-col gap-2">
+                <label className="text-zinc-400 text-sm font-medium">Temperature</label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="2"
+                  step="0.1"
+                  value={selectedTemperature}
+                  onChange={(e) => setSelectedTemperature(e.target.value)}
+                  placeholder="Optional override (0-2)"
+                  className="bg-black/40 border border-zinc-855 text-white rounded px-3 py-2 text-xs"
                 />
               </div>
             )}
@@ -964,25 +1003,48 @@ export default function GroupsPage() {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2">
-                <label className="text-zinc-400 text-sm font-medium">Thinking Level</label>
-                <Input
-                  value={editingGroupItem.thinking_level}
-                  onChange={(e) => setEditingGroupItem({ ...editingGroupItem, thinking_level: e.target.value })}
-                  placeholder="Optional (low, 1024)"
-                  className="bg-black/40 border border-zinc-850 text-white rounded px-3 py-2 text-xs"
-                />
-              </div>
+              {groups.find((g) => g.id === editingGroupItem.groupId)?.capability === 'chat' && (
+                <div className="flex flex-col gap-2">
+                  <label className="text-zinc-400 text-sm font-medium">Thinking Level</label>
+                  <Input
+                    value={editingGroupItem.thinking_level}
+                    onChange={(e) => setEditingGroupItem({ ...editingGroupItem, thinking_level: e.target.value })}
+                    placeholder="Optional (low, 1024)"
+                    className="bg-black/40 border border-zinc-850 text-white rounded px-3 py-2 text-xs"
+                  />
+                </div>
+              )}
 
-              <div className="flex flex-col gap-2">
-                <label className="text-zinc-400 text-sm font-medium">System Prompt</label>
-                <Textarea
-                  value={editingGroupItem.system_prompt}
-                  onChange={(e) => setEditingGroupItem({ ...editingGroupItem, system_prompt: e.target.value })}
-                  placeholder="Optional system instructions..."
-                  className="bg-black/40 border border-zinc-850 text-white rounded px-3 py-2 text-xs h-14 resize-none custom-scrollbar overflow-y-auto no-field-sizing"
-                />
-              </div>
+              {(() => {
+                const capability = groups.find((g) => g.id === editingGroupItem.groupId)?.capability;
+                return (capability === 'chat' || capability === 'tts') && (
+                  <div className="flex flex-col gap-2">
+                    <label className="text-zinc-400 text-sm font-medium">Temperature</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      value={editingGroupItem.temperature}
+                      onChange={(e) => setEditingGroupItem({ ...editingGroupItem, temperature: e.target.value })}
+                      placeholder="Optional override (0-2)"
+                      className="bg-black/40 border border-zinc-855 text-white rounded px-3 py-2 text-xs"
+                    />
+                  </div>
+                );
+              })()}
+
+              {groups.find((g) => g.id === editingGroupItem.groupId)?.capability === 'chat' && (
+                <div className="flex flex-col gap-2">
+                  <label className="text-zinc-400 text-sm font-medium">System Prompt</label>
+                  <Textarea
+                    value={editingGroupItem.system_prompt}
+                    onChange={(e) => setEditingGroupItem({ ...editingGroupItem, system_prompt: e.target.value })}
+                    placeholder="Optional system instructions..."
+                    className="bg-black/40 border border-zinc-850 text-white rounded px-3 py-2 text-xs h-14 resize-none custom-scrollbar overflow-y-auto no-field-sizing"
+                  />
+                </div>
+              )}
 
               <DialogFooter className="mt-4 flex justify-between w-full gap-3">
                 <Button
