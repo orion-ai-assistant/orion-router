@@ -15,19 +15,36 @@ for cmd in git python3 npm; do
 done
 echo "✔ Tüm bağımlılıklar mevcut (Git, Python, NPM)."
 
-# 2. Repo Klonlama
-echo -e "\n[2/5] Orion Router klonlanıyor..."
+# 2. Repo Klonlama veya Güncelleme
+echo -e "\n[2/5] Orion Router klasörüne ayarlanıyor..."
 INSTALL_DIR="$HOME/.orion-router"
 REPO_URL="https://github.com/krstalacam/orion-router.git"
+
+# --- YENİ: Kilitli dosyaları açmak için çalışan eski süreci durdur ---
+PID_FILE="$INSTALL_DIR/.orion.pid"
+if [ -f "$PID_FILE" ]; then
+    OLD_PID=$(cat "$PID_FILE")
+    if ps -p "$OLD_PID" > /dev/null 2>&1; then
+        # Alt süreçleri ve ana süreci zorla kapat
+        pkill -P "$OLD_PID" 2>/dev/null || true
+        kill -9 "$OLD_PID" 2>/dev/null || true
+        sleep 1
+        echo "[!] Arka planda çalışan eski Orion Router durduruldu."
+    fi
+    rm -f "$PID_FILE"
+fi
+
 if [ ! -d "$INSTALL_DIR/.git" ]; then
   if [ -d "$INSTALL_DIR" ]; then
     rm -rf "$INSTALL_DIR"
   fi
   git clone "$REPO_URL" "$INSTALL_DIR"
 else
-  echo "✔ Klasör var, en güncel kodlar çekiliyor (git pull)..."
+  echo "✔ Klasör var, GitHub'daki en güncel kodlar zorla çekiliyor..."
   cd "$INSTALL_DIR"
-  git pull
+  
+  git fetch origin main || { echo "[HATA] git fetch başarısız oldu. Bağlantı sorunu olabilir."; exit 1; }
+  git reset --hard origin/main || { echo "[HATA] Kodları güncelleme (reset) başarısız oldu."; exit 1; }
 fi
 cd "$INSTALL_DIR"
 
@@ -43,9 +60,9 @@ echo -e "\n[4/5] Dashboard bağımlılıkları (NPM) yükleniyor..."
 echo -e "\n[5/5] Global 'orion-router' komutu sisteme yükleniyor..."
 
 # Shell profile'ı belirle
-if [ -n "$ZSH_VERSION" ]; then
+if [ -n "${ZSH_VERSION:-}" ]; then
   PROFILE="$HOME/.zshrc"
-elif [ -n "$BASH_VERSION" ]; then
+elif [ -n "${BASH_VERSION:-}" ]; then
   PROFILE="$HOME/.bashrc"
 else
   PROFILE="$HOME/.profile"
@@ -53,8 +70,8 @@ fi
 
 # Eski kirli kalıntıları temizle
 if [ -f "$PROFILE" ]; then
-  sed -i '/# --- ORION ROUTER CLI START ---/,/# --- ORION ROUTER CLI END ---/d' "$PROFILE" 2>/dev/null || true
-  sed -i '/^[[:space:]]*orion-router\([[:space:]]\+start\)\?[[:space:]]*$/d' "$PROFILE" 2>/dev/null || true
+  sed -i.bak '/# --- ORION ROUTER CLI START ---/,/# --- ORION ROUTER CLI END ---/d' "$PROFILE" 2>/dev/null || true
+  sed -i.bak '/^[[:space:]]*orion-router\([[:space:]]\+start\)\?[[:space:]]*$/d' "$PROFILE" 2>/dev/null || true
 fi
 
 # Yeni fonksiyonu ekle
@@ -108,8 +125,10 @@ orion-router() {
         if [ -f "$PID_FILE" ]; then
             local PID=$(cat "$PID_FILE")
             if ps -p "$PID" > /dev/null 2>&1; then
-                kill -TERM "$PID"
-                echo "[OK] Orion Router ana süreci durduruldu."
+                # pkill ile alt süreçleri de temizle
+                pkill -P "$PID" 2>/dev/null || true
+                kill -9 "$PID" 2>/dev/null || true
+                echo "[OK] Orion Router ana süreci ve alt süreçleri durduruldu."
             else
                 echo "Süreç zaten sonlanmış."
             fi

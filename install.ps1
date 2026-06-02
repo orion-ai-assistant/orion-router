@@ -13,9 +13,9 @@ if ($Mode -notin @("local", "docker")) {
     Write-Host "`nHATA: Kurulum modunu belirtmediniz!" -ForegroundColor Red
     Write-Host "Lutfen terminalde scripti asagidaki gibi parametre vererek calistirin:`n" -ForegroundColor Yellow
     Write-Host "  1. Local Kurulum:" -ForegroundColor White
-    Write-Host "     . .\install.ps1 local`n" -ForegroundColor Green
+    Write-Host "     .\install.ps1 local`n" -ForegroundColor Green
     Write-Host "  2. Docker Kurulum:" -ForegroundColor White
-    Write-Host "     . .\install.ps1 docker`n" -ForegroundColor Green
+    Write-Host "     .\install.ps1 docker`n" -ForegroundColor Green
     exit 1
 }
 
@@ -43,26 +43,6 @@ function Install-FreshCopy {
   }
 }
 
-function Update-TrackedFilesFromRemote {
-  param ([string]$Reason)
-
-  Write-Host ""
-  Write-Host "[!] $Reason" -ForegroundColor Yellow
-  Write-Host "[OK] Git'in takip ettigi dosyalar sunucudaki son hale zorla cekiliyor..." -ForegroundColor Yellow
-
-  git fetch origin main
-  if ($LASTEXITCODE -ne 0) {
-    Write-Host "[HATA] git fetch basarisiz oldu." -ForegroundColor Red
-    exit $LASTEXITCODE
-  }
-
-  git reset --hard origin/main
-  if ($LASTEXITCODE -ne 0) {
-    Write-Host "[HATA] git reset --hard origin/main basarisiz oldu." -ForegroundColor Red
-    exit $LASTEXITCODE
-  }
-}
-
 # 1. Gereksinim Kontrolleri
 Write-Host "[1/5] Sistem gereksinimleri kontrol ediliyor..."
 if ($Mode -eq "local") { $requiredCommands = @("git", "python", "npm") } 
@@ -74,18 +54,42 @@ foreach ($cmd in $requiredCommands) {
 }
 Write-Host "[OK] Gereksinimler karsilandi ($($requiredCommands -join ', ')).`n" -ForegroundColor Green
 
+
 # 2. Repo Klonlama veya Guncelleme
 Write-Host "[2/5] Orion Router AppData klasorune ayarlaniyor..."
+
+# --- YENI: Kilitli dosyalari acmak icin calisan eski sureci durdur ---
+$PidFile = Join-Path $TargetFolder ".orion.pid"
+if (Test-Path $PidFile) {
+  $pidToStop = Get-Content $PidFile
+  # /F ve /T ile ana sureci ve python alt sureclerini sessizce zorla kapatiyoruz
+  taskkill /F /T /PID $pidToStop 2>$null | Out-Null
+  Start-Sleep -Seconds 1 # Sistemin dosya kilitlerini birakmasi icin 1 saniye bekle
+  Remove-Item -Path $PidFile -ErrorAction SilentlyContinue
+  Write-Host "[!] Arka planda calisan eski Orion Router durduruldu." -ForegroundColor DarkGray
+}
+
 $GitPath = Join-Path $TargetFolder ".git"
 if (-not (Test-Path $TargetFolder) -or -not (Test-Path $GitPath)) {
   Install-FreshCopy "Hedef klasor yok veya Git deposu degil."
 } else {
-  Write-Host "[OK] Klasor var, en guncel kodlar cekiliyor (git pull)..." -ForegroundColor Yellow
+  Write-Host "[OK] Klasor var, GitHub'daki en guncel kodlar zorla cekiliyor..." -ForegroundColor Yellow
   Set-Location -Path $TargetFolder
-  git pull
+  
+  git fetch origin main
   if ($LASTEXITCODE -ne 0) {
-    Update-TrackedFilesFromRemote "git pull yerel degisiklikler yuzunden tamamlanamadi."
+    Write-Host "[HATA] git fetch basarisiz oldu. Baglanti sorunu olabilir." -ForegroundColor Red
+    exit $LASTEXITCODE
   }
+
+  git reset --hard origin/main
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "[HATA] Kodlari guncelleme (reset) basarisiz oldu." -ForegroundColor Red
+    exit $LASTEXITCODE
+  }
+  
+  # Not: "git clean -fd" buradan kaldirildi. 
+  # Artik Git log, .pid, .env gibi untracked dosyalara dokunmayacak.
 }
 Set-Location -Path $TargetFolder
 Write-Host ""
@@ -101,6 +105,7 @@ if ($Mode -eq "local") {
     Write-Host "[3/5] ve [4/5] Adimlari Atlaniyor..." -ForegroundColor DarkGray
     Write-Host "Docker modu secildigi icin local bagimliliklar indirilmeyecek.`n" -ForegroundColor DarkGray
 }
+
 
 # 5. Global Komutun Yuklenmesi
 Write-Host "[5/5] Global 'orion-router' komutu sisteme yukleniyor..."
