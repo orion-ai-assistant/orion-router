@@ -21,7 +21,47 @@ if ($Mode -notin @("local", "docker")) {
 
 Write-Host "Kurulum Modu: $Mode" -ForegroundColor Yellow
 $TargetFolder = Join-Path $env:LOCALAPPDATA "OrionRouter"
+$RepoUrl = "https://github.com/krstalacam/orion-router.git"
 Write-Host "Hedef Dizin:  $TargetFolder`n" -ForegroundColor DarkGray
+
+function Install-FreshCopy {
+  param ([string]$Reason)
+
+  Write-Host ""
+  Write-Host "[!] $Reason" -ForegroundColor Yellow
+  Write-Host "[OK] Temiz kopya kurulacak." -ForegroundColor Yellow
+
+  if (Test-Path $TargetFolder) {
+    Set-Location -Path $env:TEMP
+    Remove-Item -Path $TargetFolder -Recurse -Force
+  }
+
+  git clone $RepoUrl $TargetFolder
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "[HATA] Temiz klon basarisiz oldu." -ForegroundColor Red
+    exit $LASTEXITCODE
+  }
+}
+
+function Update-TrackedFilesFromRemote {
+  param ([string]$Reason)
+
+  Write-Host ""
+  Write-Host "[!] $Reason" -ForegroundColor Yellow
+  Write-Host "[OK] Git'in takip ettigi dosyalar sunucudaki son hale zorla cekiliyor..." -ForegroundColor Yellow
+
+  git fetch origin main
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "[HATA] git fetch basarisiz oldu." -ForegroundColor Red
+    exit $LASTEXITCODE
+  }
+
+  git reset --hard origin/main
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "[HATA] git reset --hard origin/main basarisiz oldu." -ForegroundColor Red
+    exit $LASTEXITCODE
+  }
+}
 
 # 1. Gereksinim Kontrolleri
 Write-Host "[1/5] Sistem gereksinimleri kontrol ediliyor..."
@@ -38,12 +78,14 @@ Write-Host "[OK] Gereksinimler karsilandi ($($requiredCommands -join ', ')).`n" 
 Write-Host "[2/5] Orion Router AppData klasorune ayarlaniyor..."
 $GitPath = Join-Path $TargetFolder ".git"
 if (-not (Test-Path $TargetFolder) -or -not (Test-Path $GitPath)) {
-  if (Test-Path $TargetFolder) { Remove-Item -Path $TargetFolder -Recurse -Force -ErrorAction SilentlyContinue }
-  git clone https://github.com/krstalacam/orion-router.git $TargetFolder
+  Install-FreshCopy "Hedef klasor yok veya Git deposu degil."
 } else {
   Write-Host "[OK] Klasor var, en guncel kodlar cekiliyor (git pull)..." -ForegroundColor Yellow
   Set-Location -Path $TargetFolder
   git pull
+  if ($LASTEXITCODE -ne 0) {
+    Update-TrackedFilesFromRemote "git pull yerel degisiklikler yuzunden tamamlanamadi."
+  }
 }
 Set-Location -Path $TargetFolder
 Write-Host ""

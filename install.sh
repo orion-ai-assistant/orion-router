@@ -18,8 +18,12 @@ echo "✔ Tüm bağımlılıklar mevcut (Git, Python, NPM)."
 # 2. Repo Klonlama
 echo -e "\n[2/5] Orion Router klonlanıyor..."
 INSTALL_DIR="$HOME/.orion-router"
-if [ ! -d "$INSTALL_DIR" ]; then
-  git clone https://github.com/krstalacam/orion-router.git "$INSTALL_DIR"
+REPO_URL="https://github.com/krstalacam/orion-router.git"
+if [ ! -d "$INSTALL_DIR/.git" ]; then
+  if [ -d "$INSTALL_DIR" ]; then
+    rm -rf "$INSTALL_DIR"
+  fi
+  git clone "$REPO_URL" "$INSTALL_DIR"
 else
   echo "✔ Klasör var, en güncel kodlar çekiliyor (git pull)..."
   cd "$INSTALL_DIR"
