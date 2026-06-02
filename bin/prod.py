@@ -26,9 +26,20 @@ from pathlib import Path
 # ─────────────────────────────────────────────────────────────────────────────
 if sys.platform == "win32":
     os.system("")
+    os.environ["PYTHONUTF8"] = "1"
+
     try:
-        sys.stdout.reconfigure(encoding='utf-8')
-        sys.stderr.reconfigure(encoding='utf-8')
+        sys.stdout.reconfigure(
+            encoding="utf-8",
+            errors="replace",
+            line_buffering=True
+        )
+
+        sys.stderr.reconfigure(
+            encoding="utf-8",
+            errors="replace",
+            line_buffering=True
+        )
     except Exception:
         pass
 
@@ -57,6 +68,7 @@ def dim(msg: str)  -> None: _p(" ", msg, GRAY)
 ROOT      = Path(__file__).parent.parent.resolve()
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+from core.lifespan import print_active_services_banner
 TOOLS_DIR = ROOT / "tools"
 PG_BIN    = TOOLS_DIR / "pgsql" / "bin"
 PG_DATA   = ROOT / ".pgdata-prod"
@@ -454,41 +466,6 @@ def banner() -> None:
     print(f"\n{CYAN}{BOLD}╔{line}╗{RESET}")
     print(f"{CYAN}{BOLD}║{'Orion Router':^55}║{RESET}")
     print(f"{CYAN}{BOLD}╚{line}╝{RESET}\n")
-
-def print_active_services_banner(router_port: str) -> None:
-    import socket
-    def get_local_ip() -> str:
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))
-            ip = s.getsockname()[0]
-            s.close()
-            return ip
-        except Exception:
-            return "127.0.0.1"
-    
-    BLUE = "\033[94m"
-
-    local_ip = get_local_ip()
-    dashboard_url = f"http://localhost:{router_port}"
-    local_url = f"http://{local_ip}:{router_port}"
-    
-    border_line = f"{GRAY}────────────────────────────────────────────────{RESET}"
-    title_colored = f"{BLUE}{BOLD}ORION ROUTER{RESET}"
-    dash_colored  = f"{BLUE}➜{RESET}  {BOLD}Dashboard:{RESET}   {CYAN}{dashboard_url}{RESET}"
-    ip_colored    = f"{BLUE}➜{RESET}  {BOLD}Yerel Ağ:{RESET}    {CYAN}{local_url}{RESET}"
-    
-    # Print the banner block with clean newlines to separate from surrounding logs
-    print()
-    print(border_line)
-    print(title_colored)
-    print()
-    print(dash_colored)
-    print(ip_colored)
-    print(border_line)
-    print(f"{GRAY}Durdurmak için CTRL+C tuşlarına basın{RESET}")
-    print()
-
 
 def main() -> None:
     if not acquire_lock():

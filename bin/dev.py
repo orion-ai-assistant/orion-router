@@ -21,10 +21,21 @@ from pathlib import Path
 # Terminal Colors (ANSI — Windows 10+ destekler)
 # ─────────────────────────────────────────────────────────────────────────────
 if sys.platform == "win32":
-    os.system("")  # enable ANSI escape codes on Windows
+    os.system("")
+    os.environ["PYTHONUTF8"] = "1"
+
     try:
-        sys.stdout.reconfigure(encoding='utf-8')
-        sys.stderr.reconfigure(encoding='utf-8')
+        sys.stdout.reconfigure(
+            encoding="utf-8",
+            errors="replace",
+            line_buffering=True
+        )
+
+        sys.stderr.reconfigure(
+            encoding="utf-8",
+            errors="replace",
+            line_buffering=True
+        )
     except Exception:
         pass
 
@@ -53,6 +64,7 @@ def dim(msg: str)  -> None: _p(" ", msg, GRAY)
 ROOT      = Path(__file__).parent.parent.resolve()
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+from core.lifespan import print_active_services_banner
 TOOLS_DIR = ROOT / "tools"
 PG_BIN    = TOOLS_DIR / "pgsql" / "bin"
 PG_DATA   = ROOT / ".pgdata-dev"
@@ -447,39 +459,6 @@ def banner() -> None:
     print(f"{CYAN}{BOLD}║{'Orion Router — Development Environment':^55}║{RESET}")
     print(f"{CYAN}{BOLD}╚{line}╝{RESET}\n")
 
-def print_active_services_banner(router_port: str) -> None:
-    import socket
-    def get_local_ip() -> str:
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))
-            ip = s.getsockname()[0]
-            s.close()
-            return ip
-        except Exception:
-            return "127.0.0.1"
-    
-    BLUE = "\033[94m"
-
-    local_ip = get_local_ip()
-    dashboard_url = f"http://localhost:{UI_PORT}"
-    local_url = f"http://{local_ip}:{UI_PORT}"
-    border_line = f"{GRAY}────────────────────────────────────────────────{RESET}"
-    title_colored = f"{BLUE}{BOLD}ORION ROUTER{RESET}"
-    dash_colored  = f"{BLUE}➜{RESET}  {BOLD}Dashboard:{RESET}   {CYAN}{dashboard_url}{RESET}"
-    ip_colored    = f"{BLUE}➜{RESET}  {BOLD}Yerel Ağ:{RESET}    {CYAN}{local_url}{RESET}"
-    
-    print()
-    print(border_line)
-    print(title_colored)
-    print()
-    print(dash_colored)
-    print(ip_colored)
-    print(border_line)
-    print(f"{GRAY}Durdurmak için CTRL+C tuşlarına basın{RESET}")
-    print()
-
-
 def main() -> None:
     if not acquire_lock():
         err("Hata: Baska bir Orion Router instancesi calisiyor (Portlar kullanimda olabilir).")
@@ -527,7 +506,7 @@ def main() -> None:
 
             if backend_ready and frontend_ready:
                 time.sleep(2.5)
-                print_active_services_banner(port)
+                print_active_services_banner(port, dashboard_port=str(UI_PORT))
                 return
             time.sleep(0.5)
 

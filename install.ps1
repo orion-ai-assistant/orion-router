@@ -6,7 +6,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 Write-Host "==========================================" -ForegroundColor Cyan
-Write-Host "     Orion Router Native Kurulum Araci    " -ForegroundColor Cyan
+Write-Host "    Orion Router Native Kurulum Araci    " -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 
 if ($Mode -notin @("local", "docker")) {
@@ -34,9 +34,8 @@ foreach ($cmd in $requiredCommands) {
 }
 Write-Host "[OK] Gereksinimler karsilandi ($($requiredCommands -join ', ')).`n" -ForegroundColor Green
 
-# 2. Repo Klonlama veya Guncelleme (Akilli Kontrol)
+# 2. Repo Klonlama veya Guncelleme
 Write-Host "[2/5] Orion Router AppData klasorune ayarlaniyor..."
-# Eger klasor yoksa VEYA icinde gercekten bir git projesi barinmiyorsa klasorun icini temizleyip bastan klonla
 $GitPath = Join-Path $TargetFolder ".git"
 if (-not (Test-Path $TargetFolder) -or -not (Test-Path $GitPath)) {
   if (Test-Path $TargetFolder) { Remove-Item -Path $TargetFolder -Recurse -Force -ErrorAction SilentlyContinue }
@@ -49,7 +48,7 @@ if (-not (Test-Path $TargetFolder) -or -not (Test-Path $GitPath)) {
 Set-Location -Path $TargetFolder
 Write-Host ""
 
-# 3 & 4. Bagimliliklar (Sadece Local Mode Icin)
+# 3 & 4. Bagimliliklar
 if ($Mode -eq "local") {
     Write-Host "[3/5] Python paketleri (pip) yukleniyor..."
     python -m pip install -e .
@@ -81,52 +80,69 @@ function Global:Invoke-OrionRouter {
         Write-Host ""
         Write-Host "  Komutlar:"
         Write-Host "    start   " -NoNewline -ForegroundColor Green; Write-Host "  Sunucuyu arka planda baslatir"
-        Write-Host "    stop    " -NoNewline -ForegroundColor Red; Write-Host "  Calisan sunucuyu durdurur"
-        Write-Host "    logs    " -NoNewline -ForegroundColor Magenta; Write-Host "  Arka plan loglarini canli olarak gosterir"
+        Write-Host "    stop    " -NoNewline -ForegroundColor Red; Write-Host "  Calisan sunucuyu ve tum alt surecleri durdurur"
+        Write-Host "    logs    " -NoNewline -ForegroundColor Magenta; Write-Host "  Arka plan loglarini ve hatalari gosterir"
         Write-Host "    help    " -NoNewline -ForegroundColor Cyan; Write-Host "  Bu yardim menusunu gosterir"
         Write-Host ""
     }
     elseif (`$Action -eq "start") {
         if (Test-Path `$PidFile) { 
-            Write-Host "[OK] Orion Router zaten arka planda calisiyor!" -ForegroundColor Yellow
-            Write-Host "Loglari gormek icin: orion-router logs" -ForegroundColor Cyan
-            return 
+            `$pidContent = Get-Content `$PidFile
+            if (Get-Process -Id `$pidContent -ErrorAction SilentlyContinue) {
+                Write-Host "[OK] Orion Router zaten arka planda calisiyor!" -ForegroundColor Yellow
+                Write-Host "Loglari gormek icin: orion-router logs" -ForegroundColor Cyan
+                return 
+            } else {
+                Remove-Item -Path `$PidFile -ErrorAction SilentlyContinue
+            }
         }
+
         Write-Host "Orion Router local olarak baslatiliyor..." -ForegroundColor Cyan
         Set-Location `$ProjectPath
-        New-Item -Path `$LogFile -ItemType File -Force | Out-Null
-        New-Item -Path `$ErrorLogFile -ItemType File -Force | Out-Null
         
-        # Windows PowerShell kuralı gereği output ve error dosyalarını ayırdık
-        `$process = Start-Process -FilePath "python" -ArgumentList "prod.py" -RedirectStandardOutput `$LogFile -RedirectStandardError `$ErrorLogFile -PassThru -WindowStyle Hidden
+        `$process = Start-Process -FilePath "python" -ArgumentList "orion.py", "prod" -RedirectStandardOutput `$LogFile -RedirectStandardError `$ErrorLogFile -PassThru -WindowStyle Hidden
         `$process.Id | Out-File -FilePath `$PidFile
         
         Write-Host "[OK] Orion Router arka planda calismaya basladi!" -ForegroundColor Green
+        Write-Host "[OK] Artik su komutlari kullanabilirsiniz: orion-router start | stop | logs | help" -ForegroundColor Cyan
+        Write-Host "[OK] Bu terminali kapatabilirsiniz; Orion Router arka planda calismaya devam eder." -ForegroundColor Cyan
         Write-Host "----------------------------------------------------" -ForegroundColor Gray
         Write-Host "  Canli loglar basliyor... (Cikmak icin Ctrl+C basabilirsiniz)" -ForegroundColor Magenta
         Write-Host "----------------------------------------------------" -ForegroundColor Gray
-        Get-Content `$LogFile -Wait -Tail 10
+        Get-Content `$LogFile -Wait -Tail 10 -Encoding UTF8
     }
     elseif (`$Action -eq "stop") {
-        if (-not (Test-Path `$PidFile)) { Write-Host "Calisan bir Orion Router bulunamadi!" -ForegroundColor Red; return }
-        `$pidToStop = Get-Content `$PidFile
-        try { Stop-Process -Id `$pidToStop -Force -ErrorAction Stop; Write-Host "[OK] Orion Router basariyla kapatildi." -ForegroundColor Green } 
-        catch { Write-Host "Kapatilirken bir hata oldu." -ForegroundColor DarkGray } 
-        finally { 
-            Remove-Item -Path `$PidFile -ErrorAction SilentlyContinue 
-            Remove-Item -Path `$LogFile -ErrorAction SilentlyContinue
-            Remove-Item -Path `$ErrorLogFile -ErrorAction SilentlyContinue
+        if (Test-Path `$PidFile) {
+            `$pidToStop = Get-Content `$PidFile
+            try { 
+                # /F zorla, /T agac yapisiyla tum alt surecleri temizler.
+                taskkill /F /T /PID `$pidToStop | Out-Null
+                Write-Host "[OK] Orion Router ana sureci ve bagli alt surecleri sonlandirildi." -ForegroundColor Green
+            } 
+            catch { Write-Host "Surec durdurulurken bir hata oldu veya zaten sonlanmis." -ForegroundColor DarkGray } 
+            finally { 
+                Remove-Item -Path `$PidFile -ErrorAction SilentlyContinue 
+            }
+        } else {
+            Write-Host "Calisan etkin bir Orion Router sureci (.orion.pid) bulunamadi." -ForegroundColor Red
         }
     }
     elseif (`$Action -eq "logs") {
+        if (Test-Path `$ErrorLogFile) {
+            `$errContent = Get-Content `$ErrorLogFile -Tail 15 -ErrorAction SilentlyContinue -Encoding UTF8
+            if (`$errContent) {
+                Write-Host "`n[!] SON HATALAR (orion_error.log):" -ForegroundColor Red
+                `$errContent | ForEach-Object { Write-Host "  `$_" -ForegroundColor DarkRed }
+                Write-Host "----------------------------------------------------" -ForegroundColor Gray
+            }
+        }
         if (Test-Path `$LogFile) {
             Write-Host "  Canli loglar basliyor... (Cikmak icin Ctrl+C basabilirsiniz)" -ForegroundColor Magenta
-            Get-Content `$LogFile -Wait -Tail 20
+            Get-Content `$LogFile -Wait -Tail 20 -Encoding UTF8
         } else { Write-Host "Henuz bir log dosyasi yok." -ForegroundColor Red }
     }
     else { Write-Host "Gecersiz komut. Yardim icin 'orion-router' yazabilirsiniz." -ForegroundColor Red }
 }
-Set-Alias -Scope Global orion-router Invoke-OrionRouter
 "@
 } else {
 $ProfileCode = @"
@@ -152,6 +168,8 @@ function Global:Invoke-OrionRouter {
         Set-Location `$ProjectPath
         docker compose -p orion-router up -d
         Write-Host "[OK] Container basladi! Kapatmak icin 'orion-router stop' yazabilirsiniz." -ForegroundColor Green
+        Write-Host "[OK] Artik su komutlari kullanabilirsiniz: orion-router start | stop | logs | help" -ForegroundColor Cyan
+        Write-Host "[OK] Bu terminali kapatabilirsiniz; Orion Router Docker'da arka planda calismaya devam eder." -ForegroundColor Cyan
         Write-Host "----------------------------------------------------" -ForegroundColor Gray
         Write-Host "  Canli loglar basliyor... (Cikmak icin Ctrl+C basabilirsiniz)" -ForegroundColor Magenta
         Write-Host "----------------------------------------------------" -ForegroundColor Gray
@@ -169,29 +187,41 @@ function Global:Invoke-OrionRouter {
     }
     else { Write-Host "Gecersiz komut. Yardim icin 'orion-router' yazabilirsiniz." -ForegroundColor Red }
 }
-Set-Alias -Scope Global orion-router Invoke-OrionRouter
 "@
 }
 
-# Profil dosyasi kontrolleri
+# Güvenli Profil Yönetimi (Marker Tabanlı)
 $ProfileDir = Split-Path $PROFILE
 if (-not (Test-Path $ProfileDir)) { New-Item -Type Directory -Path $ProfileDir -Force | Out-Null }
 if (-not (Test-Path $PROFILE)) { New-Item -Type File -Path $PROFILE -Force | Out-Null }
 
 $CurrentProfile = Get-Content $PROFILE -Raw
-if ($CurrentProfile -match "Invoke-OrionRouter") {
-    $CurrentProfile = $CurrentProfile -replace "(?s)function .*?Invoke-OrionRouter.*?Set-Alias .*?orion-router .*?(?:`r?`n|)", ""
-    Set-Content -Path $PROFILE -Value $CurrentProfile
-}
+if ($null -eq $CurrentProfile) { $CurrentProfile = "" }
 
-Add-Content -Path $PROFILE -Value "`n$ProfileCode"
-Invoke-Expression $ProfileCode
+# Eski kirli kalintilari temizle
+$CurrentProfile = $CurrentProfile -replace "(?s)function .*?Invoke-OrionRouter.*?Set-Alias .*?orion-router .*?(?:`r?`n|)", ""
+$CurrentProfile = $CurrentProfile -replace "(?m)^\s*Invoke-OrionRouter(?:\s+start)?\s*$", ""
+$CurrentProfile = $CurrentProfile -replace "(?m)^orion-router.*$", ""
+$CurrentProfile = $CurrentProfile -replace "(?s)# --- ORION ROUTER CLI START ---.*?# --- ORION ROUTER CLI END ---\r?\n?", ""
+
+$MarkerBlock = @"
+# --- ORION ROUTER CLI START ---
+$ProfileCode
+Set-Alias -Scope Global orion-router Invoke-OrionRouter
+# --- ORION ROUTER CLI END ---
+"@
+
+$CurrentProfile = $CurrentProfile.Trim() + "`n`n" + $MarkerBlock
+Set-Content -Path $PROFILE -Value $CurrentProfile.Trim()
+
+# Yeni kodu mevcut oturuma zorla besle
+Invoke-Expression $MarkerBlock
 
 Write-Host ""
-Write-Host "==========================================" -ForegroundColor Cyan
-Write-Host "[OK] $Mode kurulumu tamamlandi!" -ForegroundColor Green
-Write-Host "Sistem otomatik olarak baslatiliyor..." -ForegroundColor Yellow
-Write-Host "==========================================" -ForegroundColor Cyan
-Write-Host ""
+Write-Host "[OK] Kurulum tamamlandi." -ForegroundColor Green
+Write-Host "[OK] 'orion-router' komutu bu terminalde ve yeni terminallerde hazir." -ForegroundColor Cyan
+Write-Host "     Kullanabileceginiz komutlar: orion-router start | stop | logs | help" -ForegroundColor Cyan
+Write-Host "     Baslattiktan sonra bu terminali kapatabilirsiniz." -ForegroundColor Cyan
+Write-Host "[OK] Orion Router baslatiliyor..." -ForegroundColor Green
 
-orion-router start
+Invoke-OrionRouter start

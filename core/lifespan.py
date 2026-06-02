@@ -35,7 +35,10 @@ def get_local_ip() -> str:
         return "127.0.0.1"
 
 
-def print_active_services_banner(router_port: str | None) -> None:
+def print_active_services_banner(
+    router_port: str | None,
+    dashboard_port: str | None = None,
+) -> None:
     # Terminal Colors (ANSI)
     BLUE   = "\033[94m"
     GREEN  = "\033[92m"
@@ -56,8 +59,9 @@ def print_active_services_banner(router_port: str | None) -> None:
         else:
             local_ip = get_local_ip()
 
-    dashboard_url = f"http://localhost:{port}"
-    local_url = f"http://{local_ip}:{port}"
+    public_port = dashboard_port or port
+    dashboard_url = f"http://localhost:{public_port}"
+    local_url = f"http://{local_ip}:{public_port}"
 
     border_line = f"{GRAY}────────────────────────────────────────────────{RESET}"
     title_colored = f"{BLUE}{BOLD}ORION ROUTER{RESET}"
@@ -72,9 +76,7 @@ def print_active_services_banner(router_port: str | None) -> None:
     print(dash_colored)
     print(ip_colored)
     print(border_line)
-    
-    if not is_docker:
-        print(f"{GRAY}Durdurmak için CTRL+C tuşlarına basın{RESET}")
+    print(f"{GRAY}Komutlar: orion-router start | stop | logs | help{RESET}")
     print()
 
 
