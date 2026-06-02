@@ -24,19 +24,23 @@ Orion projesinin **AI Gateway (Router)** katmanı. İstemcilerden ve worker'lard
 
 Projeyi sisteminize kurmanın en hızlı yolu **Docker** kullanmaktır. Repoyu klonlamanıza bile gerek yoktur.
 
-```bash
-# Gerekli dosyayı indirin
-curl -O https://raw.githubusercontent.com/krstalacam/orion-router/main/docker-compose.ghcr.yml
+**Windows (PowerShell):**
 
-# Docker ağını oluşturup servisi başlatın
-docker network create orion-network || true
-docker compose -f docker-compose.ghcr.yml up -d
-
+```powershell
+powershell -c "irm https://raw.githubusercontent.com/krstalacam/orion-router/main/install.ps1 | iex"
 ```
 
-Kurulum tamamlandığında panele 👉 **`http://localhost:20128/dashboard`** adresinden erişebilirsiniz.
+**macOS / Linux (Bash):**
 
-> *Not:* API anahtarlarınızı `.env` dosyası yerine doğrudan Dashboard üzerindeki **Key Pool** menüsünden güvenle ekleyebilirsiniz.
+```bash
+curl -sL https://raw.githubusercontent.com/krstalacam/orion-router/main/install.sh | bash
+```
+
+Bu scriptler Docker kontrolu yapar, gerekli compose dosyasini indirir, `orion-network` agini olusturur ve servisi ayaga kaldirir.
+
+Kurulum tamamlandiginda panele 👉 **`http://localhost:20128/dashboard`** adresinden erisebilirsiniz.
+
+> *Not:* API anahtarlarinizi `.env` dosyasi yerine dogrudan Dashboard uzerindeki **Key Pool** menusunden guvenle ekleyebilirsiniz.
 
 ---
 
