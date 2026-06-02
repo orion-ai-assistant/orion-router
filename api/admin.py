@@ -37,16 +37,19 @@ def _require_text(value, field_name: str) -> str:
 
 
 
-@router.get("/api/settings/is-default-password", dependencies=[Depends(verify_admin)])
+@router.get("/api/settings/is-default-password")
 async def is_default_password():
     from core.security import verify_secret
     from core import config
     hashed_db = await db_manager.get_config("admin_secret_hash")
+    default_pass = config.ADMIN_SECRET
+    
     if hashed_db:
-        is_default = verify_secret("orion-admin", hashed_db) or verify_secret("test", hashed_db)
+        is_default = verify_secret(default_pass, hashed_db)
     else:
-        is_default = config.ADMIN_SECRET in ("orion-admin", "test")
-    return {"is_default": is_default}
+        is_default = True
+        
+    return {"is_default": is_default, "default_password": default_pass if is_default else None}
 
 
 @router.put("/api/settings/admin-secret", dependencies=[Depends(verify_admin)])

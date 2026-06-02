@@ -37,6 +37,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [adminKey, setAdminKeyState] = useState<string>('');
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isDefaultPassword, setIsDefaultPassword] = useState<boolean>(false);
+  const [defaultPasswordValue, setDefaultPasswordValue] = useState<string>('');
   const [showLogin, setShowLogin] = useState<boolean>(false);
   const [adminKeyInput, setAdminKeyInput] = useState<string>('');
   const [loginError, setLoginError] = useState<string>('');
@@ -58,6 +59,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (res.ok) {
         const data = await res.json();
         setIsDefaultPassword(data.is_default);
+        if (data.default_password) {
+          setDefaultPasswordValue(data.default_password);
+        }
       }
     } catch (err) {
       console.error("Error checking password status:", err);
@@ -99,7 +103,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       // Temporarily set it in session to test if it's correct
       setAdminKey(key);
       const res = await fetch('/dashboard/api/stats', {
-        headers: { 'X-Admin-Key': key }
+        headers: { 'X-Admin-Key': encodeURIComponent(key) }
       });
       if (res.ok) {
         setAdminKeyState(key);
@@ -172,14 +176,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           className="max-w-[440px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl"
         >
           <DialogHeader>
-            <DialogTitle className="text-xl font-heading font-semibold text-white">Admin Authentication</DialogTitle>
-            <DialogDescription className="text-zinc-400 text-sm mt-2">
-              Please enter the admin secret to access gateway settings.
-              {isDefaultPassword && (
-                <span className="block mt-2 text-zinc-400 text-xs">
-                  Default password is <strong className="text-white font-semibold">orion-admin</strong>. You can change it later in settings.
-                </span>
-              )}
+            <DialogTitle className="text-xl font-heading font-semibold text-white">Orion Dashboard</DialogTitle>
+            <DialogDescription className="text-zinc-400 text-xs mt-1.5 leading-relaxed">
+              Enter your admin password to unlock the dashboard.
             </DialogDescription>
           </DialogHeader>
 
@@ -189,13 +188,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               value={adminKeyInput}
               onChange={(e) => setAdminKeyInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && login()}
-              placeholder="Admin key"
+              placeholder="Admin password"
               className="bg-black/40 border border-zinc-800 text-white rounded px-4 py-3 w-full"
             />
             {loginError && (
               <div className="mt-3 text-red-500 bg-red-950/20 border border-red-500/30 rounded p-3 text-xs flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{loginError}</span>
+              </div>
+            )}
+            {isDefaultPassword && (
+              <div className="mt-3 text-zinc-500 text-[11px] text-center leading-relaxed">
+                You can change it later in settings. Default password: <code className="ml-1.5 px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-white font-mono text-[11px] cursor-pointer hover:bg-zinc-800 hover:border-zinc-700 transition-colors active:scale-95 duration-100 inline-block align-middle" title="Click to copy" onClick={() => { navigator.clipboard.writeText(defaultPasswordValue); showToast('Password copied to clipboard!', 'success'); }}>{defaultPasswordValue}</code>
               </div>
             )}
           </div>

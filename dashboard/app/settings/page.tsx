@@ -83,7 +83,7 @@ export default function SettingsPage() {
       const res = await fetch('/dashboard/api/logs', {
         method: 'DELETE',
         headers: {
-          'X-Admin-Key': key,
+          'X-Admin-Key': encodeURIComponent(key),
         },
       });
 

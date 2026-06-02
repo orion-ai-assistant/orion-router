@@ -87,10 +87,14 @@ async def authenticate_request(request: Request) -> dict:
     raise HTTPException(status_code=401, detail="Invalid API key")
 
 
+import urllib.parse
+
 async def verify_admin(x_admin_key: str = Header(default=None)):
     """Dependency: Admin yetkisi kontrolü."""
     if not x_admin_key:
         raise HTTPException(status_code=401, detail="Unauthorized admin access")
+    
+    x_admin_key = urllib.parse.unquote(x_admin_key)
     
     hashed_db = await db_manager.get_config("admin_secret_hash")
     if hashed_db:
