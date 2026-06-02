@@ -25,13 +25,18 @@ class GeminiEmbedProvider(BaseEmbed):
         auth_header: str | None = None,
         **kwargs,
     ) -> dict:
-        if not api_key:
+        resolved_key = self._resolve_api_key(
+            auth_header=auth_header,
+            api_key=api_key,
+        )
+
+        if not resolved_key:
             raise ValueError("Gemini Embed Error: No API key provided.")
 
         if not model:
             raise ValueError("Gemini Embed Error: Model name is required.")
 
-        client = genai.Client(api_key=api_key)
+        client = genai.Client(api_key=resolved_key)
         embed_model = model
 
         logger.info(f"Generating Gemini embeddings with model: {embed_model}")

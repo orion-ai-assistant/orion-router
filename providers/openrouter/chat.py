@@ -21,19 +21,26 @@ class OpenRouterChatProvider(BaseChat):
         model: str,
         messages: list[dict[str, Any]],
         api_key: str | None = None,
+        auth_header: str | None = None,
         **kwargs,
     ) -> AsyncGenerator[Any, None]:
 
         url = f"{_BASE_URL.rstrip('/')}/api/v1/chat/completions"
 
-        if not api_key:
+        resolved_key = self._resolve_api_key(
+            auth_header=auth_header,
+            api_key=api_key,
+        )
+
+        if not resolved_key:
             raise ValueError("OpenRouter Error: No API key provided.")
 
+        from core.config import OPENROUTER_REFERER, OPENROUTER_TITLE
         headers = {
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://github.com/krstalacam/orion-ai-assistant",
-            "X-Title": "Orion AI Assistant",
-            "Authorization": f"Bearer {api_key}",
+            "HTTP-Referer": OPENROUTER_REFERER,
+            "X-Title": OPENROUTER_TITLE,
+            "Authorization": f"Bearer {resolved_key}",
         }
 
         payload = {

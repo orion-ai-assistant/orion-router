@@ -17,6 +17,7 @@ import importlib
 import inspect
 import logging
 import pkgutil
+import pathlib
 from datetime import datetime, timedelta, timezone
 from typing import AsyncGenerator, Any
 
@@ -28,6 +29,10 @@ logger = logging.getLogger("service-router.dynamic")
 
 # Quota aşılmış key'leri kısa süre atla — gereksiz 429 round-trip'lerini keser.
 QUOTA_COOLDOWN_SECONDS = 45
+
+# Provider klasöründe taranacak yetenek dosyaları.
+# Yeni bir yetenek eklemek için buraya adını yazıp providers/<name>/<yetenek>.py dosyasını oluşturun.
+ALLOWED_CAPABILITIES: list[str] = ["chat", "embeddings", "tts", "files", "image", "audio", "video"]
 
 
 def _pool_key_on_quota_cooldown(pool_key: dict) -> bool:
@@ -163,33 +168,85 @@ class DynamicLLMRouter:
         self._load_providers()
 
     def _load_providers(self):
-        """providers/ altındaki tüm alt paketleri tarar ve yetenek sınıflarını yükler."""
-        for _, name, is_pkg in pkgutil.iter_modules(providers.__path__):
-            if not is_pkg:
-                continue  # Yalnızca alt paketleri (klasörleri) yükle
+        """providers/ altındaki tüm alt paketleri ve yetenek dosyalarını tarar.
 
-            module = importlib.import_module(f"providers.{name}")
+        Keşif Mantığı:
+          - providers/<name>/ klasörü bulunur.
+          - Yalnızca belirli yetenekleri ifade eden dosyalar (chat.py, embeddings.py, tts.py, files.py vb.) taranır.
+          - Bu sayede test_ veya _ ile başlayan dosyaları kontrol etmeye gerek kalmaz; 
+            sadece izin verilen yetenek dosyaları modül olarak yüklenir.
+          - BaseChat, BaseEmbed, BaseTTS, BaseFileUpload sınıflarından türetilen sınıflar otomatik kaydedilir.
+          - Geliştiricinin __init__.py içine açıkça export eklemesi gerekmez.
+        """
+        BASE_CLASSES = (BaseChat, BaseEmbed, BaseTTS, BaseFileUpload)
 
-            for _, obj in inspect.getmembers(module, inspect.isclass):
-                pname = getattr(obj, "provider_name", None)
-                if not pname:
-                    continue
+        def _register(obj):
+            """Bir sınıfı ilgili provider sözlüğüne kaydeder."""
+            pname = getattr(obj, "provider_name", None)
+            if not pname:
+                return
 
-                if issubclass(obj, BaseChat) and obj is not BaseChat:
+            if issubclass(obj, BaseChat) and obj is not BaseChat:
+                if pname not in self.chat_providers:
                     self.chat_providers[pname] = obj()
                     logger.info(f"Loaded chat provider: {pname} ({obj.__name__})")
 
-                if issubclass(obj, BaseEmbed) and obj is not BaseEmbed:
+            if issubclass(obj, BaseEmbed) and obj is not BaseEmbed:
+                if pname not in self.embed_providers:
                     self.embed_providers[pname] = obj()
                     logger.info(f"Loaded embed provider: {pname} ({obj.__name__})")
 
-                if issubclass(obj, BaseTTS) and obj is not BaseTTS:
+            if issubclass(obj, BaseTTS) and obj is not BaseTTS:
+                if pname not in self.tts_providers:
                     self.tts_providers[pname] = obj()
                     logger.info(f"Loaded TTS provider: {pname} ({obj.__name__})")
 
-                if issubclass(obj, BaseFileUpload) and obj is not BaseFileUpload:
+            if issubclass(obj, BaseFileUpload) and obj is not BaseFileUpload:
+                if pname not in self.file_providers:
                     self.file_providers[pname] = obj()
                     logger.info(f"Loaded file provider: {pname} ({obj.__name__})")
+
+        providers_path = pathlib.Path(providers.__path__[0])
+        
+        for provider_dir in providers_path.iterdir():
+            if not provider_dir.is_dir() or provider_dir.name == "__pycache__":
+                continue
+                
+            name = provider_dir.name
+
+            # 1. Paketin kökünü (__init__.py varsa) import etmeyi dene (geriye dönük uyumluluk)
+            modules_to_scan = []
+            try:
+                pkg_module = importlib.import_module(f"providers.{name}")
+                modules_to_scan.append(pkg_module)
+            except ImportError:
+                pass  # __init__.py yoksa sorun değil, namespace package olarak çalışır
+            except Exception as e:
+                logger.error(f"Failed to import provider package 'providers.{name}': {e}")
+
+            # 2. Yalnızca izin verilen yetenek dosyalarını tara (bkz. ALLOWED_CAPABILITIES)
+            for cap in ALLOWED_CAPABILITIES:
+                py_file = provider_dir / f"{cap}.py"
+                if not py_file.exists():
+                    continue
+                    
+                try:
+                    submod = importlib.import_module(f"providers.{name}.{cap}")
+                    modules_to_scan.append(submod)
+                except Exception as e:
+                    logger.error(f"Failed to import submodule 'providers.{name}.{cap}': {e}")
+
+            # 3. Bulunan tüm modüllerdeki sınıfları tara ve kaydet
+            seen_classes: set = set()
+            for mod in modules_to_scan:
+                for _, obj in inspect.getmembers(mod, inspect.isclass):
+                    if obj in seen_classes:
+                        continue  # Aynı sınıfı birden fazla kez kaydetme
+                    if not any(issubclass(obj, bc) for bc in BASE_CLASSES):
+                        continue
+                    seen_classes.add(obj)
+                    _register(obj)
+
 
     def _get_db_key(self, provider: str) -> str | None:
         """DB'deki provider API anahtarını döner (gerçek upstream key).
@@ -232,10 +289,15 @@ class DynamicLLMRouter:
             db_key = self._get_db_key(provider)
             if db_key:
                 keys.append((db_key, None))
-            elif client_key and not client_key.startswith("sk-orion-"):
-                keys.append((client_key, None))
             else:
-                keys.append((None, None))
+                clean_client_key = client_key
+                if clean_client_key and clean_client_key.startswith("Bearer "):
+                    clean_client_key = clean_client_key.removeprefix("Bearer ").strip()
+
+                if clean_client_key and not clean_client_key.startswith("sk-orion-"):
+                    keys.append((clean_client_key, None))
+                else:
+                    keys.append((None, None))
         return keys
 
     # -----------------------------------------------------------------------

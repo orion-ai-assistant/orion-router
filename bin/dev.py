@@ -175,34 +175,23 @@ def kill_port(port: int) -> None:
         pass
 
 def kill_portable_postgres() -> None:
-    """Kill all postgres.exe processes running from the portable tools directory."""
-    if sys.platform != "win32":
-        return
-    try:
-        target_path = str(PG_BIN / "postgres.exe").lower().replace("\\", "/")
-        target_escaped = target_path.replace("'", "''")
-        cmd = [
-            "powershell",
-            "-Command",
-            f"Get-CimInstance Win32_Process -Filter \"Name = 'postgres.exe'\" | "
-            f"Where-Object {{ "
-            f"  ($_.ExecutablePath -and $_.ExecutablePath.ToLower().Replace('\\', '/') -eq '{target_escaped}') -or "
-            f"  ($_.CommandLine -and $_.CommandLine.ToLower().Contains('{target_escaped}')) "
-            f"}} | "
-            f"ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }}"
-        ]
-        run_silent(cmd)
-    except Exception:
-        pass
-
-    # Clean up stale postmaster.pid
+    """Sadece bu ortama ait (PG_DATA) postgres sureclerini temizler."""
     pid_file = PG_DATA / "postmaster.pid"
     if pid_file.exists():
         try:
-            pid_file.unlink(missing_ok=True)
-            dim("    Stale postmaster.pid silindi")
+            lines = pid_file.read_text().splitlines()
+            if lines and lines[0].isdigit():
+                pid = lines[0]
+                run_silent(["taskkill", "/f", "/t", "/pid", pid])
+                dim(f"    Eski PostgreSQL sureci (PID {pid}) sonlandirildi")
         except Exception:
             pass
+        finally:
+            try:
+                pid_file.unlink(missing_ok=True)
+                dim("    Stale postmaster.pid silindi")
+            except Exception:
+                pass
 
 
 # ─────────────────────────────────────────────────────────────────────────────

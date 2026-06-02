@@ -109,14 +109,20 @@ class GeminiTTSProvider(BaseTTS):
         input_text: str,
         voice: str | None = None,
         api_key: str | None = None,
+        auth_header: str | None = None,
         **kwargs,
     ) -> tuple[bytes, str, dict]:
-        if not api_key:
+        resolved_key = self._resolve_api_key(
+            auth_header=auth_header,
+            api_key=api_key,
+        )
+
+        if not resolved_key:
             raise ValueError("Gemini TTS Error: No API key provided.")
         if not model:
             raise ValueError("Gemini TTS Error: Model name is required.")
 
-        client = genai.Client(api_key=api_key)
+        client = genai.Client(api_key=resolved_key)
         voice_name = voice or self.get_voices()[0]
 
         # Temperature: güvenli parse — geçersiz değer gelirse loglanıp atlanır

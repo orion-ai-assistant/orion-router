@@ -21,17 +21,23 @@ class OpenAIChatProvider(BaseChat):
         model: str,
         messages: list[dict[str, Any]],
         api_key: str | None = None,
+        auth_header: str | None = None,
         **kwargs,
     ) -> AsyncGenerator[Any, None]:
 
         url = f"{_BASE_URL}/v1/chat/completions"
 
-        if not api_key:
+        resolved_key = self._resolve_api_key(
+            auth_header=auth_header,
+            api_key=api_key,
+        )
+
+        if not resolved_key:
             raise ValueError("OpenAI Error: No API key provided.")
 
         headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
+            "Authorization": f"Bearer {resolved_key}",
         }
 
         payload = {

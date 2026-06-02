@@ -27,7 +27,6 @@ class _ProviderMixin:
     def _resolve_api_key(
         auth_header: str | None,
         api_key: str | None,
-        env_key: str | None,
     ) -> str | None:
         """Gerçek upstream API anahtarını belirler; Orion sanal anahtarlarını reddeder."""
         if auth_header:
@@ -36,7 +35,7 @@ class _ProviderMixin:
                 return token
         if api_key and not api_key.startswith("sk-orion-"):
             return api_key
-        return env_key
+        return None
 
     @staticmethod
     async def _iter_sse_lines(response) -> AsyncGenerator[dict, None]:

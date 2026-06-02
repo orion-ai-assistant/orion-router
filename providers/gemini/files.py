@@ -43,10 +43,11 @@ class GeminiFileProvider(BaseFileUpload):
         display_name: str,
         api_key: str | None = None,
     ) -> dict:
-        if not api_key:
+        resolved_key = api_key
+        if not resolved_key:
             raise ValueError("Gemini File Upload Error: No API key provided.")
 
-        client = genai.Client(api_key=api_key)
+        client = genai.Client(api_key=resolved_key)
 
         logger.info(
             f"Uploading file to Gemini File API: name={display_name}, "

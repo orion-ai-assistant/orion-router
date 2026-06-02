@@ -30,16 +30,22 @@ class GeminiChatProvider(BaseChat):
         model: str,
         messages: list[dict[str, Any]],
         api_key: str | None = None,
+        auth_header: str | None = None,
         **kwargs,
     ) -> AsyncGenerator[Any, None]:
 
-        if not api_key:
+        resolved_key = self._resolve_api_key(
+            auth_header=auth_header,
+            api_key=api_key,
+        )
+
+        if not resolved_key:
             err_msg = "Gemini Error: No API key provided."
             yield f'data: {json.dumps({"error": {"message": err_msg, "type": "api_error"}}, ensure_ascii=False)}\n\n'
             return
 
         try:
-            client = genai.Client(api_key=api_key)
+            client = genai.Client(api_key=resolved_key)
         except Exception as e:
             err_msg = f"Gemini client init failed: {e}"
             yield f'data: {json.dumps({"error": {"message": err_msg, "type": "api_error"}}, ensure_ascii=False)}\n\n'

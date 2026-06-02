@@ -110,6 +110,10 @@ _DATA_DIR = _ROOT / "data"
 MODEL_PRICING_PATH = _DATA_DIR / "model_pricing.json"
 MODEL_INFO_PATH = _DATA_DIR / "model_info.json"
 
+# --- OpenRouter App Identification Headers ---
+OPENROUTER_REFERER = os.getenv("OPENROUTER_REFERER")
+OPENROUTER_TITLE = os.getenv("OPENROUTER_TITLE")
+
 # --- Dashboard UI ---
 # Next.js static build directory (out)
 _dash_val = os.getenv("DASHBOARD_OUT_DIR")
