@@ -70,6 +70,7 @@ def kill_port(port: int):
         except Exception:
             pass
 
+    killed_any = False
     try:
         result = subprocess.run(["netstat", "-aon"], capture_output=True, text=True)
         for line in result.stdout.splitlines():
@@ -78,12 +79,19 @@ def kill_port(port: int):
                 if pid.isdigit() and pid != "0":
                     run_silent(["taskkill", "/f", "/t", "/pid", pid])
                     dim(f"    Port {port} → PID {pid} kapatildi")
+                    killed_any = True
     except Exception:
         pass
 
+    if killed_any:
+        time.sleep(2.0)
+
 def kill_portable_postgres():
+    import time
     for data_dir in [DEV_DATA, PROD_DATA]:
         pid_file = data_dir / "postmaster.pid"
+        killed_any = False
+
         if pid_file.exists():
             try:
                 lines = pid_file.read_text().splitlines()
@@ -91,14 +99,36 @@ def kill_portable_postgres():
                     pid = lines[0]
                     run_silent(["taskkill", "/f", "/t", "/pid", pid])
                     dim(f"    Eski PostgreSQL sureci (PID {pid}) sonlandirildi ({data_dir.name})")
+                    killed_any = True
             except Exception:
                 pass
-            finally:
-                try:
-                    pid_file.unlink(missing_ok=True)
-                    dim(f"    Stale postmaster.pid silindi ({data_dir.name})")
-                except Exception:
-                    pass
+
+        if killed_any:
+            time.sleep(2.0)
+        else:
+            time.sleep(1.0)
+
+        for file_name in ["postmaster.pid", "postmaster.opts"]:
+            try:
+                (data_dir / file_name).unlink(missing_ok=True)
+                dim(f"    Stale {file_name} silindi ({data_dir.name})")
+            except Exception:
+                pass
+
+def kill_all_postgres() -> None:
+    import time
+    try:
+        result = subprocess.run(
+            ["tasklist", "/fi", "imagename eq postgres.exe"],
+            capture_output=True,
+            text=True,
+        )
+        if "postgres.exe" in result.stdout.lower():
+            run_silent(["taskkill", "/f", "/t", "/im", "postgres.exe"])
+            dim("    Tum postgres.exe surecleri zorla kapatildi")
+            time.sleep(2.0)
+    except Exception:
+        pass
 
 def main():
     line = "═" * 55
@@ -114,6 +144,7 @@ def main():
         kill_port(port)
     
     kill_portable_postgres()
+    kill_all_postgres()
 
     print()
     ok("Tum servisler ve portlar temizlendi.")

@@ -620,6 +620,9 @@ export default function PlaygroundPage() {
   const resolvedDefaults = getResolvedDefaults();
   const resolvedTtsDefaults = getResolvedTtsDefaults();
 
+  const selectedChatGroup = groups.find((g) => g.name === chatModel && g.capability === 'chat');
+  const selectedTtsGroup = groups.find((g) => g.name === ttsModel && g.capability === 'tts');
+
   const hasTempOverride = chatTemp !== '';
   const hasThinkingOverride = chatThinking !== '';
   const hasSystemPromptOverride = chatSystemPrompt !== '';
@@ -673,9 +676,40 @@ export default function PlaygroundPage() {
               </div>
             </div>
             <div className="flex flex-col gap-1">
-              <div className="flex justify-between items-center mb-1">
+              <div className="flex justify-between items-center mb-1 relative group">
                 <label className="text-zinc-400 text-[10px] font-semibold uppercase">Temperature</label>
-                {resolvedDefaults.temperature !== null ? (
+                {selectedChatGroup ? (
+                  <>
+                    <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all cursor-help ${hasTempOverride
+                        ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
+                        : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
+                      }`}>
+                      Default: Group
+                    </span>
+                    <div className="absolute top-full right-0 mt-1 hidden group-hover:block z-50 bg-[#242427]/98 border border-zinc-700/60 text-zinc-200 text-[10px] p-2.5 rounded shadow-xl whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar pointer-events-none min-w-[220px]">
+                      <div className="font-semibold text-[9px] text-purple-400 mb-1.5 uppercase tracking-wide">Group Temperature:</div>
+                      <div className="flex flex-col gap-1">
+                        {selectedChatGroup.items?.map((item: any, idx: number) => {
+                          const mDetail = models.find((m) => m.name === item.name && m.capability === 'chat');
+                          const tVal = item.temperature !== undefined && item.temperature !== null
+                            ? item.temperature
+                            : (mDetail?.temperature ?? null);
+                          return (
+                            <div key={item.id} className="flex justify-between items-center gap-2 border-b border-zinc-800/50 pb-1 last:border-0 last:pb-0">
+                              <span className="text-zinc-400 font-mono text-[8px] truncate whitespace-nowrap block max-w-[145px]" title={item.name}>{idx + 1}. {item.name}</span>
+                              <span className="text-white font-mono text-[8px] shrink-0 whitespace-nowrap">
+                                {tVal !== null ? tVal : '-'}
+                              </span>
+                            </div>
+                          );
+                        })}
+                        {(!selectedChatGroup.items || selectedChatGroup.items.length === 0) && (
+                          <span className="text-zinc-500 text-[9px]">No models in this group</span>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                ) : resolvedDefaults.temperature !== null ? (
                   <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all ${hasTempOverride
                       ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
                       : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
@@ -685,7 +719,7 @@ export default function PlaygroundPage() {
                 ) : (
                   <span className={`text-[9px] font-medium transition-all ${hasTempOverride ? 'text-zinc-700 line-through opacity-50' : 'text-zinc-500'
                     }`}>
-                    Default: Provider choice
+                    Default: -
                   </span>
                 )}
               </div>
@@ -701,9 +735,38 @@ export default function PlaygroundPage() {
               />
             </div>
             <div className="flex flex-col gap-1">
-              <div className="flex justify-between items-center mb-1">
+              <div className="flex justify-between items-center mb-1 relative group">
                 <label className="text-zinc-400 text-[10px] font-semibold uppercase">Thinking</label>
-                {resolvedDefaults.thinking_level ? (
+                {selectedChatGroup ? (
+                  <>
+                    <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all cursor-help ${hasThinkingOverride
+                        ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
+                        : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
+                      }`}>
+                      Default: Group
+                    </span>
+                    <div className="absolute top-full right-0 mt-1 hidden group-hover:block z-50 bg-[#242427]/98 border border-zinc-700/60 text-zinc-200 text-[10px] p-2.5 rounded shadow-xl whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar pointer-events-none min-w-[220px]">
+                      <div className="font-semibold text-[9px] text-purple-400 mb-1.5 uppercase tracking-wide">Group Thinking:</div>
+                      <div className="flex flex-col gap-1">
+                        {selectedChatGroup.items?.map((item: any, idx: number) => {
+                          const mDetail = models.find((m) => m.name === item.name && m.capability === 'chat');
+                          const thinkVal = item.thinking_level || mDetail?.thinking_level || null;
+                          return (
+                            <div key={item.id} className="flex justify-between items-center gap-2 border-b border-zinc-800/50 pb-1 last:border-0 last:pb-0">
+                              <span className="text-zinc-400 font-mono text-[8px] truncate whitespace-nowrap block max-w-[145px]" title={item.name}>{idx + 1}. {item.name}</span>
+                              <span className="text-white font-mono text-[8px] shrink-0 whitespace-nowrap">
+                                {thinkVal !== null ? thinkVal : '-'}
+                              </span>
+                            </div>
+                          );
+                        })}
+                        {(!selectedChatGroup.items || selectedChatGroup.items.length === 0) && (
+                          <span className="text-zinc-500 text-[9px]">No models in this group</span>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                ) : resolvedDefaults.thinking_level ? (
                   <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all ${hasThinkingOverride
                       ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
                       : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
@@ -713,7 +776,7 @@ export default function PlaygroundPage() {
                 ) : (
                   <span className={`text-[9px] font-medium transition-all ${hasThinkingOverride ? 'text-zinc-700 line-through opacity-50' : 'text-zinc-500'
                     }`}>
-                    Default: None
+                    Default: -
                   </span>
                 )}
               </div>
@@ -727,7 +790,39 @@ export default function PlaygroundPage() {
             <div className="flex flex-col gap-1">
               <div className="flex justify-between items-center mb-1 relative group">
                 <label className="text-zinc-400 text-[10px] font-semibold uppercase">System Prompt</label>
-                {resolvedDefaults.system_prompt ? (
+                {selectedChatGroup ? (
+                  <>
+                    <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all cursor-help ${hasSystemPromptOverride
+                        ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
+                        : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
+                      }`}>
+                      Default: Group
+                    </span>
+                    <div className="absolute top-full right-0 mt-1 hidden group-hover:block z-50 bg-[#242427]/98 border border-zinc-700/60 text-zinc-200 text-[10px] p-2.5 rounded shadow-xl whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar pointer-events-none min-w-[220px]">
+                      <div className="font-semibold text-[9px] text-purple-400 mb-1.5 uppercase tracking-wide">Group System Prompt:</div>
+                      <div className="flex flex-col gap-1">
+                        {selectedChatGroup.items?.map((item: any, idx: number) => {
+                          const mDetail = models.find((m) => m.name === item.name && m.capability === 'chat');
+                          const sysPrompt = item.system_prompt || mDetail?.system_prompt || null;
+                          const displayPrompt = sysPrompt 
+                            ? (sysPrompt.length > 8 ? `"${sysPrompt.slice(0, 8)}..."` : `"${sysPrompt}"`)
+                            : '-';
+                          return (
+                            <div key={item.id} className="flex justify-between items-center gap-2 border-b border-zinc-800/50 pb-1 last:border-0 last:pb-0">
+                              <span className="text-zinc-400 font-mono text-[8px] truncate whitespace-nowrap block max-w-[145px]" title={item.name}>{idx + 1}. {item.name}</span>
+                              <span className="text-white font-mono text-[8px] shrink-0 max-w-[60px] truncate whitespace-nowrap" title={sysPrompt || undefined}>
+                                {displayPrompt}
+                              </span>
+                            </div>
+                          );
+                        })}
+                        {(!selectedChatGroup.items || selectedChatGroup.items.length === 0) && (
+                          <span className="text-zinc-500 text-[9px]">No models in this group</span>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                ) : resolvedDefaults.system_prompt ? (
                   <>
                     <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all cursor-help truncate max-w-[120px] block ${hasSystemPromptOverride
                         ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
@@ -743,7 +838,7 @@ export default function PlaygroundPage() {
                 ) : (
                   <span className={`text-[9px] font-medium transition-all ${hasSystemPromptOverride ? 'text-zinc-700 line-through opacity-50' : 'text-zinc-500'
                     }`}>
-                    Default: None
+                    Default: -
                   </span>
                 )}
               </div>
@@ -861,9 +956,40 @@ export default function PlaygroundPage() {
               </div>
             </div>
             <div className="flex flex-col gap-1">
-              <div className="flex justify-between items-center mb-1">
+              <div className="flex justify-between items-center mb-1 relative group">
                 <label className="text-zinc-400 text-[10px] font-semibold uppercase">Temperature</label>
-                {resolvedTtsDefaults.temperature !== null ? (
+                {selectedTtsGroup ? (
+                  <>
+                    <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all cursor-help ${hasTtsTempOverride
+                        ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
+                        : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
+                      }`}>
+                      Default: Group
+                    </span>
+                    <div className="absolute top-full right-0 mt-1 hidden group-hover:block z-50 bg-[#242427]/98 border border-zinc-700/60 text-zinc-200 text-[10px] p-2.5 rounded shadow-xl whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar pointer-events-none min-w-[220px]">
+                      <div className="font-semibold text-[9px] text-purple-400 mb-1.5 uppercase tracking-wide">Group Temperature:</div>
+                      <div className="flex flex-col gap-1">
+                        {selectedTtsGroup.items?.map((item: any, idx: number) => {
+                          const mDetail = models.find((m) => m.name === item.name && m.capability === 'tts');
+                          const tVal = item.temperature !== undefined && item.temperature !== null
+                            ? item.temperature
+                            : (mDetail?.temperature ?? null);
+                          return (
+                            <div key={item.id} className="flex justify-between items-center gap-2 border-b border-zinc-800/50 pb-1 last:border-0 last:pb-0">
+                              <span className="text-zinc-400 font-mono text-[8px] truncate whitespace-nowrap block max-w-[145px]" title={item.name}>{idx + 1}. {item.name}</span>
+                              <span className="text-white font-mono text-[8px] shrink-0 whitespace-nowrap">
+                                {tVal !== null ? tVal : '-'}
+                              </span>
+                            </div>
+                          );
+                        })}
+                        {(!selectedTtsGroup.items || selectedTtsGroup.items.length === 0) && (
+                          <span className="text-zinc-500 text-[9px]">No models in this group</span>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                ) : resolvedTtsDefaults.temperature !== null ? (
                   <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all ${hasTtsTempOverride
                       ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
                       : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
@@ -873,7 +999,7 @@ export default function PlaygroundPage() {
                 ) : (
                   <span className={`text-[9px] font-medium transition-all ${hasTtsTempOverride ? 'text-zinc-700 line-through opacity-50' : 'text-zinc-500'
                     }`}>
-                    Default: Provider choice
+                    Default: -
                   </span>
                 )}
               </div>

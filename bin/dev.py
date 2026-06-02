@@ -160,6 +160,7 @@ def kill_port(port: int) -> None:
         except Exception:
             pass
 
+    killed_any = False
     try:
         result = run(
             ["netstat", "-aon"],
@@ -171,8 +172,12 @@ def kill_port(port: int) -> None:
                 if pid.isdigit() and pid != "0":
                     run_silent(["taskkill", "/f", "/t", "/pid", pid])
                     dim(f"    Port {port} → PID {pid} kapatildi")
+                    killed_any = True
     except Exception:
         pass
+
+    if killed_any:
+        time.sleep(2.0)
 
 def kill_portable_postgres() -> None:
     """Sadece bu ortama ait (PG_DATA) postgres sureclerini temizler."""
@@ -183,6 +188,7 @@ def kill_portable_postgres() -> None:
         run_silent([str(PG_CTL), "-D", str(PG_DATA), "-m", "fast", "stop"])
 
     # 2. Adim: postmaster.pid'den PID oku, hala calisiyor mu kontrol et
+    killed_any = False
     if pid_file.exists():
         try:
             lines = pid_file.read_text().splitlines()
@@ -193,16 +199,22 @@ def kill_portable_postgres() -> None:
                 if check.returncode == 0:
                     run_silent(["taskkill", "/f", "/t", "/pid", pid])
                     dim(f"    Eski PostgreSQL sureci (PID {pid}) zorla kapatildi")
+                    killed_any = True
         except Exception:
             pass
-        finally:
-            try:
-                pid_file.unlink(missing_ok=True)
-            except Exception:
-                pass
 
-    # 3. Adim: OS'un tum dosya kilidlerini birakmasi icin bekle
-    time.sleep(1.5)
+    # 3. Adim: Isletim sisteminin dosya kilitlerini birakmasi icin bekle
+    if killed_any:
+        time.sleep(2.0)
+    else:
+        time.sleep(1.0)
+
+    # 4. Adim: Baslamayi engelleyen hayalet kilitleri zorla sil
+    for file_name in ["postmaster.pid", "postmaster.opts"]:
+        try:
+            (PG_DATA / file_name).unlink(missing_ok=True)
+        except Exception:
+            pass
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -293,43 +305,64 @@ def init_database() -> None:
 
 def start_postgres() -> None:
     info("PostgreSQL baslatiliyor...")
-    # Onceki oturumdan kalan kilitli log dosyasini temizle (retry dongusu)
-    deadline = time.time() + 5.0
-    while time.time() < deadline:
+
+    def _cleanup_stale_locks() -> None:
+        for file_name in ["postmaster.pid", "postmaster.opts"]:
+            try:
+                (PG_DATA / file_name).unlink(missing_ok=True)
+            except Exception:
+                pass
+
+    for attempt in range(1, 4):
+        _cleanup_stale_locks()
+
+        # Onceki oturumdan kalan kilitli log dosyasini temizle (retry dongusu)
+        deadline = time.time() + 5.0
+        while time.time() < deadline:
+            try:
+                if PG_LOG.exists():
+                    PG_LOG.unlink()
+                break  # Basarili — dongudan cik
+            except OSError:
+                time.sleep(0.4)  # Hala kilitli, biraz bekle
+        else:
+            # 5 saniye sonra hala kilitli — farkli isimle log kullan
+            import datetime
+            ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            PG_LOG_ALT = PG_DATA / f"pg_{ts}.log"
+            warn(f"    pg.log serbest birakilamadi, alternatif kullaniliyor: {PG_LOG_ALT.name}")
+            result = run([
+                str(PG_CTL),
+                "-D", str(PG_DATA),
+                "-l", str(PG_LOG_ALT),
+                "-o", f"-p {PG_PORT} -F",
+                "start",
+            ])
+            if result.returncode == 0:
+                return
+            time.sleep(2.0)
+            kill_portable_postgres()
+            continue
+
+        # Temiz log dosyasi olustur
         try:
-            if PG_LOG.exists():
-                PG_LOG.unlink()
-            break  # Basarili — dongudan cik
-        except OSError:
-            time.sleep(0.4)  # Hala kilitli, biraz bekle
-    else:
-        # 5 saniye sonra hala kilitli — farkli isimle log kullan
-        import datetime
-        ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        PG_LOG_ALT = PG_DATA / f"pg_{ts}.log"
-        warn(f"    pg.log serbest birakilamadi, alternatif kullaniliyor: {PG_LOG_ALT.name}")
-        run([
+            PG_LOG.parent.mkdir(parents=True, exist_ok=True)
+            PG_LOG.touch()
+        except Exception:
+            pass
+
+        result = run([
             str(PG_CTL),
             "-D", str(PG_DATA),
-            "-l", str(PG_LOG_ALT),
+            "-l", str(PG_LOG),
             "-o", f"-p {PG_PORT} -F",
             "start",
         ])
-        return
+        if result.returncode == 0:
+            return
 
-    # Temiz log dosyasi olustur
-    try:
-        PG_LOG.parent.mkdir(parents=True, exist_ok=True)
-        PG_LOG.touch()
-    except Exception:
-        pass
-    run([
-        str(PG_CTL),
-        "-D", str(PG_DATA),
-        "-l", str(PG_LOG),
-        "-o", f"-p {PG_PORT} -F",
-        "start",
-    ])
+        time.sleep(2.0)
+        kill_portable_postgres()
 
 def wait_for_postgres(timeout: float = 15.0) -> None:
     info("PostgreSQL'in hazir olmasi bekleniyor...")
