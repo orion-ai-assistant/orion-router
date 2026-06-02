@@ -214,31 +214,6 @@ def kill_portable_postgres() -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Step 1 — Prerequisite Checks
-# ─────────────────────────────────────────────────────────────────────────────
-
-def check_npm() -> None:
-    if not shutil.which("npm"):
-        err("npm bulunamadi! https://nodejs.org adresinden Node.js kur.")
-        sys.exit(1)
-    ok("Node.js / npm mevcut")
-
-def check_python_deps() -> None:
-    try:
-        import fastapi, uvicorn, asyncpg  # noqa: F401
-        ok("Python bagimliliklari mevcut")
-    except ImportError:
-        warn("Python bagimliliklari eksik — yukleniyor...")
-        run([sys.executable, "-m", "pip", "install", "-e", "."], cwd=ROOT)
-        try:
-            import fastapi, uvicorn, asyncpg  # noqa: F401
-            ok("Python bagimliliklari yuklendi")
-        except ImportError:
-            err("Python bagimliliklari yuklenemedi!")
-            sys.exit(1)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
 # Step 2 — Free Ports
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -250,7 +225,7 @@ def free_ports(router_port: str) -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Step 3 — PostgreSQL Portable
+# Step 3 — PostgreSQL Portable (otomatik indirilir)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _download_progress(block_num: int, block_size: int, total: int) -> None:
@@ -405,10 +380,6 @@ def setup_db_and_user() -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def build_dashboard(router_port: str) -> None:
-    if not (DASHBOARD / "node_modules").exists():
-        warn("node_modules bulunamadi — npm install yapiliyor...")
-        run(["npm", "install"], cwd=DASHBOARD, shell=True)
-
     info("Dashboard production build yapiliyor (npm run build)...")
     env = {**os.environ, "NEXT_PUBLIC_ROUTER_PORT": router_port}
     result = run(
@@ -525,11 +496,6 @@ def main() -> None:
         sys.exit(1)
 
     banner()
-
-    info("Sistem kontrolleri yapiliyor...")
-    check_npm()
-    check_python_deps()
-    print()
 
     run_silent([sys.executable, "-c", "import core.config"], cwd=ROOT)
     router_port = read_env("ROUTER_PORT", "20128")

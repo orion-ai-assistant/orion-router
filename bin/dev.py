@@ -10,7 +10,6 @@ Kullanim:
 
 import os
 import sys
-import shutil
 import time
 import subprocess
 import urllib.request
@@ -147,7 +146,6 @@ def kill_port(port: int) -> None:
     import time
     if shutil.which("docker"):
         try:
-            # Docker uzerinde bu portu yayinlayan bir konteyner var mi bak
             cmd = ["docker", "ps", "--filter", f"publish={port}", "--format", "{{.ID}}"]
             res = run(cmd, capture_output=True, text=True, timeout=5)
             if res.returncode == 0:
@@ -156,7 +154,7 @@ def kill_port(port: int) -> None:
                     for cid in container_ids:
                         dim(f"    Port {port} Docker tarafindan kullaniliyor. Konteyner ({cid}) durduruluyor...")
                         run_silent(["docker", "stop", cid], timeout=15)
-                    time.sleep(1.5) # Portun temizlenmesi icin kisa bir sure bekle
+                    time.sleep(1.5)
         except Exception:
             pass
 
@@ -183,18 +181,15 @@ def kill_portable_postgres() -> None:
     """Sadece bu ortama ait (PG_DATA) postgres sureclerini temizler."""
     pid_file = PG_DATA / "postmaster.pid"
 
-    # 1. Adim: pg_ctl stop ile nazikce kapat (en temiz yol)
     if PG_DATA.exists() and PG_CTL.exists():
         run_silent([str(PG_CTL), "-D", str(PG_DATA), "-m", "fast", "stop"])
 
-    # 2. Adim: postmaster.pid'den PID oku, hala calisiyor mu kontrol et
     killed_any = False
     if pid_file.exists():
         try:
             lines = pid_file.read_text().splitlines()
             if lines and lines[0].isdigit():
                 pid = lines[0]
-                # Surecin gercekten bitip bitmedigini kontrol et
                 check = run_silent(["tasklist", "/fi", f"PID eq {pid}", "/fo", "csv", "/nh"])
                 if check.returncode == 0:
                     run_silent(["taskkill", "/f", "/t", "/pid", pid])
@@ -203,13 +198,11 @@ def kill_portable_postgres() -> None:
         except Exception:
             pass
 
-    # 3. Adim: Isletim sisteminin dosya kilitlerini birakmasi icin bekle
     if killed_any:
         time.sleep(2.0)
     else:
         time.sleep(1.0)
 
-    # 4. Adim: Baslamayi engelleyen hayalet kilitleri zorla sil
     for file_name in ["postmaster.pid", "postmaster.opts"]:
         try:
             (PG_DATA / file_name).unlink(missing_ok=True)
@@ -218,32 +211,7 @@ def kill_portable_postgres() -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Step 1 — Prerequisite Checks
-# ─────────────────────────────────────────────────────────────────────────────
-
-def check_npm() -> None:
-    if not shutil.which("npm"):
-        err("npm bulunamadi! https://nodejs.org adresinden Node.js kur.")
-        sys.exit(1)
-    ok("Node.js / npm mevcut")
-
-def check_python_deps() -> None:
-    try:
-        import fastapi, uvicorn, asyncpg  # noqa: F401
-        ok("Python bagimliliklari mevcut")
-    except ImportError:
-        warn("Python bagimliliklari eksik — yukleniyor...")
-        run([sys.executable, "-m", "pip", "install", "-e", "."], cwd=ROOT)
-        try:
-            import fastapi, uvicorn, asyncpg  # noqa: F401
-            ok("Python bagimliliklari yuklendi")
-        except ImportError:
-            err("Python bagimliliklari yuklenemedi!")
-            sys.exit(1)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Step 2 — Free Ports
+# Step 1 — Free Ports
 # ─────────────────────────────────────────────────────────────────────────────
 
 def free_ports(router_port: str) -> None:
@@ -254,7 +222,7 @@ def free_ports(router_port: str) -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Step 3 — PostgreSQL Portable
+# Step 2 — PostgreSQL Portable
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _download_progress(block_num: int, block_size: int, total: int) -> None:
@@ -272,7 +240,7 @@ def download_postgres() -> None:
     info("PostgreSQL Portable bulunamadi — indiriliyor")
     TOOLS_DIR.mkdir(parents=True, exist_ok=True)
     urllib.request.urlretrieve(PG_DOWNLOAD_URL, PG_ZIP, _download_progress)
-    print()  # newline after progress bar
+    print()
     ok("Indirme tamamlandi")
 
     info("Arsiv cikariliyor...")
@@ -316,17 +284,15 @@ def start_postgres() -> None:
     for attempt in range(1, 4):
         _cleanup_stale_locks()
 
-        # Onceki oturumdan kalan kilitli log dosyasini temizle (retry dongusu)
         deadline = time.time() + 5.0
         while time.time() < deadline:
             try:
                 if PG_LOG.exists():
                     PG_LOG.unlink()
-                break  # Basarili — dongudan cik
+                break
             except OSError:
-                time.sleep(0.4)  # Hala kilitli, biraz bekle
+                time.sleep(0.4)
         else:
-            # 5 saniye sonra hala kilitli — farkli isimle log kullan
             import datetime
             ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             PG_LOG_ALT = PG_DATA / f"pg_{ts}.log"
@@ -344,7 +310,6 @@ def start_postgres() -> None:
             kill_portable_postgres()
             continue
 
-        # Temiz log dosyasi olustur
         try:
             PG_LOG.parent.mkdir(parents=True, exist_ok=True)
             PG_LOG.touch()
@@ -386,10 +351,8 @@ def stop_postgres() -> None:
 def setup_db_and_user() -> None:
     info("Veritabani ve kullanici yapilandiriliyor...")
 
-    # Set password
     psql("-c", f"ALTER USER {PG_USER} WITH PASSWORD '{PG_PASS}'")
 
-    # Create database only if it doesn't exist (pipe trick — reliable in Python)
     check_sql = (
         f"SELECT 'CREATE DATABASE {PG_DB}' "
         f"WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '{PG_DB}')"
@@ -413,18 +376,7 @@ def setup_db_and_user() -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Step 4 — npm install
-# ─────────────────────────────────────────────────────────────────────────────
-
-def ensure_node_modules() -> None:
-    if not (DASHBOARD / "node_modules").exists():
-        warn("node_modules bulunamadi — npm install yapiliyor (sadece bir kez)...")
-        run(["npm", "install"], cwd=DASHBOARD, shell=True)
-        ok("node_modules hazir")
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Step 5 — Environment Variables
+# Step 3 — Environment Variables
 # ─────────────────────────────────────────────────────────────────────────────
 
 def set_env(router_port: str) -> None:
@@ -442,7 +394,7 @@ def set_env(router_port: str) -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Step 6 — Launch Services
+# Step 4 — Launch Services
 # ─────────────────────────────────────────────────────────────────────────────
 
 def launch(router_port: str) -> list[tuple[str, subprocess.Popen]]:
@@ -455,7 +407,7 @@ def launch(router_port: str) -> list[tuple[str, subprocess.Popen]]:
     )
     procs.append(("FastAPI", backend))
 
-    # Next.js frontend (listen on all network interfaces)
+    # Next.js frontend
     frontend = subprocess.Popen(
         ["npm", "run", "dev", "--", "-p", str(UI_PORT), "-H", "0.0.0.0"],
         cwd=DASHBOARD,
@@ -517,7 +469,6 @@ def print_active_services_banner(router_port: str) -> None:
     dash_colored  = f"{BLUE}➜{RESET}  {BOLD}Dashboard:{RESET}   {CYAN}{dashboard_url}{RESET}"
     ip_colored    = f"{BLUE}➜{RESET}  {BOLD}Yerel Ağ:{RESET}    {CYAN}{local_url}{RESET}"
     
-    # Print the banner block with clean newlines to separate from surrounding logs
     print()
     print(border_line)
     print(title_colored)
@@ -536,22 +487,12 @@ def main() -> None:
 
     banner()
 
-    # ── Checks ──────────────────────────────────
-    info("Sistem kontrolleri yapiliyor...")
-    check_npm()
-    check_python_deps()
-    print()
-
-    # ── Read config ─────────────────────────────
-    # Trigger .env auto-copy if missing
     run_silent([sys.executable, "-c", "import core.config"], cwd=ROOT)
     router_port = read_env("ROUTER_DEV_PORT", "20129")
 
-    # ── Free ports ──────────────────────────────
     free_ports(router_port)
     print()
 
-    # ── PostgreSQL ──────────────────────────────
     download_postgres()
     init_database()
     start_postgres()
@@ -559,15 +500,9 @@ def main() -> None:
     setup_db_and_user()
     print()
 
-    # ── Node.js ─────────────────────────────────
-    ensure_node_modules()
-    print()
-
-    # ── Launch ──────────────────────────────────
     set_env(router_port)
     procs = launch(router_port)
 
-    # ── Print Banner when server is ready ───────
     def wait_for_server_and_print_banner(port: str) -> None:
         backend_url = f"http://127.0.0.1:{port}/health"
         backend_ready = False
@@ -600,7 +535,6 @@ def main() -> None:
     t.daemon = True
     t.start()
 
-    # ── Wait ────────────────────────────────────
     try:
         while True:
             alive = [p for _, p in procs if p.poll() is None]

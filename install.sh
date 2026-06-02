@@ -1,68 +1,37 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-compose_url="${ORION_COMPOSE_URL:-https://raw.githubusercontent.com/krstalacam/orion-router/main/docker-compose.ghcr.yml}"
-env_example_url="${ORION_ENV_EXAMPLE_URL:-https://raw.githubusercontent.com/krstalacam/orion-router/main/.env.example}"
-project_name="orion-router"
-network_name="${ORION_NETWORK:-orion-network}"
-work_dir="${HOME}/.orion-router"
-compose_file="$work_dir/docker-compose.ghcr.yml"
-env_example_file="$work_dir/.env.example"
-env_file="$work_dir/.env"
+echo "=========================================="
+echo "    Orion Router Native Kurulum Aracı     "
+echo "=========================================="
 
-mkdir -p "$work_dir"
-
-if ! command -v docker >/dev/null 2>&1; then
-  echo "Docker not found. Please install Docker Desktop first." >&2
-  exit 1
-fi
-
-if ! docker compose version >/dev/null 2>&1; then
-  echo "Docker Compose is not available. Please update Docker Desktop." >&2
-  exit 1
-fi
-
-if command -v curl >/dev/null 2>&1; then
-  curl -fsSL "$compose_url" -o "$compose_file"
-  curl -fsSL "$env_example_url" -o "$env_example_file"
-elif command -v wget >/dev/null 2>&1; then
-  wget -qO "$compose_file" "$compose_url"
-  wget -qO "$env_example_file" "$env_example_url"
-else
-  echo "curl or wget is required to download the compose file." >&2
-  exit 1
-fi
-
-if ! grep -q "^services:" "$compose_file"; then
-  echo "Downloaded file does not look like a Docker Compose file." >&2
-  exit 1
-fi
-
-if [ ! -f "$env_file" ]; then
-  cp "$env_example_file" "$env_file"
-fi
-
-if ! docker network inspect "$network_name" >/dev/null 2>&1; then
-  docker network create "$network_name" >/dev/null 2>&1
-else
-  echo "Network already exists: $network_name"
-fi
-
-for name in router router-db; do
-  if docker ps -a --format '{{.Names}}' | grep -qx "$name"; then
-    label="$(docker inspect -f '{{ if index .Config.Labels "com.docker.compose.project" }}{{ index .Config.Labels "com.docker.compose.project" }}{{end}}' "$name" 2>/dev/null || true)"
-    if [ -n "$label" ] && [ "$label" != "$project_name" ]; then
-      echo "Removing conflicting container: $name (project $label)"
-      docker rm -f "$name" >/dev/null 2>&1 || true
-    else
-      echo "Container already exists: $name"
-    fi
+# 1. Gereksinim Kontrolleri
+echo "[1/5] Sistem gereksinimleri kontrol ediliyor..."
+for cmd in git python3 npm; do
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "Hata: $cmd bulunamadı! Lütfen kurup tekrar deneyin." >&2
+    exit 1
   fi
 done
+echo "✔ Tüm bağımlılıklar mevcut (Git, Python, NPM)."
 
-(
-  cd "$work_dir"
-  docker compose --project-name "$project_name" -f "$compose_file" up -d
-)
+# 2. Repo Klonlama
+echo -e "\n[2/5] Orion Router klonlanıyor..."
+if [ ! -d "orion-router" ]; then
+  git clone https://github.com/krstalacam/orion-router.git
+else
+  echo "✔ 'orion-router' klasörü zaten var, atlanıyor."
+fi
+cd orion-router
 
-echo "Orion Router is up. Dashboard: http://localhost:20128/dashboard"
+# 3. Python Bağımlılıkları
+echo -e "\n[3/5] Python paketleri (pip) yükleniyor..."
+python3 -m pip install -e .
+
+# 4. Node.js Bağımlılıkları
+echo -e "\n[4/5] Dashboard bağımlılıkları (NPM) yükleniyor..."
+(cd dashboard && npm install)
+
+# 5. Sistemi Başlat
+echo -e "\n[5/5] Orion Router Prodüksiyon modunda başlatılıyor..."
+python3 prod.py
