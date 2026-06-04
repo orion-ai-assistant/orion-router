@@ -138,3 +138,8 @@ class AnthropicChatProvider(BaseChat):
 
 FastAPI/Gateway yeniden başladığında, `anthropic` sağlayıcısı ve `chat` yeteneği otomatik olarak keşfedilir ve kullanıma hazır hale gelir.
 
+""""""""
+
+ powershell -ep bypass -c "& ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/krstalacam/orion-router/main/install.ps1'))) docker"
+
+ bunu kullanıyoruz artık

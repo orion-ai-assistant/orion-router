@@ -54,17 +54,15 @@ foreach ($cmd in $requiredCommands) {
 }
 Write-Host "[OK] Gereksinimler karsilandi ($($requiredCommands -join ', ')).`n" -ForegroundColor Green
 
-
 # 2. Repo Klonlama veya Guncelleme
 Write-Host "[2/5] Orion Router AppData klasorune ayarlaniyor..."
 
-# --- YENI: Kilitli dosyalari acmak icin calisan eski sureci durdur ---
+# Kilitli dosyalari acmak icin calisan eski sureci durdur
 $PidFile = Join-Path $TargetFolder ".orion.pid"
 if (Test-Path $PidFile) {
   $pidToStop = Get-Content $PidFile
-  # /F ve /T ile ana sureci ve python alt sureclerini sessizce zorla kapatiyoruz
   taskkill /F /T /PID $pidToStop 2>$null | Out-Null
-  Start-Sleep -Seconds 1 # Sistemin dosya kilitlerini birakmasi icin 1 saniye bekle
+  Start-Sleep -Seconds 1
   Remove-Item -Path $PidFile -ErrorAction SilentlyContinue
   Write-Host "[!] Arka planda calisan eski Orion Router durduruldu." -ForegroundColor DarkGray
 }
@@ -87,11 +85,23 @@ if (-not (Test-Path $TargetFolder) -or -not (Test-Path $GitPath)) {
     Write-Host "[HATA] Kodlari guncelleme (reset) basarisiz oldu." -ForegroundColor Red
     exit $LASTEXITCODE
   }
-  
-  # Not: "git clean -fd" buradan kaldirildi. 
-  # Artik Git log, .pid, .env gibi untracked dosyalara dokunmayacak.
 }
 Set-Location -Path $TargetFolder
+Write-Host ""
+
+# --- Akilli .env Kontrolü ---
+Write-Host "[*] .env dosyasi kontrol ediliyor..."
+if (-not (Test-Path ".env")) {
+    if (Test-Path ".env.example") {
+        Copy-Item ".env.example" ".env"
+        Write-Host "[OK] .env dosyasi bulunamadi. Docker uyarılarını engellemek icin .env.example dosyasından yeni bir .env uretildi." -ForegroundColor Green
+    } else {
+        Write-Host "[!] .env.example bulunamadi, bos bir .env dosyasi olusturuluyor..." -ForegroundColor Yellow
+        New-Item -Path ".env" -ItemType File | Out-Null
+    }
+} else {
+    Write-Host "[OK] Mevcut .env dosyasi tespit edildi. Konfigürasyonlarinizin ezilmemesi icin degisiklik yapilmadi." -ForegroundColor Green
+}
 Write-Host ""
 
 # 3 & 4. Bagimliliklar
@@ -103,9 +113,8 @@ if ($Mode -eq "local") {
     Write-Host ""
 } else {
     Write-Host "[3/5] ve [4/5] Adimlari Atlaniyor..." -ForegroundColor DarkGray
-    Write-Host "Docker modu secildigi icin local bagimliliklar indirilmeyecek.`n" -ForegroundColor DarkGray
+    Write-Host "Docker modu secildigi icin local bagimliliklar indirilmeyecek. Sadece GHCR imajlari çekilecek.`n" -ForegroundColor DarkGray
 }
-
 
 # 5. Global Komutun Yuklenmesi
 Write-Host "[5/5] Global 'orion-router' komutu sisteme yukleniyor..."
@@ -162,7 +171,6 @@ function Global:Invoke-OrionRouter {
         if (Test-Path `$PidFile) {
             `$pidToStop = Get-Content `$PidFile
             try { 
-                # /F zorla, /T agac yapisiyla tum alt surecleri temizler.
                 taskkill /F /T /PID `$pidToStop | Out-Null
                 Write-Host "[OK] Orion Router ana sureci ve bagli alt surecleri sonlandirildi." -ForegroundColor Green
             } 
@@ -196,6 +204,7 @@ $ProfileCode = @"
 function Global:Invoke-OrionRouter {
     param ([Parameter(Position=0)][string]`$Action = "help")
     `$ProjectPath = "`$env:LOCALAPPDATA\OrionRouter"
+    `$ComposeFile = "docker-compose.ghcr.yml"
 
     if (`$Action -in @("help", "")) {
         Write-Host ""
@@ -211,26 +220,67 @@ function Global:Invoke-OrionRouter {
         Write-Host ""
     }
     elseif (`$Action -eq "start") {
-        Write-Host "Orion Router Docker uzerinde baslatiliyor..." -ForegroundColor Cyan
+        # --- Akilli Docker Daemon Kontrolü ve Otomatik Başlatma ---
+        Write-Host "Docker durumu kontrol ediliyor..." -ForegroundColor Cyan
+        `$DockerReady = `$false
+        try {
+            # Docker motorunun komutlara cevap verip vermediğini test et
+            docker info --format '{{.Name}}' 2>`$null | Out-Null
+            `$DockerReady = `$true
+        } catch {
+            `$DockerReady = `$false
+        }
+
+        if (-not `$DockerReady) {
+            Write-Host "[!] Docker Daemon aktif degil. Docker Desktop baslatilmaya calisiliyor..." -ForegroundColor Yellow
+            `$DockerDesktopPath = "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+            
+            if (Test-Path `$DockerDesktopPath) {
+                Start-Process -FilePath `$DockerDesktopPath
+                Write-Host "[*] Docker Desktop tetiklendi. Motorun (Engine) hazir olmasi bekleniyor (max 30 saniye)..." -ForegroundColor Cyan
+                
+                # En fazla 6 defa (5'er saniye arayla) motorun gelmesini bekle
+                for (`$i = 1; `$i -le 6; `$i++) {
+                    Start-Sleep -Seconds 5
+                    try {
+                        docker info --format '{{.Name}}' 2>`$null | Out-Null
+                        `$DockerReady = `$true
+                        Write-Host "[OK] Docker Engine aktif ve hazir!" -ForegroundColor Green
+                        break
+                    } catch {
+                        Write-Host "    Hazirlaniyor... (`$(`$i * 5) saniye gecen sure)" -ForegroundColor DarkGray
+                    }
+                }
+            }
+            
+            if (-not `$DockerReady) {
+                Write-Host "`n[HATA] Docker Desktop otomatik olarak baslatilamadi veya motor zamaninda yanit vermedi." -ForegroundColor Red
+                Write-Host "Lutfen Docker Desktop uygulamasini el ile acin, sol alttaki ikonun YESIL olmasini bekleyin ve komutu tekrar deneyin.`n" -ForegroundColor Yellow
+                return
+            }
+        }
+        # ----------------------------------------------------------
+
+        Write-Host "Orion Router Docker uzerinde (GHCR Imajlarla) baslatiliyor..." -ForegroundColor Cyan
         Set-Location `$ProjectPath
-        docker compose -p orion-router up -d
+        docker compose -f `$ComposeFile -p orion-router up -d
         Write-Host "[OK] Container basladi! Kapatmak icin 'orion-router stop' yazabilirsiniz." -ForegroundColor Green
         Write-Host "[OK] Artik su komutlari kullanabilirsiniz: orion-router start | stop | logs | help" -ForegroundColor Cyan
         Write-Host "[OK] Bu terminali kapatabilirsiniz; Orion Router Docker'da arka planda calismaya devam eder." -ForegroundColor Cyan
         Write-Host "----------------------------------------------------" -ForegroundColor Gray
         Write-Host "  Canli loglar basliyor... (Cikmak icin Ctrl+C basabilirsiniz)" -ForegroundColor Magenta
         Write-Host "----------------------------------------------------" -ForegroundColor Gray
-        docker compose -p orion-router logs -f
+        docker compose -f `$ComposeFile -p orion-router logs -f
     }
     elseif (`$Action -eq "stop") {
         Write-Host "Orion Router Docker uzerinde durduruluyor..." -ForegroundColor Yellow
         Set-Location `$ProjectPath
-        docker compose -p orion-router stop
+        docker compose -f `$ComposeFile -p orion-router stop
         Write-Host "[OK] Container basariyla durduruldu." -ForegroundColor Green
     }
     elseif (`$Action -eq "logs") {
         Set-Location `$ProjectPath
-        docker compose -p orion-router logs -f
+        docker compose -f `$ComposeFile -p orion-router logs -f
     }
     else { Write-Host "Gecersiz komut. Yardim icin 'orion-router' yazabilirsiniz." -ForegroundColor Red }
 }
@@ -245,7 +295,7 @@ if (-not (Test-Path $PROFILE)) { New-Item -Type File -Path $PROFILE -Force | Out
 $CurrentProfile = Get-Content $PROFILE -Raw
 if ($null -eq $CurrentProfile) { $CurrentProfile = "" }
 
-# Eski kirli kalintilari temizle
+# Eski kalintilari temizle
 $CurrentProfile = $CurrentProfile -replace "(?s)function .*?Invoke-OrionRouter.*?Set-Alias .*?orion-router .*?(?:`r?`n|)", ""
 $CurrentProfile = $CurrentProfile -replace "(?m)^\s*Invoke-OrionRouter(?:\s+start)?\s*$", ""
 $CurrentProfile = $CurrentProfile -replace "(?m)^orion-router.*$", ""
