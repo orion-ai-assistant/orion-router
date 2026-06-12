@@ -1,5 +1,5 @@
 param (
-    [string]$Mode = ""
+    [string]$Mode = "docker"
 )
 
 Set-StrictMode -Version Latest

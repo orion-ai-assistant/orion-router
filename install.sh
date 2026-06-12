@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-MODE="${1:-}"
+MODE="${1:-docker}"
 
 echo "=========================================="
 echo "    Orion Router Native Kurulum Aracı     "

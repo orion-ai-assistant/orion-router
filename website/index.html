@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OrionGateway</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap"
+        rel="stylesheet" />
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="bg-glow-container" id="orion-bg-glows"></div>
+    <div class="noise-overlay" id="noise-background-overlay"></div>
+
+    <header class="navbar" id="orion-main-navigation-menu">
+        <div class="container nav-inner" id="navbar-inner-wrapper">
+            <div class="logo" id="orion-identity-brand">
+                <div class="logo-icon" id="orion-logo-icon-box">
+                    <svg fill="currentColor" viewBox="0 0 24 24" class="w-5 h-5">
+                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                    </svg>
+                </div>
+                <span id="orion-brand-text">OrionGateway</span>
+            </div>
+            <nav class="nav-links" id="orion-navigation-linklist">
+                <a href="#" id="nav-link-home">Ana Sayfa</a>
+                <a href="#features" id="nav-link-architecture">Mimari</a>
+                <a href="#usage" id="nav-link-integration">Entegrasyon</a>
+                <a href="https://github.com/krstalacam/orion-router" target="_blank" rel="noreferrer" class="btn-github"
+                    id="nav-link-github-repo">
+                    <svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4">
+                        <path fill-rule="evenodd"
+                            d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .284.14.562.672.513A10.425 10.425 0 0022 12.017C22 6.484 17.522 2 12 2z"
+                            clip-rule="evenodd" />
+                    </svg>
+                    GitHub
+                </a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="hero container" id="orion-landing-hero-section">
+        <h1 class="reveal delay-1" id="orion-main-headline">
+            Tek Bir API<br /><span class="text-gradient">Bütün Yapay Zekalar</span>
+        </h1>
+        <p class="hero-desc reveal delay-2" id="orion-main-description">
+            OpenAI SDK'sı ile tam uyumlu çalışan, parametreleri arka planda otomatik dönüştüren akıllı ağ geçidi.
+        </p>
+
+        <div class="glass-panel code-showcase reveal delay-3" id="orion-developer-setup-showcase">
+            <div class="panel-header" id="showcase-header">
+                <div class="tab-buttons" id="setup-tab-controls">
+                    <button class="tab-btn active" data-method="docker" id="btn-tab-docker">
+                        Docker
+                    </button>
+                    <button class="tab-btn" data-method="local" id="btn-tab-local">
+                        Yerel
+                    </button>
+                </div>
+                <div class="os-buttons" id="setup-os-controls">
+                    <button class="os-btn active" data-os="win" id="btn-os-win">
+                        Windows
+                    </button>
+                    <button class="os-btn" data-os="mac" id="btn-os-mac">
+                        macOS / Linux
+                    </button>
+                </div>
+            </div>
+
+            <div class="panel-body" id="showcase-code-body">
+                <div id="win-docker-panel" class="code-content active">
+                    <span class="keyword">powershell</span> <span class="arg">-c</span> <span class="keyword">iex</span><span class="arg">(</span><span class="keyword">irm</span> <span class="string">raw.github.com/krstalacam/orion-router/main/install.ps1</span><span class="arg">)</span>
+                </div>
+
+                <div id="mac-docker-panel" class="code-content">
+                    <span class="keyword">curl</span> <span class="arg">-sL</span> <span class="string">raw.github.com/krstalacam/orion-router/main/install.sh</span> <span class="arg">|</span> <span class="keyword">bash</span>
+                </div>
+
+                <div id="win-local-panel" class="code-content">
+                    <span class="keyword">powershell</span> <span class="arg">-c</span> <span class="string">"&amp;([scriptblock]::Create((irm raw.github.com/krstalacam/orion-router/main/install.ps1))) local"</span>
+                </div>
+
+                <div id="mac-local-panel" class="code-content">
+                    <span class="keyword">curl</span> <span class="arg">-sL</span> <span class="string">raw.github.com/krstalacam/orion-router/main/install.sh</span> <span class="arg">|</span> <span class="keyword">bash</span> <span class="arg">-s local</span>
+                </div>
+
+                <button class="copy-btn hover:opacity-100" id="orion-cli-copy-action-button"
+                    aria-label="Kurulum komutunu kopyala">
+                    <div id="copy-icon-container" style="display: flex; align-items: center;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            style="width: 14px; height: 14px;">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z">
+                            </path>
+                        </svg>
+                    </div>
+                </button>
+            </div>
+
+            <div class="panel-footer" id="showcase-status-bar">
+                Kurulum tamamlandıktan sonra: <a href="http://localhost:20128" target="_blank"
+                    class="status-link">localhost:20128</a>
+            </div>
+        </div>
+    </main>
+
+    <section id="features" class="container section">
+        <div class="section-heading text-center reveal" id="features-header-wrapper">
+            <span class="tag">Mimari</span>
+            <h2>Gelişmiş Yetenekler</h2>
+            <p>Alışık olduğunuz yapıyı bozmadan sisteminize entegre olur.</p>
+        </div>
+
+        <div class="bento-grid" id="orion-architecture-bento-grid">
+            <div class="glass-panel feature-card reveal delay-1" id="feature-dropin-card">
+                <div class="feat-icon" id="icon-dropin">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-6 h-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                </div>
+                <h3>Drop-in Replacement</h3>
+                <p>Mevcut projelerinizde sadece <code class="inline-code">base_url</code> değiştirerek OpenAI SDK'sı
+                    üzerinden tüm modellere anında geçiş yapın.</p>
+            </div>
+
+            <div class="glass-panel feature-card reveal delay-2" id="feature-translation-card">
+                <div class="feat-icon" id="icon-translation">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-6 h-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547z">
+                        </path>
+                    </svg>
+                </div>
+                <h3>Gelişmiş Çeviri</h3>
+                <p><code class="inline-code">thinking_level</code> gibi parametreleri Gemini, ChatGPT vb. modeller için
+                    doğru formata otomatik dönüştürür.</p>
+            </div>
+
+            <div class="glass-panel feature-card reveal delay-3" id="feature-dashboard-card">
+                <div class="feat-icon" id="icon-dashboard">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-6 h-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+                        </path>
+                    </svg>
+                </div>
+                <h3>Entegre Dashboard</h3>
+                <p>Logları izleyin, provider'ları yönetin ve harcamalarınızı limitlendirin.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <section id="usage" class="container section">
+        <div class="section-heading text-center reveal" id="usage-header-wrapper">
+            <span class="tag">Entegrasyon</span>
+            <h2>OpenAI SDK Uyumluluğu</h2>
+        </div>
+        <div class="glass-panel editor-panel reveal delay-2" id="orion-integration-editor">
+            <span class="lang">PYTHON</span>
+            <pre class="editor-body" id="python-code-field"><code><span class="keyword">import</span> openai
+
+client = openai.OpenAI(
+&nbsp;&nbsp;&nbsp;&nbsp;base_url=<span class="string">"http://localhost:20128/v1"</span>,
+&nbsp;&nbsp;&nbsp;&nbsp;api_key=<span class="string">"orion-virtual-key-here"</span>
+)
+
+response = client.chat.completions.create(
+&nbsp;&nbsp;&nbsp;&nbsp;model=<span class="string">"gemini-2.5-pro"</span>, 
+&nbsp;&nbsp;&nbsp;&nbsp;messages=[&#123;<span class="string">"role"</span>: <span class="string">"user"</span>, <span class="string">"content"</span>: <span class="string">"Merhaba Orion!"</span>&#125;],
+&nbsp;&nbsp;&nbsp;&nbsp;temperature=<span class="number">0.7</span>,
+&nbsp;&nbsp;&nbsp;&nbsp;extra_body=&#123;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">"thinking_level"</span>: <span class="string">"high"</span> 
+&nbsp;&nbsp;&nbsp;&nbsp;&#125;
+)
+
+<span class="keyword">print</span>(response.choices[<span class="number">0</span>].message.content)</code></pre>
+        </div>
+    </section>
+
+    <footer id="orion-landing-footer">
+        <div class="container text-center" id="footer-inner-container">
+            <p>&copy; 2026 Orion Router. <a href="#orion-main-navigation-menu" id="link-footer-license">MIT Lisansı</a>
+                ile açık kaynak projesidir.</p>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
