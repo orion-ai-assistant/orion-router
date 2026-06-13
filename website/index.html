@@ -78,19 +78,28 @@
 
             <div class="panel-body" id="showcase-code-body">
                 <div id="win-docker-panel" class="code-content active">
-                    <span class="keyword">powershell</span> <span class="arg">-c</span> <span class="keyword">iex</span><span class="arg">(</span><span class="keyword">irm</span> <span class="string">raw.github.com/krstalacam/orion-router/main/install.ps1</span><span class="arg">)</span>
+                    <span class="keyword">powershell</span> <span class="arg">-c</span> <span
+                        class="keyword">iex</span><span class="arg">(</span><span class="keyword">irm</span> <span
+                        class="string">raw.github.com/krstalacam/orion-router/main/install.ps1</span><span
+                        class="arg">)</span>
                 </div>
 
                 <div id="mac-docker-panel" class="code-content">
-                    <span class="keyword">curl</span> <span class="arg">-sL</span> <span class="string">raw.github.com/krstalacam/orion-router/main/install.sh</span> <span class="arg">|</span> <span class="keyword">bash</span>
+                    <span class="keyword">curl</span> <span class="arg">-sL</span> <span
+                        class="string">raw.github.com/krstalacam/orion-router/main/install.sh</span> <span
+                        class="arg">|</span> <span class="keyword">bash</span>
                 </div>
 
                 <div id="win-local-panel" class="code-content">
-                    <span class="keyword">powershell</span> <span class="arg">-c</span> <span class="string">"&amp;([scriptblock]::Create((irm raw.github.com/krstalacam/orion-router/main/install.ps1))) local"</span>
+                    <span class="keyword">powershell</span> <span class="arg">-c</span> <span
+                        class="string">"&amp;([scriptblock]::Create((irm
+                        raw.github.com/krstalacam/orion-router/main/install.ps1))) local"</span>
                 </div>
 
                 <div id="mac-local-panel" class="code-content">
-                    <span class="keyword">curl</span> <span class="arg">-sL</span> <span class="string">raw.github.com/krstalacam/orion-router/main/install.sh</span> <span class="arg">|</span> <span class="keyword">bash</span> <span class="arg">-s local</span>
+                    <span class="keyword">curl</span> <span class="arg">-sL</span> <span
+                        class="string">raw.github.com/krstalacam/orion-router/main/install.sh</span> <span
+                        class="arg">|</span> <span class="keyword">bash</span> <span class="arg">-s local</span>
                 </div>
 
                 <button class="copy-btn hover:opacity-100" id="orion-cli-copy-action-button"
@@ -172,7 +181,7 @@
 
 client = openai.OpenAI(
 &nbsp;&nbsp;&nbsp;&nbsp;base_url=<span class="string">"http://localhost:20128/v1"</span>,
-&nbsp;&nbsp;&nbsp;&nbsp;api_key=<span class="string">"orion-virtual-key-here"</span>
+&nbsp;&nbsp;&nbsp;&nbsp;api_key=<span class="string">"orion_virtual_key"</span>
 )
 
 response = client.chat.completions.create(
