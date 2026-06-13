@@ -615,7 +615,105 @@ footer a:hover {
     transition-delay: 300ms;
 }
 
+
+/* --- LANGUAGE SELECTOR --- */
+.lang-selector-container {
+    position: relative;
+    display: inline-block;
+}
+
+.lang-selector-trigger {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-muted);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.lang-selector-trigger:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: #fff;
+    border-color: var(--brand-light);
+}
+
+.lang-selector-container.active .lang-selector-trigger {
+    background: rgba(139, 92, 246, 0.1);
+    border-color: var(--brand-main);
+    color: #fff;
+}
+
+.chevron-icon {
+    width: 12px;
+    height: 12px;
+    transition: transform 0.2s ease;
+}
+
+.lang-selector-container.active .chevron-icon {
+    transform: rotate(180deg);
+}
+
+.lang-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 140px;
+    box-shadow: var(--shadow-deep);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    opacity: 0;
+    transform: translateY(-8px);
+    pointer-events: none;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    z-index: 100;
+}
+
+.lang-selector-container.active .lang-dropdown {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.lang-dropdown-item {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    text-align: left;
+    transition: background-color 0.15s ease, color 0.15s ease;
+    white-space: nowrap;
+}
+
+.lang-dropdown-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+}
+
+.lang-dropdown-item.active {
+    background: rgba(139, 92, 246, 0.15);
+    color: var(--brand-light);
+    font-weight: 600;
+}
+
 /* --- MOBİL UYUM (RESPONSIVE) --- */
+
 
 /* Tablet (768px ve altı) */
 @media (max-width: 768px) {

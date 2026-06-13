@@ -68,6 +68,7 @@ def dim(msg: str)  -> None: _p(" ", msg, GRAY)
 ROOT      = Path(__file__).parent.parent.resolve()
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+from bin.i18n import t
 from core.lifespan import print_active_services_banner
 TOOLS_DIR = ROOT / "tools"
 PG_BIN    = TOOLS_DIR / "pgsql" / "bin"
@@ -165,7 +166,7 @@ def kill_port(port: int) -> None:
                 container_ids = [line.strip() for line in res.stdout.splitlines() if line.strip()]
                 if container_ids:
                     for cid in container_ids:
-                        dim(f"    Port {port} Docker tarafindan kullaniliyor. Konteyner ({cid}) durduruluyor...")
+                        dim(t("docker_cleaning_port", port=port, cid=cid))
                         run_silent(["docker", "stop", cid], timeout=15)
                     time.sleep(1.5) # Portun temizlenmesi icin kisa bir sure bekle
         except Exception:
@@ -179,7 +180,7 @@ def kill_port(port: int) -> None:
                 pid = line.split()[-1]
                 if pid.isdigit() and pid != "0":
                     run_silent(["taskkill", "/f", "/t", "/pid", pid])
-                    dim(f"    Port {port} → PID {pid} kapatildi")
+                    dim(t("port_killed", port=port, pid=pid))
                     killed_any = True
     except Exception:
         pass
@@ -206,7 +207,7 @@ def kill_portable_postgres() -> None:
                 check = run_silent(["tasklist", "/fi", f"PID eq {pid}", "/fo", "csv", "/nh"])
                 if check.returncode == 0:
                     run_silent(["taskkill", "/f", "/t", "/pid", pid])
-                    dim(f"    Eski PostgreSQL sureci (PID {pid}) zorla kapatildi")
+                    dim(t("old_pg_killed", pid=pid, name="prod"))
                     killed_any = True
         except Exception:
             pass
@@ -230,7 +231,7 @@ def kill_portable_postgres() -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def free_ports(router_port: str) -> None:
-    info(f"Portlar temizleniyor: {router_port}, {PG_PORT}...")
+    info(t("cleaning_ports", ports=f"{router_port}, {PG_PORT}"))
     kill_portable_postgres()
     for port in [int(router_port), PG_PORT]:
         kill_port(port)
@@ -251,21 +252,21 @@ def download_postgres() -> None:
     if PG_BIN.exists():
         return
     print()
-    info("PostgreSQL Portable bulunamadi — indiriliyor")
+    info(t("pg_not_found_downloading"))
     TOOLS_DIR.mkdir(parents=True, exist_ok=True)
     urllib.request.urlretrieve(PG_DOWNLOAD_URL, PG_ZIP, _download_progress)
     print()
-    ok("Indirme tamamlandi")
-    info("Arsiv cikariliyor...")
+    ok(t("download_complete"))
+    info(t("extracting_archive"))
     with zipfile.ZipFile(PG_ZIP, "r") as zf:
         zf.extractall(TOOLS_DIR)
     PG_ZIP.unlink(missing_ok=True)
-    ok("PostgreSQL hazir")
+    ok(t("pg_ready"))
 
 def init_database() -> None:
     if PG_DATA.exists():
         return
-    info("Veritabani dizini olusturuluyor (ilk kurulum)...")
+    info(t("db_dir_creating"))
     result = run([
         str(INITDB),
         "-D", str(PG_DATA),
@@ -276,14 +277,14 @@ def init_database() -> None:
     ], capture_output=True, text=True)
 
     if not PG_DATA.exists() or result.returncode != 0:
-        err("initdb basarisiz!")
+        err(t("initdb_failed"))
         print(result.stdout[-2000:])
         print(result.stderr[-2000:])
         sys.exit(1)
-    ok("Veritabani dizini hazir")
+    ok(t("db_dir_ready"))
 
 def start_postgres() -> None:
-    info("PostgreSQL baslatiliyor...")
+    info(t("starting_pg"))
 
     def _cleanup_stale_locks() -> None:
         for file_name in ["postmaster.pid", "postmaster.opts"]:
@@ -309,7 +310,7 @@ def start_postgres() -> None:
             import datetime
             ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             PG_LOG_ALT = PG_DATA / f"pg_{ts}.log"
-            warn(f"    pg.log serbest birakilamadi, alternatif kullaniliyor: {PG_LOG_ALT.name}")
+            warn(t("pg_log_lock_warning", name=PG_LOG_ALT.name))
             result = run([
                 str(PG_CTL),
                 "-D", str(PG_DATA),
@@ -344,7 +345,7 @@ def start_postgres() -> None:
         kill_portable_postgres()
 
 def wait_for_postgres(timeout: float = 15.0) -> None:
-    info("PostgreSQL'in hazir olmasi bekleniyor...")
+    info(t("waiting_for_pg"))
     start_time = time.time()
     while time.time() - start_time < timeout:
         try:
@@ -352,18 +353,18 @@ def wait_for_postgres(timeout: float = 15.0) -> None:
             with socket.create_connection(("127.0.0.1", PG_PORT), timeout=1.0):
                 res = psql("-c", "SELECT 1")
                 if res.returncode == 0:
-                    ok("PostgreSQL hazir ve baglantilari kabul ediyor.")
+                    ok(t("pg_accepting_conns"))
                     return
         except Exception:
             pass
         time.sleep(0.5)
-    warn("PostgreSQL hazir olma zaman asimina ugradi, yine de devam ediliyor...")
+    warn(t("pg_timeout_warning"))
 
 def stop_postgres() -> None:
     run_silent([str(PG_CTL), "-D", str(PG_DATA), "stop"])
 
 def setup_db_and_user() -> None:
-    info("Veritabani ve kullanici yapilandiriliyor...")
+    info(t("configuring_db_user"))
     psql("-c", f"ALTER USER {PG_USER} WITH PASSWORD '{PG_PASS}'")
 
     check_sql = (
@@ -384,7 +385,7 @@ def setup_db_and_user() -> None:
     )
     select_proc.stdout.close()
     exec_proc.wait()
-    ok(f"Veritabani hazir ({PG_DB})")
+    ok(t("db_ready", db=PG_DB))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -392,7 +393,7 @@ def setup_db_and_user() -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def build_dashboard(router_port: str) -> None:
-    info("Dashboard production build yapiliyor (npm run build)...")
+    info(t("db_build_dashboard"))
     env = {**os.environ, "NEXT_PUBLIC_ROUTER_PORT": router_port}
     result = run(
         ["npm", "run", "build"],
@@ -401,9 +402,9 @@ def build_dashboard(router_port: str) -> None:
         env=env,
     )
     if result.returncode != 0:
-        err("Dashboard build basarisiz!")
+        err(t("err_dashboard_build_failed"))
         sys.exit(1)
-    ok("Dashboard build tamamlandi")
+    ok(t("dashboard_build_complete"))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -445,16 +446,16 @@ def launch(router_port: str) -> list[tuple[str, subprocess.Popen]]:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def shutdown(procs: list) -> None:
-    print(f"\n{RED}✘  Durdurma sinyali alindi — kapatiliyor...{RESET}", flush=True)
+    print(f"\n{RED}✘  {t('shutdown_received')}{RESET}", flush=True)
     for name, proc in procs:
         try:
             run_silent(["taskkill", "/f", "/t", "/pid", str(proc.pid)])
-            dim(f"    {name} kapatildi (PID {proc.pid})")
+            dim(t("service_closed", name=name, pid=proc.pid))
         except Exception:
             pass
-    info("PostgreSQL durduruluyor...")
+    info(t("stopping_pg_label", label="PostgreSQL"))
     stop_postgres()
-    ok("Tum servisler kapatildi.")
+    ok(t("all_services_shutdown"))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -464,12 +465,12 @@ def shutdown(procs: list) -> None:
 def banner() -> None:
     line = "═" * 55
     print(f"\n{CYAN}{BOLD}╔{line}╗{RESET}")
-    print(f"{CYAN}{BOLD}║{'Orion Router':^55}║{RESET}")
+    print(f"{CYAN}{BOLD}║{t('prod_title'):^55}║{RESET}")
     print(f"{CYAN}{BOLD}╚{line}╝{RESET}\n")
 
 def main() -> None:
     if not acquire_lock():
-        err("Hata: Baska bir Orion Router instancesi calisiyor (Portlar kullanimda olabilir).")
+        err(t("err_lock_fail"))
         sys.exit(1)
 
     banner()
@@ -516,7 +517,7 @@ def main() -> None:
         while True:
             alive = [p for _, p in procs if p.poll() is None]
             if not alive:
-                warn("Servis beklenmedik sekilde kapandi.")
+                warn(t("service_crashed_single"))
                 break
             time.sleep(1)
     except KeyboardInterrupt:

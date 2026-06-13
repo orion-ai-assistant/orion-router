@@ -12,6 +12,7 @@ import os
 import sys
 import subprocess
 from pathlib import Path
+from bin.i18n import t
 
 # Terminal Renkleri (ANSI)
 if sys.platform == "win32":
@@ -36,18 +37,18 @@ BIN_DIR = ROOT / "bin"
 def print_banner():
     line = "═" * 55
     print(f"\n{CYAN}{BOLD}╔{line}╗{RESET}")
-    print(f"{CYAN}{BOLD}║{'Orion Router — Command Line Interface':^55}║{RESET}")
+    print(f"{CYAN}{BOLD}║{t('cli_title'):^55}║{RESET}")
     print(f"{CYAN}{BOLD}╚{line}╝{RESET}\n")
 
 def print_usage():
     print_banner()
-    print(f"{BOLD}Kullanım:{RESET}")
+    print(f"{BOLD}{t('usage')}{RESET}")
     print(f"    python orion.py <komut>\n")
-    print(f"{BOLD}Geçerli Komutlar:{RESET}")
-    print(f"    {GREEN}{BOLD}dev{RESET}   : Geliştirme (Development) ortamını başlatır (hot-reload aktiftir).")
-    print(f"    {GREEN}{BOLD}prod{RESET}  : Üretim (Production) ortamını derler ve yerel olarak başlatır.")
-    print(f"    {RED}{BOLD}stop{RESET}  : Çalışan tüm arka plan servislerini ve portları temizler.\n")
-    print(f"{GRAY}Örnek: python orion.py prod{RESET}\n")
+    print(f"{BOLD}{t('valid_commands')}{RESET}")
+    print(f"    {GREEN}{BOLD}dev{RESET}   : {t('cmd_dev_desc')}")
+    print(f"    {GREEN}{BOLD}prod{RESET}  : {t('cmd_prod_desc')}")
+    print(f"    {RED}{BOLD}stop{RESET}  : {t('cmd_stop_desc')}\n")
+    print(f"{GRAY}{t('cmd_example')}{RESET}\n")
 
 def main():
     if len(sys.argv) < 2:
@@ -64,7 +65,13 @@ def main():
     if cmd in script_map:
         script_path = script_map[cmd]
         if not script_path.exists():
-            print(f"{RED}{BOLD}Hata:{RESET} '{script_path.name}' dosyası {BIN_DIR} altında bulunamadı!")
+            err_msg = t("err_file_not_found", name=script_path.name, dir=BIN_DIR)
+            if "Hata:" in err_msg:
+                rest = err_msg.replace("Hata:", "")
+                print(f"{RED}{BOLD}Hata:{RESET}{rest}")
+            else:
+                rest = err_msg.replace("Error:", "")
+                print(f"{RED}{BOLD}Error:{RESET}{rest}")
             sys.exit(1)
         
         try:
@@ -75,7 +82,13 @@ def main():
             # CTRL+C ile kesildiğinde ana script temiz sonlansın
             pass
     else:
-        print(f"\n{RED}{BOLD}✘  Hata: Bilinmeyen komut '{cmd}'{RESET}")
+        err_msg = t("err_unknown_command", cmd=cmd)
+        if "Hata:" in err_msg:
+            rest = err_msg.replace("Hata:", "")
+            print(f"\n{RED}{BOLD}✘  Hata:{RESET}{rest}{RESET}")
+        else:
+            rest = err_msg.replace("Error:", "")
+            print(f"\n{RED}{BOLD}✘  Error:{RESET}{rest}{RESET}")
         print_usage()
         sys.exit(1)
 

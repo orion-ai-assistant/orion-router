@@ -34,6 +34,7 @@ def dim(m):  _p(" ", m, GRAY)
 ROOT    = Path(__file__).parent.parent.resolve()
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+from bin.i18n import t
 PG_BIN  = ROOT / "tools" / "pgsql" / "bin"
 PG_CTL  = PG_BIN / "pg_ctl.exe"
 
@@ -48,9 +49,9 @@ def run_silent(cmd):
 
 def stop_pg(data_dir: Path, label: str):
     if data_dir.exists() and PG_CTL.exists():
-        info(f"{label} PostgreSQL durduruluyor...")
+        info(t("stopping_pg_label", label=label))
         run_silent([str(PG_CTL), "-D", str(data_dir), "stop"])
-        ok(f"{label} PostgreSQL durduruldu")
+        ok(t("stopped_pg_label", label=label))
 
 def kill_port(port: int):
     import shutil
@@ -64,7 +65,7 @@ def kill_port(port: int):
                 container_ids = [line.strip() for line in res.stdout.splitlines() if line.strip()]
                 if container_ids:
                     for cid in container_ids:
-                        dim(f"    Port {port} Docker tarafindan kullaniliyor. Konteyner ({cid}) durduruluyor...")
+                        dim(t("docker_cleaning_port", port=port, cid=cid))
                         subprocess.run(["docker", "stop", cid], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
                     time.sleep(1.5) # Portun temizlenmesi icin kisa bir sure bekle
         except Exception:
@@ -78,7 +79,7 @@ def kill_port(port: int):
                 pid = line.split()[-1]
                 if pid.isdigit() and pid != "0":
                     run_silent(["taskkill", "/f", "/t", "/pid", pid])
-                    dim(f"    Port {port} → PID {pid} kapatildi")
+                    dim(t("port_killed", port=port, pid=pid))
                     killed_any = True
     except Exception:
         pass
@@ -98,7 +99,7 @@ def kill_portable_postgres():
                 if lines and lines[0].isdigit():
                     pid = lines[0]
                     run_silent(["taskkill", "/f", "/t", "/pid", pid])
-                    dim(f"    Eski PostgreSQL sureci (PID {pid}) sonlandirildi ({data_dir.name})")
+                    dim(t("old_pg_killed", pid=pid, name=data_dir.name))
                     killed_any = True
             except Exception:
                 pass
@@ -111,7 +112,7 @@ def kill_portable_postgres():
         for file_name in ["postmaster.pid", "postmaster.opts"]:
             try:
                 (data_dir / file_name).unlink(missing_ok=True)
-                dim(f"    Stale {file_name} silindi ({data_dir.name})")
+                dim(t("stale_file_deleted", file=file_name, name=data_dir.name))
             except Exception:
                 pass
 
@@ -125,7 +126,7 @@ def kill_all_postgres() -> None:
         )
         if "postgres.exe" in result.stdout.lower():
             run_silent(["taskkill", "/f", "/t", "/im", "postgres.exe"])
-            dim("    Tum postgres.exe surecleri zorla kapatildi")
+            dim(t("all_pg_killed"))
             time.sleep(2.0)
     except Exception:
         pass
@@ -133,13 +134,13 @@ def kill_all_postgres() -> None:
 def main():
     line = "═" * 55
     print(f"\n{RED}{BOLD}╔{line}╗{RESET}")
-    print(f"{RED}{BOLD}║{'Orion Router — Acil Durdurma':^55}║{RESET}")
+    print(f"{RED}{BOLD}║{t('stop_title'):^55}║{RESET}")
     print(f"{RED}{BOLD}╚{line}╝{RESET}\n")
 
     stop_pg(DEV_DATA, "Dev")
     stop_pg(PROD_DATA, "Prod")
 
-    info(f"Portlar temizleniyor: {', '.join(map(str, PORTS))}...")
+    info(t("cleaning_ports", ports=', '.join(map(str, PORTS))))
     for port in PORTS:
         kill_port(port)
     
@@ -147,7 +148,7 @@ def main():
     kill_all_postgres()
 
     print()
-    ok("Tum servisler ve portlar temizlendi.")
+    ok(t("all_services_cleared"))
 
 if __name__ == "__main__":
     main()

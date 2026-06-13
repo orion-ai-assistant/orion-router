@@ -22,8 +22,13 @@ def _ensure_env_file() -> bool:
         return False
     try:
         shutil.copy(_ENV_EXAMPLE_PATH, _ENV_PATH)
+        try:
+            from bin.i18n import t
+            msg = t("config_env_copied")
+        except Exception:
+            msg = "[orion-router] .env not found; .env.example copied to .env."
         print(
-            "[orion-router] .env bulunamadı; .env.example kopyalanarak .env oluşturuldu.",
+            msg,
             file=sys.stderr,
         )
         return True
@@ -69,9 +74,19 @@ def _ensure_encryption_key() -> None:
         if _ENV_PATH.exists():
             with open(_ENV_PATH, "a", encoding="utf-8") as f:
                 f.write(f'\nENCRYPTION_KEY="{new_key}"\n')
-        print("[orion-router] Yeni ENCRYPTION_KEY oluşturuldu ve .env dosyasına eklendi.", file=sys.stderr)
+        try:
+            from bin.i18n import t
+            msg = t("config_key_created")
+        except Exception:
+            msg = "[orion-router] New ENCRYPTION_KEY generated and added to .env file."
+        print(msg, file=sys.stderr)
     except Exception as e:
-        print(f"[orion-router] ENCRYPTION_KEY oluşturulamadı: {e}", file=sys.stderr)
+        try:
+            from bin.i18n import t
+            msg = t("config_key_failed", e=e)
+        except Exception:
+            msg = f"[orion-router] ENCRYPTION_KEY could not be generated: {e}"
+        print(msg, file=sys.stderr)
 
 _ensure_encryption_key()
 

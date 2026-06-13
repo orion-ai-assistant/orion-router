@@ -96,4 +96,61 @@ document.addEventListener('DOMContentLoaded', () => {
             // İsteğe bağlı: Kullanıcıya "Kopyalanamadı" şeklinde bir HTML bildirimi gösterebilirsin
         });
     });
+
+    // --- Çoklu Dil (i18n) Arayüz Mantığı ---
+    const langContainer = document.getElementById('orion-lang-selector-container');
+    const langTrigger = document.getElementById('orion-lang-selector-trigger');
+    const langText = document.getElementById('current-lang-text');
+    const langDropdownItems = document.querySelectorAll('.lang-dropdown-item');
+    
+    if (langTrigger && langContainer) {
+        // Dropdown'ı aç/kapat
+        langTrigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            langContainer.classList.toggle('active');
+        });
+
+        // Dışarı tıklandığında dropdown'ı kapat
+        document.addEventListener('click', () => {
+            langContainer.classList.remove('active');
+        });
+        
+        // Dil değiştirildiğinde UI'ı güncelle (i18n.js tarafından tetiklenir)
+        document.addEventListener('orion-lang-changed', (e) => {
+            const lang = e.detail.lang;
+            if (langText) {
+                langText.textContent = lang.toUpperCase();
+            }
+            langDropdownItems.forEach(item => {
+                if (item.getAttribute('data-lang') === lang) {
+                    item.classList.add('active');
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+        });
+        
+        // Dil seçeneklerine tıklanınca setLanguage tetikle
+        langDropdownItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                const selectedLang = e.currentTarget.getAttribute('data-lang');
+                if (window.setLanguage) {
+                    window.setLanguage(selectedLang);
+                }
+                langContainer.classList.remove('active');
+            });
+        });
+
+        // Sayfa ilk yüklendiğinde dil seçici butonlarını aktif dile göre güncelle
+        if (window.ORION_CURRENT_LANG) {
+            if (langText) {
+                langText.textContent = window.ORION_CURRENT_LANG.toUpperCase();
+            }
+            langDropdownItems.forEach(item => {
+                if (item.getAttribute('data-lang') === window.ORION_CURRENT_LANG) {
+                    item.classList.add('active');
+                }
+            });
+        }
+    }
 });

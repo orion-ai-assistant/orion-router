@@ -63,10 +63,18 @@ def print_active_services_banner(
     dashboard_url = f"http://localhost:{public_port}"
     local_url = f"http://{local_ip}:{public_port}"
 
+    try:
+        from bin.i18n import t
+        local_net_label = t("banner_local_network")
+        cmds_hint = t("banner_commands_hint")
+    except Exception:
+        local_net_label = "Local Network"
+        cmds_hint = "Commands: orionrouter start | stop | logs | help"
+
     border_line = f"{GRAY}────────────────────────────────────────────────{RESET}"
     title_colored = f"{BLUE}{BOLD}ORION ROUTER{RESET}"
     dash_colored  = f"{BLUE}➜{RESET}  {BOLD}Dashboard:{RESET}   {CYAN}{dashboard_url}{RESET}"
-    ip_colored    = f"{BLUE}➜{RESET}  {BOLD}Yerel Ağ:{RESET}    {CYAN}{local_url}{RESET}"
+    ip_colored    = f"{BLUE}➜{RESET}  {BOLD}{local_net_label}:{RESET}    {CYAN}{local_url}{RESET}"
 
     # Print the banner block with clean newlines to separate from surrounding logs
     print()
@@ -76,7 +84,7 @@ def print_active_services_banner(
     print(dash_colored)
     print(ip_colored)
     print(border_line)
-    print(f"{GRAY}Komutlar: orion-router start | stop | logs | help{RESET}")
+    print(f"{GRAY}{cmds_hint}{RESET}")
     print()
 
 

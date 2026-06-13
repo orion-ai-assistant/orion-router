@@ -4,26 +4,26 @@ set -euo pipefail
 MODE="${1:-docker}"
 
 echo "=========================================="
-echo "    Orion Router Native Kurulum Aracı     "
+echo "      Orion Router Native Installer       "
 echo "=========================================="
 
 if [ "$MODE" != "local" ] && [ "$MODE" != "docker" ]; then
-  echo -e "\nHATA: Kurulum modunu belirtmediniz!"
-  echo "Lütfen terminalde scripti aşağıdaki gibi parametre vererek çalıştırın:\n"
-  echo "  1. Local Kurulum:"
+  echo -e "\nERROR: You did not specify the installation mode!"
+  echo "Please run the script in the terminal with one of the following parameters:\n"
+  echo "  1. Local Installation:"
   echo "     ./install.sh local\n"
-  echo "  2. Docker Kurulum:"
+  echo "  2. Docker Installation:"
   echo "     ./install.sh docker\n"
   exit 1
 fi
 
-echo "Kurulum Modu: $MODE"
+echo "Installation Mode: $MODE"
 INSTALL_DIR="$HOME/.orion-router"
 REPO_URL="https://github.com/krstalacam/orion-router.git"
-echo "Hedef Dizin:  $INSTALL_DIR"
+echo "Target Directory:  $INSTALL_DIR"
 
-# 1. Gereksinim Kontrolleri
-echo -e "\n[1/5] Sistem gereksinimleri kontrol ediliyor..."
+# 1. Requirement Checks
+echo -e "\n[1/5] Checking system requirements..."
 if [ "$MODE" = "local" ]; then
   REQUIRED_CMDS=(git python3 npm)
 else
@@ -32,14 +32,14 @@ fi
 
 for cmd in "${REQUIRED_CMDS[@]}"; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
-    echo "Hata: '$cmd' bulunamadı! Lütfen kurup tekrar deneyin." >&2
+    echo "Error: '$cmd' not found! Please install it and try again." >&2
     exit 1
   fi
 done
-echo "✔ Gereksinimler karşılandı (${REQUIRED_CMDS[*]})."
+echo "✔ Requirements met (${REQUIRED_CMDS[*]})."
 
-# 2. Repo Klonlama veya Güncelleme
-echo -e "\n[2/5] Orion Router klasörüne ayarlanıyor..."
+# 2. Repo Clone or Update
+echo -e "\n[2/5] Setting up Orion Router directory..."
 
 PID_FILE="$INSTALL_DIR/.orion.pid"
 if [ -f "$PID_FILE" ]; then
@@ -48,7 +48,7 @@ if [ -f "$PID_FILE" ]; then
         pkill -P "$OLD_PID" 2>/dev/null || true
         kill -9 "$OLD_PID" 2>/dev/null || true
         sleep 1
-        echo "[!] Arka planda çalışan eski Orion Router durduruldu."
+        echo "[!] Stale background Orion Router process terminated."
     fi
     rm -f "$PID_FILE"
 fi
@@ -59,42 +59,42 @@ if [ ! -d "$INSTALL_DIR/.git" ]; then
   fi
   git clone "$REPO_URL" "$INSTALL_DIR"
 else
-  echo "✔ Klasör var, GitHub'daki en güncel kodlar zorla çekiliyor..."
+  echo "✔ Directory exists, forcing updates from GitHub..."
   cd "$INSTALL_DIR"
-  git fetch origin main || { echo "[HATA] git fetch başarısız oldu. Bağlantı sorunu olabilir."; exit 1; }
-  git reset --hard origin/main || { echo "[HATA] Kodları güncelleme (reset) başarısız oldu."; exit 1; }
+  git fetch origin main || { echo "[ERROR] git fetch failed. There might be a connection issue."; exit 1; }
+  git reset --hard origin/main || { echo "[ERROR] Resetting/updating code failed."; exit 1; }
 fi
 cd "$INSTALL_DIR"
 
-# --- Akıllı .env Kontrolü ---
-echo -e "\n[*] .env dosyası kontrol ediliyor..."
+# --- Smart .env Check ---
+echo -e "\n[*] Checking .env file..."
 if [ ! -f ".env" ]; then
     if [ -f ".env.example" ]; then
         cp .env.example .env
-        echo "✔ .env dosyası bulunamadı. Docker uyarılarını engellemek için .env.example dosyasından yeni bir .env üretildi."
+        echo "✔ .env file not found. Created a new .env file from .env.example to prevent Docker warnings."
     else
-        echo "[!] .env.example bulunamadı, boş bir .env dosyası oluşturuluyor..."
+        echo "[!] .env.example not found, creating an empty .env file..."
         touch .env
     fi
 else
-    echo "✔ Mevcut .env dosyası tespit edildi. Konfigürasyonlarınızın ezilmemesi için değişiklik yapılmadı."
+    echo "✔ Existing .env file detected. Kept intact to preserve your configurations."
 fi
 
-# 3 & 4. Bağımlılıklar
+# 3 & 4. Dependencies
 if [ "$MODE" = "local" ]; then
-    echo -e "\n[3/5] Python paketleri (pip) yükleniyor..."
+    echo -e "\n[3/5] Installing Python packages (pip)..."
     python3 -m pip install -e .
-    echo -e "\n[4/5] Dashboard bağımlılıkları (NPM) yükleniyor..."
+    echo -e "\n[4/5] Installing Dashboard dependencies (NPM)..."
     if [ -d "dashboard" ]; then
         (cd dashboard && npm install)
     fi
 else
-    echo -e "\n[3/5] ve [4/5] Adımları Atlanıyor..."
-    echo "Docker modu seçildiği için local bağımlılıklar indirilmeyecek. Sadece GHCR imajları çekilecek."
+    echo -e "\n[3/5] and [4/5] Steps Skipped..."
+    echo "Docker mode selected; local dependencies will not be installed. Only GHCR images will be pulled."
 fi
 
-# 5. Global Komutun Yüklenmesi
-echo -e "\n[5/5] Global 'orionrouter' komutu sisteme yükleniyor..."
+# 5. Global Command Installation
+echo -e "\n[5/5] Installing global 'orionrouter' command..."
 
 if [ -n "${ZSH_VERSION:-}" ]; then
   PROFILE="$HOME/.zshrc"
@@ -104,7 +104,7 @@ else
   PROFILE="$HOME/.profile"
 fi
 
-# Eski kalıntıları temizle
+# Clean old entries
 if [ -f "$PROFILE" ]; then
   sed -i.bak '/# --- ORION ROUTER CLI START ---/,/# --- ORION ROUTER CLI END ---/d' "$PROFILE" 2>/dev/null || true
   sed -i.bak '/^[[:space:]]*orion-router\([[:space:]]\+start\)\?[[:space:]]*$/d' "$PROFILE" 2>/dev/null || true
@@ -112,7 +112,7 @@ if [ -f "$PROFILE" ]; then
   rm -f "${PROFILE}.bak"
 fi
 
-# Moduna göre ilgili CLI scriptini oluştur
+# Create CLI script based on mode
 CLI_SCRIPT="$INSTALL_DIR/orionrouter"
 
 if [ "$MODE" = "local" ]; then
@@ -129,34 +129,34 @@ if [ "$ACTION" = "help" ] || [ -z "$ACTION" ]; then
     echo ""
     echo "  Orion Router CLI"
     echo "  --------------------------------"
-    echo "  Kullanım: orionrouter <komut>"
+    echo "  Usage: orionrouter <command>"
     echo ""
-    echo "  Komutlar:"
-    echo "    start   Sunucuyu arka planda başlatır"
-    echo "    stop    Çalışan sunucuyu ve tüm alt süreçleri durdurur"
-    echo "    logs    Arka plan loglarını ve hataları gösterir"
-    echo "    help    Bu yardım menüsünü gösterir"
+    echo "  Commands:"
+    echo "    start   Starts the server in the background"
+    echo "    stop    Stops the running server and all child processes"
+    echo "    logs    Shows background logs and errors"
+    echo "    help    Shows this help menu"
     echo ""
 elif [ "$ACTION" = "start" ]; then
     if [ -f "$PID_FILE" ]; then
         PID=$(cat "$PID_FILE")
         if ps -p "$PID" > /dev/null 2>&1; then
-            echo "[OK] Orion Router zaten arka planda çalışıyor!"
-            echo "Logları görmek için: orionrouter logs"
+            echo "[OK] Orion Router is already running in the background!"
+            echo "To view logs: orionrouter logs"
             exit 0
         fi
         rm -f "$PID_FILE"
     fi
 
-    echo "Orion Router local olarak başlatılıyor..."
+    echo "Starting Orion Router locally..."
     cd "$PROJECT_DIR"
     nohup python3 orion.py prod > "$LOG_FILE" 2> "$ERROR_LOG_FILE" &
     echo $! > "$PID_FILE"
     
-    echo "[OK] Orion Router arka planda çalışmaya başladı!"
-    echo "[OK] Artik su komutlari kullanabilirsiniz: orionrouter start | stop | logs | help"
+    echo "[OK] Orion Router started running in the background!"
+    echo "[OK] You can now use these commands: orionrouter start | stop | logs | help"
     echo "----------------------------------------------------"
-    echo "  Canlı loglar başlıyor... (Çıkmak için Ctrl+C basabilirsiniz)"
+    echo "  Streaming live logs... (Press Ctrl+C to exit)"
     echo "----------------------------------------------------"
     tail -f "$LOG_FILE"
 elif [ "$ACTION" = "stop" ]; then
@@ -165,28 +165,28 @@ elif [ "$ACTION" = "stop" ]; then
         if ps -p "$PID" > /dev/null 2>&1; then
             pkill -P "$PID" 2>/dev/null || true
             kill -9 "$PID" 2>/dev/null || true
-            echo "[OK] Orion Router ana süreci ve alt süreçleri durduruldu."
+            echo "[OK] Orion Router main and child processes stopped."
         else
-            echo "Süreç zaten sonlanmış."
+            echo "Process already terminated."
         fi
         rm -f "$PID_FILE"
     else
-        echo "Çalışan etkin bir Orion Router süreci (.orion.pid) bulunamadı."
+        echo "No active running Orion Router process (.orion.pid) found."
     fi
 elif [ "$ACTION" = "logs" ]; then
     if [ -f "$ERROR_LOG_FILE" ]; then
-        echo -e "\n[!] SON HATALAR (orion_error.log):"
+        echo -e "\n[!] RECENT ERRORS (orion_error.log):"
         tail -15 "$ERROR_LOG_FILE"
         echo "----------------------------------------------------"
     fi
     if [ -f "$LOG_FILE" ]; then
-        echo "  Canlı loglar başlıyor... (Çıkmak için Ctrl+C basabilirsiniz)"
+        echo "  Streaming live logs... (Press Ctrl+C to exit)"
         tail -f "$LOG_FILE"
     else
-        echo "Henüz bir log dosyası yok."
+        echo "No log file exists yet."
     fi
 else
-    echo "Geçersiz komut. Yardım için 'orionrouter help' yazabilirsiniz."
+    echo "Invalid command. Type 'orionrouter help' for assistance."
 fi
 EOF
 else
@@ -201,71 +201,71 @@ if [ "$ACTION" = "help" ] || [ -z "$ACTION" ]; then
     echo ""
     echo "  Orion Router CLI (Docker Mode)"
     echo "  --------------------------------"
-    echo "  Kullanım: orionrouter <komut>"
+    echo "  Usage: orionrouter <command>"
     echo ""
-    echo "  Komutlar:"
-    echo "    start   Container'ı arka planda başlatır"
-    echo "    stop    Çalışan container'ı durdurur"
-    echo "    logs    Container loglarını canlı olarak gösterir"
-    echo "    help    Bu yardım menüsünü gösterir"
+    echo "  Commands:"
+    echo "    start   Starts container in the background"
+    echo "    stop    Stops the running container"
+    echo "    logs    Shows live container logs"
+    echo "    help    Shows this help menu"
     echo ""
 elif [ "$ACTION" = "start" ]; then
-    echo "Docker durumu kontrol ediliyor..."
+    echo "Checking Docker status..."
     DOCKER_READY=0
     if docker info >/dev/null 2>&1; then
         DOCKER_READY=1
     else
-        echo "[!] Docker Daemon aktif değil. Başlatılmaya çalışılıyor..."
+        echo "[!] Docker Daemon is not active. Attempting to start..."
         if command -v systemctl >/dev/null 2>&1; then
             sudo systemctl start docker || true
         elif [ "$(uname)" = "Darwin" ]; then
             open -a Docker || true
         fi
 
-        echo "[*] Docker Engine hazır olması bekleniyor (max 30 saniye)..."
+        echo "[*] Waiting for Docker Engine to be ready (max 30 seconds)..."
         for i in {1..6}; do
             sleep 5
             if docker info >/dev/null 2>&1; then
                 DOCKER_READY=1
-                echo "[OK] Docker Engine aktif ve hazır!"
+                echo "[OK] Docker Engine is active and ready!"
                 break
             fi
-            echo "    Hazırlanıyor... ($((i * 5)) saniye geçen süre)"
+            echo "    Initializing... ($((i * 5)) seconds elapsed)"
         done
     fi
 
     if [ $DOCKER_READY -eq 0 ]; then
-        echo -e "\n[HATA] Docker otomatik olarak başlatılamadı veya motor zamanında yanıt vermedi."
-        echo "Lütfen Docker uygulamanızı açın ve komutu tekrar deneyin.\n"
+        echo -e "\n[ERROR] Docker could not be started automatically, or the engine failed to respond in time."
+        echo "Please open Docker Desktop and try again.\n"
         exit 1
     fi
 
-    echo "Orion Router Docker üzerinde (GHCR İmajlarla) başlatılıyor..."
+    echo "Starting Orion Router on Docker (with GHCR Images)..."
     cd "$PROJECT_DIR"
     docker compose -f "$COMPOSE_FILE" -p orion-router up -d
-    echo "[OK] Container başladı! Kapatmak icin 'orionrouter stop' yazabilirsiniz."
-    echo "[OK] Artik su komutlari kullanabilirsiniz: orionrouter start | stop | logs | help"
+    echo "[OK] Container started! To stop, type 'orionrouter stop'."
+    echo "[OK] You can now use these commands: orionrouter start | stop | logs | help"
     echo "----------------------------------------------------"
-    echo "  Canlı loglar başlıyor... (Çıkmak için Ctrl+C basabilirsiniz)"
+    echo "  Streaming live logs... (Press Ctrl+C to exit)"
     echo "----------------------------------------------------"
     docker compose -f "$COMPOSE_FILE" -p orion-router logs -f
 elif [ "$ACTION" = "stop" ]; then
-    echo "Orion Router Docker üzerinde durduruluyor..."
+    echo "Stopping Orion Router on Docker..."
     cd "$PROJECT_DIR"
     docker compose -f "$COMPOSE_FILE" -p orion-router stop
-    echo "[OK] Container başarıyla durduruldu."
+    echo "[OK] Container stopped successfully."
 elif [ "$ACTION" = "logs" ]; then
     cd "$PROJECT_DIR"
     docker compose -f "$COMPOSE_FILE" -p orion-router logs -f
 else
-    echo "Geçersiz komut. Yardım için 'orionrouter help' yazabilirsiniz."
+    echo "Invalid command. Type 'orionrouter help' for assistance."
 fi
 EOF
 fi
 
 chmod +x "$CLI_SCRIPT"
 
-# PATH Ayarını Profile Ekle
+# Add PATH to profile
 if [ -f "$PROFILE" ]; then
     if ! grep -q "export PATH=\"$INSTALL_DIR:\$PATH\"" "$PROFILE" 2>/dev/null; then
         echo -e "\n# --- ORION ROUTER CLI START ---" >> "$PROFILE"
@@ -274,14 +274,14 @@ if [ -f "$PROFILE" ]; then
     fi
 fi
 
-# Değişiklikleri mevcut oturuma yansıt
+# Apply to current session
 export PATH="$INSTALL_DIR:$PATH"
 
 echo ""
-echo "[OK] Kurulum tamamlandı."
-echo "[OK] 'orionrouter' komutu bu terminalde ve yeni terminallerde hazır."
-echo "     Kullanabileceğiniz komutlar: orionrouter start | stop | logs | help"
-echo "     Başlattıktan sonra bu terminali kapatabilirsiniz."
-echo "[OK] Orion Router başlatılıyor..."
+echo "[OK] Installation complete."
+echo "[OK] 'orionrouter' command is ready in this terminal and new ones."
+echo "     Available commands: orionrouter start | stop | logs | help"
+echo "     You can close this terminal after starting."
+echo "[OK] Starting Orion Router..."
 
 orionrouter start
