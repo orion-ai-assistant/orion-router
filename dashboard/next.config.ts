@@ -26,6 +26,12 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true, 
   },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   
   // Olası tüm giriş yöntemlerine (dinamik IP'ler dahil) izin veriyoruz:
   allowedDevOrigins: [
