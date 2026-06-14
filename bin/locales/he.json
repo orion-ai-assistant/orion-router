@@ -42,7 +42,7 @@
     "service_closed": "    {name} נסגר (PID {pid})",
     "all_services_shutdown": "כל השירותים כובו.",
     "service_crashed_multi": "אחד השירותים נסגר באופן לא צפוי: {names}",
-    "service_crashed_single": "השירות נסגר באופן לא צפوي.",
+    "service_crashed_single": "השירות נסגר באופן לא צפוי.",
     "config_env_copied": "[orion-router] .env לא נמצא; .env.example הועתק ל-.env.",
     "config_key_created": "[orion-router] מפתח הצפנה ENCRYPTION_KEY חדש נוצר והתווסף לקובץ .env.",
     "config_key_failed": "[orion-router] לא ניתן היה ליצור את מפתח ההצפנה ENCRYPTION_KEY: {e}",
