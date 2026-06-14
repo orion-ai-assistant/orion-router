@@ -101,9 +101,32 @@ document.addEventListener('DOMContentLoaded', () => {
     const langContainer = document.getElementById('orion-lang-selector-container');
     const langTrigger = document.getElementById('orion-lang-selector-trigger');
     const langText = document.getElementById('current-lang-text');
-    const langDropdownItems = document.querySelectorAll('.lang-dropdown-item');
+    const langDropdown = document.getElementById('orion-lang-dropdown');
     
-    if (langTrigger && langContainer) {
+    if (langTrigger && langContainer && langDropdown && window.LOCALES && window.LOCALE_NAMES) {
+        // Dynamically build language switcher options sorted alphabetically by display name
+        langDropdown.innerHTML = '';
+        const sortedLocales = [...window.LOCALES].sort((a, b) => {
+            const nameA = window.LOCALE_NAMES[a] || '';
+            const nameB = window.LOCALE_NAMES[b] || '';
+            return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+        });
+
+        sortedLocales.forEach(locale => {
+            const btn = document.createElement('button');
+            btn.className = 'lang-dropdown-item';
+            btn.setAttribute('data-lang', locale);
+            btn.textContent = `${window.LOCALE_NAMES[locale]} (${locale.toUpperCase()})`;
+            btn.addEventListener('click', (e) => {
+                const selectedLang = e.currentTarget.getAttribute('data-lang');
+                if (window.setLanguage) {
+                    window.setLanguage(selectedLang);
+                }
+                langContainer.classList.remove('active');
+            });
+            langDropdown.appendChild(btn);
+        });
+
         // Dropdown'ı aç/kapat
         langTrigger.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -121,23 +144,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (langText) {
                 langText.textContent = lang.toUpperCase();
             }
-            langDropdownItems.forEach(item => {
+            const items = langDropdown.querySelectorAll('.lang-dropdown-item');
+            items.forEach(item => {
                 if (item.getAttribute('data-lang') === lang) {
                     item.classList.add('active');
                 } else {
                     item.classList.remove('active');
                 }
-            });
-        });
-        
-        // Dil seçeneklerine tıklanınca setLanguage tetikle
-        langDropdownItems.forEach(item => {
-            item.addEventListener('click', (e) => {
-                const selectedLang = e.currentTarget.getAttribute('data-lang');
-                if (window.setLanguage) {
-                    window.setLanguage(selectedLang);
-                }
-                langContainer.classList.remove('active');
             });
         });
 
@@ -146,7 +159,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (langText) {
                 langText.textContent = window.ORION_CURRENT_LANG.toUpperCase();
             }
-            langDropdownItems.forEach(item => {
+            const items = langDropdown.querySelectorAll('.lang-dropdown-item');
+            items.forEach(item => {
                 if (item.getAttribute('data-lang') === window.ORION_CURRENT_LANG) {
                     item.classList.add('active');
                 }

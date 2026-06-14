@@ -8,8 +8,7 @@
     "cmd_example": "Örnek: python orion.py prod",
     "err_file_not_found": "Hata: '{name}' dosyası {dir} altında bulunamadı!",
     "err_unknown_command": "Hata: Bilinmeyen komut '{cmd}'",
-    
-    "stop_title": "Orion Router — Acil Durdurma",
+    "stop_title": "Orion Router - Durdurma",
     "stopping_pg_label": "{label} PostgreSQL durduruluyor...",
     "stopped_pg_label": "{label} PostgreSQL durduruldu",
     "docker_cleaning_port": "    Port {port} Docker tarafından kullanılıyor. Konteyner ({cid}) durduruluyor...",
@@ -19,7 +18,6 @@
     "all_pg_killed": "    Tüm postgres.exe süreçleri zorla kapatıldı",
     "cleaning_ports": "Portlar temizleniyor: {ports}...",
     "all_services_cleared": "Tüm servisler ve portlar temizlendi.",
-    
     "err_lock_fail": "Hata: Başka bir Orion Router örneği çalışıyor (Portlar kullanımda olabilir).",
     "dev_title": "Orion Router — Development Environment",
     "prod_title": "Orion Router",
@@ -45,7 +43,6 @@
     "all_services_shutdown": "Tüm servisler kapatıldı.",
     "service_crashed_multi": "Servislerden biri beklenmedik şekilde kapandı: {names}",
     "service_crashed_single": "Servis beklenmedik şekilde kapandı.",
-    
     "config_env_copied": "[orion-router] .env bulunamadı; .env.example kopyalanarak .env oluşturuldu.",
     "config_key_created": "[orion-router] Yeni ENCRYPTION_KEY oluşturuldu ve .env dosyasına eklendi.",
     "config_key_failed": "[orion-router] ENCRYPTION_KEY oluşturulamadı: {e}",

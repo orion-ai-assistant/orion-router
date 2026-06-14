@@ -670,7 +670,9 @@ footer a:hover {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    min-width: 140px;
+    min-width: 180px;
+    max-height: 240px;
+    overflow-y: auto;
     box-shadow: var(--shadow-deep);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);

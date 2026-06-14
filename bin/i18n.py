@@ -3,6 +3,37 @@ import json
 import locale
 from pathlib import Path
 
+SUPPORTED_LOCALES = [
+    "en", "vi", "zh-CN", "zh-TW", "ja", "pt-BR", "pt-PT", "ko", "es", "de", 
+    "fr", "he", "ar", "ru", "pl", "cs", "nl", "tr", "uk", "tl", "id", "th", 
+    "hi", "bn", "ur", "ro", "sv", "it", "el", "hu", "fi", "da", "no"
+]
+
+def normalize_locale(locale_str: str) -> str:
+    if not locale_str:
+        return "en"
+    
+    locale_str = locale_str.strip().lower().replace("_", "-")
+    
+    # Exact case-insensitive match
+    for loc in SUPPORTED_LOCALES:
+        if loc.lower() == locale_str:
+            return loc
+            
+    # Try mapping prefix (e.g. ja-jp -> ja, es-es -> es)
+    prefix = locale_str.split("-")[0]
+    for loc in SUPPORTED_LOCALES:
+        if loc.lower() == prefix:
+            return loc
+            
+    # Custom fallback for Chinese
+    if prefix == "zh":
+        if "tw" in locale_str or "hk" in locale_str:
+            return "zh-TW"
+        return "zh-CN"
+        
+    return "en"
+
 def detect_lang() -> str:
     # 1. Check if CLI_LANG is set in the .env file in project root
     root = Path(__file__).parent.parent.resolve()
@@ -15,30 +46,30 @@ def detect_lang() -> str:
                 if stripped and not stripped.startswith("#") and "=" in stripped:
                     k, _, v = stripped.partition("=")
                     if k.strip() == "CLI_LANG":
-                        cli_lang = v.strip().strip('"').strip("'").lower()
+                        cli_lang = v.strip().strip('"').strip("'")
                         break
         except Exception:
             pass
 
-    if cli_lang in ["tr", "en", "zh"]:
-        return cli_lang
+    if cli_lang:
+        normalized = normalize_locale(cli_lang)
+        if normalized != "en" or cli_lang.lower().startswith("en"):
+            return normalized
 
     # 2. Check OS Environment variable
     env_lang = os.getenv("CLI_LANG")
     if env_lang:
-        env_lang = env_lang.lower()
-        if env_lang in ["tr", "en", "zh"]:
-            return env_lang
+        normalized = normalize_locale(env_lang)
+        if normalized != "en" or env_lang.lower().startswith("en"):
+            return normalized
 
     # 3. Detect system default display language
     try:
         sys_lang, _ = locale.getdefaultlocale()
         if sys_lang:
-            sys_lang = sys_lang.lower()
-            if sys_lang.startswith("tr"):
-                return "tr"
-            elif sys_lang.startswith("zh"):
-                return "zh"
+            normalized = normalize_locale(sys_lang)
+            if normalized != "en" or sys_lang.lower().startswith("en"):
+                return normalized
     except Exception:
         pass
 

@@ -8,8 +8,7 @@
     "cmd_example": "示例: python orion.py prod",
     "err_file_not_found": "错误: 在 {dir} 下未找到文件 '{name}'！",
     "err_unknown_command": "错误: 未知命令 '{cmd}'",
-    
-    "stop_title": "Orion Router — 紧急停止",
+    "stop_title": "Orion Router - 停止",
     "stopping_pg_label": "正在停止 {label} PostgreSQL...",
     "stopped_pg_label": "{label} PostgreSQL 已停止",
     "docker_cleaning_port": "    端口 {port} 已被 Docker 使用。正在停止容器 ({cid})...",
@@ -19,7 +18,6 @@
     "all_pg_killed": "    所有 postgres.exe 进程已被强制关闭",
     "cleaning_ports": "正在清理端口: {ports}...",
     "all_services_cleared": "所有服务和端口已清理。",
-    
     "err_lock_fail": "错误: 另一个 Orion Router 实例正在运行 (端口可能已被占用)。",
     "dev_title": "Orion Router — 开发环境",
     "prod_title": "Orion Router",
@@ -45,7 +43,6 @@
     "all_services_shutdown": "所有服务已关闭。",
     "service_crashed_multi": "其中一个服务意外关闭: {names}",
     "service_crashed_single": "服务意外关闭。",
-    
     "config_env_copied": "[orion-router] 未找到 .env 文件；已从 .env.example 复制创建 .env。",
     "config_key_created": "[orion-router] 已生成新的 ENCRYPTION_KEY 并添加到 .env 文件中。",
     "config_key_failed": "[orion-router] 无法生成 ENCRYPTION_KEY: {e}",
