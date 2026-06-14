@@ -921,3 +921,67 @@ footer a:hover {
         font-size: 0.82rem;
     }
 }
+
+/* Always keep code blocks Left-To-Right and Left-Aligned */
+pre, code, .code-content, .editor-body, .panel-body {
+    direction: ltr !important;
+    text-align: left !important;
+}
+
+/* RTL Text direction and alignment overrides (preserving layout grids) */
+html.rtl-active h1,
+html.rtl-active h2,
+html.rtl-active h3,
+html.rtl-active h4,
+html.rtl-active p,
+html.rtl-active span,
+html.rtl-active a {
+    direction: rtl;
+}
+
+html.rtl-active .feature-card h3,
+html.rtl-active .feature-card p,
+html.rtl-active .panel-footer span {
+    text-align: right;
+}
+
+/* Align feature card icons to the right side of the card in RTL */
+html.rtl-active .feat-icon {
+    align-self: flex-end;
+}
+
+/* Exclude code elements, brand identity, control panels, and buttons from text-level RTL styling */
+html.rtl-active pre,
+html.rtl-active code,
+html.rtl-active .code-content,
+html.rtl-active .editor-body,
+html.rtl-active .panel-body,
+html.rtl-active .logo,
+html.rtl-active .logo-icon,
+html.rtl-active #orion-brand-text,
+html.rtl-active .panel-header,
+html.rtl-active .tab-buttons,
+html.rtl-active .os-buttons,
+html.rtl-active .editor-panel,
+html.rtl-active .lang,
+html.rtl-active .copy-btn,
+html.rtl-active .lang-selector-container {
+    direction: ltr !important;
+    text-align: left !important;
+}
+
+/* Keep navigation container alignment LTR but set text flow of links to RTL */
+html.rtl-active .nav-links {
+    direction: ltr !important;
+}
+html.rtl-active .nav-links a {
+    direction: rtl !important;
+}
+
+/* Center aligned elements must remain centered */
+html.rtl-active .text-center h2,
+html.rtl-active .text-center p,
+html.rtl-active #orion-main-headline,
+html.rtl-active #orion-main-description {
+    text-align: center !important;
+}

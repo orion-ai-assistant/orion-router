@@ -1,4 +1,4 @@
-const LOCALES = ["en", "vi", "zh-CN", "zh-TW", "ja", "pt-BR", "pt-PT", "ko", "es", "de", "fr", "he", "ar", "ru", "pl", "cs", "nl", "tr", "uk", "tl", "id", "th", "hi", "bn", "ur", "ro", "sv", "it", "el", "hu", "fi", "da", "no"];
+const LOCALES = ["en", "vi", "zh-CN", "zh-TW", "ja", "pt-BR", "pt-PT", "ko", "es", "de", "fr", "he", "ar", "ru", "pl", "cs", "nl", "tr", "uk", "tl", "id", "th", "hi", "bn", "ur", "ro", "sv", "it", "el", "hu", "fi", "da", "no", "fa", "ms", "sw", "ta", "te", "mr", "sk", "bg", "sr", "hr"];
 const DEFAULT_LOCALE = "en";
 const LOCALE_COOKIE = "locale";
 
@@ -35,7 +35,17 @@ const LOCALE_NAMES = {
   "hu": "Magyar",
   "fi": "Suomi",
   "da": "Dansk",
-  "no": "Norsk"
+  "no": "Norsk",
+  "fa": "فارسی",
+  "ms": "Bahasa Melayu",
+  "sw": "Kiswahili",
+  "ta": "தமிழ்",
+  "te": "తెలుగు",
+  "mr": "मराठी",
+  "sk": "Slovenčina",
+  "bg": "Български",
+  "sr": "Српски",
+  "hr": "Hrvatski"
 };
 
 function normalizeLocale(locale) {
@@ -126,6 +136,17 @@ function isSupportedLocale(locale) {
         
         window.ORION_CURRENT_LANG = normalized;
         document.documentElement.lang = normalized;
+        
+        // Handle RTL layouts (without flipping the global flex grids and logo/buttons)
+        const rtlLocales = ["fa", "ar", "he", "ur"];
+        if (rtlLocales.includes(normalized)) {
+            document.documentElement.dir = "ltr";
+            document.documentElement.classList.add("rtl-active");
+        } else {
+            document.documentElement.dir = "ltr";
+            document.documentElement.classList.remove("rtl-active");
+        }
+        
         setStoredLanguage(normalized);
 
         const translateElements = document.querySelectorAll('[data-i18n]');

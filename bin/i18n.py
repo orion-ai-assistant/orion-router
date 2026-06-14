@@ -6,7 +6,8 @@ from pathlib import Path
 SUPPORTED_LOCALES = [
     "en", "vi", "zh-CN", "zh-TW", "ja", "pt-BR", "pt-PT", "ko", "es", "de", 
     "fr", "he", "ar", "ru", "pl", "cs", "nl", "tr", "uk", "tl", "id", "th", 
-    "hi", "bn", "ur", "ro", "sv", "it", "el", "hu", "fi", "da", "no"
+    "hi", "bn", "ur", "ro", "sv", "it", "el", "hu", "fi", "da", "no",
+    "fa", "ms", "sw", "ta", "te", "mr", "sk", "bg", "sr", "hr"
 ]
 
 def normalize_locale(locale_str: str) -> str:
