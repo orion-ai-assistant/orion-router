@@ -66,6 +66,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 from bin.i18n import t
 from core.lifespan import print_active_services_banner
+from bin.pg_integrity import generate_manifest, verify_manifest
+from bin.npm_integrity import npm_needs_install, record_npm_install
 TOOLS_DIR = ROOT / "tools"
 PG_BIN    = TOOLS_DIR / "pgsql" / "bin"
 PG_DATA   = ROOT / ".pgdata-dev"
@@ -257,15 +259,7 @@ def _download_progress(block_num: int, block_size: int, total: int) -> None:
             print(f"    [{bar}] {pct:3d}%  {mb:5.1f} MB", flush=True)
 
 def download_postgres() -> None:
-    # Verify that all key binaries and directories exist. If any are missing, the installation is considered corrupt/incomplete.
-    required_paths = [
-        PG_CTL,
-        PG_BIN / "postgres.exe",
-        INITDB,
-        TOOLS_DIR / "pgsql" / "lib",
-        TOOLS_DIR / "pgsql" / "share",
-    ]
-    if all(path.exists() for path in required_paths):
+    if verify_manifest(TOOLS_DIR):
         return
 
     print()
@@ -279,6 +273,7 @@ def download_postgres() -> None:
     with zipfile.ZipFile(PG_ZIP, "r") as zf:
         zf.extractall(TOOLS_DIR)
     PG_ZIP.unlink(missing_ok=True)
+    generate_manifest(TOOLS_DIR, "postgresql-16.3-1-windows-x64-binaries")
     ok(t("pg_ready"))
 
 def init_database() -> None:
@@ -454,6 +449,14 @@ def launch(router_port: str) -> list[tuple[str, subprocess.Popen]]:
     procs.append(("FastAPI", backend))
 
     # Next.js frontend
+    if npm_needs_install(DASHBOARD):
+        dim("Installing dashboard dependencies...")
+        result_npm = run(["npm", "install"], cwd=DASHBOARD, shell=True)
+        if result_npm.returncode != 0:
+            err("Failed to install dashboard dependencies")
+            sys.exit(1)
+        record_npm_install(DASHBOARD)
+
     frontend = subprocess.Popen(
         ["npm", "run", "dev", "--", "-p", str(UI_PORT), "-H", "0.0.0.0"],
         cwd=DASHBOARD,

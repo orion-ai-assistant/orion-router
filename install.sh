@@ -41,21 +41,10 @@ echo "✔ Requirements met (${REQUIRED_CMDS[*]})."
 # 2. Repo Clone or Update
 echo -e "\n[2/5] Setting up Orion Router directory..."
 
-PID_FILE="$INSTALL_DIR/.orion.pid"
-if [ -f "$PID_FILE" ]; then
-    OLD_PID=$(cat "$PID_FILE")
     STOP_SCRIPT="$INSTALL_DIR/bin/stop.py"
     if [ -f "$STOP_SCRIPT" ]; then
-        python3 "$STOP_SCRIPT" >/dev/null 2>&1 || true
+        python3 "$STOP_SCRIPT" --quiet >/dev/null 2>&1 || true
     fi
-    if ps -p "$OLD_PID" > /dev/null 2>&1; then
-        pkill -P "$OLD_PID" 2>/dev/null || true
-        kill -9 "$OLD_PID" 2>/dev/null || true
-        sleep 1
-        echo "[!] Stale background Orion Router process terminated."
-    fi
-    rm -f "$PID_FILE"
-fi
 
 if [ ! -d "$INSTALL_DIR" ]; then
   # Case 1: No folder at all — fresh clone
@@ -182,21 +171,9 @@ elif [ "$ACTION" = "start" ]; then
 elif [ "$ACTION" = "stop" ]; then
     STOP_SCRIPT="$PROJECT_DIR/bin/stop.py"
     if [ -f "$STOP_SCRIPT" ]; then
-        python3 "$STOP_SCRIPT" >/dev/null 2>&1 || true
+        python3 "$STOP_SCRIPT" || true
     fi
-    if [ -f "$PID_FILE" ]; then
-        PID=$(cat "$PID_FILE")
-        if ps -p "$PID" > /dev/null 2>&1; then
-            pkill -P "$PID" 2>/dev/null || true
-            kill -9 "$PID" 2>/dev/null || true
-            echo "[OK] Orion Router main and child processes stopped."
-        else
-            echo "Process already terminated."
-        fi
-        rm -f "$PID_FILE"
-    else
-        echo "[OK] Orion Router stopped (any background databases/ports cleared)."
-    fi
+    echo "[OK] Orion Router stopped."
 elif [ "$ACTION" = "logs" ]; then
     if [ -f "$ERROR_LOG_FILE" ]; then
         echo -e "\n[!] RECENT ERRORS (orion_error.log):"
