@@ -52,7 +52,7 @@ def run_silent(cmd):
 def stop_pg(data_dir: Path, label: str) -> bool:
     if data_dir.exists() and PG_CTL.exists():
         if not QUIET_MODE: info(t("stopping_pg_label", label=label))
-        run_silent([str(PG_CTL), "-D", str(data_dir), "stop"])
+        run_silent([str(PG_CTL), "-D", str(data_dir), "-t", "5", "stop"])
         if QUIET_MODE: ok(t("stopped_pg_label", label=label))
         else: ok(t("stopped_pg_label", label=label))
         return True

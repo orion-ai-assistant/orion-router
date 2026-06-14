@@ -197,7 +197,7 @@ def kill_portable_postgres() -> None:
     pid_file = PG_DATA / "postmaster.pid"
 
     if PG_DATA.exists() and PG_CTL.exists():
-        run_silent([str(PG_CTL), "-D", str(PG_DATA), "-m", "fast", "stop"])
+        run_silent([str(PG_CTL), "-D", str(PG_DATA), "-t", "5", "-m", "fast", "stop"])
 
     killed_any = False
     if pid_file.exists():
@@ -387,7 +387,7 @@ def wait_for_postgres(timeout: float = 15.0) -> None:
     sys.exit(1)
 
 def stop_postgres() -> None:
-    run_silent([str(PG_CTL), "-D", str(PG_DATA), "stop"])
+    run_silent([str(PG_CTL), "-D", str(PG_DATA), "-t", "5", "stop"])
 
 def setup_db_and_user() -> None:
     info(t("configuring_db_user"))

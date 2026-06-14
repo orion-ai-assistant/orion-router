@@ -196,7 +196,7 @@ def kill_portable_postgres() -> None:
 
     # 1. Adim: pg_ctl stop ile nazikce kapat (en temiz yol)
     if PG_DATA.exists() and PG_CTL.exists():
-        run_silent([str(PG_CTL), "-D", str(PG_DATA), "-m", "fast", "stop"])
+        run_silent([str(PG_CTL), "-D", str(PG_DATA), "-t", "5", "-m", "fast", "stop"])
 
     # 2. Adim: postmaster.pid'den PID oku, hala calisiyor mu kontrol et
     killed_any = False
@@ -389,7 +389,7 @@ def wait_for_postgres(timeout: float = 15.0) -> None:
     sys.exit(1)
 
 def stop_postgres() -> None:
-    run_silent([str(PG_CTL), "-D", str(PG_DATA), "stop"])
+    run_silent([str(PG_CTL), "-D", str(PG_DATA), "-t", "5", "stop"])
 
 def setup_db_and_user() -> None:
     info(t("configuring_db_user"))
