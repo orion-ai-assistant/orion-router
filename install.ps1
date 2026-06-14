@@ -138,6 +138,8 @@ if ($Mode -eq "local") {
     $lines.Add('$LogFile    = Join-Path $ProjectPath "orion_output.log"')
     $lines.Add('$ErrFile    = Join-Path $ProjectPath "orion_error.log"')
     $lines.Add('')
+    $lines.Add('$PreviousLocation = Get-Location')
+    $lines.Add('try {')
     $lines.Add('if ($Action -in @("help","")) {')
     $lines.Add('    Write-Host ""')
     $lines.Add('    Write-Host "  Orion Router CLI" -ForegroundColor Cyan')
@@ -187,6 +189,9 @@ if ($Mode -eq "local") {
     $lines.Add('        Get-Content $LogFile -Wait -Tail 20 -Encoding UTF8')
     $lines.Add('    } else { Write-Host "No log file exists yet." -ForegroundColor Red }')
     $lines.Add('} else { Write-Host "Invalid command. Type: orionrouter help" -ForegroundColor Red }')
+    $lines.Add('} finally {')
+    $lines.Add('    Set-Location $PreviousLocation')
+    $lines.Add('}')
 } else {
     $lines = [System.Collections.Generic.List[string]]::new()
     $lines.Add('param ([Parameter(Position=0)][string]$Action = "help")')
@@ -194,6 +199,8 @@ if ($Mode -eq "local") {
     $lines.Add('$ProjectPath = "$env:LOCALAPPDATA\OrionRouter"')
     $lines.Add('$ComposeFile = "docker-compose.ghcr.yml"')
     $lines.Add('')
+    $lines.Add('$PreviousLocation = Get-Location')
+    $lines.Add('try {')
     $lines.Add('if ($Action -in @("help","")) {')
     $lines.Add('    Write-Host ""')
     $lines.Add('    Write-Host "  Orion Router CLI (Docker Mode)" -ForegroundColor Cyan')
@@ -241,6 +248,9 @@ if ($Mode -eq "local") {
     $lines.Add('    Set-Location $ProjectPath')
     $lines.Add('    docker compose -f $ComposeFile -p orion-router logs -f')
     $lines.Add('} else { Write-Host "Invalid command. Type: orionrouter help" -ForegroundColor Red }')
+    $lines.Add('} finally {')
+    $lines.Add('    Set-Location $PreviousLocation')
+    $lines.Add('}')
 }
 
 $ScriptCode = $lines -join "`r`n"

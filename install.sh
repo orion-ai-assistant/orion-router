@@ -41,10 +41,10 @@ echo "✔ Requirements met (${REQUIRED_CMDS[*]})."
 # 2. Repo Clone or Update
 echo -e "\n[2/5] Setting up Orion Router directory..."
 
-    STOP_SCRIPT="$INSTALL_DIR/bin/stop.py"
-    if [ -f "$STOP_SCRIPT" ]; then
-        python3 "$STOP_SCRIPT" --quiet >/dev/null 2>&1 || true
-    fi
+STOP_SCRIPT="$INSTALL_DIR/bin/stop.py"
+if [ -f "$STOP_SCRIPT" ]; then
+  python3 "$STOP_SCRIPT" --quiet >/dev/null 2>&1 || true
+fi
 
 if [ ! -d "$INSTALL_DIR" ]; then
   # Case 1: No folder at all — fresh clone
@@ -134,6 +134,9 @@ PID_FILE="$PROJECT_DIR/.orion.pid"
 LOG_FILE="$PROJECT_DIR/orion_output.log"
 ERROR_LOG_FILE="$PROJECT_DIR/orion_error.log"
 
+ORIGINAL_DIR=$(pwd)
+trap 'cd "$ORIGINAL_DIR"' EXIT
+
 if [ "$ACTION" = "help" ] || [ -z "$ACTION" ]; then
     echo ""
     echo "  Orion Router CLI"
@@ -193,6 +196,9 @@ cat > "$CLI_SCRIPT" << 'EOF'
 ACTION="${1:-help}"
 PROJECT_DIR="$HOME/.orion-router"
 COMPOSE_FILE="docker-compose.ghcr.yml"
+
+ORIGINAL_DIR=$(pwd)
+trap 'cd "$ORIGINAL_DIR"' EXIT
 
 if [ "$ACTION" = "help" ] || [ -z "$ACTION" ]; then
     echo ""
