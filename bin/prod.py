@@ -272,7 +272,22 @@ def download_postgres() -> None:
     ok(t("download_complete"))
     info(t("extracting_archive"))
     with zipfile.ZipFile(PG_ZIP, "r") as zf:
-        zf.extractall(TOOLS_DIR)
+        namelist = zf.namelist()
+        total_files = len(namelist)
+        last_pct = -1
+        for i, member in enumerate(namelist, 1):
+            zf.extract(member, TOOLS_DIR)
+            pct = int(i * 100 / total_files)
+            if pct != last_pct:
+                last_pct = pct
+                bar = "█" * (pct // 5) + "░" * (20 - pct // 5)
+                if sys.stdout.isatty():
+                    print(f"\r    [{bar}] {pct:3d}%  ({i}/{total_files} files)", end="", flush=True)
+                else:
+                    if pct % 10 == 0:
+                        print(f"    [{bar}] {pct:3d}%  ({i}/{total_files} files)", flush=True)
+        if sys.stdout.isatty():
+            print()
     PG_ZIP.unlink(missing_ok=True)
     generate_manifest(TOOLS_DIR, "postgresql-16.3-1-windows-x64-binaries")
     ok(t("pg_ready"))
