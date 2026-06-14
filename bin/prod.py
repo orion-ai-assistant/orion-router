@@ -249,7 +249,7 @@ def _download_progress(block_num: int, block_size: int, total: int) -> None:
     print(f"\r    [{bar}] {pct:3d}%  {mb:5.1f} MB", end="", flush=True)
 
 def download_postgres() -> None:
-    if PG_BIN.exists():
+    if PG_CTL.exists():  # Check for the actual binary, not just the directory
         return
     print()
     info(t("pg_not_found_downloading"))

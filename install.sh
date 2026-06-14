@@ -53,18 +53,34 @@ if [ -f "$PID_FILE" ]; then
     rm -f "$PID_FILE"
 fi
 
-if [ ! -d "$INSTALL_DIR/.git" ]; then
-  if [ -d "$INSTALL_DIR" ]; then
-    rm -rf "$INSTALL_DIR"
-  fi
+if [ ! -d "$INSTALL_DIR" ]; then
+  # Case 1: No folder at all — fresh clone
+  echo "[OK] Cloning fresh copy from GitHub..."
   git clone "$REPO_URL" "$INSTALL_DIR"
+
+elif [ ! -d "$INSTALL_DIR/.git" ]; then
+  # Case 2: Folder exists but no .git — init in-place (avoids rm -rf on locked dirs)
+  echo "[!] Folder exists but has no git repository. Initializing in-place..."
+  cd "$INSTALL_DIR"
+  git init
+  # Safely set remote (remove if exists, then add)
+  git remote remove origin 2>/dev/null || true
+  git remote add origin "$REPO_URL"
+  git fetch origin main || { echo "[ERROR] git fetch failed. Check your internet connection."; exit 1; }
+  git reset --hard origin/main || { echo "[ERROR] git reset failed."; exit 1; }
+  echo "✔ Repository initialized and updated."
+
 else
+  # Case 3: Folder + .git exist — ensure remote is correct URL then update
   echo "✔ Directory exists, forcing updates from GitHub..."
   cd "$INSTALL_DIR"
+  # Fix remote URL in case it was broken by a previous failed install
+  git remote set-url origin "$REPO_URL" 2>/dev/null || git remote add origin "$REPO_URL"
   git fetch origin main || { echo "[ERROR] git fetch failed. There might be a connection issue."; exit 1; }
   git reset --hard origin/main || { echo "[ERROR] Resetting/updating code failed."; exit 1; }
 fi
 cd "$INSTALL_DIR"
+
 
 # --- Smart .env Check ---
 echo -e "\n[*] Checking .env file..."
