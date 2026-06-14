@@ -239,11 +239,22 @@ def free_ports(router_port: str) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _download_progress(block_num: int, block_size: int, total: int) -> None:
+    if not hasattr(_download_progress, "last_pct"):
+        _download_progress.last_pct = -1
+
     done = min(block_num * block_size, total)
+    if total <= 0: return
     pct  = int(done * 100 / total)
-    bar  = "█" * (pct // 5) + "░" * (20 - pct // 5)
     mb   = done / 1_048_576
-    print(f"\r    [{bar}] {pct:3d}%  {mb:5.1f} MB", end="", flush=True)
+    bar  = "█" * (pct // 5) + "░" * (20 - pct // 5)
+
+    if sys.stdout.isatty():
+        print(f"\r    [{bar}] {pct:3d}%  {mb:5.1f} MB", end="", flush=True)
+    else:
+        # Log dosyasina yaziliyorsa asiri log sismesini engellemek icin her %10'da bir yazdir
+        if pct % 10 == 0 and pct != _download_progress.last_pct:
+            _download_progress.last_pct = pct
+            print(f"    [{bar}] {pct:3d}%  {mb:5.1f} MB", flush=True)
 
 def download_postgres() -> None:
     if PG_BIN.exists():
