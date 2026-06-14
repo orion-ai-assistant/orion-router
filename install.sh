@@ -162,11 +162,7 @@ elif [ "$ACTION" = "start" ]; then
     nohup python3 orion.py prod > "$LOG_FILE" 2> "$ERROR_LOG_FILE" &
     echo $! > "$PID_FILE"
     
-    echo "[OK] Orion Router started running in the background!"
-    echo "[OK] You can now use these commands: orionrouter start | stop | logs | help"
-    echo "----------------------------------------------------"
-    echo "  Streaming live logs... (Press Ctrl+C to exit)"
-    echo "----------------------------------------------------"
+    echo "Streaming live logs... (Press Ctrl+C to exit)"
     tail -f "$LOG_FILE"
 elif [ "$ACTION" = "stop" ]; then
     STOP_SCRIPT="$PROJECT_DIR/bin/stop.py"
@@ -244,11 +240,7 @@ elif [ "$ACTION" = "start" ]; then
     echo "Starting Orion Router on Docker (with GHCR Images)..."
     cd "$PROJECT_DIR"
     docker compose -f "$COMPOSE_FILE" -p orion-router up -d
-    echo "[OK] Container started! To stop, type 'orionrouter stop'."
-    echo "[OK] You can now use these commands: orionrouter start | stop | logs | help"
-    echo "----------------------------------------------------"
-    echo "  Streaming live logs... (Press Ctrl+C to exit)"
-    echo "----------------------------------------------------"
+    echo "Streaming live logs... (Press Ctrl+C to exit)"
     docker compose -f "$COMPOSE_FILE" -p orion-router logs -f
 elif [ "$ACTION" = "stop" ]; then
     echo "Stopping Orion Router on Docker..."
@@ -281,8 +273,6 @@ export PATH="$INSTALL_DIR:$PATH"
 echo ""
 echo "[OK] Installation complete."
 echo "[OK] 'orionrouter' command is ready in this terminal and new ones."
-echo "     Available commands: orionrouter start | stop | logs | help"
-echo "     You can close this terminal after starting."
 echo "[OK] Starting Orion Router..."
 
 orionrouter start

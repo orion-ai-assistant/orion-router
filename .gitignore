@@ -36,7 +36,13 @@ Thumbs.db
 .pgdata-dev/
 .pgdata-prod/
 tools/pgsql/
+tools/pgsql.manifest
+tools/postgresql.zip
 
-# Orion lock files
+# Orion lock & pid files
 .orion.dev.lock
 .orion.prod.lock
+.orion.pid
+
+# Dashboard generated
+dashboard/.npm_lockfile_hash

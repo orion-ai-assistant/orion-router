@@ -163,12 +163,7 @@ if ($Mode -eq "local") {
     $lines.Add('    Set-Location $ProjectPath')
     $lines.Add('    $p = Start-Process -FilePath "python" -ArgumentList "orion.py","prod" -RedirectStandardOutput $LogFile -RedirectStandardError $ErrFile -PassThru -WindowStyle Hidden')
     $lines.Add('    $p.Id | Out-File -FilePath $PidFile')
-    $lines.Add('    Write-Host "[OK] Orion Router started in the background!" -ForegroundColor Green')
-    $lines.Add('    Write-Host "[OK] Commands: orionrouter start | stop | logs | help" -ForegroundColor Cyan')
-    $lines.Add('    Write-Host "[OK] You can close this terminal; Orion Router continues running." -ForegroundColor Cyan')
-    $lines.Add('    Write-Host "----------------------------------------------------" -ForegroundColor Gray')
-    $lines.Add('    Write-Host "  Streaming live logs... (Ctrl+C to exit)" -ForegroundColor Magenta')
-    $lines.Add('    Write-Host "----------------------------------------------------" -ForegroundColor Gray')
+    $lines.Add('    Write-Host "Streaming live logs... (Ctrl+C to exit)" -ForegroundColor Magenta')
     $lines.Add('    Get-Content $LogFile -Wait -Tail 10 -Encoding UTF8')
     $lines.Add('} elseif ($Action -eq "stop") {')
     $lines.Add('    $StopScript = Join-Path $ProjectPath "bin\stop.py"')
@@ -235,11 +230,7 @@ if ($Mode -eq "local") {
     $lines.Add('    Write-Host "Starting Orion Router on Docker (GHCR Images)..." -ForegroundColor Cyan')
     $lines.Add('    Set-Location $ProjectPath')
     $lines.Add('    docker compose -f $ComposeFile -p orion-router up -d')
-    $lines.Add('    Write-Host "[OK] Container started! Type: orionrouter stop to stop." -ForegroundColor Green')
-    $lines.Add('    Write-Host "[OK] Commands: orionrouter start | stop | logs | help" -ForegroundColor Cyan')
-    $lines.Add('    Write-Host "----------------------------------------------------" -ForegroundColor Gray')
-    $lines.Add('    Write-Host "  Streaming live logs... (Ctrl+C to exit)" -ForegroundColor Magenta')
-    $lines.Add('    Write-Host "----------------------------------------------------" -ForegroundColor Gray')
+    $lines.Add('    Write-Host "Streaming live logs... (Ctrl+C to exit)" -ForegroundColor Magenta')
     $lines.Add('    docker compose -f $ComposeFile -p orion-router logs -f')
     $lines.Add('} elseif ($Action -eq "stop") {')
     $lines.Add('    Write-Host "Stopping Orion Router on Docker..." -ForegroundColor Yellow')
@@ -299,7 +290,6 @@ Set-Content -Path $PROFILE -Value $CurrentProfile.Trim()
 Write-Host ""
 Write-Host "[OK] Installation complete." -ForegroundColor Green
 Write-Host "[OK] 'orionrouter' command is ready in this terminal and new ones." -ForegroundColor Cyan
-Write-Host "     Commands: orionrouter start | stop | logs | help" -ForegroundColor Cyan
-Write-Host "[OK] Starting Orion Router..." -ForegroundColor Green
+Write-Host "[OK] Starting Orion Router..." -ForegroundColor Yellow
 
 & (Join-Path $TargetFolder "orionrouter.ps1") start
