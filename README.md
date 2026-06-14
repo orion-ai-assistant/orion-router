@@ -1,122 +1,90 @@
 # Orion Custom Service Router — AI Gateway
 
-Orion projesinin **AI Gateway (Router)** katmanı. İstemcilerden ve worker'lardan gelen tüm yapay zeka (LLM, Embedding, TTS, Dosya Yükleme) isteklerini tek bir merkezde toplar, yetkilendirir ve ilgili sağlayıcılara (OpenAI, OpenRouter, Gemini, Local) dinamik olarak yönlendirir.
+**English** | [Türkçe](README.tr.md) | [中文](README.zh-CN.md)
 
-## 🤔 Bu Proje Nedir ve Amacı Ne?
+Orion project's **AI Gateway (Router)** layer. It centrally collects, authorizes, and dynamically routes all AI requests (LLM, Embedding, TTS, File Upload) from clients and workers to the relevant providers (OpenAI, OpenRouter, Gemini, Local).
 
-Orion Router, yapay zeka modelleriyle çalışan uygulamalarınız ve ekipleriniz için **kendi kişisel "OpenAI" ağ geçidinizi** (gateway) kurmanızı sağlar.
+To install and start using Orion Router on your system, please visit our website. *(Note: Our website offers documentation in multiple languages!)*
 
-* **Tek API, Tüm Modeller:** Uygulamalarınızı sadece Orion Router'a bağlarsınız. Arka planda OpenAI, Anthropic, Gemini, OpenRouter veya kendi sunucunuzdaki yerel modelleri kullanabilirsiniz. Kodunuzu değiştirmeden sağlayıcı değiştirebilir veya çöken API'lardan anında yedeğe geçebilirsiniz (Fallback).
-* **Güvenlik ve Gizlilik:** Gerçek API anahtarlarınız (Upstream Keys) sunucunuzda güvende kalır. İstemcilere ve takım arkadaşlarınıza sadece sizin belirlediğiniz **Sanal Anahtarları (Virtual Keys)** verirsiniz.
-* **Maliyet Yönetimi:** Hangi kullanıcının veya projenin ne kadar harcadığını takip edebilir, bütçe limitleri koyabilirsiniz.
-* **Hazır Dashboard:** İstekleri, maliyetleri, logları takip edebileceğiniz ve modelleri test edebileceğiniz modern bir arayüz ile gelir.
+👉 **[Website (Documentation & Installation)](https://krstalacam.github.io/orion-router/)** 👈
 
-## 💡 Nasıl Kullanılır?
+---
 
-Orion Router, **tamamen OpenAI API uyumlu** çalışacak şekilde tasarlanmıştır. Herhangi bir OpenAI kütüphanesinde (Python, Node.js, LangChain vs.) sadece `base_url` ve `api_key` değiştirerek Orion'u anında sisteminize entegre edebilirsiniz!
+## 🤔 What is this project and its purpose?
 
-**Örnek Python (OpenAI SDK) Kullanımı:**
+Orion Router allows you to build **your own personal "OpenAI" gateway** for your AI-powered applications and teams.
+
+* **Single API, All Models:** Connect your applications only to Orion Router. In the background, you can use OpenAI, Anthropic, Gemini, OpenRouter, or your own local server models. You can switch providers without changing your code or instantly fallback from crashed APIs.
+* **Security and Privacy:** Your actual API keys (Upstream Keys) remain secure on your server. You only provide **Virtual Keys** that you define to your clients and teammates.
+* **Cost Management:** You can track how much each user or project spends and set budget limits.
+* **Built-in Dashboard:** It comes with a modern interface where you can track requests, costs, logs, and test models.
+
+## 💡 How to Use?
+
+Orion Router is designed to work **fully compatible with the OpenAI API**. In any OpenAI library (Python, Node.js, LangChain, etc.), you can instantly integrate Orion into your system by simply changing the `base_url` and `api_key`!
+
+**Example Python (OpenAI SDK) Usage:**
 
 ```python
 import openai
 
-# OpenAI client'ını Orion Router'a yönlendiriyoruz
+# Routing the OpenAI client to Orion Router
 client = openai.OpenAI(
-    base_url="http://localhost:20128/v1", # Orion Router sunucu adresiniz
-    api_key="orion-sanal-anahtariniz"     # Dashboard üzerinden ürettiğiniz sanal anahtar
+    base_url="http://localhost:20128/v1", # Your Orion Router server address
+    api_key="your-orion-virtual-key"      # The virtual key you generated via Dashboard
 )
 
 response = client.chat.completions.create(
     model="gemini-3.1-flash-lite", 
-    messages=[{"role": "user", "content": "Merhaba Orion!"}],
+    messages=[{"role": "user", "content": "Hello Orion!"}],
     temperature=0.7, 
     tools=[], 
     extra_body={
-        "thinking_level": "medium" # Düşünme kapasitesi; "low" - "high" veya token bütçesi: 1024, 8192 vb. (modelin desteklemesi gerekir)
+        "thinking_level": "medium" # Thinking capacity; "low" - "high" or token budget: 1024, 8192, etc. (must be supported by the model)
     }
 )
 
 print(response.choices[0].message.content)
 ```
 
-> **🧠 Gelişmiş Parametre Çevirisi:** Orion Router; `temperature`, `tools` (Fonksiyon çağırma/Function Calling) ve `thinking_level` (Düşünme Bütçesi) gibi özellikleri evrensel olarak destekler. Siz sadece standart formatta isteği gönderirsiniz, Orion Router arka planda bu parametreleri hedeflenen sağlayıcının (OpenAI, Gemini, Anthropic vb.) anlayacağı doğru yapıya (örn. *reasoning_effort*, *thinking_budget*) otomatik olarak adapte eder!
+> **🧠 Advanced Parameter Translation:** Orion Router universally supports features like `temperature`, `tools` (Function Calling), and `thinking_level` (Thinking Budget). You just send the request in standard format, and Orion Router automatically adapts these parameters in the background to the correct structure understood by the target provider (e.g., *reasoning_effort*, *thinking_budget*)!
 
-## ✨ Öne Çıkan Özellikler
+## ✨ Key Features
 
-* **Dinamik Yönlendirme:** Çöken API'larda otomatik olarak fallback (yedek) sağlayıcılara geçiş.
-* **Bütçe ve Limit Kontrolü:** İstemcilere özel sanal anahtarlar (virtual keys) atayarak harcamaları kısıtlama.
-* **Gizlilik Odaklı:** Gerçek API anahtarlarınızı (Upstream Keys) asla dışarı sızdırmaz.
-* **Genişletilebilir Mimari:** Tek bir Python dosyası ekleyerek sisteme yeni bir AI sağlayıcısı entegre edebilme.
-* **Dahili Dashboard:** İstekleri, maliyetleri ve logları takip edebileceğiniz, dahili test alanı (Playground) sunan modern arayüz.
-
----
-
-## 🚀 Hızlı Başlangıç (Önerilen)
-
-Projeyi sisteminize kurmanın en hızlı yolu **Docker** kullanmaktır. Repoyu klonlamanıza bile gerek yoktur. Terminalinize aşağıdaki komutu yapıştırarak tüm sistemi tek seferde ayağa kaldırabilirsiniz.
-
-**Windows (PowerShell):**
-
-```powershell
-powershell -ep bypass -c "& ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/krstalacam/orion-router/main/install.ps1'))) docker"
-```
-
-**macOS / Linux (Bash):**
-
-```bash
-curl -sL https://raw.githubusercontent.com/krstalacam/orion-router/main/install.sh | bash
-```
-
-Bu scriptler Docker kontrolü yapar, gerekli compose dosyasını indirir, `orion-network` ağını oluşturur ve servisi ayağa kaldırır.
-
-Kurulum tamamlandığında panele 👉 **`http://localhost:20128/dashboard`** adresinden erişebilirsiniz.
-
-> *Not:* API anahtarlarınızı `.env` dosyası yerine doğrudan Dashboard üzerindeki **Key Pool** menüsünden güvenle ekleyebilirsiniz.
+* **Dynamic Routing:** Automatic fallback to backup providers for crashed APIs.
+* **Budget and Limit Control:** Restricting expenses by assigning custom virtual keys to clients.
+* **Privacy Focused:** Never leaks your actual API keys (Upstream Keys).
+* **Extensible Architecture:** Ability to integrate a new AI provider into the system by adding a single Python file.
+* **Built-in Dashboard:** A modern interface offering a built-in testing area (Playground) and tracking of requests, costs, and logs.
 
 ---
 
-## 🐍 Yerel (Native) Kurulum
+## 🛠 For Developers
 
-Eğer projeyi Docker olmadan çalıştırmak isterseniz, sistemin sunduğu taşınabilir (portable) yapı sayesinde veritabanı kurmanıza gerek kalmaz.
+A basic guide for developers who want to customize the system or add new features.
 
-**Ön Koşul:** `Python 3.11+`
+### CLI Tools (`orion.py`)
 
-```bash
-git clone https://github.com/krstalacam/orion-router.git 
-cd orion-router
-python orion.py prod
-```
+You can use the `orion.py` file in the root directory to manage the development process:
 
-Bu komut; PostgreSQL'i indirir, Next.js arayüzünü derler ve tüm sistemi tek bir port (`20128`) üzerinden yayına alır.
+* `python orion.py dev` : Starts the hot-reload active development environment (PostgreSQL: 5444, API: 20129, UI: 3001).
+* `python orion.py prod` : Builds the production version and runs it on a single port.
+* `python orion.py stop` : Cleans up all background hanging ports and services.
 
----
+### 🔌 Adding a New Provider
 
-## 🛠 Geliştiriciler İçin
+`dynamic_router.py` automatically scans and loads folders under `providers/`.
 
-Sistemi özelleştirmek veya yeni özellikler eklemek isteyen geliştiriciler için temel rehber.
+**Capability File Mappings:**
+You just need to create the file for the capability you want to support under the `providers/<provider_name>/` folder:
+* `chat.py` ➔ Chat provider inherited from `BaseChat` class
+* `embeddings.py` ➔ Embedding provider inherited from `BaseEmbed` class
+* `tts.py` ➔ Text-to-Speech provider inherited from `BaseTTS` class
+* `files.py` ➔ File Upload provider inherited from `BaseFileUpload` class
 
-### CLI Araçları (`orion.py`)
+**Example: Anthropic Integration (Chat)**
 
-Geliştirme sürecini yönetmek için kök dizindeki `orion.py` dosyasını kullanabilirsiniz:
-
-* `python orion.py dev` : Hot-reload aktif geliştirme ortamını başlatır (PostgreSQL: 5444, API: 20129, UI: 3001).
-* `python orion.py prod` : Üretim sürümünü derler ve tek portta çalıştırır.
-* `python orion.py stop` : Arka planda asılı kalan tüm portları ve servisleri temizler.
-
-### 🔌 Yeni Bir Sağlayıcı (Provider) Eklemek
-
-`dynamic_router.py`, `providers/` altındaki klasörleri tarayarak otomatik yükler.
-
-**Yetenek Dosya Eşleşmeleri:**
-`providers/<provider_adi>/` klasörü altında desteklemek istediğiniz yeteneğe ait dosyayı oluşturmanız yeterlidir:
-* `chat.py` ➔ `BaseChat` sınıfından türetilen Chat sağlayıcısı
-* `embeddings.py` ➔ `BaseEmbed` sınıfından türetilen Embedding sağlayıcısı
-* `tts.py` ➔ `BaseTTS` sınıfından türetilen Text-to-Speech sağlayıcısı
-* `files.py` ➔ `BaseFileUpload` sınıfından türetilen Dosya Yükleme sağlayıcısı
-
-**Örnek: Anthropic Entegrasyonu (Chat)**
-
-1. `providers/anthropic/chat.py` dosyasını oluşturun ve `BaseChat` sınıfından miras alın:
+1. Create the `providers/anthropic/chat.py` file and inherit from the `BaseChat` class:
 
 ```python
 import os
@@ -134,7 +102,7 @@ class AnthropicChatProvider(BaseChat):
         auth_header: str | None = None,
         **kwargs,
     ) -> AsyncGenerator[Any, None]:
-        # 1. API Anahtarını al (auth_header, api_key veya env_key fallbacks)
+        # 1. Get the API Key (auth_header, api_key or env_key fallbacks)
         resolved_key = self._resolve_api_key(
             auth_header=auth_header,
             api_key=api_key,
@@ -144,11 +112,11 @@ class AnthropicChatProvider(BaseChat):
         if not resolved_key:
             raise ValueError("Anthropic Error: No API key provided.")
         
-        # 2. HTTPX AsyncClient ile hedef API'ye istek at
-        # 3. Veriyi standart formatta yield et:
+        # 2. Make request to target API using HTTPX AsyncClient
+        # 3. Yield data in standard format:
         # yield 'data: {"choices":[{"delta":{"content":"..."}}]}\n\n'
         pass
 
 ```
 
-FastAPI/Gateway yeniden başladığında, `anthropic` sağlayıcısı ve `chat` yeteneği otomatik olarak keşfedilir ve kullanıma hazır hale gelir.
+When FastAPI/Gateway restarts, the `anthropic` provider and `chat` capability are automatically discovered and ready to use.
