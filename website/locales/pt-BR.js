@@ -2,7 +2,7 @@ if (typeof ORION_TRANSLATIONS === 'undefined') {
     window.ORION_TRANSLATIONS = {};
 }
 
-window.ORION_TRANSLATIONS.pt-BR = {
+window.ORION_TRANSLATIONS["pt-BR"] = {
     "nav_home": "Início",
     "nav_architecture": "Arquitetura",
     "nav_integration": "Integração",

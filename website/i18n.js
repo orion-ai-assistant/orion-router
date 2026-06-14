@@ -104,6 +104,7 @@ function isSupportedLocale(locale) {
                 return;
             }
             const script = document.createElement('script');
+            script.charset = 'utf-8';
             script.src = `locales/${lang}.js`;
             script.onload = () => resolve();
             script.onerror = () => {

@@ -2,7 +2,7 @@ if (typeof ORION_TRANSLATIONS === 'undefined') {
     window.ORION_TRANSLATIONS = {};
 }
 
-window.ORION_TRANSLATIONS.zh-TW = {
+window.ORION_TRANSLATIONS["zh-TW"] = {
     "nav_home": "首頁",
     "nav_architecture": "架構",
     "nav_integration": "整合",

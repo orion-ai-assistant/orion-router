@@ -16,7 +16,7 @@ window.ORION_TRANSLATIONS.mr = {
     "feat_tag": "आर्किटेक्चर",
     "feat_title": "प्रगत वैशिष्ट्ये",
     "feat_subtitle": "तुमचा सध्याचा सेटअप न मोडता तुमच्या सिस्टममध्ये समाकलित होते.",
-    "feat_dropin_title": "डॉप-इन पर्याय",
+    "feat_dropin_title": "ड्रॉप-इन पर्याय",
     "feat_dropin_desc": "तुमच्या सध्याच्या प्रोजेक्ट्समध्ये फक्त <code class=\"inline-code\">base_url</code> बदलून OpenAI SDK द्वारे सर्व मॉडेल्सवर त्वरित स्विच करा.",
     "feat_trans_title": "प्रगत भाषांतर",
     "feat_trans_desc": "Gemini, ChatGPT इत्यादींसाठी योग्य स्वरूपात <code class=\"inline-code\">thinking_level</code> सारखे पॅरामीटर्स स्वयंचलितपणे रूपांतरित करते.",

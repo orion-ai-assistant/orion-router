@@ -9,7 +9,7 @@ window.ORION_TRANSLATIONS.ar = {
     "hero_title": "API موحد،<br /><span class=\"text-gradient\">جميع نماذج الذكاء الاصطناعي</span>",
     "hero_desc": "بوابة ذكية متوافقة مع OpenAI SDK، تقوم بتحويل المعلمات تلقائيًا في الخلفية.",
     "tab_docker": "Docker",
-    "tab_local": "محيلي",
+    "tab_local": "محلي",
     "os_win": "Windows",
     "os_mac": "macOS / Linux",
     "install_complete": "بعد اكتمال التثبيت:",
