@@ -16,7 +16,7 @@ from bin.i18n import t
 
 # Terminal Renkleri (ANSI)
 if sys.platform == "win32":
-    os.system("")  # Windows ANSI destegini etkinlestir
+    os.system("chcp 65001 >nul")  # UTF-8 kod sayfasini ayarla ve Windows ANSI destegini etkinlestir
     try:
         sys.stdout.reconfigure(encoding='utf-8')
         sys.stderr.reconfigure(encoding='utf-8')

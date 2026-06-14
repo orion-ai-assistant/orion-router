@@ -19,7 +19,7 @@
     "cleaning_ports": "ポートをクリーニングしています: {ports}...",
     "all_services_cleared": "すべてのサービスとポートがクリアされました。",
     "err_lock_fail": "エラー: Orion Router の別のインスタンスが実行されています (ポートが使用中の可能性があります)。",
-    "dev_title": "Orion Router — Development Environment",
+    "dev_title": "Orion Router — 開発環境",
     "prod_title": "Orion Router",
     "pg_not_found_downloading": "PostgreSQL Portable が見つかりません — ダウンロード中",
     "download_complete": "ダウンロード完了",

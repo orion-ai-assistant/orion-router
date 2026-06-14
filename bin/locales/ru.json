@@ -19,7 +19,7 @@
     "cleaning_ports": "Очистка портов: {ports}...",
     "all_services_cleared": "Все службы и порты очищены.",
     "err_lock_fail": "Ошибка: Запущен другой экземпляр Orion Router (порты могут быть заняты).",
-    "dev_title": "Orion Router — Development Environment",
+    "dev_title": "Orion Router — Среда разработки",
     "prod_title": "Orion Router",
     "pg_not_found_downloading": "PostgreSQL Portable не найден — загрузка",
     "download_complete": "Загрузка завершена",

@@ -15,7 +15,7 @@ import subprocess
 from pathlib import Path
 
 if sys.platform == "win32":
-    os.system("")
+    os.system("chcp 65001 >nul")
     try:
         sys.stdout.reconfigure(encoding='utf-8')
         sys.stderr.reconfigure(encoding='utf-8')

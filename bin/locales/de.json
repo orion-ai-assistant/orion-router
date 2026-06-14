@@ -19,7 +19,7 @@
     "cleaning_ports": "Bereinige Ports: {ports}...",
     "all_services_cleared": "Alle Dienste und Ports bereinigt.",
     "err_lock_fail": "Fehler: Eine andere Instanz von Orion Router wird bereits ausgeführt (Ports sind möglicherweise belegt).",
-    "dev_title": "Orion Router — Development Environment",
+    "dev_title": "Orion Router — Entwicklungsumgebung",
     "prod_title": "Orion Router",
     "pg_not_found_downloading": "PostgreSQL Portable nicht gefunden — wird heruntergeladen",
     "download_complete": "Download abgeschlossen",

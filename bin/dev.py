@@ -21,7 +21,7 @@ from pathlib import Path
 # Terminal Colors (ANSI — Windows 10+ destekler)
 # ─────────────────────────────────────────────────────────────────────────────
 if sys.platform == "win32":
-    os.system("")
+    os.system("chcp 65001 >nul")
     os.environ["PYTHONUTF8"] = "1"
 
     try:

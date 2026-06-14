@@ -19,7 +19,7 @@
     "cleaning_ports": "Nettoyage des ports : {ports}...",
     "all_services_cleared": "Tous les services et ports ont été nettoyés.",
     "err_lock_fail": "Erreur : Une autre instance d'Orion Router est en cours d'exécution (les ports peuvent être occupés).",
-    "dev_title": "Orion Router — Development Environment",
+    "dev_title": "Orion Router — Environnement de Développement",
     "prod_title": "Orion Router",
     "pg_not_found_downloading": "PostgreSQL Portable introuvable — téléchargement en cours",
     "download_complete": "Téléchargement terminé",

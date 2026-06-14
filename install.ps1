@@ -132,6 +132,7 @@ Write-Host "[5/5] Installing global 'orionrouter' command..." -ForegroundColor Y
 if ($Mode -eq "local") {
     $lines = [System.Collections.Generic.List[string]]::new()
     $lines.Add('param ([Parameter(Position=0)][string]$Action = "help")')
+    $lines.Add('[Console]::OutputEncoding = [System.Text.Encoding]::UTF8')
     $lines.Add('')
     $lines.Add('$ProjectPath = "$env:LOCALAPPDATA\OrionRouter"')
     $lines.Add('$PidFile    = Join-Path $ProjectPath ".orion.pid"')
@@ -195,6 +196,7 @@ if ($Mode -eq "local") {
 } else {
     $lines = [System.Collections.Generic.List[string]]::new()
     $lines.Add('param ([Parameter(Position=0)][string]$Action = "help")')
+    $lines.Add('[Console]::OutputEncoding = [System.Text.Encoding]::UTF8')
     $lines.Add('')
     $lines.Add('$ProjectPath = "$env:LOCALAPPDATA\OrionRouter"')
     $lines.Add('$ComposeFile = "docker-compose.ghcr.yml"')

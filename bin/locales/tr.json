@@ -19,7 +19,7 @@
     "cleaning_ports": "Portlar temizleniyor: {ports}...",
     "all_services_cleared": "Tüm servisler ve portlar temizlendi.",
     "err_lock_fail": "Hata: Başka bir Orion Router örneği çalışıyor (Portlar kullanımda olabilir).",
-    "dev_title": "Orion Router — Development Environment",
+    "dev_title": "Orion Router — Geliştirme Ortamı",
     "prod_title": "Orion Router",
     "pg_not_found_downloading": "PostgreSQL Portable bulunamadı — indiriliyor",
     "download_complete": "İndirme tamamlandı",
