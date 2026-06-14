@@ -298,6 +298,11 @@ $CurrentProfile = $CurrentProfile -replace "(?m)^orion-?router.*`$", ""
 Set-Content -Path $PROFILE -Value $CurrentProfile.Trim()
 
 Write-Host ""
+if ($Mode -eq "local") {
+    Write-Host "[*] Pre-fetching resources (PostgreSQL) to display live progress..." -ForegroundColor Cyan
+    python -c "import sys; sys.path.insert(0, '.'); from bin.prod import download_postgres; download_postgres(); from bin.npm_integrity import record_npm_install; from pathlib import Path; record_npm_install(Path('dashboard'))"
+}
+Write-Host ""
 Write-Host "[OK] Installation complete." -ForegroundColor Green
 Write-Host "[OK] 'orionrouter' command is ready in this terminal and new ones." -ForegroundColor Cyan
 Write-Host "[OK] Starting Orion Router..." -ForegroundColor Yellow

@@ -276,6 +276,11 @@ fi
 # Apply to current session
 export PATH="$INSTALL_DIR:$PATH"
 
+if [ "$MODE" = "local" ]; then
+    echo -e "\n[*] Pre-fetching resources (PostgreSQL) to display live progress..."
+    python3 -c "import sys; sys.path.insert(0, '.'); from bin.prod import download_postgres; download_postgres(); from bin.npm_integrity import record_npm_install; from pathlib import Path; record_npm_install(Path('dashboard'))"
+fi
+
 echo ""
 echo "[OK] Installation complete."
 echo "[OK] 'orionrouter' command is ready in this terminal and new ones."
