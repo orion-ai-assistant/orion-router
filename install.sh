@@ -44,6 +44,10 @@ echo -e "\n[2/5] Setting up Orion Router directory..."
 PID_FILE="$INSTALL_DIR/.orion.pid"
 if [ -f "$PID_FILE" ]; then
     OLD_PID=$(cat "$PID_FILE")
+    STOP_SCRIPT="$INSTALL_DIR/bin/stop.py"
+    if [ -f "$STOP_SCRIPT" ]; then
+        python3 "$STOP_SCRIPT" >/dev/null 2>&1 || true
+    fi
     if ps -p "$OLD_PID" > /dev/null 2>&1; then
         pkill -P "$OLD_PID" 2>/dev/null || true
         kill -9 "$OLD_PID" 2>/dev/null || true
@@ -176,6 +180,10 @@ elif [ "$ACTION" = "start" ]; then
     echo "----------------------------------------------------"
     tail -f "$LOG_FILE"
 elif [ "$ACTION" = "stop" ]; then
+    STOP_SCRIPT="$PROJECT_DIR/bin/stop.py"
+    if [ -f "$STOP_SCRIPT" ]; then
+        python3 "$STOP_SCRIPT" >/dev/null 2>&1 || true
+    fi
     if [ -f "$PID_FILE" ]; then
         PID=$(cat "$PID_FILE")
         if ps -p "$PID" > /dev/null 2>&1; then
@@ -187,7 +195,7 @@ elif [ "$ACTION" = "stop" ]; then
         fi
         rm -f "$PID_FILE"
     else
-        echo "No active running Orion Router process (.orion.pid) found."
+        echo "[OK] Orion Router stopped (any background databases/ports cleared)."
     fi
 elif [ "$ACTION" = "logs" ]; then
     if [ -f "$ERROR_LOG_FILE" ]; then

@@ -117,19 +117,28 @@ def kill_portable_postgres():
                 pass
 
 def kill_all_postgres() -> None:
+    import sys
     import time
-    try:
-        result = subprocess.run(
-            ["tasklist", "/fi", "imagename eq postgres.exe"],
-            capture_output=True,
-            text=True,
-        )
-        if "postgres.exe" in result.stdout.lower():
-            run_silent(["taskkill", "/f", "/t", "/im", "postgres.exe"])
+    if sys.platform == "win32":
+        try:
+            result = subprocess.run(
+                ["tasklist", "/fi", "imagename eq postgres.exe"],
+                capture_output=True,
+                text=True,
+            )
+            if "postgres.exe" in result.stdout.lower():
+                run_silent(["taskkill", "/f", "/t", "/im", "postgres.exe"])
+                dim(t("all_pg_killed"))
+                time.sleep(2.0)
+        except Exception:
+            pass
+    else:
+        try:
+            run_silent(["pkill", "-f", "postgres"])
             dim(t("all_pg_killed"))
             time.sleep(2.0)
-    except Exception:
-        pass
+        except Exception:
+            pass
 
 def main():
     line = "═" * 55

@@ -257,7 +257,15 @@ def _download_progress(block_num: int, block_size: int, total: int) -> None:
             print(f"    [{bar}] {pct:3d}%  {mb:5.1f} MB", flush=True)
 
 def download_postgres() -> None:
-    if PG_BIN.exists():
+    # Verify that all key binaries and directories exist. If any are missing, the installation is considered corrupt/incomplete.
+    required_paths = [
+        PG_CTL,
+        PG_BIN / "postgres.exe",
+        INITDB,
+        TOOLS_DIR / "pgsql" / "lib",
+        TOOLS_DIR / "pgsql" / "share",
+    ]
+    if all(path.exists() for path in required_paths):
         return
 
     print()
@@ -353,6 +361,18 @@ def start_postgres() -> None:
         time.sleep(2.0)
         kill_portable_postgres()
 
+def print_pg_log_errors() -> None:
+    if PG_LOG.exists():
+        try:
+            log_content = PG_LOG.read_text(encoding="utf-8", errors="replace")
+            print(f"\n{RED}=== PostgreSQL Log (pg.log) ==={RESET}")
+            lines = log_content.splitlines()[-20:]
+            for line in lines:
+                print(f"  {line}")
+            print(f"{RED}================================{RESET}\n")
+        except Exception as e:
+            dim(f"Could not read pg.log: {e}")
+
 def wait_for_postgres(timeout: float = 15.0) -> None:
     info(t("waiting_for_pg"))
     start_time = time.time()
@@ -367,7 +387,9 @@ def wait_for_postgres(timeout: float = 15.0) -> None:
         except Exception:
             pass
         time.sleep(0.5)
-    warn(t("pg_timeout_warning"))
+    err(t("pg_timeout_warning"))
+    print_pg_log_errors()
+    sys.exit(1)
 
 def stop_postgres() -> None:
     run_silent([str(PG_CTL), "-D", str(PG_DATA), "stop"])

@@ -40,6 +40,13 @@ Write-Host ""
 # 2. Repo Clone or Update
 Write-Host "[2/5] Setting up Orion Router AppData directory..."
 
+$StopScript = Join-Path $TargetFolder "bin\stop.py"
+if (Test-Path $StopScript) {
+    try {
+        Start-Process -FilePath "python" -ArgumentList $StopScript -NoNewWindow -Wait -ErrorAction SilentlyContinue
+    } catch {}
+}
+
 $PidFile = Join-Path $TargetFolder ".orion.pid"
 if (Test-Path $PidFile) {
     $pidToStop = Get-Content $PidFile
@@ -172,6 +179,12 @@ if ($Mode -eq "local") {
     $lines.Add('    Write-Host "----------------------------------------------------" -ForegroundColor Gray')
     $lines.Add('    Get-Content $LogFile -Wait -Tail 10 -Encoding UTF8')
     $lines.Add('} elseif ($Action -eq "stop") {')
+    $lines.Add('    $StopScript = Join-Path $ProjectPath "bin\stop.py"')
+    $lines.Add('    if (Test-Path $StopScript) {')
+    $lines.Add('        try {')
+    $lines.Add('            Start-Process -FilePath "python" -ArgumentList $StopScript -NoNewWindow -Wait -ErrorAction SilentlyContinue')
+    $lines.Add('        } catch {}')
+    $lines.Add('    }')
     $lines.Add('    if (Test-Path $PidFile) {')
     $lines.Add('        $pidToStop = Get-Content $PidFile')
     $lines.Add('        try {')
@@ -179,7 +192,9 @@ if ($Mode -eq "local") {
     $lines.Add('            Write-Host "[OK] Orion Router stopped." -ForegroundColor Green')
     $lines.Add('        } catch { Write-Host "Error stopping process or already terminated." -ForegroundColor DarkGray }')
     $lines.Add('        finally { Remove-Item -Path $PidFile -ErrorAction SilentlyContinue }')
-    $lines.Add('    } else { Write-Host "No active Orion Router process found." -ForegroundColor Red }')
+    $lines.Add('    } else {')
+    $lines.Add('        Write-Host "[OK] Orion Router stopped (any background databases/ports cleared)." -ForegroundColor Green')
+    $lines.Add('    }')
     $lines.Add('} elseif ($Action -eq "logs") {')
     $lines.Add('    if (Test-Path $ErrFile) {')
     $lines.Add('        $errs = Get-Content $ErrFile -Tail 15 -ErrorAction SilentlyContinue -Encoding UTF8')
