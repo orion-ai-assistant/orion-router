@@ -11,9 +11,17 @@ def _sha256(path: Path) -> str:
     return h.hexdigest()
 
 def generate_manifest(tools_dir: Path, version_label: str) -> None:
+    """Kurulum tamamlandığında manifest + sentinel dosyasını oluşturur.
+    
+    Sentinel (pgsql.ready) dosyası yalnızca tüm işlemler başarıyla
+    tamamlandığında yazılır. Bu sayede yarım kalan kurulumlar güvenle tespit edilir.
+    """
     pgsql_dir = tools_dir / "pgsql"
     if not pgsql_dir.exists():
         return
+
+    # Önceki sentinel'i sil — yeni manifest yazılana kadar kurulum "eksik" sayılır
+    (tools_dir / "pgsql.ready").unlink(missing_ok=True)
 
     manifest = {"version": version_label, "files": {}}
     for root, _, files in os.walk(pgsql_dir):
@@ -32,39 +40,17 @@ def generate_manifest(tools_dir: Path, version_label: str) -> None:
     with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2)
 
+    # Sentinel: manifest tamamen yazıldıktan sonra kurulumun eksiksiz olduğunu işaretler
+    (tools_dir / "pgsql.ready").write_text(version_label, encoding="utf-8")
+
 
 def verify_manifest(tools_dir: Path) -> bool:
-    """Bütünlük doğrulaması — dosya varlığı ve boyut kontrolü.
+    """Kurulumun eksiksiz tamamlandığını kontrol eder.
 
-    Hash hesaplamaz. Sadece dosya var mı ve boyutu doğru mu diye bakar.
-    Bir hata durumunda çalışır, yaklaşık 100-300ms sürer. 
-    Eğer eksik/farklı boyutta dosya varsa False döner ve onarımı tetikler.
+    Mantık: Sadece 'pgsql.ready' sentinel dosyasına bakar.
+    Bu dosya yalnızca generate_manifest() başarıyla tamamlandığında oluşturulur.
+    Kurulum yarım kaldıysa sentinel yoktur → False döner → yeniden kurulum tetiklenir.
     """
-    manifest_path = tools_dir / "pgsql.manifest"
-    if not manifest_path.exists():
-        return False
+    return (tools_dir / "pgsql.ready").is_file()
 
-    try:
-        with open(manifest_path, "r", encoding="utf-8") as f:
-            manifest = json.load(f)
-    except Exception:
-        return False
-
-    pgsql_dir = tools_dir / "pgsql"
-    if "files" not in manifest:
-        return False
-
-    for relative_path, info in manifest["files"].items():
-        actual_file = pgsql_dir / relative_path
-        if not actual_file.exists():
-            return False
-        
-        try:
-            expected_size = info.get("size") if isinstance(info, dict) else None
-            if expected_size is not None and actual_file.stat().st_size != expected_size:
-                return False
-        except Exception:
-            return False
-
-    return True
 

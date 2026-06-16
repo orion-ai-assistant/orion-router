@@ -272,8 +272,16 @@ def _download_progress(block_num: int, block_size: int, total: int) -> None:
             print(f"    [{bar}] {pct:3d}%  {mb:5.1f} MB", flush=True)
 
 def download_postgres() -> None:
-    if (TOOLS_DIR / "pgsql").exists():
+    # Sentinel dosyası varsa kurulum eksiksiz tamamlanmış demektir
+    if (TOOLS_DIR / "pgsql.ready").is_file():
         return
+
+    # Sentinel yoksa: ya hiç kurulmamış, ya da yarım kalmış.
+    # Her iki durumda da temiz bir kurulum yap.
+    import shutil
+    shutil.rmtree(TOOLS_DIR / "pgsql", ignore_errors=True)
+    (TOOLS_DIR / "pgsql.manifest").unlink(missing_ok=True)
+
     print()
     info(t("pg_not_found_downloading"))
     TOOLS_DIR.mkdir(parents=True, exist_ok=True)
@@ -299,8 +307,10 @@ def download_postgres() -> None:
         if sys.stdout.isatty():
             print()
     PG_ZIP.unlink(missing_ok=True)
+    # generate_manifest hem manifest'i hem de sentinel'i (pgsql.ready) yazar
     generate_manifest(TOOLS_DIR, "postgresql-16.3-1-windows-x64-binaries")
     ok(t("pg_ready"))
+
 
 def init_database(_repair_attempted: bool = False) -> None:
     if PG_DATA.exists():
@@ -327,6 +337,7 @@ def init_database(_repair_attempted: bool = False) -> None:
                 import shutil
                 shutil.rmtree(TOOLS_DIR / "pgsql", ignore_errors=True)
                 (TOOLS_DIR / "pgsql.manifest").unlink(missing_ok=True)
+                (TOOLS_DIR / "pgsql.ready").unlink(missing_ok=True)
                 download_postgres()
                 init_database(_repair_attempted=True)
                 return
@@ -431,9 +442,9 @@ def wait_for_postgres(timeout: float = DEFAULT_TIMEOUT) -> None:
         stop_postgres()
         shutil.rmtree(TOOLS_DIR / "pgsql", ignore_errors=True)
         (TOOLS_DIR / "pgsql.manifest").unlink(missing_ok=True)
+        (TOOLS_DIR / "pgsql.ready").unlink(missing_ok=True)
         download_postgres()
         start_postgres()
-        # Onarım sonrası tek bir deneme — sonsuz döngüden kaçınmak için timeout değerini geçmiyoruz
         _wait_for_postgres_once(timeout)
         return
         
