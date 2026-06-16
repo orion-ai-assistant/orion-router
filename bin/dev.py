@@ -626,9 +626,9 @@ def main() -> None:
                 return
             time.sleep(0.5)
 
-    t = threading.Thread(target=wait_for_server_and_print_banner, args=[router_port])
-    t.daemon = True
-    t.start()
+    banner_thread = threading.Thread(target=wait_for_server_and_print_banner, args=[router_port])
+    banner_thread.daemon = True
+    banner_thread.start()
 
     try:
         while True:
