@@ -96,7 +96,7 @@ async function persistGroupPriorities(groupId: string, items: GroupItem[]): Prom
 }
 
 export default function GroupsPage() {
-  const { showToast, confirmAction } = useApp();
+  const { showToast, confirmAction, t } = useApp();
   const [groups, setGroups] = useState<ModelGroup[]>([]);
   const [models, setModels] = useState<ModelItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -568,14 +568,14 @@ export default function GroupsPage() {
     <section id="groups" className="tab-content active block pt-8">
       <header className="flex justify-between items-end mb-8 pb-6 border-b border-border">
         <div className="header-titles">
-          <h1 className="font-heading text-3xl font-semibold tracking-tight">Model Groups</h1>
-          <p className="text-zinc-400 text-sm mt-1">Create fallback chains from registered models</p>
+          <h1 className="font-heading text-3xl font-semibold tracking-tight">{t('groups.title')}</h1>
+          <p className="text-zinc-400 text-sm mt-1">{t('groups.description')}</p>
         </div>
         <Button
           onClick={() => setShowAddGroupModal(true)}
           className="bg-white text-black hover:bg-zinc-200 font-medium px-6 py-2.5 rounded-full transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-1.5"
         >
-          + Create Group
+          + {t('groups.createGroup')}
         </Button>
       </header>
 
@@ -604,7 +604,7 @@ export default function GroupsPage() {
                       onClick={() => openAddGroupItem(group)}
                       className="bg-white text-black hover:bg-zinc-200 text-xs px-3.5 py-1.5 h-auto rounded font-semibold flex items-center gap-1"
                     >
-                      + Add Model
+                      + {t('groups.addModelItem')}
                     </Button>
                     <Button
                       variant="outline"
@@ -750,12 +750,12 @@ export default function GroupsPage() {
       <Dialog open={showAddGroupModal} onOpenChange={setShowAddGroupModal}>
         <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-xl font-heading font-semibold text-white">Create Model Group</DialogTitle>
+            <DialogTitle className="text-xl font-heading font-semibold text-white">{t('groups.createModalTitle')}</DialogTitle>
           </DialogHeader>
 
           <form onSubmit={handleCreateGroup} className="flex flex-col gap-4 my-2">
             <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">Group Name</label>
+              <label className="text-zinc-400 text-sm font-medium">{t('groups.groupName')}</label>
               <Input
                 value={groupForm.name}
                 onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })}
@@ -787,13 +787,13 @@ export default function GroupsPage() {
                 onClick={() => setShowAddGroupModal(false)}
                 className="border-zinc-800 text-white hover:bg-zinc-900 rounded font-medium"
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button
                 type="submit"
                 className="bg-white text-black hover:bg-zinc-200 rounded font-medium"
               >
-                Create Group
+                {t('common.create')}
               </Button>
             </DialogFooter>
           </form>

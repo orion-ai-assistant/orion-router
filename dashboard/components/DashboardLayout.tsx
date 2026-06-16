@@ -19,26 +19,26 @@ import {
 
 interface SidebarTab {
   id: string;
-  label: string;
+  i18nKey: string;
   icon: React.ComponentType<any>;
   url: string;
 }
 
 const TABS: SidebarTab[] = [
-  { id: 'dashboard', label: 'Overview', icon: LayoutDashboard, url: '/' },
-  { id: 'keys', label: 'Virtual Keys', icon: Key, url: '/keys' },
-  { id: 'logs', label: 'Logs', icon: FileText, url: '/logs' },
-  { id: 'key-pool', label: 'Provider Keys', icon: Lock, url: '/key-pool' },
-  { id: 'models', label: 'Models', icon: Bot, url: '/models' },
-  { id: 'groups', label: 'Groups', icon: Network, url: '/groups' },
-  { id: 'playground', label: 'Playground', icon: Terminal, url: '/playground' },
-  { id: 'model-info', label: 'Model Info', icon: Info, url: '/model-info' },
-  { id: 'settings', label: 'Settings', icon: Settings, url: '/settings' }
+  { id: 'dashboard', i18nKey: 'nav.overview', icon: LayoutDashboard, url: '/' },
+  { id: 'keys', i18nKey: 'nav.keys', icon: Key, url: '/keys' },
+  { id: 'logs', i18nKey: 'nav.logs', icon: FileText, url: '/logs' },
+  { id: 'key-pool', i18nKey: 'nav.providerKeys', icon: Lock, url: '/key-pool' },
+  { id: 'models', i18nKey: 'nav.models', icon: Bot, url: '/models' },
+  { id: 'groups', i18nKey: 'nav.groups', icon: Network, url: '/groups' },
+  { id: 'playground', i18nKey: 'nav.playground', icon: Terminal, url: '/playground' },
+  { id: 'model-info', i18nKey: 'nav.modelInfo', icon: Info, url: '/model-info' },
+  { id: 'settings', i18nKey: 'nav.settings', icon: Settings, url: '/settings' }
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { isAuthenticated, logout } = useApp();
+  const { isAuthenticated, logout, t } = useApp();
 
   // Normalize path because pathname might have trailing slash or not
   const isActive = (tabUrl: string) => {
@@ -81,7 +81,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     }`}
                 >
                   <Icon className="w-[18px] h-[18px] shrink-0" />
-                  <span>{tab.label}</span>
+                  <span>{t(tab.i18nKey)}</span>
                 </Link>
               </li>
             );
@@ -95,7 +95,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             className="flex w-full items-center gap-3.5 px-5 py-3 rounded-md cursor-pointer transition-all duration-200 font-medium text-[14px] text-red-400/80 hover:bg-red-950/20 hover:text-red-400"
           >
             <LogOut className="w-[18px] h-[18px]" />
-            <span>Sign Out</span>
+            <span>{t('nav.signOut')}</span>
           </button>
         </div>
       </aside>

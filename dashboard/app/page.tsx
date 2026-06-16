@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { adminFetch } from '@/lib/api';
 import { money, formatNumber } from '@/lib/utils';
+import { useApp } from '@/components/AppContext';
 import { Coins, Cpu, Key } from 'lucide-react';
 
 interface Stats {
@@ -18,6 +19,7 @@ interface Stats {
 }
 
 export default function OverviewPage() {
+  const { t } = useApp();
   const [stats, setStats] = useState<Stats>({
     total_cost: 0,
     prompt_cost: 0,
@@ -72,8 +74,8 @@ export default function OverviewPage() {
 
       <header className="flex justify-between items-end mb-8 pb-6 border-b border-border">
         <div className="header-titles">
-          <h1 className="font-heading text-3xl font-semibold tracking-tight">Overview</h1>
-          <p className="text-zinc-400 text-sm mt-1">Gateway usage and registry health</p>
+          <h1 className="font-heading text-3xl font-semibold tracking-tight">{t('overview.title')}</h1>
+          <p className="text-zinc-400 text-sm mt-1">{t('overview.description')}</p>
         </div>
       </header>
 
@@ -84,31 +86,31 @@ export default function OverviewPage() {
             <Coins className="w-6 h-6 stroke-[1.8]" />
           </div>
           <div className="stat-details relative group">
-            <h3 className="text-zinc-400 text-xs font-medium mb-1">Total Cost</h3>
+            <h3 className="text-zinc-400 text-xs font-medium mb-1">{t('overview.totalCost')}</h3>
             <div className="value val-cost font-heading text-3xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
               {money(stats.total_cost, 4)}
             </div>
 
             {/* Elegant Hover Tooltip */}
             <div className="absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 hidden group-hover:block z-50 bg-[#18181b]/95 border border-zinc-800 text-zinc-200 p-3 rounded-lg shadow-2xl pointer-events-none backdrop-blur-md">
-              <div className="font-semibold text-[10px] text-zinc-400 mb-2.5 uppercase tracking-wider border-b border-zinc-800/80 pb-1.5 text-center">Cost Breakdown</div>
+              <div className="font-semibold text-[10px] text-zinc-400 mb-2.5 uppercase tracking-wider border-b border-zinc-800/80 pb-1.5 text-center">{t('overview.costBreakdown')}</div>
               <div className="flex flex-col gap-1.5 font-mono text-xs">
                 <div className="flex items-center justify-between gap-6">
-                  <span className="text-zinc-400 font-sans">Input</span>
+                  <span className="text-zinc-400 font-sans">{t('overview.input')}</span>
                   <div className="flex items-center">
                     <span className="text-zinc-500 w-8 text-right">%{stats.total_cost > 0 ? Math.round(((stats.prompt_cost || 0) / stats.total_cost) * 100) : 0}</span>
                     <span className="text-zinc-200 font-medium w-[70px] text-right">{money(stats.prompt_cost || 0, 4)}</span>
                   </div>
                 </div>
                 <div className="flex items-center justify-between gap-6">
-                  <span className="text-zinc-400 font-sans">Thinking</span>
+                  <span className="text-zinc-400 font-sans">{t('overview.thinking')}</span>
                   <div className="flex items-center">
                     <span className="text-zinc-500 w-8 text-right">%{stats.total_cost > 0 ? Math.round(((stats.thoughts_cost || 0) / stats.total_cost) * 100) : 0}</span>
                     <span className="text-zinc-200 font-medium w-[70px] text-right">{money(stats.thoughts_cost || 0, 4)}</span>
                   </div>
                 </div>
                 <div className="flex items-center justify-between gap-6">
-                  <span className="text-zinc-400 font-sans">Output</span>
+                  <span className="text-zinc-400 font-sans">{t('overview.output')}</span>
                   <div className="flex items-center">
                     <span className="text-zinc-500 w-8 text-right">%{stats.total_cost > 0 ? Math.round(((stats.completion_cost || 0) / stats.total_cost) * 100) : 0}</span>
                     <span className="text-zinc-200 font-medium w-[70px] text-right">{money(stats.completion_cost || 0, 4)}</span>
@@ -125,31 +127,31 @@ export default function OverviewPage() {
             <Cpu className="w-6 h-6 stroke-[1.8]" />
           </div>
           <div className="stat-details relative group">
-            <h3 className="text-zinc-400 text-xs font-medium mb-1">Tokens Processed</h3>
+            <h3 className="text-zinc-400 text-xs font-medium mb-1">{t('overview.tokensProcessed')}</h3>
             <div className="value val-tokens font-heading text-3xl font-bold bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent">
               {formatNumber(stats.total_tokens)}
             </div>
 
             {/* Elegant Hover Tooltip */}
             <div className="absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 hidden group-hover:block z-50 bg-[#18181b]/95 border border-zinc-800 text-zinc-200 p-3 rounded-lg shadow-2xl pointer-events-none backdrop-blur-md">
-              <div className="font-semibold text-[10px] text-zinc-400 mb-2.5 uppercase tracking-wider border-b border-zinc-800/80 pb-1.5">Token Breakdown</div>
+              <div className="font-semibold text-[10px] text-zinc-400 mb-2.5 uppercase tracking-wider border-b border-zinc-800/80 pb-1.5">{t('overview.tokenBreakdown')}</div>
               <div className="flex flex-col gap-1.5 font-mono text-xs">
                 <div className="flex items-center justify-between gap-6">
-                  <span className="text-zinc-400 font-sans">Input</span>
+                  <span className="text-zinc-400 font-sans">{t('overview.input')}</span>
                   <div className="flex items-center">
                     <span className="text-zinc-500 w-8 text-right">%{stats.total_tokens > 0 ? Math.round((stats.prompt_tokens / stats.total_tokens) * 100) : 0}</span>
                     <span className="text-zinc-200 font-medium w-16 text-right">{formatNumber(stats.prompt_tokens)}</span>
                   </div>
                 </div>
                 <div className="flex items-center justify-between gap-6">
-                  <span className="text-zinc-400 font-sans">Thinking</span>
+                  <span className="text-zinc-400 font-sans">{t('overview.thinking')}</span>
                   <div className="flex items-center">
                     <span className="text-zinc-500 w-8 text-right">%{stats.total_tokens > 0 ? Math.round((stats.thoughts_tokens / stats.total_tokens) * 100) : 0}</span>
                     <span className="text-zinc-200 font-medium w-16 text-right">{formatNumber(stats.thoughts_tokens)}</span>
                   </div>
                 </div>
                 <div className="flex items-center justify-between gap-6">
-                  <span className="text-zinc-400 font-sans">Output</span>
+                  <span className="text-zinc-400 font-sans">{t('overview.output')}</span>
                   <div className="flex items-center">
                     <span className="text-zinc-500 w-8 text-right">%{stats.total_tokens > 0 ? Math.round((stats.completion_tokens / stats.total_tokens) * 100) : 0}</span>
                     <span className="text-zinc-200 font-medium w-16 text-right">{formatNumber(stats.completion_tokens)}</span>
@@ -166,7 +168,7 @@ export default function OverviewPage() {
             <Key className="w-6 h-6 stroke-[1.8]" />
           </div>
           <div className="stat-details">
-            <h3 className="text-zinc-400 text-xs font-medium mb-1">Virtual Keys</h3>
+            <h3 className="text-zinc-400 text-xs font-medium mb-1">{t('overview.activeKeys')}</h3>
             <div className="value val-keys font-heading text-3xl font-bold bg-gradient-to-r from-indigo-400 to-blue-400 bg-clip-text text-transparent">
               {stats.total_keys || 0}
             </div>

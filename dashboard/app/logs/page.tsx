@@ -37,7 +37,7 @@ interface LogDetails {
 }
 
 export default function LogsPage() {
-  const { showToast } = useApp();
+  const { showToast, t } = useApp();
   const [logs, setLogs] = useState<LogItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [payloadDialogOpen, setPayloadDialogOpen] = useState(false);
@@ -154,14 +154,14 @@ export default function LogsPage() {
     <section id="logs" className="tab-content active block pt-8">
       <header className="flex justify-between items-end mb-8 pb-6 border-b border-border">
         <div className="header-titles">
-          <h1 className="font-heading text-3xl font-semibold tracking-tight">Request Logs</h1>
-          <p className="text-zinc-400 text-sm mt-1">Recent routed calls</p>
+          <h1 className="font-heading text-3xl font-semibold tracking-tight">{t('logs.title')}</h1>
+          <p className="text-zinc-400 text-sm mt-1">{t('logs.description')}</p>
         </div>
         <Button
           onClick={() => fetchLogs('refresh')}
           className="bg-transparent border border-zinc-800 text-white hover:bg-zinc-800 font-medium px-5 py-2.5 rounded-md transition-all flex items-center gap-1.5"
         >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> {t('logs.refresh')}
         </Button>
       </header>
 
@@ -170,15 +170,15 @@ export default function LogsPage() {
         <Table>
           <TableHeader className="bg-black/25">
             <TableRow className="border-b border-zinc-850 hover:bg-transparent">
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 pl-6 w-[80px]">Key</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 pl-16 w-[180px]">Model</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 pl-8 w-[120px]">Provider</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 pl-8 w-[110px]">Capability</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[150px]">Tokens</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[90px]">Cost</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[110px]">Status</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[140px]">Time</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-right pr-6 w-[80px]">Details</TableHead>
+              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 pl-6 w-[80px]">{t('keys.table.key')}</TableHead>
+              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 pl-16 w-[180px]">{t('logs.table.model')}</TableHead>
+              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 pl-8 w-[120px]">{t('logs.table.provider')}</TableHead>
+              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 pl-8 w-[110px]">{t('logs.table.capability')}</TableHead>
+              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[150px]">{t('logs.table.tokens')}</TableHead>
+              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[90px]">{t('logs.table.cost')}</TableHead>
+              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[110px]">{t('logs.table.status')}</TableHead>
+              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[140px]">{t('logs.table.time')}</TableHead>
+              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-right pr-6 w-[80px]">{t('logs.table.details')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -271,7 +271,7 @@ export default function LogsPage() {
                       onClick={() => handleShowDetails(log.id)}
                       className="border-zinc-800 text-white hover:bg-zinc-800 text-xs px-3 py-1 h-auto rounded"
                     >
-                      View
+                      {t('logs.table.view')}
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -291,7 +291,7 @@ export default function LogsPage() {
       >
         <DialogContent className="w-[min(96vw,1720px)] max-w-[min(96vw,1720px)] border border-zinc-800 bg-[#18181b] p-6 sm:p-8 rounded-2xl text-white shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-xl font-heading font-semibold text-white">Request & Response Payloads</DialogTitle>
+            <DialogTitle className="text-xl font-heading font-semibold text-white">{t('logs.payloadModalTitle')}</DialogTitle>
           </DialogHeader>
 
           {activeLogDetails?.ttsAudio && (

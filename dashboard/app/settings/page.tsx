@@ -6,9 +6,11 @@ import { useApp } from '@/components/AppContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { ChevronDown, Check } from 'lucide-react';
+import { SUPPORTED_LOCALES, LOCALE_NAMES } from '@/lib/i18n';
 
 export default function SettingsPage() {
-  const { showToast, updateAdminKey } = useApp();
+  const { showToast, updateAdminKey, t, locale, setLocale } = useApp();
   
   // Change Admin Secret states
   const [showChangeKeyModal, setShowChangeKeyModal] = useState<boolean>(false);
@@ -21,6 +23,20 @@ export default function SettingsPage() {
   const [showClearLogsModal, setShowClearLogsModal] = useState<boolean>(false);
   const [confirmAdminKey, setConfirmAdminKey] = useState<string>('');
   const [clearing, setClearing] = useState<boolean>(false);
+
+  // Locale dropdown states
+  const [langDropdownOpen, setLangDropdownOpen] = useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setLangDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleChangeAdminSecret = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,7 +67,7 @@ export default function SettingsPage() {
         }),
       });
       if (res.ok) {
-        showToast('Admin secret updated successfully!');
+        showToast(t('settings.passwordChanged'));
         updateAdminKey(newSec);
         setShowChangeKeyModal(false);
         setCurrentSecret('');
@@ -59,7 +75,7 @@ export default function SettingsPage() {
         setConfirmNewSecret('');
       } else {
         const data = await res.json().catch(() => ({}));
-        showToast(data.detail || 'Failed to update admin secret', 'error');
+        showToast(data.detail || t('common.error'), 'error');
       }
     } catch (err) {
       console.error(err);
@@ -111,14 +127,47 @@ export default function SettingsPage() {
     <section id="settings" className="tab-content active block pt-8">
       <header className="flex justify-between items-end mb-8 pb-6 border-b border-border">
         <div className="header-titles">
-          <h1 className="font-heading text-3xl font-semibold tracking-tight">Settings</h1>
-          <p className="text-zinc-400 text-sm mt-1">Manage gateway configurations</p>
+          <h1 className="font-heading text-3xl font-semibold tracking-tight">{t('settings.title')}</h1>
+          <p className="text-zinc-400 text-sm mt-1">{t('settings.description')}</p>
         </div>
       </header>
 
+      <div className="glass-panel p-8 bg-[#18181b] border border-zinc-800 rounded-md shadow-xl max-w-2xl mb-8">
+        <h2 className="font-heading text-lg font-semibold text-white mb-2">{t('settings.language.title')}</h2>
+        <p className="text-zinc-400 text-sm mb-6">{t('settings.language.description')}</p>
+        
+        <div className="flex relative" ref={dropdownRef}>
+          <button
+            onClick={() => setLangDropdownOpen(!langDropdownOpen)}
+            className="flex items-center justify-between bg-black/40 border border-zinc-800 text-white rounded px-4 py-2.5 min-w-[200px] outline-none hover:border-zinc-600 transition-colors"
+          >
+            <span>{LOCALE_NAMES[locale] || locale}</span>
+            <ChevronDown className="w-4 h-4 ml-2 text-zinc-400 shrink-0" />
+          </button>
+          
+          {langDropdownOpen && (
+            <div className="absolute top-[calc(100%+4px)] left-0 w-[240px] bg-zinc-900 border border-zinc-700 rounded-md shadow-2xl z-50 max-h-64 overflow-y-auto custom-scrollbar py-1">
+              {SUPPORTED_LOCALES.map((l) => (
+                <button
+                  key={l}
+                  onClick={() => {
+                    setLocale(l);
+                    setLangDropdownOpen(false);
+                  }}
+                  className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between hover:bg-zinc-800 transition-colors ${locale === l ? 'bg-zinc-800 text-white font-medium' : 'text-zinc-300'}`}
+                >
+                  <span dir="auto">{LOCALE_NAMES[l] || l}</span>
+                  {locale === l && <Check className="w-4 h-4 text-emerald-500 shrink-0" />}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="glass-panel p-8 bg-[#18181b] border border-zinc-800 rounded-md shadow-xl max-w-2xl">
-        <h2 className="font-heading text-lg font-semibold text-white mb-2">Admin Authentication</h2>
-        <p className="text-zinc-400 text-sm mb-6">Change the admin secret used to access this dashboard.</p>
+        <h2 className="font-heading text-lg font-semibold text-white mb-2">{t('settings.auth.title')}</h2>
+        <p className="text-zinc-400 text-sm mb-6">{t('settings.auth.description')}</p>
         
         <div className="flex">
           <Button
@@ -126,16 +175,16 @@ export default function SettingsPage() {
             onClick={() => setShowChangeKeyModal(true)}
             className="bg-white text-black hover:bg-zinc-200 font-semibold px-6 py-2.5 rounded transition-all duration-200 shadow-md"
           >
-            Change Admin Secret
+            {t('settings.auth.updateBtn')}
           </Button>
         </div>
       </div>
 
       {/* Danger Zone */}
       <div className="glass-panel p-8 bg-[#18181b] border border-red-950/20 rounded-md shadow-xl max-w-2xl mt-8">
-        <h2 className="font-heading text-lg font-semibold text-red-500 mb-2">Danger Zone</h2>
+        <h2 className="font-heading text-lg font-semibold text-red-500 mb-2">{t('settings.danger.title')}</h2>
         <p className="text-zinc-400 text-sm mb-6">
-          Permanently delete all request logs and reset key usage statistics. Virtual keys, model registries, and configurations will not be deleted.
+          {t('settings.danger.description')}
         </p>
         
         <div className="flex">
@@ -144,7 +193,7 @@ export default function SettingsPage() {
             onClick={() => setShowClearLogsModal(true)}
             className="bg-red-950/20 hover:bg-red-900/30 text-red-400 border border-red-500/25 font-semibold px-6 py-2.5 rounded transition-all duration-200 shadow-md"
           >
-            Clear All Logs & Reset Stats
+            {t('settings.danger.resetBtn')}
           </Button>
         </div>
       </div>
@@ -153,9 +202,9 @@ export default function SettingsPage() {
       <Dialog open={showClearLogsModal} onOpenChange={setShowClearLogsModal}>
         <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-xl font-heading font-semibold text-white">Confirm Log Deletion</DialogTitle>
+            <DialogTitle className="text-xl font-heading font-semibold text-white">{t('settings.danger.resetStats')}</DialogTitle>
             <DialogDescription className="text-zinc-400 text-sm mt-2">
-              This action is permanent and cannot be undone. All request log history will be deleted, and all virtual key statistics (Total Cost, Tokens) will be reset.
+              {t('settings.danger.confirmReset')}
             </DialogDescription>
           </DialogHeader>
 
@@ -183,14 +232,14 @@ export default function SettingsPage() {
                 }}
                 className="border-zinc-800 text-white hover:bg-zinc-900 rounded font-medium"
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button
                 type="submit"
                 disabled={clearing}
                 className="bg-red-600 hover:bg-red-700 text-white rounded font-medium border border-red-700/30 flex items-center justify-center min-w-[120px]"
               >
-                {clearing ? 'Clearing...' : 'Confirm & Delete'}
+                {clearing ? t('common.loading') : t('common.confirm')}
               </Button>
             </DialogFooter>
           </form>
@@ -201,9 +250,9 @@ export default function SettingsPage() {
       <Dialog open={showChangeKeyModal} onOpenChange={setShowChangeKeyModal}>
         <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-xl font-heading font-semibold text-white">Change Admin Secret</DialogTitle>
+            <DialogTitle className="text-xl font-heading font-semibold text-white">{t('settings.auth.updateBtn')}</DialogTitle>
             <DialogDescription className="text-zinc-400 text-sm mt-2">
-              To change your admin secret, please enter your current secret, then enter the new secret twice to confirm.
+              {t('settings.auth.description')}
             </DialogDescription>
           </DialogHeader>
 
@@ -257,14 +306,14 @@ export default function SettingsPage() {
                 }}
                 className="border-zinc-800 text-white hover:bg-zinc-900 rounded font-medium"
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button
                 type="submit"
                 disabled={updatingKey}
                 className="bg-white text-black hover:bg-zinc-200 rounded font-medium flex items-center justify-center min-w-[120px]"
               >
-                {updatingKey ? 'Updating...' : 'Change Secret'}
+                {updatingKey ? t('common.loading') : t('common.save')}
               </Button>
             </DialogFooter>
           </form>

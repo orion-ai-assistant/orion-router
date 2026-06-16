@@ -48,7 +48,7 @@ function isValidDropGap(sourceIndex: number, gapIndex: number): boolean {
 }
 
 export default function KeyPoolPage() {
-  const { showToast, confirmAction } = useApp();
+  const { showToast, confirmAction, t } = useApp();
   const [keyPool, setKeyPool] = useState<ProviderKey[]>([]);
   const [providers, setProviders] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -458,14 +458,14 @@ export default function KeyPoolPage() {
     <section id="key-pool" className="tab-content active block pt-8">
       <header className="flex justify-between items-end mb-8 pb-6 border-b border-border">
         <div className="header-titles">
-          <h1 className="font-heading text-3xl font-semibold tracking-tight">Provider Key Pool</h1>
-          <p className="text-zinc-400 text-sm mt-1">Server-side upstream keys with fallback order</p>
+          <h1 className="font-heading text-3xl font-semibold tracking-tight">{t('keyPool.title')}</h1>
+          <p className="text-zinc-400 text-sm mt-1">{t('keyPool.description')}</p>
         </div>
         <Button
           onClick={() => setShowAddModal(true)}
           className="bg-white text-black hover:bg-zinc-200 font-medium px-6 py-2.5 rounded-full transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-1.5"
         >
-          + Add Provider Key
+          + {t('keyPool.addKey')}
         </Button>
       </header>
 
@@ -603,12 +603,12 @@ export default function KeyPoolPage() {
       <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
         <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-xl font-heading font-semibold text-white">Add Upstream Key</DialogTitle>
+            <DialogTitle className="text-xl font-heading font-semibold text-white">{t('keyPool.addModalTitle')}</DialogTitle>
           </DialogHeader>
 
           <form onSubmit={handleCreate} className="flex flex-col gap-4 my-2">
             <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">Provider</label>
+              <label className="text-zinc-400 text-sm font-medium">{t('keyPool.provider')}</label>
               <div className="custom-select-wrapper select-wrapper w-full">
                 <select
                   value={addForm.provider}
@@ -626,7 +626,7 @@ export default function KeyPoolPage() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">Label</label>
+              <label className="text-zinc-400 text-sm font-medium">{t('keyPool.label')}</label>
               <Input
                 value={addForm.label}
                 onChange={(e) => setAddForm({ ...addForm, label: e.target.value })}
@@ -637,7 +637,7 @@ export default function KeyPoolPage() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">API Key</label>
+              <label className="text-zinc-400 text-sm font-medium">{t('keyPool.apiKey')}</label>
               <Input
                 type="password"
                 value={addForm.api_key}
@@ -655,13 +655,13 @@ export default function KeyPoolPage() {
                 onClick={() => setShowAddModal(false)}
                 className="border-zinc-800 text-white hover:bg-zinc-900 rounded font-medium"
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button
                 type="submit"
                 className="bg-white text-black hover:bg-zinc-200 rounded font-medium"
               >
-                Save Key
+                {t('common.save')}
               </Button>
             </DialogFooter>
           </form>
@@ -672,12 +672,12 @@ export default function KeyPoolPage() {
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
         <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-xl font-heading font-semibold text-white">Edit Upstream Key</DialogTitle>
+            <DialogTitle className="text-xl font-heading font-semibold text-white">{t('keyPool.editModalTitle')}</DialogTitle>
           </DialogHeader>
 
           <form onSubmit={handleUpdate} className="flex flex-col gap-4 my-2">
             <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">Label</label>
+              <label className="text-zinc-400 text-sm font-medium">{t('keyPool.label')}</label>
               <Input
                 value={editingKey.label}
                 onChange={(e) => setEditingKey({ ...editingKey, label: e.target.value })}
@@ -687,7 +687,7 @@ export default function KeyPoolPage() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">API Key</label>
+              <label className="text-zinc-400 text-sm font-medium">{t('keyPool.apiKey')}</label>
               <Input
                 type="password"
                 value={editingKey.api_key}
@@ -706,7 +706,7 @@ export default function KeyPoolPage() {
               }`}
             >
               <div className="flex flex-col gap-0.5">
-                <span className={`font-semibold text-sm ${editingKey.is_active ? 'text-purple-400' : 'text-white'}`}>Active Status</span>
+                <span className={`font-semibold text-sm ${editingKey.is_active ? 'text-purple-400' : 'text-white'}`}>{t('keys.activeStatus')}</span>
               </div>
               <Switch
                 checked={editingKey.is_active}
@@ -720,7 +720,7 @@ export default function KeyPoolPage() {
                 type="button"
                 className="bg-transparent border border-red-500/20 text-red-500 hover:bg-red-500/10 rounded font-medium flex items-center gap-1.5"
               >
-                <Trash2 className="w-4 h-4" /> Delete
+                <Trash2 className="w-4 h-4" /> {t('common.delete')}
               </Button>
               <div className="flex gap-3 justify-end">
                 <Button
@@ -729,14 +729,14 @@ export default function KeyPoolPage() {
                   onClick={() => setShowEditModal(false)}
                   className="border-zinc-800 text-white hover:bg-zinc-900 rounded font-medium"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
                 <Button
                   type="submit"
                   disabled={!isKeyDirty(editingKey)}
                   className="bg-white text-black hover:bg-zinc-200 rounded font-medium disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  Save Changes
+                  {t('common.save')}
                 </Button>
               </div>
             </DialogFooter>

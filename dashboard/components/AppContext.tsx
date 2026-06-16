@@ -6,6 +6,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertCircle, CheckCircle, AlertTriangle, X } from 'lucide-react';
+import { 
+  detectLocale, 
+  loadLocale, 
+  createTranslator, 
+  FALLBACK_LOCALE,
+  LOCALE_STORAGE_KEY,
+  TranslatorFunction,
+  isValidLocale,
+  RTL_LOCALES
+} from '@/lib/i18n';
 
 export type ToastType = 'success' | 'error';
 
@@ -29,6 +39,9 @@ interface AppContextType {
   confirmAction: (message: string, callback: () => void) => void;
   logout: () => void;
   updateAdminKey: (key: string) => void;
+  locale: string;
+  setLocale: (lang: string) => void;
+  t: TranslatorFunction;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -51,6 +64,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     message: '',
     callback: null,
   });
+
+  // i18n State
+  const [locale, setLocaleState] = useState<string>(FALLBACK_LOCALE);
+  const [translations, setTranslations] = useState<Record<string, string>>({});
+  const [fallbackTranslations, setFallbackTranslations] = useState<Record<string, string>>({});
+
+  const t = createTranslator(translations, fallbackTranslations);
 
   // Check default password status on load
   const checkPasswordStatus = async () => {
@@ -89,10 +109,56 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
 
     window.addEventListener(UNAUTHORIZED_EVENT, handleUnauthorized);
+    
+    // Load i18n
+    const initI18n = async () => {
+      const detected = detectLocale();
+      setLocaleState(detected);
+
+      const [fallback, current] = await Promise.all([
+        loadLocale(FALLBACK_LOCALE),
+        detected === FALLBACK_LOCALE ? Promise.resolve({}) : loadLocale(detected)
+      ]);
+
+      setFallbackTranslations(fallback);
+      if (detected === FALLBACK_LOCALE) {
+        setTranslations(fallback);
+      } else {
+        setTranslations(current);
+      }
+    };
+    initI18n();
+
     return () => {
       window.removeEventListener(UNAUTHORIZED_EVENT, handleUnauthorized);
     };
   }, []);
+
+  // Update HTML lang and dir when locale changes
+  useEffect(() => {
+    document.documentElement.lang = locale;
+    document.documentElement.dir = 'ltr'; // Keep layout LTR so it doesn't mirror
+    
+    if (RTL_LOCALES.includes(locale)) {
+      document.body.classList.add('rtl-language');
+    } else {
+      document.body.classList.remove('rtl-language');
+    }
+  }, [locale]);
+
+  const setLocale = async (lang: string) => {
+    if (!isValidLocale(lang)) return;
+    
+    localStorage.setItem(LOCALE_STORAGE_KEY, lang);
+    setLocaleState(lang);
+    
+    if (lang === FALLBACK_LOCALE) {
+      setTranslations(fallbackTranslations);
+    } else {
+      const newTranslations = await loadLocale(lang);
+      setTranslations(newTranslations);
+    }
+  };
 
   const login = async () => {
     const key = adminKeyInput.trim();
@@ -113,11 +179,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         // Reload page data
         window.dispatchEvent(new Event('orion-authenticated'));
       } else {
-        setLoginError('Invalid admin secret key');
+        setLoginError(t('auth.invalidKey'));
         setAdminKey('');
       }
     } catch (err) {
-      setLoginError('Authentication failed');
+      setLoginError(t('auth.failed'));
       setAdminKey('');
     }
   };
@@ -166,7 +232,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AppContext.Provider value={{ adminKey, isAuthenticated, isDefaultPassword, showToast, confirmAction, logout, updateAdminKey }}>
+    <AppContext.Provider value={{ adminKey, isAuthenticated, isDefaultPassword, showToast, confirmAction, logout, updateAdminKey, locale, setLocale, t }}>
       {children}
 
       {/* Admin Login Dialog */}
@@ -176,9 +242,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           className="max-w-[440px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl"
         >
           <DialogHeader>
-            <DialogTitle className="text-xl font-heading font-semibold text-white">Orion Dashboard</DialogTitle>
+            <DialogTitle className="text-xl font-heading font-semibold text-white">{t('auth.title')}</DialogTitle>
             <DialogDescription className="text-zinc-400 text-xs mt-1.5 leading-relaxed">
-              Enter your admin password to unlock the dashboard.
+              {t('auth.description')}
             </DialogDescription>
           </DialogHeader>
 
@@ -188,7 +254,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               value={adminKeyInput}
               onChange={(e) => setAdminKeyInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && login()}
-              placeholder="Admin password"
+              placeholder={t('auth.passwordPlaceholder')}
               className="bg-black/40 border border-zinc-800 text-white rounded px-4 py-3 w-full"
             />
             {loginError && (
@@ -199,7 +265,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             )}
             {isDefaultPassword && (
               <div className="mt-3 text-zinc-500 text-[11px] text-center leading-relaxed">
-                You can change it later in settings. Default password: <code className="ml-1.5 px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-white font-mono text-[11px] cursor-pointer hover:bg-zinc-800 hover:border-zinc-700 transition-colors active:scale-95 duration-100 inline-block align-middle" title="Click to copy" onClick={() => { navigator.clipboard.writeText(defaultPasswordValue); showToast('Password copied to clipboard!', 'success'); }}>{defaultPasswordValue}</code>
+                {t('auth.defaultPasswordInfo')} <code className="ml-1.5 px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-white font-mono text-[11px] cursor-pointer hover:bg-zinc-800 hover:border-zinc-700 transition-colors active:scale-95 duration-100 inline-block align-middle" title={t('common.copy')} onClick={() => { navigator.clipboard.writeText(defaultPasswordValue); showToast(t('common.copied'), 'success'); }}>{defaultPasswordValue}</code>
               </div>
             )}
           </div>
@@ -209,7 +275,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               onClick={login}
               className="w-full bg-white text-black hover:bg-zinc-200 font-medium py-3 rounded-md transition-all shadow-lg hover:shadow-xl"
             >
-              Unlock
+              {t('auth.unlock')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -231,7 +297,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               <AlertTriangle className="w-8 h-8" />
             </div>
             <DialogHeader>
-              <DialogTitle className="text-lg font-heading font-semibold text-white">Are you sure?</DialogTitle>
+              <DialogTitle className="text-lg font-heading font-semibold text-white">{t('common.confirm')}</DialogTitle>
               <DialogDescription className="text-zinc-400 text-sm mt-2">
                 {confirmDialog.message}
               </DialogDescription>
@@ -243,13 +309,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               onClick={() => setConfirmDialog((prev) => ({ ...prev, show: false }))}
               className="border-zinc-800 text-white hover:bg-zinc-900 rounded-md font-medium"
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               onClick={executeConfirm}
               className="bg-red-600 hover:bg-red-700 text-white rounded-md font-medium border border-red-700/30"
             >
-              Yes, Proceed
+              {t('common.yes')}
             </Button>
           </DialogFooter>
         </DialogContent>

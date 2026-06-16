@@ -380,3 +380,22 @@ body.group-drag-active [draggable="true"] {
   color: #71717a;
   font-style: italic;
 }
+
+/* RTL Language Text Directions (keeps layout LTR, text inside RTL but left-aligned) */
+body.rtl-language input,
+body.rtl-language textarea,
+body.rtl-language select,
+body.rtl-language button,
+body.rtl-language p,
+body.rtl-language h1,
+body.rtl-language h2,
+body.rtl-language h3,
+body.rtl-language label {
+  direction: rtl;
+  text-align: left;
+}
+
+body.rtl-language input[type="number"],
+body.rtl-language input[type="email"] {
+  direction: ltr; /* numbers and emails usually stay LTR */
+}

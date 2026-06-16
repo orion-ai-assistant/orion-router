@@ -22,7 +22,7 @@ interface VirtualKey {
 }
 
 export default function VirtualKeysPage() {
-  const { showToast, confirmAction } = useApp();
+  const { showToast, confirmAction, t } = useApp();
   const [virtualKeys, setVirtualKeys] = useState<VirtualKey[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -183,14 +183,14 @@ export default function VirtualKeysPage() {
     <section id="keys" className="tab-content active block pt-8">
       <header className="flex justify-between items-end mb-8 pb-6 border-b border-border">
         <div className="header-titles">
-          <h1 className="font-heading text-3xl font-semibold tracking-tight">Virtual API Keys</h1>
-          <p className="text-zinc-400 text-sm mt-1">Client-facing Orion keys and budgets</p>
+          <h1 className="font-heading text-3xl font-semibold tracking-tight">{t('keys.title')}</h1>
+          <p className="text-zinc-400 text-sm mt-1">{t('keys.description')}</p>
         </div>
         <Button
           onClick={() => setShowKeyModal(true)}
           className="bg-white text-black hover:bg-zinc-200 font-medium px-6 py-2.5 rounded-full transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-1.5"
         >
-          + Add Key
+          + {t('keys.new')}
         </Button>
       </header>
 
@@ -199,11 +199,11 @@ export default function VirtualKeysPage() {
         <Table>
           <TableHeader className="bg-black/25">
             <TableRow className="border-b border-zinc-850 hover:bg-transparent">
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 pl-6 text-left w-[25%]">Name</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-left w-[18%]">Budget</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-left w-[12%]">Used</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[20%]">Created</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-right pr-6 w-[25%]">Actions</TableHead>
+              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 pl-6 text-left w-[25%]">{t('keys.table.name')}</TableHead>
+              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-left w-[18%]">{t('keys.table.budget')}</TableHead>
+              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-left w-[12%]">{t('keys.table.used')}</TableHead>
+              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[20%]">{t('keys.table.created')}</TableHead>
+              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-right pr-6 w-[25%]">{t('keys.table.actions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -249,7 +249,7 @@ export default function VirtualKeysPage() {
                       onClick={() => openEditModal(key)}
                       className="border-zinc-800 text-white hover:bg-zinc-800 text-xs px-3.5 py-1.5 h-auto rounded"
                     >
-                      Edit
+                      {t('common.edit')}
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -263,28 +263,28 @@ export default function VirtualKeysPage() {
       <Dialog open={showKeyModal} onOpenChange={setShowKeyModal}>
         <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-xl font-heading font-semibold text-white">Create New API Key</DialogTitle>
+            <DialogTitle className="text-xl font-heading font-semibold text-white">{t('keys.createModalTitle')}</DialogTitle>
           </DialogHeader>
 
           <div className="flex flex-col gap-4 my-4">
             <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">Key Name</label>
+              <label className="text-zinc-400 text-sm font-medium">{t('keys.keyName')}</label>
               <Input
                 value={virtualKeyForm.name}
                 onChange={(e) => setVirtualKeyForm({ ...virtualKeyForm, name: e.target.value })}
-                placeholder="Production Key"
+                placeholder={t('keys.keyNamePlaceholder')}
                 className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
               />
             </div>
             <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">Budget Limit ($)</label>
+              <label className="text-zinc-400 text-sm font-medium">{t('keys.budgetLimit')}</label>
               <Input
                 type="number"
                 min="0"
                 step="0.1"
                 value={virtualKeyForm.budget || ''}
                 onChange={(e) => setVirtualKeyForm({ ...virtualKeyForm, budget: parseFloat(e.target.value) || 0 })}
-                placeholder="0 for Unlimited"
+                placeholder={t('keys.budgetPlaceholder')}
                 className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
               />
             </div>
@@ -296,13 +296,13 @@ export default function VirtualKeysPage() {
               onClick={() => setShowKeyModal(false)}
               className="border-zinc-800 text-white hover:bg-zinc-900 rounded font-medium"
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               onClick={handleCreateKey}
               className="bg-white text-black hover:bg-zinc-200 rounded font-medium"
             >
-              Create Key
+              {t('common.create')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -312,28 +312,28 @@ export default function VirtualKeysPage() {
       <Dialog open={showEditKeyModal} onOpenChange={setShowEditKeyModal}>
         <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-xl font-heading font-semibold text-white">Edit Virtual Key</DialogTitle>
+            <DialogTitle className="text-xl font-heading font-semibold text-white">{t('keys.editModalTitle')}</DialogTitle>
           </DialogHeader>
 
           <div className="flex flex-col gap-4 my-4">
             <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">Key Name</label>
+              <label className="text-zinc-400 text-sm font-medium">{t('keys.keyName')}</label>
               <Input
                 value={editingVirtualKey.name}
                 onChange={(e) => setEditingVirtualKey({ ...editingVirtualKey, name: e.target.value })}
-                placeholder="Production Key"
+                placeholder={t('keys.keyNamePlaceholder')}
                 className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
               />
             </div>
             <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">Budget Limit ($)</label>
+              <label className="text-zinc-400 text-sm font-medium">{t('keys.budgetLimit')}</label>
               <Input
                 type="number"
                 min="0"
                 step="0.1"
                 value={editingVirtualKey.budget || ''}
                 onChange={(e) => setEditingVirtualKey({ ...editingVirtualKey, budget: parseFloat(e.target.value) || 0 })}
-                placeholder="0 for Unlimited"
+                placeholder={t('keys.budgetPlaceholder')}
                 className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
               />
             </div>
@@ -346,7 +346,7 @@ export default function VirtualKeysPage() {
                 }`}
             >
               <div className="flex flex-col gap-0.5">
-                <span className={`font-semibold text-sm ${editingVirtualKey.is_active ? 'text-purple-400' : 'text-white'}`}>Active Status</span>
+                <span className={`font-semibold text-sm ${editingVirtualKey.is_active ? 'text-purple-400' : 'text-white'}`}>{t('keys.activeStatus')}</span>
               </div>
               <Switch
                 checked={editingVirtualKey.is_active}
@@ -360,7 +360,7 @@ export default function VirtualKeysPage() {
               onClick={() => handleDeleteKey(editingVirtualKey.id)}
               className="bg-transparent border border-red-500/20 text-red-500 hover:bg-red-500/10 rounded font-medium flex items-center gap-1.5"
             >
-              <Trash2 className="w-4 h-4" /> Delete
+              <Trash2 className="w-4 h-4" /> {t('common.delete')}
             </Button>
             <div className="flex gap-3 justify-end">
               <Button
@@ -368,13 +368,13 @@ export default function VirtualKeysPage() {
                 onClick={() => setShowEditKeyModal(false)}
                 className="border-zinc-800 text-white hover:bg-zinc-900 rounded font-medium"
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button
                 onClick={handleUpdateKey}
                 className="bg-white text-black hover:bg-zinc-200 rounded font-medium"
               >
-                Save Changes
+                {t('common.save')}
               </Button>
             </div>
           </DialogFooter>
@@ -391,9 +391,9 @@ export default function VirtualKeysPage() {
       >
         <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl text-center">
           <DialogHeader>
-            <DialogTitle className="text-xl font-heading font-semibold text-white">API Key Created</DialogTitle>
+            <DialogTitle className="text-xl font-heading font-semibold text-white">{t('keys.createdModalTitle')}</DialogTitle>
             <DialogDescription className="text-zinc-400 text-sm mt-2">
-              This raw key is shown only once. Please copy and store it securely.
+              {t('keys.createdModalDesc')}
             </DialogDescription>
           </DialogHeader>
 
@@ -407,7 +407,7 @@ export default function VirtualKeysPage() {
               className="bg-white text-black hover:bg-zinc-200 font-medium px-6 py-2.5 rounded shadow-lg flex items-center gap-1.5 mx-auto"
             >
               {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-              {copied ? 'Copied' : 'Copy & Close'}
+              {copied ? t('common.copied') : t('keys.copyClose')}
             </Button>
           </DialogFooter>
         </DialogContent>

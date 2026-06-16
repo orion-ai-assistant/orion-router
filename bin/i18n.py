@@ -10,6 +10,17 @@ SUPPORTED_LOCALES = [
     "fa", "ms", "sw", "ta", "te", "mr", "sk", "bg", "sr", "hr"
 ]
 
+# RTL (Right-to-Left) diller: terminal BIDI sorunlarını hafifletmek için
+# mesajlar RLM (U+200F) + RLE (U+202B) ... PDF (U+202C) ile sarmalanır.
+RTL_LOCALES = {"ar", "fa", "he", "ur"}
+
+# RLM  = Right-to-Left Mark      → akış yönünü RTL olarak işaretler
+# RLE  = Right-to-Left Embedding → gömülü LTR metni (değişkenler) doğru hizalar
+# PDF  = Pop Directional Format  → RLE bloğunu kapatır
+_RLM = "\u200f"
+_RLE = "\u202b"
+_PDF = "\u202c"
+
 def normalize_locale(locale_str: str) -> str:
     if not locale_str:
         return "en"
@@ -99,5 +110,12 @@ FALLBACK_MESSAGES = load_messages("en") if LANG != "en" else MESSAGES
 def t(key: str, **kwargs) -> str:
     msg = MESSAGES.get(key, FALLBACK_MESSAGES.get(key, key))
     if kwargs:
-        return msg.format(**kwargs)
+        msg = msg.format(**kwargs)
+
+    # RTL dillerde Unicode yön işaretleriyle sar:
+    # RLM → terminal akışını RTL olarak işaretle
+    # RLE...PDF → LTR içeriği (değişkenler, İngilizce terimler) doğru hizala
+    if LANG in RTL_LOCALES:
+        msg = f"{_RLM}{_RLE}{msg}{_PDF}"
+
     return msg

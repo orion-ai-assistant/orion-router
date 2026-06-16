@@ -63,7 +63,7 @@ const cleanNumberInput = (val: string): string => {
 };
 
 export default function ModelsPage() {
-  const { showToast, confirmAction } = useApp();
+  const { showToast, confirmAction, t } = useApp();
   const [models, setModels] = useState<ModelItem[]>([]);
   const [providers, setProviders] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -364,14 +364,14 @@ export default function ModelsPage() {
     <section id="models" className="tab-content active block pt-8">
       <header className="flex justify-between items-end mb-8 pb-6 border-b border-border">
         <div className="header-titles">
-          <h1 className="font-heading text-3xl font-semibold tracking-tight">Models</h1>
-          <p className="text-zinc-400 text-sm mt-1">Register concrete models and their provider</p>
+          <h1 className="font-heading text-3xl font-semibold tracking-tight">{t('models.title')}</h1>
+          <p className="text-zinc-400 text-sm mt-1">{t('models.description')}</p>
         </div>
         <Button
           onClick={() => setShowAddModal(true)}
           className="bg-white text-black hover:bg-zinc-200 font-medium px-6 py-2.5 rounded-full transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-1.5"
         >
-          + Add Model
+          + {t('models.addModel')}
         </Button>
       </header>
 
@@ -480,12 +480,12 @@ export default function ModelsPage() {
       <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
         <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl overflow-y-auto max-h-[90vh]">
           <DialogHeader>
-            <DialogTitle className="text-xl font-heading font-semibold text-white">Register New Model</DialogTitle>
+            <DialogTitle className="text-xl font-heading font-semibold text-white">{t('models.addModalTitle')}</DialogTitle>
           </DialogHeader>
 
           <form onSubmit={handleCreate} noValidate className="flex flex-col gap-4 my-2">
             <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">Model ID / Name</label>
+              <label className="text-zinc-400 text-sm font-medium">{t('models.modelName')}</label>
               <Input
                 value={addForm.name}
                 onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
@@ -496,7 +496,7 @@ export default function ModelsPage() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">Provider</label>
+              <label className="text-zinc-400 text-sm font-medium">{t('models.provider')}</label>
               <div className="custom-select-wrapper select-wrapper w-full">
                 <select
                   value={addForm.provider}
@@ -514,7 +514,7 @@ export default function ModelsPage() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">Capability</label>
+              <label className="text-zinc-400 text-sm font-medium">{t('models.capability')}</label>
               <div className="custom-select-wrapper select-wrapper w-full">
                 <select
                   value={addForm.capability}
@@ -579,7 +579,7 @@ export default function ModelsPage() {
             )}
 
             <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">Pricing (per 1M tokens/chars)</label>
+              <label className="text-zinc-400 text-sm font-medium">{t('models.pricing')}</label>
               <div className="flex gap-3">
                 {(addForm.capability === 'chat' || addForm.capability === 'tts' || addForm.capability === 'embed') && (
                   <div className="flex-1 flex flex-col gap-1">
@@ -635,13 +635,13 @@ export default function ModelsPage() {
                 onClick={() => setShowAddModal(false)}
                 className="border-zinc-800 text-white hover:bg-zinc-900 rounded font-medium"
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button
                 type="submit"
                 className="bg-white text-black hover:bg-zinc-200 rounded font-medium"
               >
-                Add Model
+                {t('common.save')}
               </Button>
             </DialogFooter>
           </form>
@@ -652,12 +652,12 @@ export default function ModelsPage() {
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
         <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl overflow-y-auto max-h-[90vh]">
           <DialogHeader>
-            <DialogTitle className="text-xl font-heading font-semibold text-white">Edit Registered Model</DialogTitle>
+            <DialogTitle className="text-xl font-heading font-semibold text-white">{t('models.editModalTitle')}</DialogTitle>
           </DialogHeader>
 
           <form onSubmit={handleUpdate} noValidate className="flex flex-col gap-4 my-2">
             <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">Model ID / Name</label>
+              <label className="text-zinc-400 text-sm font-medium">{t('models.modelName')}</label>
               <Input
                 value={editingModel.name}
                 onChange={(e) => setEditingModel({ ...editingModel, name: e.target.value })}
@@ -667,7 +667,7 @@ export default function ModelsPage() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">Provider</label>
+              <label className="text-zinc-400 text-sm font-medium">{t('models.provider')}</label>
               <div className="custom-select-wrapper select-wrapper w-full">
                 <select
                   value={editingModel.provider}
@@ -686,7 +686,7 @@ export default function ModelsPage() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">Capability</label>
+              <label className="text-zinc-400 text-sm font-medium">{t('models.capability')}</label>
               <div className="custom-select-wrapper select-wrapper w-full">
                 <select
                   value={editingModel.capability}
@@ -751,7 +751,7 @@ export default function ModelsPage() {
             )}
 
             <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">Pricing (per 1M tokens/chars)</label>
+              <label className="text-zinc-400 text-sm font-medium">{t('models.pricing')}</label>
               <div className="flex gap-3">
                 {(editingModel.capability === 'chat' || editingModel.capability === 'tts' || editingModel.capability === 'embed') && (
                   <div className="flex-1 flex flex-col gap-1">

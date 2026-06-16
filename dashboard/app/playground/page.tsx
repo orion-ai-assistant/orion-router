@@ -20,7 +20,7 @@ interface Message {
 }
 
 export default function PlaygroundPage() {
-  const { showToast } = useApp();
+  const { showToast, t } = useApp();
   const getSavedState = (key: string, defaultVal: string) => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem(key) || defaultVal;
@@ -632,8 +632,8 @@ export default function PlaygroundPage() {
     <section id="playground" className="tab-content active block pt-4">
       <header className="flex justify-between items-end mb-4 pb-4 border-b border-border">
         <div className="header-titles">
-          <h1 className="font-heading text-2xl font-semibold tracking-tight">Playground</h1>
-          <p className="text-zinc-400 text-xs mt-0.5">Test registered models without typing provider names</p>
+          <h1 className="font-heading text-2xl font-semibold tracking-tight">{t('playground.title')}</h1>
+          <p className="text-zinc-400 text-xs mt-0.5">{t('playground.description')}</p>
         </div>
       </header>
 
@@ -648,7 +648,7 @@ export default function PlaygroundPage() {
                 : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-white'
               }`}
           >
-            {tab === 'chat' ? 'Chat' : tab === 'tts' ? 'Text-to-Speech' : 'Embeddings'}
+            {tab === 'chat' ? t('playground.chat') : tab === 'tts' ? t('playground.tts') : t('playground.embed')}
           </button>
         ))}
       </div>
@@ -658,9 +658,9 @@ export default function PlaygroundPage() {
         <div className="playground-layout flex flex-col md:flex-row gap-4">
           {/* Settings Sidebar */}
           <div className="pg-sidebar md:w-[250px] p-4 glass-panel bg-[#18181b] border border-zinc-850 rounded-lg flex flex-col gap-3 shrink-0">
-            <h3 className="panel-title text-white font-heading font-semibold pb-1.5 border-b border-zinc-850 text-xs tracking-wide uppercase">Configuration</h3>
+            <h3 className="panel-title text-white font-heading font-semibold pb-1.5 border-b border-zinc-850 text-xs tracking-wide uppercase">{t('playground.config')}</h3>
             <div className="flex flex-col gap-1">
-              <label className="text-zinc-400 text-[10px] font-semibold uppercase">Model or Group</label>
+              <label className="text-zinc-400 text-[10px] font-semibold uppercase">{t('playground.modelOrGroup')}</label>
               <div className="custom-select-wrapper select-wrapper w-full">
                 <select
                   value={chatModel}
@@ -677,7 +677,7 @@ export default function PlaygroundPage() {
             </div>
             <div className="flex flex-col gap-1">
               <div className="flex justify-between items-center mb-1 relative group">
-                <label className="text-zinc-400 text-[10px] font-semibold uppercase">Temperature</label>
+                <label className="text-zinc-400 text-[10px] font-semibold uppercase">{t('playground.temperature')}</label>
                 {selectedChatGroup ? (
                   <>
                     <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all cursor-help ${hasTempOverride
@@ -736,7 +736,7 @@ export default function PlaygroundPage() {
             </div>
             <div className="flex flex-col gap-1">
               <div className="flex justify-between items-center mb-1 relative group">
-                <label className="text-zinc-400 text-[10px] font-semibold uppercase">Thinking</label>
+                <label className="text-zinc-400 text-[10px] font-semibold uppercase">{t('playground.thinking')}</label>
                 {selectedChatGroup ? (
                   <>
                     <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all cursor-help ${hasThinkingOverride
@@ -789,7 +789,7 @@ export default function PlaygroundPage() {
             </div>
             <div className="flex flex-col gap-1">
               <div className="flex justify-between items-center mb-1 relative group">
-                <label className="text-zinc-400 text-[10px] font-semibold uppercase">System Prompt</label>
+                <label className="text-zinc-400 text-[10px] font-semibold uppercase">{t('playground.systemPrompt')}</label>
                 {selectedChatGroup ? (
                   <>
                     <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all cursor-help ${hasSystemPromptOverride
@@ -922,9 +922,9 @@ export default function PlaygroundPage() {
         <div className="playground-layout flex flex-col md:flex-row gap-4">
           {/* Settings Sidebar */}
           <div className="pg-sidebar md:w-[250px] p-4 glass-panel bg-[#18181b] border border-zinc-850 rounded-lg flex flex-col gap-3 shrink-0">
-            <h3 className="panel-title text-white font-heading font-semibold pb-1.5 border-b border-zinc-850 text-xs tracking-wide uppercase">Audio Settings</h3>
+            <h3 className="panel-title text-white font-heading font-semibold pb-1.5 border-b border-zinc-850 text-xs tracking-wide uppercase">{t('playground.audioSettings')}</h3>
             <div className="flex flex-col gap-1">
-              <label className="text-zinc-400 text-[10px] font-semibold uppercase">Model or Group</label>
+              <label className="text-zinc-400 text-[10px] font-semibold uppercase">{t('playground.modelOrGroup')}</label>
               <div className="custom-select-wrapper select-wrapper w-full">
                 <select
                   value={ttsModel}
@@ -940,7 +940,7 @@ export default function PlaygroundPage() {
               </div>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-zinc-400 text-[10px] font-semibold uppercase">Voice Persona</label>
+              <label className="text-zinc-400 text-[10px] font-semibold uppercase">{t('playground.voicePersona')}</label>
               <div className="custom-select-wrapper select-wrapper w-full">
                 <select
                   value={ttsVoice}
@@ -957,7 +957,7 @@ export default function PlaygroundPage() {
             </div>
             <div className="flex flex-col gap-1">
               <div className="flex justify-between items-center mb-1 relative group">
-                <label className="text-zinc-400 text-[10px] font-semibold uppercase">Temperature</label>
+                <label className="text-zinc-400 text-[10px] font-semibold uppercase">{t('playground.temperature')}</label>
                 {selectedTtsGroup ? (
                   <>
                     <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all cursor-help ${hasTtsTempOverride
@@ -1019,7 +1019,7 @@ export default function PlaygroundPage() {
           {/* Main Area */}
           <div className="pg-main-area flex-1 p-4 glass-panel bg-[#18181b] border border-zinc-850 rounded-lg flex flex-col gap-3">
             <div className="flex flex-col gap-1 flex-1">
-              <label className="text-zinc-400 text-[10px] font-semibold uppercase">Text to synthesize</label>
+              <label className="text-zinc-400 text-[10px] font-semibold uppercase">{t('playground.textToSynthesize')}</label>
               <Textarea
                 value={ttsInput}
                 onChange={(e) => setTtsInput(e.target.value)}
@@ -1034,14 +1034,14 @@ export default function PlaygroundPage() {
                   onClick={() => ttsAbortControllerRef.current?.abort()}
                   className="bg-red-600 text-white hover:bg-red-700 font-semibold px-5 py-2 rounded-lg text-xs min-w-[70px]"
                 >
-                  Stop
+                  {t('playground.stop')}
                 </Button>
               ) : (
                 <Button
                   onClick={handleGenerateTTS}
                   className="bg-white text-black hover:bg-zinc-200 font-semibold px-5 py-2 rounded-lg text-xs"
                 >
-                  Generate Audio
+                  {t('playground.generateAudio')}
                 </Button>
               )}
             </div>
@@ -1060,7 +1060,7 @@ export default function PlaygroundPage() {
                   download="speech.wav"
                   className="bg-zinc-800 text-white border border-zinc-700 hover:bg-zinc-700 font-medium px-3 py-1.5 text-[10px] rounded transition-colors"
                 >
-                  Download
+                  {t('playground.download')}
                 </a>
               </div>
             )}
@@ -1073,9 +1073,9 @@ export default function PlaygroundPage() {
         <div className="playground-layout flex flex-col md:flex-row gap-4">
           {/* Settings Sidebar */}
           <div className="pg-sidebar md:w-[250px] p-4 glass-panel bg-[#18181b] border border-zinc-850 rounded-lg flex flex-col gap-3 shrink-0">
-            <h3 className="panel-title text-white font-heading font-semibold pb-1.5 border-b border-zinc-850 text-xs tracking-wide uppercase">Embedding Settings</h3>
+            <h3 className="panel-title text-white font-heading font-semibold pb-1.5 border-b border-zinc-850 text-xs tracking-wide uppercase">{t('playground.embeddingSettings')}</h3>
             <div className="flex flex-col gap-1">
-              <label className="text-zinc-400 text-[10px] font-semibold uppercase">Model or Group</label>
+              <label className="text-zinc-400 text-[10px] font-semibold uppercase">{t('playground.modelOrGroup')}</label>
               <div className="custom-select-wrapper select-wrapper w-full">
                 <select
                   value={embedModel}
@@ -1095,7 +1095,7 @@ export default function PlaygroundPage() {
           {/* Main Area */}
           <div className="pg-main-area flex-1 p-4 glass-panel bg-[#18181b] border border-zinc-850 rounded-lg flex flex-col gap-3">
             <div className="flex flex-col gap-1 flex-1">
-              <label className="text-zinc-400 text-[10px] font-semibold uppercase">Text to embed</label>
+              <label className="text-zinc-400 text-[10px] font-semibold uppercase">{t('playground.textToEmbed')}</label>
               <Textarea
                 value={embedInput}
                 onChange={(e) => setEmbedInput(e.target.value)}
@@ -1110,14 +1110,14 @@ export default function PlaygroundPage() {
                   onClick={() => embedAbortControllerRef.current?.abort()}
                   className="bg-red-600 text-white hover:bg-red-700 font-semibold px-5 py-2 rounded-lg text-xs min-w-[70px]"
                 >
-                  Stop
+                  {t('playground.stop')}
                 </Button>
               ) : (
                 <Button
                   onClick={handleGenerateEmbedding}
                   className="bg-white text-black hover:bg-zinc-200 font-semibold px-5 py-2 rounded-lg text-xs"
                 >
-                  Generate Vector
+                  {t('playground.generateVector')}
                 </Button>
               )}
             </div>

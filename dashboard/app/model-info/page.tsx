@@ -14,7 +14,7 @@ interface ModelFamily {
 }
 
 export default function ModelInfoPage() {
-  const { showToast } = useApp();
+  const { showToast, t } = useApp();
   const [modelFamilies, setModelFamilies] = useState<ModelFamily[]>([]);
   const [selectedFamily, setSelectedFamily] = useState<ModelFamily | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -46,8 +46,8 @@ export default function ModelInfoPage() {
     <section id="model-info" className="tab-content active block pt-8">
       <header className="flex justify-between items-end mb-8 pb-6 border-b border-border">
         <div className="header-titles">
-          <h1 className="font-heading text-3xl font-semibold tracking-tight">Model Bilgileri</h1>
-          <p className="text-zinc-400 text-sm mt-1">Model bazlı kurallar ve notlar</p>
+          <h1 className="font-heading text-3xl font-semibold tracking-tight">{t('modelInfo.title')}</h1>
+          <p className="text-zinc-400 text-sm mt-1">{t('modelInfo.description')}</p>
         </div>
       </header>
 
@@ -55,9 +55,9 @@ export default function ModelInfoPage() {
         {/* Sidebar */}
         <div className="model-info-sidebar w-[260px] border-r border-border pt-6 pb-4 flex flex-col gap-0.5 overflow-y-auto bg-[#18181b]/50 shrink-0 custom-scrollbar">
           {loading ? (
-            <div className="text-zinc-500 text-xs px-6 py-4 italic">Loading families...</div>
+            <div className="text-zinc-500 text-xs px-6 py-4 italic">{t('modelInfo.loading')}</div>
           ) : modelFamilies.length === 0 ? (
-            <div className="text-zinc-500 text-xs px-6 py-4 italic">No families found.</div>
+            <div className="text-zinc-500 text-xs px-6 py-4 italic">{t('modelInfo.noFamilies')}</div>
           ) : (
             modelFamilies.map((family) => (
               <button
@@ -79,13 +79,13 @@ export default function ModelInfoPage() {
         <div className="model-info-content flex-1 p-8 overflow-y-auto custom-scrollbar bg-zinc-900/20">
           {!selectedFamily ? (
             <div className="empty-state flex flex-col items-center justify-center h-full text-zinc-500 italic gap-4">
-              <p>Lütfen soldan bir model ailesi seçin.</p>
+              <p>{t('modelInfo.selectFamily')}</p>
             </div>
           ) : (
             <div className="flex flex-col gap-6 animate-in fade-in duration-300">
               {(!selectedFamily.rules || selectedFamily.rules.length === 0) ? (
                 <div className="empty-state flex flex-col items-center justify-center py-12 text-zinc-500 italic">
-                  Bu aile için kural bulunamadı.
+                  {t('modelInfo.noRules')}
                 </div>
               ) : (
                 selectedFamily.rules.map((rule, idx) => (
