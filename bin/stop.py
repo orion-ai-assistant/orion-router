@@ -37,6 +37,7 @@ ROOT    = Path(__file__).parent.parent.resolve()
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 from bin.i18n import t
+DEFAULT_TIMEOUT = 10.0
 PG_BIN  = ROOT / "tools" / "pgsql" / "bin"
 PG_CTL  = PG_BIN / "pg_ctl.exe"
 
@@ -46,8 +47,15 @@ PROD_DATA = ROOT / ".pgdata-prod"
 PORTS = [3001, 20128, 20129, 5433, 5444]
 
 
-def run_silent(cmd):
-    return subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+def run_silent(cmd, **kwargs):
+    if "timeout" not in kwargs:
+        kwargs["timeout"] = DEFAULT_TIMEOUT
+    try:
+        return subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **kwargs)
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(cmd, 1, stdout=b"", stderr=b"")
+    except FileNotFoundError:
+        return subprocess.CompletedProcess(cmd, 127, stdout=b"", stderr=b"")
 
 def stop_pg(data_dir: Path, label: str) -> bool:
     if data_dir.exists() and PG_CTL.exists():
@@ -73,14 +81,17 @@ def kill_port(port: int) -> bool:
                 if container_ids:
                     for cid in container_ids:
                         dim(t("docker_cleaning_port", port=port, cid=cid))
-                        subprocess.run(["docker", "stop", cid], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
+                        subprocess.run(["docker", "stop", cid], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=DEFAULT_TIMEOUT)
                         killed_any = True
                     time.sleep(1.5) # Portun temizlenmesi icin kisa bir sure bekle
         except Exception:
             pass
 
     try:
-        result = subprocess.run(["netstat", "-aon"], capture_output=True, text=True)
+        try:
+            result = subprocess.run(["netstat", "-aon"], capture_output=True, text=True, timeout=DEFAULT_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            result = subprocess.CompletedProcess(["netstat"], 1, stdout="", stderr="")
         for line in result.stdout.splitlines():
             if f":{port} " in line and "LISTENING" in line:
                 pid = line.split()[-1]
@@ -138,11 +149,15 @@ def kill_all_postgres() -> bool:
     killed_any = False
     if sys.platform == "win32":
         try:
-            result = subprocess.run(
-                ["tasklist", "/fi", "imagename eq postgres.exe"],
-                capture_output=True,
-                text=True,
-            )
+            try:
+                result = subprocess.run(
+                    ["tasklist", "/fi", "imagename eq postgres.exe"],
+                    capture_output=True,
+                    text=True,
+                    timeout=DEFAULT_TIMEOUT
+                )
+            except subprocess.TimeoutExpired:
+                result = subprocess.CompletedProcess(["tasklist"], 1, stdout="", stderr="")
             if "postgres.exe" in result.stdout.lower():
                 run_silent(["taskkill", "/f", "/t", "/im", "postgres.exe"])
                 dim(t("all_pg_killed"))
@@ -178,7 +193,10 @@ def kill_orion_pid() -> bool:
                         dim(t("old_pg_killed", pid=pid, name="orion router"))
                         killed_any = True
                 else:
-                    res = subprocess.run(["pgrep", "-P", pid], capture_output=True, text=True)
+                    try:
+                        res = subprocess.run(["pgrep", "-P", pid], capture_output=True, text=True, timeout=5)
+                    except subprocess.TimeoutExpired:
+                        res = subprocess.CompletedProcess(["pgrep"], 1, stdout="", stderr="")
                     if res.returncode == 0:
                         run_silent(["pkill", "-P", pid])
                     run_silent(["kill", "-9", pid])

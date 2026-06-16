@@ -72,6 +72,7 @@ from bin.i18n import t
 from core.lifespan import print_active_services_banner
 from bin.pg_integrity import generate_manifest, verify_manifest
 from bin.npm_integrity import npm_needs_install, record_npm_install
+DEFAULT_TIMEOUT = 10.0
 TOOLS_DIR = ROOT / "tools"
 PG_BIN    = TOOLS_DIR / "pgsql" / "bin"
 PG_DATA   = ROOT / ".pgdata-prod"
@@ -136,9 +137,18 @@ def release_lock() -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def run(cmd: list, **kwargs) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, **kwargs)
+    try:
+        return subprocess.run(cmd, **kwargs)
+    except subprocess.TimeoutExpired as e:
+        stdout = "" if kwargs.get("text") or kwargs.get("universal_newlines") else b""
+        return subprocess.CompletedProcess(cmd, 1, stdout=stdout, stderr=stdout)
+    except FileNotFoundError:
+        stdout = "" if kwargs.get("text") or kwargs.get("universal_newlines") else b""
+        return subprocess.CompletedProcess(cmd, 127, stdout=stdout, stderr=stdout)
 
 def run_silent(cmd: list, **kwargs) -> subprocess.CompletedProcess:
+    if "timeout" not in kwargs:
+        kwargs["timeout"] = DEFAULT_TIMEOUT
     return run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **kwargs)
 
 def psql(*args) -> subprocess.CompletedProcess:
@@ -169,14 +179,14 @@ def kill_port(port: int) -> None:
                 if container_ids:
                     for cid in container_ids:
                         dim(t("docker_cleaning_port", port=port, cid=cid))
-                        run_silent(["docker", "stop", cid], timeout=15)
+                        run_silent(["docker", "stop", cid], timeout=DEFAULT_TIMEOUT)
                     time.sleep(1.5) # Portun temizlenmesi icin kisa bir sure bekle
         except Exception:
             pass
 
     killed_any = False
     try:
-        result = run(["netstat", "-aon"], capture_output=True, text=True)
+        result = run(["netstat", "-aon"], capture_output=True, text=True, timeout=DEFAULT_TIMEOUT)
         for line in result.stdout.splitlines():
             if f":{port} " in line and "LISTENING" in line:
                 pid = line.split()[-1]
@@ -262,7 +272,7 @@ def _download_progress(block_num: int, block_size: int, total: int) -> None:
             print(f"    [{bar}] {pct:3d}%  {mb:5.1f} MB", flush=True)
 
 def download_postgres() -> None:
-    if verify_manifest(TOOLS_DIR):
+    if (TOOLS_DIR / "pgsql").exists():
         return
     print()
     info(t("pg_not_found_downloading"))
@@ -292,7 +302,7 @@ def download_postgres() -> None:
     generate_manifest(TOOLS_DIR, "postgresql-16.3-1-windows-x64-binaries")
     ok(t("pg_ready"))
 
-def init_database() -> None:
+def init_database(_repair_attempted: bool = False) -> None:
     if PG_DATA.exists():
         return
     info(t("db_dir_creating"))
@@ -309,6 +319,18 @@ def init_database() -> None:
         err(t("initdb_failed"))
         print(result.stdout[-2000:])
         print(result.stderr[-2000:])
+        
+        if not _repair_attempted:
+            warn("Checking PostgreSQL integrity...")
+            if not verify_manifest(TOOLS_DIR):
+                err("PostgreSQL files are corrupted! Deleting and repairing...")
+                import shutil
+                shutil.rmtree(TOOLS_DIR / "pgsql", ignore_errors=True)
+                (TOOLS_DIR / "pgsql.manifest").unlink(missing_ok=True)
+                download_postgres()
+                init_database(_repair_attempted=True)
+                return
+            
         sys.exit(1)
     ok(t("db_dir_ready"))
 
@@ -385,8 +407,40 @@ def print_pg_log_errors() -> None:
         except Exception as e:
             dim(f"Could not read pg.log: {e}")
 
-def wait_for_postgres(timeout: float = 15.0) -> None:
+def wait_for_postgres(timeout: float = DEFAULT_TIMEOUT) -> None:
     info(t("waiting_for_pg"))
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        try:
+            import socket
+            with socket.create_connection(("127.0.0.1", PG_PORT), timeout=1.0):
+                res = psql("-c", "SELECT 1")
+                if res.returncode == 0:
+                    ok(t("pg_accepting_conns"))
+                    return
+        except Exception:
+            pass
+        time.sleep(0.5)
+    err(t("pg_timeout_warning"))
+    print_pg_log_errors()
+    
+    warn("PostgreSQL failed to start. Checking file integrity...")
+    if not verify_manifest(TOOLS_DIR):
+        err("PostgreSQL files are corrupted! Deleting and repairing...")
+        import shutil
+        stop_postgres()
+        shutil.rmtree(TOOLS_DIR / "pgsql", ignore_errors=True)
+        (TOOLS_DIR / "pgsql.manifest").unlink(missing_ok=True)
+        download_postgres()
+        start_postgres()
+        # Onarım sonrası tek bir deneme — sonsuz döngüden kaçınmak için timeout değerini geçmiyoruz
+        _wait_for_postgres_once(timeout)
+        return
+        
+    sys.exit(1)
+
+def _wait_for_postgres_once(timeout: float) -> None:
+    """Onarım sonrası tek seferlik bekleme — özyineleme olmadan."""
     start_time = time.time()
     while time.time() - start_time < timeout:
         try:
