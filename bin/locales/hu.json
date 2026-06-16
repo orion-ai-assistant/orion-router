@@ -47,5 +47,11 @@
     "config_key_created": "[orion-router] Új ENCRYPTION_KEY generálva és hozzáadva a .env fájlhoz.",
     "config_key_failed": "[orion-router] Az ENCRYPTION_KEY nem generálható: {e}",
     "banner_local_network": "Helyi hálózat",
-    "banner_commands_hint": "Parancsok: orionrouter start | stop | logs | help"
+    "banner_commands_hint": "Parancsok: orionrouter start | stop | logs | help",
+    "pg_checking_integrity": "PostgreSQL integritásának ellenőrzése...",
+    "pg_corrupted_rebuilding": "A PostgreSQL fájlok sérültek! Törlés és javítás...",
+    "pg_failed_checking_integrity": "A PostgreSQL nem indult el. Fájlintegritás ellenőrzése...",
+    "npm_installing_deps": "Vezérlőpult-függőségek telepítése...",
+    "npm_install_failed": "A vezérlőpult-függőségek telepítése sikertelen",
+    "cmd_usage_format": "    python orion.py <command>\n"
 }

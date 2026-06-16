@@ -47,5 +47,11 @@
     "config_key_created": "[orion-router] Створено новий ENCRYPTION_KEY та додано у файл .env.",
     "config_key_failed": "[orion-router] Не вдалося створити ENCRYPTION_KEY: {e}",
     "banner_local_network": "Локальна мережа",
-    "banner_commands_hint": "Команди: orionrouter start | stop | logs | help"
+    "banner_commands_hint": "Команди: orionrouter start | stop | logs | help",
+    "pg_checking_integrity": "Перевірка цілісності PostgreSQL...",
+    "pg_corrupted_rebuilding": "Файли PostgreSQL пошкоджені! Видалення та відновлення...",
+    "pg_failed_checking_integrity": "PostgreSQL не вдалося запустити. Перевірка цілісності файлів...",
+    "npm_installing_deps": "Встановлення залежностей панелі...",
+    "npm_install_failed": "Не вдалося встановити залежності панелі",
+    "cmd_usage_format": "    python orion.py <command>\n"
 }

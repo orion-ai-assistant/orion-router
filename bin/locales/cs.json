@@ -47,5 +47,11 @@
     "config_key_created": "[orion-router] Nový ENCRYPTION_KEY vygenerován a přidán do .env.",
     "config_key_failed": "[orion-router] Nepodařilo se vygenerovat ENCRYPTION_KEY: {e}",
     "banner_local_network": "Místní síť",
-    "banner_commands_hint": "Příkazy: orionrouter start | stop | logs | help"
+    "banner_commands_hint": "Příkazy: orionrouter start | stop | logs | help",
+    "pg_checking_integrity": "Kontrola integrity PostgreSQL...",
+    "pg_corrupted_rebuilding": "Soubory PostgreSQL jsou poškozeny! Mazání a oprava...",
+    "pg_failed_checking_integrity": "PostgreSQL se nepodařilo spustit. Kontrola integrity souborů...",
+    "npm_installing_deps": "Instalace závislostí panelu...",
+    "npm_install_failed": "Instalace závislostí panelu selhala",
+    "cmd_usage_format": "    python orion.py <command>\n"
 }

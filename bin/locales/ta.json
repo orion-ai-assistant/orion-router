@@ -47,5 +47,11 @@
     "config_key_created": "[orion-router] புதிய ENCRYPTION_KEY உருவாக்கப்பட்டு .env கோப்பில் சேர்க்கப்பட்டது.",
     "config_key_failed": "[orion-router] ENCRYPTION_KEY ஐ உருவாக்க முடியவில்லை: {e}",
     "banner_local_network": "உள்ளூர் நெட்வொர்க்",
-    "banner_commands_hint": "கட்டளைகள்: orionrouter start | stop | logs | help"
+    "banner_commands_hint": "கட்டளைகள்: orionrouter start | stop | logs | help",
+    "pg_checking_integrity": "PostgreSQL ஒருமைப்பாட்டை சரிபார்க்கிறது...",
+    "pg_corrupted_rebuilding": "PostgreSQL கோப்புகள் சிதைந்துள்ளன! நீக்கி சரிசெய்கிறது...",
+    "pg_failed_checking_integrity": "PostgreSQL தொடங்கவில்லை. கோப்பு ஒருமைப்பாட்டை சரிபார்க்கிறது...",
+    "npm_installing_deps": "டாஷ்போர்டு சார்புகளை நிறுவுகிறது...",
+    "npm_install_failed": "டாஷ்போர்டு சார்புகளை நிறுவுவதில் தோல்வி",
+    "cmd_usage_format": "    python orion.py <command>\n"
 }

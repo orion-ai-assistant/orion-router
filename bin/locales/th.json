@@ -47,5 +47,11 @@
     "config_key_created": "[orion-router] สร้าง ENCRYPTION_KEY ใหม่และเพิ่มลงในไฟล์ .env เรียบร้อยแล้ว",
     "config_key_failed": "[orion-router] ไม่สามารถสร้าง ENCRYPTION_KEY ได้: {e}",
     "banner_local_network": "เครือข่ายโลคอล",
-    "banner_commands_hint": "คำสั่ง: orionrouter start | stop | logs | help"
+    "banner_commands_hint": "คำสั่ง: orionrouter start | stop | logs | help",
+    "pg_checking_integrity": "กำลังตรวจสอบความสมบูรณ์ของ PostgreSQL...",
+    "pg_corrupted_rebuilding": "ไฟล์ PostgreSQL เสียหาย! กำลังลบและซ่อมแซม...",
+    "pg_failed_checking_integrity": "PostgreSQL ไม่สามารถเริ่มได้ กำลังตรวจสอบความสมบูรณ์ของไฟล์...",
+    "npm_installing_deps": "กำลังติดตั้งแพ็คเกจของแดชบอร์ด...",
+    "npm_install_failed": "การติดตั้งแพ็คเกจของแดชบอร์ดล้มเหลว",
+    "cmd_usage_format": "    python orion.py <command>\n"
 }

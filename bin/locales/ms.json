@@ -47,5 +47,11 @@
     "config_key_created": "[orion-router] ENCRYPTION_KEY baharu dijana dan ditambahkan pada fail .env.",
     "config_key_failed": "[orion-router] ENCRYPTION_KEY tidak dapat dijana: {e}",
     "banner_local_network": "Rangkaian Tempatan",
-    "banner_commands_hint": "Arahan: orionrouter start | stop | logs | help"
+    "banner_commands_hint": "Arahan: orionrouter start | stop | logs | help",
+    "pg_checking_integrity": "Memeriksa integriti PostgreSQL...",
+    "pg_corrupted_rebuilding": "Fail PostgreSQL rosak! Memadam dan membaiki...",
+    "pg_failed_checking_integrity": "PostgreSQL gagal dimulakan. Memeriksa integriti fail...",
+    "npm_installing_deps": "Memasang kebergantungan papan pemuka...",
+    "npm_install_failed": "Pemasangan kebergantungan papan pemuka gagal",
+    "cmd_usage_format": "    python orion.py <command>\n"
 }

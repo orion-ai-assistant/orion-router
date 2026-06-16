@@ -47,5 +47,11 @@
     "config_key_created": "[orion-router] Δημιουργήθηκε νέο ENCRYPTION_KEY και προστέθηκε στο αρχείο .env.",
     "config_key_failed": "[orion-router] Δεν ήταν δυνατή η δημιουργία του ENCRYPTION_KEY: {e}",
     "banner_local_network": "Τοπικό Δίκτυο",
-    "banner_commands_hint": "Εντολές: orionrouter start | stop | logs | help"
+    "banner_commands_hint": "Εντολές: orionrouter start | stop | logs | help",
+    "pg_checking_integrity": "Έλεγχος ακεραιότητας PostgreSQL...",
+    "pg_corrupted_rebuilding": "Τα αρχεία PostgreSQL είναι κατεστραμμένα! Διαγραφή και επιδιόρθωση...",
+    "pg_failed_checking_integrity": "Η PostgreSQL δεν εκκινήθηκε. Έλεγχος ακεραιότητας αρχείων...",
+    "npm_installing_deps": "Εγκατάσταση εξαρτήσεων πίνακα ελέγχου...",
+    "npm_install_failed": "Η εγκατάσταση εξαρτήσεων πίνακα ελέγχου απέτυχε",
+    "cmd_usage_format": "    python orion.py <command>\n"
 }

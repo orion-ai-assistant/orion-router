@@ -47,5 +47,11 @@
     "config_key_created": "[orion-router] ENCRYPTION_KEY baru dibuat dan ditambahkan ke berkas .env.",
     "config_key_failed": "[orion-router] Gagal membuat ENCRYPTION_KEY: {e}",
     "banner_local_network": "Jaringan Lokal",
-    "banner_commands_hint": "Perintah: orionrouter start | stop | logs | help"
+    "banner_commands_hint": "Perintah: orionrouter start | stop | logs | help",
+    "pg_checking_integrity": "Memeriksa integritas PostgreSQL...",
+    "pg_corrupted_rebuilding": "File PostgreSQL rusak! Menghapus dan memperbaiki...",
+    "pg_failed_checking_integrity": "PostgreSQL gagal dimulai. Memeriksa integritas file...",
+    "npm_installing_deps": "Menginstal dependensi dashboard...",
+    "npm_install_failed": "Gagal menginstal dependensi dashboard",
+    "cmd_usage_format": "    python orion.py <command>\n"
 }

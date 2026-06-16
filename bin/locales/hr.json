@@ -47,5 +47,11 @@
     "config_key_created": "[orion-router] Novi ENCRYPTION_KEY generiran i dodan u .env datoteku.",
     "config_key_failed": "[orion-router] ENCRYPTION_KEY nije mogao biti generiran: {e}",
     "banner_local_network": "Lokalna mreža",
-    "banner_commands_hint": "Naredbe: orionrouter start | stop | logs | help"
+    "banner_commands_hint": "Naredbe: orionrouter start | stop | logs | help",
+    "pg_checking_integrity": "Provjera integriteta PostgreSQL...",
+    "pg_corrupted_rebuilding": "PostgreSQL datoteke su oštećene! Brisanje i popravak...",
+    "pg_failed_checking_integrity": "PostgreSQL se nije uspio pokrenuti. Provjera integriteta datoteka...",
+    "npm_installing_deps": "Instalacija ovisnosti upravljačke ploče...",
+    "npm_install_failed": "Instalacija ovisnosti upravljačke ploče nije uspjela",
+    "cmd_usage_format": "    python orion.py <command>\n"
 }

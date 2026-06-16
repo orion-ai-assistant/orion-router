@@ -47,5 +47,11 @@
     "config_key_created": "[orion-router] Khóa ENCRYPTION_KEY mới đã được tạo và lưu vào tệp .env.",
     "config_key_failed": "[orion-router] Không thể tạo khóa ENCRYPTION_KEY: {e}",
     "banner_local_network": "Mạng nội bộ",
-    "banner_commands_hint": "Lệnh: orionrouter start | stop | logs | help"
+    "banner_commands_hint": "Lệnh: orionrouter start | stop | logs | help",
+    "pg_checking_integrity": "Đang kiểm tra tính toàn vẹn của PostgreSQL...",
+    "pg_corrupted_rebuilding": "Các tệp PostgreSQL bị hỏng! Đang xóa và sửa chữa...",
+    "pg_failed_checking_integrity": "PostgreSQL không thể khởi động. Đang kiểm tra tính toàn vẹn của tệp...",
+    "npm_installing_deps": "Đang cài đặt các gói phụ thuộc của bảng điều khiển...",
+    "npm_install_failed": "Cài đặt các gói phụ thuộc của bảng điều khiển thất bại",
+    "cmd_usage_format": "    python orion.py <command>\n"
 }

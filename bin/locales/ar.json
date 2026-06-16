@@ -47,5 +47,11 @@
     "config_key_created": "[orion-router] تم إنشاء مفتاح تشفير ENCRYPTION_KEY جديد وإضافته إلى ملف .env.",
     "config_key_failed": "[orion-router] تعذر إنشاء ENCRYPTION_KEY: {e}",
     "banner_local_network": "الشبكة المحلية",
-    "banner_commands_hint": "الأوامر: orionrouter start | stop | logs | help"
+    "banner_commands_hint": "الأوامر: orionrouter start | stop | logs | help",
+    "pg_checking_integrity": "جارٍ التحقق من سلامة PostgreSQL...",
+    "pg_corrupted_rebuilding": "ملفات PostgreSQL تالفة! جارٍ الحذف وإعادة التثبيت...",
+    "pg_failed_checking_integrity": "فشل تشغيل PostgreSQL. جارٍ التحقق من سلامة الملفات...",
+    "npm_installing_deps": "جارٍ تثبيت اعتماديات لوحة التحكم...",
+    "npm_install_failed": "فشل تثبيت اعتماديات لوحة التحكم",
+    "cmd_usage_format": "    python orion.py <command>\n"
 }

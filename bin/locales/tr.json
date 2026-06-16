@@ -6,8 +6,9 @@
     "cmd_prod_desc": "Üretim (Production) ortamını derler ve yerel olarak başlatır.",
     "cmd_stop_desc": "Çalışan tüm arka plan servislerini ve portları temizler.",
     "cmd_example": "Örnek: python orion.py prod",
-    "err_file_not_found": "Hata: '{name}' dosyası {dir} altında bulunamadı!",
-    "err_unknown_command": "Hata: Bilinmeyen komut '{cmd}'",
+    "err_prefix": "Hata:",
+    "err_file_not_found": "'{name}' dosyası {dir} altında bulunamadı!",
+    "err_unknown_command": "Bilinmeyen komut '{cmd}'",
     "stop_title": "Orion Router - Durdurma",
     "stopping_pg_label": "{label} PostgreSQL durduruluyor...",
     "stopped_pg_label": "{label} PostgreSQL durduruldu",
@@ -47,5 +48,11 @@
     "config_key_created": "[orion-router] Yeni ENCRYPTION_KEY oluşturuldu ve .env dosyasına eklendi.",
     "config_key_failed": "[orion-router] ENCRYPTION_KEY oluşturulamadı: {e}",
     "banner_local_network": "Yerel Ağ",
-    "banner_commands_hint": "Komutlar: orionrouter start | stop | logs | help"
+    "banner_commands_hint": "Komutlar: orionrouter start | stop | logs | help",
+    "pg_checking_integrity": "PostgreSQL bütünlüğü kontrol ediliyor...",
+    "pg_corrupted_rebuilding": "PostgreSQL dosyaları bozulmuş! Siliniyor ve yeniden kuruluyor...",
+    "pg_failed_checking_integrity": "PostgreSQL başlatılamadı. Dosya bütünlüğü kontrol ediliyor...",
+    "npm_installing_deps": "Dashboard bağımlılıkları kuruluyor...",
+    "npm_install_failed": "Dashboard bağımlılıkları kurulamadı!",
+    "cmd_usage_format": "    python orion.py <komut>\n"
 }

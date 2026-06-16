@@ -47,5 +47,11 @@
     "config_key_created": "[orion-router] מפתח הצפנה ENCRYPTION_KEY חדש נוצר והתווסף לקובץ .env.",
     "config_key_failed": "[orion-router] לא ניתן היה ליצור את מפתח ההצפנה ENCRYPTION_KEY: {e}",
     "banner_local_network": "רשת מקומית",
-    "banner_commands_hint": "פקודות: orionrouter start | stop | logs | help"
+    "banner_commands_hint": "פקודות: orionrouter start | stop | logs | help",
+    "pg_checking_integrity": "בודק את שלמות PostgreSQL...",
+    "pg_corrupted_rebuilding": "קבצי PostgreSQL פגומים! מוחק ומשקם...",
+    "pg_failed_checking_integrity": "PostgreSQL לא הצליח להתחיל. בודק את שלמות הקבצים...",
+    "npm_installing_deps": "מתקין תלויות לוח הבקרה...",
+    "npm_install_failed": "התקנת תלויות לוח הבקרה נכשלה",
+    "cmd_usage_format": "    python orion.py <command>\n"
 }

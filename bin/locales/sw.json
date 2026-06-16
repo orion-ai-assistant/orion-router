@@ -47,5 +47,11 @@
     "config_key_created": "[orion-router] ENCRYPTION_KEY mpya imetengenezwa na kuongezwa kwenye faili ya .env.",
     "config_key_failed": "[orion-router] ENCRYPTION_KEY haikuweza kuzalishwa: {e}",
     "banner_local_network": "Mtandao wa Ndani",
-    "banner_commands_hint": "Amri: orionrouter start | stop | logs | help"
+    "banner_commands_hint": "Amri: orionrouter start | stop | logs | help",
+    "pg_checking_integrity": "Inakagua uadilifu wa PostgreSQL...",
+    "pg_corrupted_rebuilding": "Faili za PostgreSQL zimeharibika! Zinafutwa na kutengenezwa...",
+    "pg_failed_checking_integrity": "PostgreSQL haikuweza kuanza. Inakagua uadilifu wa faili...",
+    "npm_installing_deps": "Inaweka utegemezi wa dashibodi...",
+    "npm_install_failed": "Uwekaji wa utegemezi wa dashibodi umeshindwa",
+    "cmd_usage_format": "    python orion.py <command>\n"
 }

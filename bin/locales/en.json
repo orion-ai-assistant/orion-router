@@ -6,8 +6,9 @@
     "cmd_prod_desc": "Builds and starts the Production environment locally.",
     "cmd_stop_desc": "Clears all running background services and ports.",
     "cmd_example": "Example: python orion.py prod",
-    "err_file_not_found": "Error: File '{name}' not found under {dir}!",
-    "err_unknown_command": "Error: Unknown command '{cmd}'",
+    "err_prefix": "Error:",
+    "err_file_not_found": "File '{name}' not found under {dir}!",
+    "err_unknown_command": "Unknown command '{cmd}'",
     "stop_title": "Orion Router - Stop",
     "stopping_pg_label": "Stopping {label} PostgreSQL...",
     "stopped_pg_label": "{label} PostgreSQL stopped",
@@ -47,5 +48,11 @@
     "config_key_created": "[orion-router] New ENCRYPTION_KEY generated and added to .env file.",
     "config_key_failed": "[orion-router] ENCRYPTION_KEY could not be generated: {e}",
     "banner_local_network": "Local Network",
-    "banner_commands_hint": "Commands: orionrouter start | stop | logs | help"
+    "banner_commands_hint": "Commands: orionrouter start | stop | logs | help",
+    "pg_checking_integrity": "Checking PostgreSQL integrity...",
+    "pg_corrupted_rebuilding": "PostgreSQL files are corrupted! Deleting and repairing...",
+    "pg_failed_checking_integrity": "PostgreSQL failed to start. Checking file integrity...",
+    "npm_installing_deps": "Installing dashboard dependencies...",
+    "npm_install_failed": "Failed to install dashboard dependencies",
+    "cmd_usage_format": "    python orion.py <command>\n"
 }

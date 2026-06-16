@@ -47,5 +47,11 @@
     "config_key_created": "[orion-router] नया ENCRYPTION_KEY जनरेट किया गया और .env फ़ाइल में जोड़ा गया।",
     "config_key_failed": "[orion-router] ENCRYPTION_KEY जनरेट नहीं किया जा सका: {e}",
     "banner_local_network": "स्थानीय नेटवर्क",
-    "banner_commands_hint": "कमांड: orionrouter start | stop | logs | help"
+    "banner_commands_hint": "कमांड: orionrouter start | stop | logs | help",
+    "pg_checking_integrity": "PostgreSQL अखंडता जाँची जा रही है...",
+    "pg_corrupted_rebuilding": "PostgreSQL फ़ाइलें दूषित हैं! हटाया और मरम्मत किया जा रहा है...",
+    "pg_failed_checking_integrity": "PostgreSQL प्रारंभ नहीं हो सका। फ़ाइल अखंडता जाँची जा रही है...",
+    "npm_installing_deps": "डैशबोर्ड निर्भरताएँ इंस्टॉल की जा रही हैं...",
+    "npm_install_failed": "डैशबोर्ड निर्भरताएँ इंस्टॉल करने में विफल",
+    "cmd_usage_format": "    python orion.py <command>\n"
 }

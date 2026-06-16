@@ -47,5 +47,11 @@
     "config_key_created": "[orion-router] 已產生新的 ENCRYPTION_KEY 並新增到 .env 檔案中。",
     "config_key_failed": "[orion-router] 無法產生 ENCRYPTION_KEY: {e}",
     "banner_local_network": "區域網路",
-    "banner_commands_hint": "命令: orionrouter start | stop | logs | help"
+    "banner_commands_hint": "命令: orionrouter start | stop | logs | help",
+    "pg_checking_integrity": "正在檢查 PostgreSQL 完整性...",
+    "pg_corrupted_rebuilding": "PostgreSQL 檔案已損毀！正在刪除並修復...",
+    "pg_failed_checking_integrity": "PostgreSQL 無法啟動。正在檢查檔案完整性...",
+    "npm_installing_deps": "正在安裝主控台相依套件...",
+    "npm_install_failed": "安裝主控台相依套件失敗",
+    "cmd_usage_format": "    python orion.py <command>\n"
 }

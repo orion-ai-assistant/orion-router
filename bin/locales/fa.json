@@ -47,5 +47,11 @@
     "config_key_created": "[orion-router] کلید رمزنگاری جدید ENCRYPTION_KEY ایجاد و به فایل .env اضافه شد.",
     "config_key_failed": "[orion-router] امکان ایجاد ENCRYPTION_KEY وجود ندارد: {e}",
     "banner_local_network": "شبکه محلی",
-    "banner_commands_hint": "دستورات: orionrouter start | stop | logs | help"
+    "banner_commands_hint": "دستورات: orionrouter start | stop | logs | help",
+    "pg_checking_integrity": "در حال بررسی یکپارچگی PostgreSQL...",
+    "pg_corrupted_rebuilding": "فایل‌های PostgreSQL خراب شده‌اند! در حال حذف و بازسازی...",
+    "pg_failed_checking_integrity": "PostgreSQL راه‌اندازی نشد. در حال بررسی یکپارچگی فایل‌ها...",
+    "npm_installing_deps": "در حال نصب وابستگی‌های داشبورد...",
+    "npm_install_failed": "نصب وابستگی‌های داشبورد ناموفق بود",
+    "cmd_usage_format": "    python orion.py <command>\n"
 }

@@ -43,7 +43,7 @@ def print_banner():
 def print_usage():
     print_banner()
     print(f"{BOLD}{t('usage')}{RESET}")
-    print(f"    python orion.py <komut>\n")
+    print(t("cmd_usage_format"), end="")
     print(f"{BOLD}{t('valid_commands')}{RESET}")
     print(f"    {GREEN}{BOLD}dev{RESET}   : {t('cmd_dev_desc')}")
     print(f"    {GREEN}{BOLD}prod{RESET}  : {t('cmd_prod_desc')}")
@@ -66,12 +66,7 @@ def main():
         script_path = script_map[cmd]
         if not script_path.exists():
             err_msg = t("err_file_not_found", name=script_path.name, dir=BIN_DIR)
-            if "Hata:" in err_msg:
-                rest = err_msg.replace("Hata:", "")
-                print(f"{RED}{BOLD}Hata:{RESET}{rest}")
-            else:
-                rest = err_msg.replace("Error:", "")
-                print(f"{RED}{BOLD}Error:{RESET}{rest}")
+            print(f"{RED}{BOLD}{t('err_prefix')}{RESET} {err_msg}")
             sys.exit(1)
         
         try:
@@ -83,12 +78,7 @@ def main():
             pass
     else:
         err_msg = t("err_unknown_command", cmd=cmd)
-        if "Hata:" in err_msg:
-            rest = err_msg.replace("Hata:", "")
-            print(f"\n{RED}{BOLD}✘  Hata:{RESET}{rest}{RESET}")
-        else:
-            rest = err_msg.replace("Error:", "")
-            print(f"\n{RED}{BOLD}✘  Error:{RESET}{rest}{RESET}")
+        print(f"\n{RED}{BOLD}✘  {t('err_prefix')}{RESET} {err_msg}")
         print_usage()
         sys.exit(1)
 

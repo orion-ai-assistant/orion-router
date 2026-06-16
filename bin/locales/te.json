@@ -47,5 +47,11 @@
     "config_key_created": "[orion-router] కొత్త ENCRYPTION_KEY జనరేట్ చేయబడింది మరియు .env ఫైల్‌కు జోడించబడింది.",
     "config_key_failed": "[orion-router] ENCRYPTION_KEY ని జనరేట్ చేయలేకపోయింది: {e}",
     "banner_local_network": "స్థానిక నెట్‌వర్క్",
-    "banner_commands_hint": "ఆదేశాలు: orionrouter start | stop | logs | help"
+    "banner_commands_hint": "ఆదేశాలు: orionrouter start | stop | logs | help",
+    "pg_checking_integrity": "PostgreSQL సమగ్రతను తనిఖీ చేస్తోంది...",
+    "pg_corrupted_rebuilding": "PostgreSQL ఫైల్‌లు చెడిపోయాయి! తొలగించి మరమ్మత్తు చేస్తోంది...",
+    "pg_failed_checking_integrity": "PostgreSQL ప్రారంభించలేకపోయింది. ఫైల్ సమగ్రతను తనిఖీ చేస్తోంది...",
+    "npm_installing_deps": "డాష్‌బోర్డ్ డిపెండెన్సీలు ఇన్‌స్టాల్ చేస్తోంది...",
+    "npm_install_failed": "డాష్‌బోర్డ్ డిపెండెన్సీల ఇన్‌స్టాలేషన్ విఫలమైంది",
+    "cmd_usage_format": "    python orion.py <command>\n"
 }

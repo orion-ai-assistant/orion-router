@@ -47,5 +47,11 @@
     "config_key_created": "[orion-router] Cheie ENCRYPTION_KEY nouă generată și adăugată în fișierul .env.",
     "config_key_failed": "[orion-router] Nu s-a putut genera cheia ENCRYPTION_KEY: {e}",
     "banner_local_network": "Rețea Locală",
-    "banner_commands_hint": "Comenzi: orionrouter start | stop | logs | help"
+    "banner_commands_hint": "Comenzi: orionrouter start | stop | logs | help",
+    "pg_checking_integrity": "Se verifică integritatea PostgreSQL...",
+    "pg_corrupted_rebuilding": "Fișierele PostgreSQL sunt corupte! Se șterg și se repară...",
+    "pg_failed_checking_integrity": "PostgreSQL nu a pornit. Se verifică integritatea fișierelor...",
+    "npm_installing_deps": "Se instalează dependențele dashboard-ului...",
+    "npm_install_failed": "Instalarea dependențelor dashboard-ului a eșuat",
+    "cmd_usage_format": "    python orion.py <command>\n"
 }

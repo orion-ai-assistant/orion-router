@@ -47,5 +47,11 @@
     "config_key_created": "[orion-router] 새 ENCRYPTION_KEY가 생성되어 .env 파일에 추가되었습니다.",
     "config_key_failed": "[orion-router] ENCRYPTION_KEY를 생성할 수 없습니다: {e}",
     "banner_local_network": "로컬 네트워크",
-    "banner_commands_hint": "명령어: orionrouter start | stop | logs | help"
+    "banner_commands_hint": "명령어: orionrouter start | stop | logs | help",
+    "pg_checking_integrity": "PostgreSQL 무결성 확인 중...",
+    "pg_corrupted_rebuilding": "PostgreSQL 파일이 손상되었습니다! 삭제 후 복구 중...",
+    "pg_failed_checking_integrity": "PostgreSQL을 시작할 수 없습니다. 파일 무결성 확인 중...",
+    "npm_installing_deps": "대시보드 의존성 설치 중...",
+    "npm_install_failed": "대시보드 의존성 설치 실패",
+    "cmd_usage_format": "    python orion.py <command>\n"
 }
