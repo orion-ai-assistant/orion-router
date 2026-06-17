@@ -53,5 +53,6 @@
     "pg_failed_checking_integrity": "PostgreSQL தொடங்கவில்லை. கோப்பு ஒருமைப்பாட்டை சரிபார்க்கிறது...",
     "npm_installing_deps": "டாஷ்போர்டு சார்புகளை நிறுவுகிறது...",
     "npm_install_failed": "டாஷ்போர்டு சார்புகளை நிறுவுவதில் தோல்வி",
-    "cmd_usage_format": "    python orion.py <command>\n"
+    "cmd_usage_format": "    python orion.py <command>\n",
+    "api_err_localhost_not_allowed": "செயல்திறன் எச்சரிக்கை: 'localhost' இன் பயன்பாடு Orion Router ஆல் கட்டுப்படுத்தப்பட்டுள்ளது. பைதான் நூலகங்களில் 2 வினாடி DNS/IPv6 தெளிவுத்திறன் தாமதத்தை (காலாவதி) தவிர்க்க, உங்கள் கிளையண்ட் குறியீட்டில் உள்ள இணைப்பு URL ஐ '127.0.0.1' என மாற்றவும்."
 }

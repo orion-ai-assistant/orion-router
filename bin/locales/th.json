@@ -53,5 +53,6 @@
     "pg_failed_checking_integrity": "PostgreSQL ไม่สามารถเริ่มได้ กำลังตรวจสอบความสมบูรณ์ของไฟล์...",
     "npm_installing_deps": "กำลังติดตั้งแพ็คเกจของแดชบอร์ด...",
     "npm_install_failed": "การติดตั้งแพ็คเกจของแดชบอร์ดล้มเหลว",
-    "cmd_usage_format": "    python orion.py <command>\n"
+    "cmd_usage_format": "    python orion.py <command>\n",
+    "api_err_localhost_not_allowed": "คำเตือนด้านประสิทธิภาพ: การใช้ 'localhost' ถูกจำกัดโดย Orion Router เพื่อหลีกเลี่ยงความล่าช้าในการค้นหา DNS/IPv6 เป็นเวลา 2 วินาที (หมดเวลา) ในไลบรารี Python โปรดเปลี่ยน URL การเชื่อมต่อของคุณเป็น '127.0.0.1' ในโค้ดไคลเอนต์ของคุณ"
 }

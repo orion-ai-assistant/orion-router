@@ -53,5 +53,6 @@
     "pg_failed_checking_integrity": "PostgreSQL gagal dimulakan. Memeriksa integriti fail...",
     "npm_installing_deps": "Memasang kebergantungan papan pemuka...",
     "npm_install_failed": "Pemasangan kebergantungan papan pemuka gagal",
-    "cmd_usage_format": "    python orion.py <command>\n"
+    "cmd_usage_format": "    python orion.py <command>\n",
+    "api_err_localhost_not_allowed": "Amaran Prestasi: Penggunaan 'localhost' disekat oleh Orion Router. Untuk mengelakkan kelewatan resolusi DNS/IPv6 selama 2 saat (timeout) dalam perpustakaan Python, sila tukar URL sambungan anda kepada '127.0.0.1' dalam kod klien anda."
 }

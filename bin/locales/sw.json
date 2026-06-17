@@ -53,5 +53,6 @@
     "pg_failed_checking_integrity": "PostgreSQL haikuweza kuanza. Inakagua uadilifu wa faili...",
     "npm_installing_deps": "Inaweka utegemezi wa dashibodi...",
     "npm_install_failed": "Uwekaji wa utegemezi wa dashibodi umeshindwa",
-    "cmd_usage_format": "    python orion.py <command>\n"
+    "cmd_usage_format": "    python orion.py <command>\n",
+    "api_err_localhost_not_allowed": "Onyo la Utendaji: Matumizi ya 'localhost' yamezuiliwa na Orion Router. Ili kuepuka ucheleweshaji wa sekunde 2 wa azimio la DNS/IPv6 (timeout) katika maktaba za Python, tafadhali badilisha URL yako ya muunganisho kuwa '127.0.0.1' katika msimbo wako wa mteja."
 }

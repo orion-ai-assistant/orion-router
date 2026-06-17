@@ -53,5 +53,6 @@
     "pg_failed_checking_integrity": "PostgreSQL راه‌اندازی نشد. در حال بررسی یکپارچگی فایل‌ها...",
     "npm_installing_deps": "در حال نصب وابستگی‌های داشبورد...",
     "npm_install_failed": "نصب وابستگی‌های داشبورد ناموفق بود",
-    "cmd_usage_format": "    python orion.py <command>\n"
+    "cmd_usage_format": "    python orion.py <command>\n",
+    "api_err_localhost_not_allowed": "هشدار عملکرد: استفاده از 'localhost' توسط Orion Router محدود شده است. برای جلوگیری از تاخیر ۲ ثانیه‌ای رزولوشن DNS/IPv6 (تایم‌اوت) در کتابخانه‌های پایتون، لطفاً آدرس URL اتصال خود را در کد کلاینت به '127.0.0.1' تغییر دهید."
 }

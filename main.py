@@ -101,11 +101,17 @@ class LocalhostWarningMiddleware(BaseHTTPMiddleware):
         # Sadece API endpointleri için uyarı basıyoruz (Dashboard'un kendi içi iletişimini darlamamak için)
         if "localhost" in host and request.url.path.startswith("/v1/"):
             logger.warning(f"Performans Engeli: İstemci '{host}' üzerinden bağlandı. İstek 400 hatası ile reddedildi.")
+            
+            # Dil tercihine göre çeviriyi alıyoruz
+            accept_lang = request.headers.get("accept-language")
+            from bin.i18n import t_lang
+            error_message = t_lang("api_err_localhost_not_allowed", accept_lang)
+            
             return JSONResponse(
                 status_code=400,
                 content={
                     "error": {
-                        "message": "Performans Uyarısı: 'localhost' kullanımı Orion Router tarafından yasaklanmıştır. Python kütüphanelerinde 2 saniyelik DNS/IPv6 gecikmesi (timeout) yaşamamak için lütfen istemci kodundaki bağlantı URL'nizi '127.0.0.1' olarak değiştirin.",
+                        "message": error_message,
                         "type": "invalid_request_error",
                         "code": "localhost_not_allowed"
                     }
@@ -113,6 +119,7 @@ class LocalhostWarningMiddleware(BaseHTTPMiddleware):
             )
             
         return await call_next(request)
+
 
 # ---------------------------------------------------------------------------
 #  Uygulama

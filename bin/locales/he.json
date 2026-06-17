@@ -53,5 +53,6 @@
     "pg_failed_checking_integrity": "PostgreSQL לא הצליח להתחיל. בודק את שלמות הקבצים...",
     "npm_installing_deps": "מתקין תלויות לוח הבקרה...",
     "npm_install_failed": "התקנת תלויות לוח הבקרה נכשלה",
-    "cmd_usage_format": "    python orion.py <command>\n"
+    "cmd_usage_format": "    python orion.py <command>\n",
+    "api_err_localhost_not_allowed": "אזהרת ביצועים: השימוש ב-'localhost' חסום על ידי Orion Router. כדי למנוע עיכوب של 2 שניות ברזולוציית DNS/IPv6 (פסק זמן) בספריות פייתון, אנא שנו את כתובת ה-URL לקישור ל-'127.0.0.1' בקוד הלקוח שלכם."
 }

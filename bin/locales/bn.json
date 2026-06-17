@@ -53,5 +53,6 @@
     "pg_failed_checking_integrity": "PostgreSQL চালু হতে ব্যর্থ হয়েছে। ফাইলের অখণ্ডতা যাচাই করা হচ্ছে...",
     "npm_installing_deps": "ড্যাশবোর্ড নির্ভরতা ইনস্টল করা হচ্ছে...",
     "npm_install_failed": "ড্যাশবোর্ড নির্ভরতা ইনস্টল করতে ব্যর্থ হয়েছে",
-    "cmd_usage_format": "    python orion.py <command>\n"
+    "cmd_usage_format": "    python orion.py <command>\n",
+    "api_err_localhost_not_allowed": "কার্যক্ষমতা সতর্কতা: Orion Router দ্বারা 'localhost' ব্যবহার নিষিদ্ধ করা হয়েছে। পাইথন লাইব্রেরিতে ২ সেকেন্ডের DNS/IPv6 রেজোলিউশন বিলম্ব (টাইমআউট) এড়াতে অনুগ্রহ করে আপনার ক্লায়েন্ট কোডে সংযোগ URLটি '127.0.0.1' এ পরিবর্তন করুন।"
 }

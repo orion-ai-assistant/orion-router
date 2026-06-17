@@ -53,5 +53,6 @@
     "pg_failed_checking_integrity": "Hindi masimulan ang PostgreSQL. Sinusuri ang integridad ng file...",
     "npm_installing_deps": "Ini-install ang mga dependency ng dashboard...",
     "npm_install_failed": "Nabigo ang pag-install ng mga dependency ng dashboard",
-    "cmd_usage_format": "    python orion.py <command>\n"
+    "cmd_usage_format": "    python orion.py <command>\n",
+    "api_err_localhost_not_allowed": "Babala sa Performance: Ang paggamit ng 'localhost' ay pinaghihigpitan ng Orion Router. Upang maiwasan ang 2-segundong pagkaantala sa paglutas ng DNS/IPv6 (timeout) sa mga library ng Python, mangyaring palitan ang iyong URL ng koneksyon sa '127.0.0.1' sa code ng iyong client."
 }

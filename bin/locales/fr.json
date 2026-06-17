@@ -53,5 +53,6 @@
     "pg_failed_checking_integrity": "PostgreSQL n'a pas pu démarrer. Vérification de l'intégrité des fichiers...",
     "npm_installing_deps": "Installation des dépendances du tableau de bord...",
     "npm_install_failed": "Échec de l'installation des dépendances du tableau de bord",
-    "cmd_usage_format": "    python orion.py <command>\n"
+    "cmd_usage_format": "    python orion.py <command>\n",
+    "api_err_localhost_not_allowed": "Avertissement de performance : L'utilisation de 'localhost' est restreinte par Orion Router. Pour éviter un délai de résolution DNS/IPv6 de 2 secondes (timeout) dans les bibliothèques Python, veuillez modifier l'URL de connexion en '127.0.0.1' dans votre code client."
 }

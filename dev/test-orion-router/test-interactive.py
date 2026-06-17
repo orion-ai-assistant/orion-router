@@ -7,7 +7,7 @@ import openai
 print("Sistem başlatılıyor, lütfen bekleyin...")
 
 client = openai.OpenAI(
-    base_url='http://127.0.0.1:20128/v1', 
+    base_url='http://localhost:20128/v1', 
     api_key='sk-orion-T4wlYzqt11Af2omYK9IjKoj-qpUlwppFcyTpCRWfzOg'
 )
 

@@ -53,5 +53,6 @@
     "pg_failed_checking_integrity": "فشل تشغيل PostgreSQL. جارٍ التحقق من سلامة الملفات...",
     "npm_installing_deps": "جارٍ تثبيت اعتماديات لوحة التحكم...",
     "npm_install_failed": "فشل تثبيت اعتماديات لوحة التحكم",
-    "cmd_usage_format": "    python orion.py <command>\n"
+    "cmd_usage_format": "    python orion.py <command>\n",
+    "api_err_localhost_not_allowed": "تحذير أداء: استخدام 'localhost' محظور بواسطة Orion Router. لتجنب تأخير لمدة ثانيتين في دقة DNS/IPv6 (مهلة) في مكتبات بايثون، يرجى تغيير عنوان URL للاتصال إلى '127.0.0.1' في رمز العميل الخاص بك."
 }

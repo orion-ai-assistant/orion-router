@@ -53,5 +53,6 @@
     "pg_failed_checking_integrity": "PostgreSQL se nepodařilo spustit. Kontrola integrity souborů...",
     "npm_installing_deps": "Instalace závislostí panelu...",
     "npm_install_failed": "Instalace závislostí panelu selhala",
-    "cmd_usage_format": "    python orion.py <command>\n"
+    "cmd_usage_format": "    python orion.py <command>\n",
+    "api_err_localhost_not_allowed": "Varování o výkonu: Použití 'localhost' je zakázáno Orion Routerem. Chcete-li se vyhnout 2sekundovému zpoždění překladu DNS/IPv6 (timeout) v knihovnách Pythonu, změňte prosím adresu URL připojení ve svém klientském kódu na '127.0.0.1'."
 }

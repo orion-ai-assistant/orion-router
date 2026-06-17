@@ -53,5 +53,6 @@
     "pg_failed_checking_integrity": "PostgreSQL startede ikke. Kontrollerer filintegritet...",
     "npm_installing_deps": "Installerer kontrolpanel-afhængigheder...",
     "npm_install_failed": "Installation af kontrolpanel-afhængigheder mislykkedes",
-    "cmd_usage_format": "    python orion.py <command>\n"
+    "cmd_usage_format": "    python orion.py <command>\n",
+    "api_err_localhost_not_allowed": "Ydelsesadvarsel: Brug af 'localhost' er begrænset af Orion Router. For at undgå en 2-sekunders DNS/IPv6-opløsningsforsinkelse (timeout) i Python-biblioteker skal du ændre din forbindelses-URL til '127.0.0.1' i din klientkode."
 }

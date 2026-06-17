@@ -53,5 +53,6 @@
     "pg_failed_checking_integrity": "Η PostgreSQL δεν εκκινήθηκε. Έλεγχος ακεραιότητας αρχείων...",
     "npm_installing_deps": "Εγκατάσταση εξαρτήσεων πίνακα ελέγχου...",
     "npm_install_failed": "Η εγκατάσταση εξαρτήσεων πίνακα ελέγχου απέτυχε",
-    "cmd_usage_format": "    python orion.py <command>\n"
+    "cmd_usage_format": "    python orion.py <command>\n",
+    "api_err_localhost_not_allowed": "Προειδοποίηση απόδοσης: Η χρήση του 'localhost' περιορίζεται από το Orion Router. Για να αποφύγετε καθυστέρηση 2 δευτερολέπτων στην ανάλυση DNS/IPv6 (timeout) στις βιβλιοθήκες Python, αλλάξτε τη διεύθυνση URL σύνδεσης σε '127.0.0.1' στον κώδικα πελάτη σας."
 }

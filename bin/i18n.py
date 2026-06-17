@@ -119,3 +119,45 @@ def t(key: str, **kwargs) -> str:
         msg = f"{_RLM}{_RLE}{msg}{_PDF}"
 
     return msg
+
+# --- API (HTTP Request) Translation Support ---
+_API_LANG_CACHE = {}
+
+def parse_accept_language(accept_language_header: str | None) -> str:
+    """HTTP Accept-Language başlığından en öncelikli dil kodunu çıkarır."""
+    if not accept_language_header:
+        return LANG
+    try:
+        # Örnek: "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7"
+        parts = accept_language_header.split(",")
+        if parts:
+            first_part = parts[0].split(";")[0].strip()
+            return first_part
+    except Exception:
+        pass
+    return LANG
+
+
+def t_lang(key: str, lang_str: str | None, **kwargs) -> str:
+    """Belirtilen dile göre (HTTP Accept-Language vb.) çeviri döndürür, cache kullanır."""
+    parsed_lang = parse_accept_language(lang_str)
+    normalized = normalize_locale(parsed_lang)
+    
+    if normalized not in _API_LANG_CACHE:
+        _API_LANG_CACHE[normalized] = load_messages(normalized)
+        
+    msg = _API_LANG_CACHE[normalized].get(key)
+    if msg is None:
+        # Fallback to English
+        if "en" not in _API_LANG_CACHE:
+            _API_LANG_CACHE["en"] = load_messages("en")
+        msg = _API_LANG_CACHE["en"].get(key, key)
+        
+    if kwargs:
+        msg = msg.format(**kwargs)
+        
+    if normalized in RTL_LOCALES:
+        msg = f"{_RLM}{_RLE}{msg}{_PDF}"
+        
+    return msg
+

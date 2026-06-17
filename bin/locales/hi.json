@@ -53,5 +53,6 @@
     "pg_failed_checking_integrity": "PostgreSQL प्रारंभ नहीं हो सका। फ़ाइल अखंडता जाँची जा रही है...",
     "npm_installing_deps": "डैशबोर्ड निर्भरताएँ इंस्टॉल की जा रही हैं...",
     "npm_install_failed": "डैशबोर्ड निर्भरताएँ इंस्टॉल करने में विफल",
-    "cmd_usage_format": "    python orion.py <command>\n"
+    "cmd_usage_format": "    python orion.py <command>\n",
+    "api_err_localhost_not_allowed": "प्रदर्शन चेतावनी: Orion Router द्वारा 'localhost' के उपयोग पर प्रतिबंध लगा दिया गया है। पायथन पुस्तकालयों में 2-सेकंड की DNS/IPv6 रिज़ॉल्यूशन देरी (टाइमआउट) से बचने के लिए, कृपया अपने क्लाइंट कोड में कनेक्शन URL को '127.0.0.1' में बदलें।"
 }

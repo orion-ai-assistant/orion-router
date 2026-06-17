@@ -53,5 +53,6 @@
     "pg_failed_checking_integrity": "PostgreSQL을 시작할 수 없습니다. 파일 무결성 확인 중...",
     "npm_installing_deps": "대시보드 의존성 설치 중...",
     "npm_install_failed": "대시보드 의존성 설치 실패",
-    "cmd_usage_format": "    python orion.py <command>\n"
+    "cmd_usage_format": "    python orion.py <command>\n",
+    "api_err_localhost_not_allowed": "성능 경고: Orion Router에서는 'localhost' 사용이 금지되어 있습니다. Python 라이브러리에서 2초간의 DNS/IPv6 확인 지연(타임아웃)을 방지하려면 클라이언트 코드의 연결 URL을 '127.0.0.1'로 변경하십시오."
 }

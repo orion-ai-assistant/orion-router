@@ -53,5 +53,6 @@
     "pg_failed_checking_integrity": "PostgreSQL ei käynnistynyt. Tarkistetaan tiedostojen eheyttä...",
     "npm_installing_deps": "Asennetaan hallintapaneelin riippuvuuksia...",
     "npm_install_failed": "Hallintapaneelin riippuvuuksien asennus epäonnistui",
-    "cmd_usage_format": "    python orion.py <command>\n"
+    "cmd_usage_format": "    python orion.py <command>\n",
+    "api_err_localhost_not_allowed": "Suorituskykyvaroitus: Orion Router rajoittaa 'localhostin' käyttöä. Välttääksesi 2 sekunnin DNS/IPv6-selvitysviiveen (aikakatkaisun) Python-kirjastoissa, muuta yhteysosoitteesi muotoon '127.0.0.1' asiakaskoodissasi."
 }

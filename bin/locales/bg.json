@@ -53,5 +53,6 @@
     "pg_failed_checking_integrity": "PostgreSQL не успя да стартира. Проверка на целостта на файловете...",
     "npm_installing_deps": "Инсталиране на зависимостите на таблото...",
     "npm_install_failed": "Неуспешна инсталация на зависимостите на таблото",
-    "cmd_usage_format": "    python orion.py <command>\n"
+    "cmd_usage_format": "    python orion.py <command>\n",
+    "api_err_localhost_not_allowed": "Предупреждение за производителност: Използването на 'localhost' е ограничено от Orion Router. За да избегнете 2-секундно забавяне на DNS/IPv6 резолюция (таймаут) в Python библиотеки, моля, променете своя URL за връзка на '127.0.0.1' в клиентския си код."
 }

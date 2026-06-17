@@ -53,5 +53,6 @@
     "pg_failed_checking_integrity": "PostgreSQL ప్రారంభించలేకపోయింది. ఫైల్ సమగ్రతను తనిఖీ చేస్తోంది...",
     "npm_installing_deps": "డాష్‌బోర్డ్ డిపెండెన్సీలు ఇన్‌స్టాల్ చేస్తోంది...",
     "npm_install_failed": "డాష్‌బోర్డ్ డిపెండెన్సీల ఇన్‌స్టాలేషన్ విఫలమైంది",
-    "cmd_usage_format": "    python orion.py <command>\n"
+    "cmd_usage_format": "    python orion.py <command>\n",
+    "api_err_localhost_not_allowed": "పనితీరు హెచ్చరిక: Orion Router ద్వారా 'localhost' వినియోగం పరిమితం చేయబడింది. పైథాన్ లైబ్రరీలలో 2 సెకన్ల DNS/IPv6 రిజల్యూషన్ ఆలస్యాన్ని (టైమౌట్) నివారించడానికి, దయచేసి మీ క్లయింట్ కోడ్‌లో కనెక్షన్ URLని '127.0.0.1'కి మార్చండి."
 }

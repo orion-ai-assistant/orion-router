@@ -53,5 +53,6 @@
     "pg_failed_checking_integrity": "PostgreSQL 無法啟動。正在檢查檔案完整性...",
     "npm_installing_deps": "正在安裝主控台相依套件...",
     "npm_install_failed": "安裝主控台相依套件失敗",
-    "cmd_usage_format": "    python orion.py <command>\n"
+    "cmd_usage_format": "    python orion.py <command>\n",
+    "api_err_localhost_not_allowed": "效能警告：Orion Router 禁用 'localhost'。為避免 Python 函式庫中 2 秒的 DNS/IPv6 解析延遲（超時），請將用戶端程式碼中的連線 URL 變更為 '127.0.0.1'。"
 }

@@ -53,5 +53,6 @@
     "pg_failed_checking_integrity": "PostgreSQL không thể khởi động. Đang kiểm tra tính toàn vẹn của tệp...",
     "npm_installing_deps": "Đang cài đặt các gói phụ thuộc của bảng điều khiển...",
     "npm_install_failed": "Cài đặt các gói phụ thuộc của bảng điều khiển thất bại",
-    "cmd_usage_format": "    python orion.py <command>\n"
+    "cmd_usage_format": "    python orion.py <command>\n",
+    "api_err_localhost_not_allowed": "Cảnh báo hiệu suất: Sử dụng 'localhost' bị cấm bởi Orion Router. Để tránh độ trễ 2 giây cho việc phân giải DNS/IPv6 (timeout) trong thư viện Python, vui lòng thay đổi URL kết nối thành '127.0.0.1' trong mã nguồn ứng dụng của bạn."
 }
