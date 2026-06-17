@@ -5,11 +5,12 @@ FastAPI Depends fonksiyonları. Route'larda doğrudan inject edilir.
 
 Tek merkezi auth gate: authenticate_request()
   - Admin secret → system modu
-  - sk-orion-... → virtual key doğrulaması
+  - sk-orion-... → virtual key doğrulaması (kısa süreli in-memory cache ile)
   - Diğer → 401 Unauthorized
 """
 import hashlib
 import logging
+import time
 
 from fastapi import Request, HTTPException, Header
 from database import db_manager
@@ -17,13 +18,30 @@ from core import config
 
 logger = logging.getLogger("service-router.deps")
 
+# ---------------------------------------------------------------------------
+#  Virtual Key In-Memory Cache
+#  Her istek için DB sorgusu yapmak yerine kısa süreli (TTL saniye) cache.
+#  key_hash → {"id": ..., "name": ..., "is_active": ..., "budget": ...,
+#               "used_amount": ..., "_ts": monotonic_timestamp}
+# ---------------------------------------------------------------------------
+_VKEY_CACHE_TTL = 30  # saniye
+_vkey_cache: dict = {}
+
+
+def invalidate_vkey_cache(key_hash: str | None = None) -> None:
+    """Virtual key cache'ini temizle. key_hash=None ise tüm cache'i temizler."""
+    if key_hash is None:
+        _vkey_cache.clear()
+    else:
+        _vkey_cache.pop(key_hash, None)
+
 
 async def authenticate_request(request: Request) -> dict:
     """Tek merkezi auth gate. Her istek buradan geçer.
 
     Authorization: Bearer <token> başlığından token'ı alır ve şu kontrolleri yapar:
       1. Token == ADMIN_SECRET → {"source": "system", "key_id": None}
-      2. Token sk-orion-... ile başlıyorsa → DB'den virtual key doğrula
+      2. Token sk-orion-... ile başlıyorsa → DB'den virtual key doğrula (TTL cache'li)
       3. Hiçbiri değilse → 401
 
     Returns:
@@ -52,14 +70,30 @@ async def authenticate_request(request: Request) -> dict:
     # --- 1. Virtual Key kontrolü ---
     if token.startswith("sk-orion-"):
         key_hash = hashlib.sha256(token.encode()).hexdigest()
-        try:
-            row = await db_manager.fetchrow(
-                "SELECT id, name, is_active, budget, used_amount FROM router_virtual_keys WHERE api_key_hash = $1",
-                key_hash,
-            )
-        except Exception as e:
-            logger.error(f"DB error during key verification: {e}")
-            raise HTTPException(status_code=500, detail="Internal error during authentication")
+
+        # Cache kontrolü
+        row = None
+        cached = _vkey_cache.get(key_hash)
+        if cached is not None:
+            if time.monotonic() - cached["_ts"] < _VKEY_CACHE_TTL:
+                row = cached
+                logger.debug("Virtual key served from cache (hash prefix: %s...)", key_hash[:8])
+            else:
+                # TTL doldu, cache'den temizle ve yeniden sorgula
+                del _vkey_cache[key_hash]
+
+        if row is None:
+            try:
+                row = await db_manager.fetchrow(
+                    "SELECT id, name, is_active, budget, used_amount FROM router_virtual_keys WHERE api_key_hash = $1",
+                    key_hash,
+                )
+            except Exception as e:
+                logger.error(f"DB error during key verification: {e}")
+                raise HTTPException(status_code=500, detail="Internal error during authentication")
+
+            if row:
+                _vkey_cache[key_hash] = dict(row) | {"_ts": time.monotonic()}
 
         if not row:
             raise HTTPException(status_code=401, detail="Invalid API key")
@@ -80,10 +114,7 @@ async def authenticate_request(request: Request) -> dict:
         if token == config.ADMIN_SECRET:
             return {"source": "system", "key_id": None}
 
-
-
-    # --- 3. Tanınmayan token: pass-through olarak işaretle ---
-    # Playground'dan direkt provider key gönderiliyorsa bunu upstream'e iletmek için işaretle
+    # --- 3. Tanınmayan token ---
     raise HTTPException(status_code=401, detail="Invalid API key")
 
 

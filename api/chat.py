@@ -41,8 +41,10 @@ async def chat_completions(
         )
 
     messages = body.get("messages", [])
-    raw_model = body.get("model", "local-model")
-    model = (raw_model or "local-model").strip()
+    raw_model = body.get("model", "")
+    model = (raw_model or "").strip()
+    if not model:
+        raise HTTPException(status_code=400, detail="'model' field is required. Please specify a model name explicitly.")
     thinking_level = body.get("thinking_level")
     system_prompt = body.get("system_prompt")
     tools = body.get("tools")

@@ -159,6 +159,9 @@ async def update_admin_key(key_id: str, request: Request):
             budget,
             is_active,
         )
+        # Key deactivated or budget changed → invalidate auth cache
+        from core.dependencies import invalidate_vkey_cache
+        invalidate_vkey_cache()  # Basit: tümü temizle (hash erişimi yok)
         return dict(row)
     except HTTPException:
         raise
@@ -170,11 +173,16 @@ async def update_admin_key(key_id: str, request: Request):
 async def delete_admin_key(key_id: str):
     """Sanal API anahtarını siler."""
     try:
-        result = await db_manager.execute(
-            "DELETE FROM router_virtual_keys WHERE id = $1",
+        # Delete and invalidate auth cache for this key
+        row = await db_manager.fetchrow(
+            "DELETE FROM router_virtual_keys WHERE id = $1 RETURNING api_key_hash",
             key_id,
         )
-        return {"status": "success", "result": result}
+        if row:
+            from core.dependencies import invalidate_vkey_cache
+            import hashlib
+            invalidate_vkey_cache()  # Tüm cache temizle (hash'i elde etmek güç)
+        return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
