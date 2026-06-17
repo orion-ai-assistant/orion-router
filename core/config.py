@@ -22,6 +22,25 @@ def _ensure_env_file() -> bool:
         return False
     try:
         shutil.copy(_ENV_EXAMPLE_PATH, _ENV_PATH)
+        
+        # Cihazın varsayılan dilini tespit edip yeni oluşturulan .env dosyasına ekliyoruz
+        try:
+            import locale
+            sys_lang, _ = locale.getdefaultlocale()
+            if sys_lang:
+                # Dairesel importları önlemek için lokal import
+                try:
+                    from bin.i18n import normalize_locale
+                    detected_lang = normalize_locale(sys_lang)
+                except Exception:
+                    detected_lang = sys_lang.split("_")[0].lower() if "_" in sys_lang else sys_lang.lower()
+                
+                if detected_lang:
+                    with open(_ENV_PATH, "a", encoding="utf-8") as f:
+                        f.write(f'\n# Cihaz dili otomatik algılandı\nCLI_LANG="{detected_lang}"\n')
+        except Exception:
+            pass
+
         try:
             from bin.i18n import t
             msg = t("config_env_copied")
@@ -34,6 +53,7 @@ def _ensure_env_file() -> bool:
         return True
     except OSError:
         return False
+
 
 
 def _load_env_file() -> None:
