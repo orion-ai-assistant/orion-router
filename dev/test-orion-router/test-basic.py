@@ -1,14 +1,13 @@
 import openai
 
 client = openai.OpenAI(
-    base_url="http://localhost:20128/v1",
-    api_key="sk-orion-yw-4dcSmGgitl2H6lTFaUdAZqlIzK3IEEmNNDhzqbtE"
+    base_url="http://127.0.0.1:20128/v1",
+    api_key="sk-orion-T4wlYzqt11Af2omYK9IjKoj-qpUlwppFcyTpCRWfzOg"
 )
 
 response = client.chat.completions.create(
     model="gemini-2.5-flash", 
     messages=[{"role": "user", "content": "Merhaba nasılsın!"}],
-    temperature=0.7,
     extra_body={
         "thinking_level": "0" 
     },

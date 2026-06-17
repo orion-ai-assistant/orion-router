@@ -40,7 +40,7 @@ if (isDev) {
   nextConfig.rewrites = async () => {
     const backendUrl =
       process.env.BACKEND_URL ||
-      `http://localhost:${process.env.ROUTER_PORT || "20128"}`;
+      `http://127.0.0.1:${process.env.ROUTER_PORT || "20128"}`;
     return [
       {
         source: "/v1/:path*",

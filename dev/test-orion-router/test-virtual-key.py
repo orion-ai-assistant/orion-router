@@ -13,7 +13,7 @@ import sys
 import urllib.request
 import urllib.error
 
-DEFAULT_URL = "http://localhost:20128"
+DEFAULT_URL = "http://127.0.0.1:20128"
 DEFAULT_MODEL = "gemini-2.5-flash"
 
 
