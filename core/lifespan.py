@@ -214,6 +214,9 @@ async def lifespan(app: FastAPI):
             logger.error(f"Error seeding model_info: {e}")
 
     # --- Cache'i yükle ---
+    from core.dependencies import prewarm_vkey_cache
+    await prewarm_vkey_cache()
+    
     app.state.pricing_cache = await db_manager.get_all_pricing()
     app.state.model_info_cache = await db_manager.get_config("model_info") or {"families": []}
 

@@ -24,9 +24,8 @@ logger = logging.getLogger("service-router.deps")
 #  key_hash → {"id": ..., "name": ..., "is_active": ..., "budget": ...,
 #               "used_amount": ..., "_ts": monotonic_timestamp}
 # ---------------------------------------------------------------------------
-_VKEY_CACHE_TTL = 30  # saniye
+_VKEY_CACHE_TTL = float('inf')  # Sınırsız (Dashboard'dan güncellenene kadar RAM'de kalır)
 _vkey_cache: dict = {}
-
 
 def invalidate_vkey_cache(key_hash: str | None = None) -> None:
     """Virtual key cache'ini temizle. key_hash=None ise tüm cache'i temizler."""
@@ -34,6 +33,24 @@ def invalidate_vkey_cache(key_hash: str | None = None) -> None:
         _vkey_cache.clear()
     else:
         _vkey_cache.pop(key_hash, None)
+
+async def prewarm_vkey_cache() -> None:
+    """Sunucu başlarken tüm aktif sanal anahtarları DB'den çekip RAM'e yükler."""
+    from database import db_manager
+    import time
+    try:
+        rows = await db_manager.fetch(
+            "SELECT id, name, is_active, budget, used_amount, api_key_hash FROM router_virtual_keys WHERE is_active = true"
+        )
+        for r in rows:
+            r_dict = dict(r)
+            khash = r_dict.pop("api_key_hash")
+            _vkey_cache[khash] = r_dict | {"_ts": time.monotonic()}
+        import logging
+        logging.getLogger("service-router.auth").info(f"Pre-warmed {len(rows)} virtual keys into RAM.")
+    except Exception as e:
+        import logging
+        logging.getLogger("service-router.auth").error(f"Failed to pre-warm virtual keys: {e}")
 
 
 async def authenticate_request(request: Request) -> dict:

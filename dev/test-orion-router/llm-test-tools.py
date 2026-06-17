@@ -8,7 +8,7 @@ init(autoreset=True)
 # Orion Router'ın adresi ve Senin Sanal Anahtarın
 client = OpenAI(
     base_url="http://localhost:20128/v1",
-    api_key="sk-orion--ckpS6QQtoKm8U-S39qUxfsA8yHOeqjI8-3WZY2akvc"
+    api_key="sk-orion-T4wlYzqt11Af2omYK9IjKoj-qpUlwppFcyTpCRWfzOg"
 )
 
 def get_weather(location: str):
@@ -44,7 +44,7 @@ def orion_chat_session():
     print(f"{Fore.CYAN}=== ORION AI SOHBET MODU (TOOL CALL TEST) ==={Style.RESET_ALL}")
     print(f"{Fore.YELLOW}Çıkmak için 'exit' veya 'quit' yazabilirsiniz.")
     print(f"Model değiştirmek için: '/model gpt-4o'\n{Style.RESET_ALL}")
-    current_model = "gemini-3.1-flash-lite"
+    current_model = "gemini-2.5-flash-lite"
     
     messages = [
         {"role": "system", "content": "Sen yetenekli bir asistanın. Gerektiğinde hava durumu aracını kullan."}
@@ -77,7 +77,7 @@ def orion_chat_session():
                     messages=messages,
                     stream=True,
                     tools=tools,
-                    extra_body={"thinking_level": "medium"} # Router'a düşünme bütçesi tetikleyicisi gönderiyoruz
+                    extra_body={"thinking_level": "0"} # Router'a düşünme bütçesi tetikleyicisi gönderiyoruz
                 )
                 
                 full_response = ""

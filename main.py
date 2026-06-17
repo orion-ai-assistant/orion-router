@@ -91,10 +91,34 @@ if os.path.exists("/.dockerenv"):
     logging.getLogger("uvicorn.error").addFilter(DockerLogFilter())
     logging.getLogger("uvicorn").addFilter(DockerLogFilter())
 
+from starlette.middleware.base import BaseHTTPMiddleware
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
+class LocalhostWarningMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        host = request.headers.get("host", "")
+        # Sadece API endpointleri için uyarı basıyoruz (Dashboard'un kendi içi iletişimini darlamamak için)
+        if "localhost" in host and request.url.path.startswith("/v1/"):
+            logger.warning(f"Performans Engeli: İstemci '{host}' üzerinden bağlandı. İstek 400 hatası ile reddedildi.")
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "error": {
+                        "message": "Performans Uyarısı: 'localhost' kullanımı Orion Router tarafından yasaklanmıştır. Python kütüphanelerinde 2 saniyelik DNS/IPv6 gecikmesi (timeout) yaşamamak için lütfen istemci kodundaki bağlantı URL'nizi '127.0.0.1' olarak değiştirin.",
+                        "type": "invalid_request_error",
+                        "code": "localhost_not_allowed"
+                    }
+                }
+            )
+            
+        return await call_next(request)
+
 # ---------------------------------------------------------------------------
 #  Uygulama
 # ---------------------------------------------------------------------------
 app = FastAPI(title="Orion Custom Service Router", lifespan=lifespan)
+app.add_middleware(LocalhostWarningMiddleware)
 
 # CORS ayarları: frontend geliştirme sunucusunun (localhost:3001) API'ye doğrudan erişebilmesi için
 app.add_middleware(
