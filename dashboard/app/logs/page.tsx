@@ -70,7 +70,7 @@ export default function LogsPage() {
     } catch (err) {
       console.error('Failed to load logs:', err);
       if (mode !== 'poll') {
-        showToast('Failed to load logs', 'error');
+        showToast(t('logs.toast.loadFailed'), 'error');
       }
     } finally {
       if (mode === 'initial') {
@@ -126,7 +126,7 @@ export default function LogsPage() {
           ttsAudio,
         });
       } else {
-        showToast('Failed to load log details', 'error');
+        showToast(t('logs.toast.loadDetailsFailed'), 'error');
         setPayloadDialogOpen(false);
         setActiveLogDetails(null);
       }
@@ -140,7 +140,7 @@ export default function LogsPage() {
 
   const copyText = (text: string, isReq: boolean) => {
     navigator.clipboard.writeText(text);
-    showToast('Payload copied to clipboard!');
+    showToast(t('logs.toast.copied'));
     if (isReq) {
       setCopiedReq(true);
       setTimeout(() => setCopiedReq(false), 2000);
@@ -171,9 +171,9 @@ export default function LogsPage() {
           <TableHeader className="bg-black/25">
             <TableRow className="border-b border-zinc-850 hover:bg-transparent">
               <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 pl-6 w-[80px]">{t('keys.table.key')}</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 pl-16 w-[180px]">{t('logs.table.model')}</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 pl-8 w-[120px]">{t('logs.table.provider')}</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 pl-8 w-[110px]">{t('logs.table.capability')}</TableHead>
+              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 pl-8 w-[240px]">{t('logs.table.model')}</TableHead>
+              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 pl-2 w-[100px]">{t('logs.table.provider')}</TableHead>
+              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 pl-4 w-[110px]">{t('logs.table.capability')}</TableHead>
               <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[150px]">{t('logs.table.tokens')}</TableHead>
               <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[90px]">{t('logs.table.cost')}</TableHead>
               <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[110px]">{t('logs.table.status')}</TableHead>
@@ -185,13 +185,13 @@ export default function LogsPage() {
             {loading && logs.length === 0 ? (
               <TableRow className="hover:bg-transparent">
                 <TableCell colSpan={9} className="text-center text-zinc-400 py-8">
-                  Loading request logs...
+                  {t('logs.loading')}
                 </TableCell>
               </TableRow>
             ) : logs.length === 0 ? (
               <TableRow className="hover:bg-transparent">
                 <TableCell colSpan={9} className="text-center text-zinc-400 py-8">
-                  No request logs found.
+                  {t('logs.empty')}
                 </TableCell>
               </TableRow>
             ) : (
@@ -200,15 +200,24 @@ export default function LogsPage() {
                   <TableCell className="font-medium text-sm py-4 pl-6 text-zinc-300">
                     {log.key_name || 'Admin'}
                   </TableCell>
-                  <TableCell className="py-4 pl-16 font-mono text-xs text-white max-w-[180px] truncate">
+                  <TableCell
+                    className={`py-4 pl-8 font-mono text-white max-w-[240px] truncate ${
+                      log.requested_model.length > 30
+                        ? 'text-[10px]'
+                        : log.requested_model.length > 20
+                        ? 'text-xs'
+                        : 'text-sm'
+                    }`}
+                    title={log.requested_model}
+                  >
                     {log.requested_model}
                   </TableCell>
-                  <TableCell className="py-4 pl-8">
+                  <TableCell className="py-4 pl-2">
                     <Badge className="bg-blue-500/10 text-blue-300 border border-blue-500/20 text-[10px] font-medium tracking-wide rounded uppercase px-2 py-0.5 capitalize">
                       {log.provider}
                     </Badge>
                   </TableCell>
-                  <TableCell className="py-4 pl-8">
+                  <TableCell className="py-4 pl-4">
                     <Badge className="bg-zinc-800 text-zinc-300 border border-zinc-700/50 text-[10px] tracking-wide rounded uppercase px-2 py-0.5">
                       {log.capability || 'chat'}
                     </Badge>
@@ -251,7 +260,7 @@ export default function LogsPage() {
                   </TableCell>
                   <TableCell className="py-4 text-center">
                     <Badge
-                      className={`text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full ${
+                      className={`text-[10px] font-semibold tracking-wide px-2 py-0.5 rounded-full ${
                         log.success === true
                           ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
                           : log.success === false
@@ -259,7 +268,11 @@ export default function LogsPage() {
                           : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
                         }`}
                     >
-                      {log.success === true ? 'Success' : log.success === false ? 'Failed' : 'Interrupted'}
+                      {log.success === true
+                        ? t('logs.status.success')
+                        : log.success === false
+                        ? t('logs.status.failed')
+                        : t('logs.status.interrupted')}
                     </Badge>
                   </TableCell>
                   <TableCell className="py-4 text-center font-mono text-xs text-zinc-400">
@@ -308,18 +321,24 @@ export default function LogsPage() {
           {activeLogDetails && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6 my-4 text-left min-h-0">
               <PayloadViewer
-                label="Request JSON"
+                label={t('logs.requestJson')}
                 displayHtml={activeLogDetails.requestHtml || 'Loading...'}
                 fullText={activeLogDetails.fullRequest}
                 copied={copiedReq}
                 onCopy={() => copyText(activeLogDetails.fullRequest, true)}
+                copyLabel={t('logs.copyFull')}
+                copiedLabel={t('logs.copied')}
+                loadingLabel={t('common.loading')}
               />
               <PayloadViewer
-                label="Response JSON"
+                label={t('logs.responseJson')}
                 displayHtml={activeLogDetails.responseHtml || 'Loading...'}
                 fullText={activeLogDetails.fullResponse}
                 copied={copiedRes}
                 onCopy={() => copyText(activeLogDetails.fullResponse, false)}
+                copyLabel={t('logs.copyFull')}
+                copiedLabel={t('logs.copied')}
+                loadingLabel={t('common.loading')}
               />
             </div>
           )}
@@ -329,7 +348,7 @@ export default function LogsPage() {
               onClick={() => setPayloadDialogOpen(false)}
               className="w-full border border-zinc-700 bg-zinc-800 text-white hover:bg-zinc-700 font-medium py-3 rounded-md transition-all"
             >
-              Close
+              {t('common.close')}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -32,7 +32,7 @@ export default function ModelInfoPage() {
       }
     } catch (err) {
       console.error('Failed to fetch model info:', err);
-      showToast('Failed to fetch model info', 'error');
+      showToast(t('modelInfo.toast.fetchFailed'), 'error');
     } finally {
       setLoading(false);
     }
@@ -95,7 +95,7 @@ export default function ModelInfoPage() {
                   >
                     <div className="rule-info text-zinc-100 text-sm font-medium leading-relaxed mb-4 flex gap-3 items-start">
                       <span className="text-amber-500 shrink-0 text-base">⚠️</span>
-                      <span>{rule.info}</span>
+                      <span>{t(rule.info)}</span>
                     </div>
                     <div className="rule-models flex flex-wrap gap-2 pt-4 border-t border-dashed border-zinc-700/50">
                       {rule.models.map((m) => (

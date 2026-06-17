@@ -192,7 +192,7 @@ export default function GroupsPage() {
       );
     } catch (err) {
       console.error(err);
-      showToast(err instanceof Error ? err.message : 'Failed to update order', 'error');
+      showToast(err instanceof Error ? err.message : t('groups.toast.updateOrderFailed'), 'error');
       await loadGroups();
     }
   };
@@ -223,7 +223,7 @@ export default function GroupsPage() {
       }
     } catch (err) {
       console.error('Failed to load groups:', err);
-      showToast('Failed to load model groups', 'error');
+      showToast(t('groups.toast.loadFailed'), 'error');
     } finally {
       setLoading(false);
     }
@@ -265,7 +265,7 @@ export default function GroupsPage() {
     e.preventDefault();
     const name = groupForm.name.trim();
     if (!name) {
-      showToast('Please enter a group name.', 'error');
+      showToast(t('groups.toast.enterGroupName'), 'error');
       return;
     }
 
@@ -282,15 +282,15 @@ export default function GroupsPage() {
       if (res.ok) {
         setGroupForm({ name: '', capability: 'chat' });
         setShowAddGroupModal(false);
-        showToast('Model group created successfully!');
+        showToast(t('groups.toast.createSuccess'));
         await loadGroups();
       } else {
         const err = await res.json();
-        showToast('Error: ' + (err.detail || 'Failed to create group'), 'error');
+        showToast(t('common.error') + ': ' + (err.detail || t('groups.toast.createFailed')), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast('Failed to create group', 'error');
+      showToast(t('groups.toast.createFailed'), 'error');
     }
   };
 
@@ -298,7 +298,7 @@ export default function GroupsPage() {
     e.preventDefault();
     const name = editingGroup.name.trim();
     if (!name) {
-      showToast('Group name cannot be empty.', 'error');
+      showToast(t('groups.toast.nameEmpty'), 'error');
       return;
     }
 
@@ -313,22 +313,22 @@ export default function GroupsPage() {
         }),
       });
       if (res.ok) {
-        showToast('Group updated successfully!');
+        showToast(t('groups.toast.updateSuccess'));
         setShowEditGroupModal(false);
         await loadGroups();
       } else {
         const err = await res.json();
-        showToast('Error: ' + (err.detail || 'Failed to update group'), 'error');
+        showToast(t('common.error') + ': ' + (err.detail || t('groups.toast.updateFailed')), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast('Failed to update group', 'error');
+      showToast(t('groups.toast.updateFailed'), 'error');
     }
   };
 
   const handleDeleteGroup = async (groupId: string, confirmed = false) => {
     if (!confirmed) {
-      confirmAction('Are you sure you want to delete this model group?', () =>
+      confirmAction(t('common.confirm.deleteGroup'), () =>
         handleDeleteGroup(groupId, true)
       );
       return;
@@ -339,15 +339,15 @@ export default function GroupsPage() {
       });
       if (res.ok) {
         setShowEditGroupModal(false);
-        showToast('Model group deleted successfully!');
+        showToast(t('groups.toast.deleteSuccess'));
         await loadGroups();
       } else {
         const err = await res.json();
-        showToast('Error: ' + (err.detail || 'Failed to delete group'), 'error');
+        showToast(t('common.error') + ': ' + (err.detail || t('groups.toast.deleteFailed')), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast('Failed to delete group', 'error');
+      showToast(t('groups.toast.deleteFailed'), 'error');
     }
   };
 
@@ -364,14 +364,14 @@ export default function GroupsPage() {
     e.preventDefault();
     if (!activeGroupForItems) return;
     if (!selectedModelId) {
-      showToast('Please select a model.', 'error');
+      showToast(t('groups.toast.selectModel'), 'error');
       return;
     }
     const priority = activeGroupForItems.items.length + 1;
 
     const tempVal = selectedTemperature === '' ? null : parseFloat(selectedTemperature);
     if (tempVal !== null && (tempVal < 0 || tempVal > 2)) {
-      showToast('Temperature must be a number between 0.0 and 2.0', 'error');
+      showToast(t('models.toast.invalidTemperature'), 'error');
       return;
     }
 
@@ -388,15 +388,15 @@ export default function GroupsPage() {
       });
       if (res.ok) {
         setShowAddGroupItemModal(false);
-        showToast('Model added to group!');
+        showToast(t('groups.toast.addModelSuccess'));
         await loadGroups();
       } else {
         const err = await res.json();
-        showToast('Error: ' + (err.detail || 'Failed to add model to group'), 'error');
+        showToast(t('common.error') + ': ' + (err.detail || t('groups.toast.addModelFailed')), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast('Failed to add model to group', 'error');
+      showToast(t('groups.toast.addModelFailed'), 'error');
     }
   };
 
@@ -420,7 +420,7 @@ export default function GroupsPage() {
 
     const tempVal = editingGroupItem.temperature === '' ? null : parseFloat(editingGroupItem.temperature);
     if (tempVal !== null && (tempVal < 0 || tempVal > 2)) {
-      showToast('Temperature must be a number between 0.0 and 2.0', 'error');
+      showToast(t('models.toast.invalidTemperature'), 'error');
       return;
     }
 
@@ -436,21 +436,21 @@ export default function GroupsPage() {
       });
       if (res.ok) {
         setShowEditGroupItemModal(false);
-        showToast('Model group item updated!');
+        showToast(t('groups.toast.itemUpdated'));
         await loadGroups();
       } else {
         const err = await res.json();
-        showToast('Error: ' + (err.detail || 'Failed to update item'), 'error');
+        showToast(t('common.error') + ': ' + (err.detail || t('groups.toast.updateItemFailed')), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast('Failed to update item', 'error');
+      showToast(t('groups.toast.updateItemFailed'), 'error');
     }
   };
 
   const handleDeleteGroupItem = async (group: ModelGroup, itemId: string, confirmed = false) => {
     if (!confirmed) {
-      confirmAction('Are you sure you want to remove this model from the group?', () =>
+      confirmAction(t('common.confirm.removeModelFromGroup'), () =>
         handleDeleteGroupItem(group, itemId, true)
       );
       return;
@@ -461,15 +461,15 @@ export default function GroupsPage() {
       });
       if (res.ok) {
         setShowEditGroupItemModal(false);
-        showToast('Model removed from group successfully!');
+        showToast(t('groups.toast.removeModelSuccess'));
         await loadGroups();
       } else {
         const err = await res.json();
-        showToast('Error: ' + (err.detail || 'Failed to remove model'), 'error');
+        showToast(t('common.error') + ': ' + (err.detail || t('groups.toast.removeModelFailed')), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast('Failed to remove model', 'error');
+      showToast(t('groups.toast.removeModelFailed'), 'error');
     }
   };
 
@@ -582,9 +582,9 @@ export default function GroupsPage() {
       {/* Group List Container */}
       <div className="group-list flex flex-col gap-6">
         {loading ? (
-          <div className="glass-panel p-8 text-center text-zinc-400">Loading model groups...</div>
+          <div className="glass-panel p-8 text-center text-zinc-400">{t('groups.loading')}</div>
         ) : groups.length === 0 ? (
-          <div className="glass-panel p-8 text-center text-zinc-400">No model groups configured yet. Create one to set up a fallback chain.</div>
+          <div className="glass-panel p-8 text-center text-zinc-400">{t('groups.empty')}</div>
         ) : (
           groups.map((group) => (
             <div key={group.id} className="glass-panel group-card p-6 bg-[#18181b] border border-zinc-800 rounded-md shadow-xl">
@@ -596,7 +596,7 @@ export default function GroupsPage() {
                   <h3 className="font-heading text-lg font-semibold text-white">{group.name}</h3>
                   {!group.is_active && (
                     <Badge className="text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full bg-red-500/10 text-red-500 border border-red-500/20">
-                      Inactive
+                      {t('groups.inactive')}
                     </Badge>
                   )}
                   <div className="flex gap-2 ml-auto items-center">
@@ -611,7 +611,7 @@ export default function GroupsPage() {
                       onClick={() => openEditGroupModal(group)}
                       className="border-zinc-800 text-white hover:bg-zinc-800 text-xs px-3.5 py-1.5 h-auto rounded"
                     >
-                      Edit
+                      {t('common.edit')}
                     </Button>
                   </div>
                 </div>
@@ -626,7 +626,7 @@ export default function GroupsPage() {
               >
                 {group.items.length === 0 ? (
                   <div className="text-zinc-500 text-xs py-4 text-center border border-dashed border-zinc-850 rounded bg-black/10">
-                    No models in this group fallback chain. Click "+ Add Model" to add one.
+                    {t('groups.emptyItems')}
                   </div>
                 ) : (
                   <>
@@ -668,18 +668,18 @@ export default function GroupsPage() {
                                 {item.provider}
                               </Badge>
                               {item.thinking_level && (
-                                <Badge className="bg-purple-500/10 text-purple-300 border border-purple-500/20 text-[9px] font-normal tracking-wide rounded uppercase px-1.5 py-0">
-                                  Think: {item.thinking_level}
+                                <Badge className="bg-purple-500/10 text-purple-300 border border-purple-500/20 text-[9px] font-normal tracking-wide rounded uppercase px-1.5 py-0 normal-case">
+                                  {t('models.think')}: {item.thinking_level}
                                 </Badge>
                               )}
                               {item.system_prompt && (
-                                <Badge className="bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-[9px] font-normal tracking-wide rounded uppercase px-1.5 py-0">
-                                  System Prompt
+                                <Badge className="bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-[9px] font-normal tracking-wide rounded normal-case px-1.5 py-0">
+                                  {t('models.systemPrompt')}
                                 </Badge>
                               )}
                               {item.temperature !== undefined && item.temperature !== null && (
-                                <Badge className="bg-orange-500/10 text-orange-300 border border-orange-500/20 text-[9px] font-normal tracking-wide rounded uppercase px-1.5 py-0">
-                                  Temp: {item.temperature}
+                                <Badge className="bg-orange-500/10 text-orange-300 border border-orange-500/20 text-[9px] font-normal tracking-wide rounded uppercase px-1.5 py-0 normal-case">
+                                  {t('models.temp')}: {item.temperature}
                                 </Badge>
                               )}
                             </div>
@@ -687,7 +687,7 @@ export default function GroupsPage() {
                             <div className="flex items-center">
                               {isModelInactive && (
                                 <Badge className="bg-red-500/10 text-red-500 border border-red-500/20 text-[9px] font-semibold tracking-wide uppercase px-1.5 py-0 rounded">
-                                  Inactive
+                                  {t('models.inactive')}
                                 </Badge>
                               )}
                             </div>
@@ -726,7 +726,7 @@ export default function GroupsPage() {
                                 className="border-zinc-850 text-white hover:bg-zinc-800/50 hover:text-white text-xs px-3 py-1 h-8 rounded ml-5"
                                 title="Edit Item"
                               >
-                                Edit
+                                {t('common.edit')}
                               </Button>
                             </div>
                           </div>
@@ -760,13 +760,13 @@ export default function GroupsPage() {
                 value={groupForm.name}
                 onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })}
                 required
-                placeholder="e.g. fast-chat-group"
+                placeholder={t('groups.groupNamePlaceholder')}
                 className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
               />
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">Capability</label>
+              <label className="text-zinc-400 text-sm font-medium">{t('models.capability')}</label>
               <div className="custom-select-wrapper select-wrapper w-full">
                 <select
                   value={groupForm.capability}
@@ -804,12 +804,12 @@ export default function GroupsPage() {
       <Dialog open={showEditGroupModal} onOpenChange={setShowEditGroupModal}>
         <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-xl font-heading font-semibold text-white">Edit Model Group</DialogTitle>
+            <DialogTitle className="text-xl font-heading font-semibold text-white">{t('groups.editModalTitle')}</DialogTitle>
           </DialogHeader>
 
           <form onSubmit={handleUpdateGroup} className="flex flex-col gap-4 my-2">
             <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">Group Name</label>
+              <label className="text-zinc-400 text-sm font-medium">{t('groups.groupName')}</label>
               <Input
                 value={editingGroup.name}
                 onChange={(e) => setEditingGroup({ ...editingGroup, name: e.target.value })}
@@ -819,7 +819,7 @@ export default function GroupsPage() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">Capability</label>
+              <label className="text-zinc-400 text-sm font-medium">{t('models.capability')}</label>
               <div className="custom-select-wrapper select-wrapper w-full">
                 <select
                   value={editingGroup.capability}
@@ -842,7 +842,7 @@ export default function GroupsPage() {
               }`}
             >
               <div className="flex flex-col gap-0.5">
-                <span className={`font-semibold text-sm ${editingGroup.is_active ? 'text-purple-400' : 'text-white'}`}>Active Status</span>
+                <span className={`font-semibold text-sm ${editingGroup.is_active ? 'text-purple-400' : 'text-white'}`}>{t('common.activeStatus')}</span>
               </div>
               <Switch
                 checked={editingGroup.is_active}
@@ -856,7 +856,7 @@ export default function GroupsPage() {
                 type="button"
                 className="bg-transparent border border-red-500/20 text-red-500 hover:bg-red-500/10 rounded font-medium flex items-center gap-1.5"
               >
-                <Trash2 className="w-4 h-4" /> Delete
+                <Trash2 className="w-4 h-4" /> {t('common.delete')}
               </Button>
               <div className="flex gap-3 justify-end">
                 <Button
@@ -865,13 +865,13 @@ export default function GroupsPage() {
                   onClick={() => setShowEditGroupModal(false)}
                   className="border-zinc-800 text-white hover:bg-zinc-900 rounded font-medium"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
                 <Button
                   type="submit"
                   className="bg-white text-black hover:bg-zinc-200 rounded font-medium"
                 >
-                  Save Changes
+                  {t('common.saveChanges')}
                 </Button>
               </div>
             </DialogFooter>
@@ -883,19 +883,19 @@ export default function GroupsPage() {
       <Dialog open={showAddGroupItemModal} onOpenChange={setShowAddGroupItemModal}>
         <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-xl font-heading font-semibold text-white">Add Model to Group</DialogTitle>
+            <DialogTitle className="text-xl font-heading font-semibold text-white">{t('groups.addItemModalTitle')}</DialogTitle>
           </DialogHeader>
 
           <form onSubmit={handleAddGroupItem} className="flex flex-col gap-4 my-2">
             <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">Select Model</label>
+              <label className="text-zinc-400 text-sm font-medium">{t('groups.selectModel')}</label>
               {activeGroupForItems &&
               getModelsByCapability(
                 activeGroupForItems.capability,
                 activeGroupForItems.items.map((i) => i.model_id)
               ).length === 0 ? (
                 <p className="text-zinc-500 text-sm py-3 px-4 rounded border border-dashed border-zinc-800 bg-black/20">
-                  No available models for this capability. Register a model first or remove duplicates from the group.
+                  {t('groups.noModelsAvailable')}
                 </p>
               ) : (
                 <div className="custom-select-wrapper select-wrapper w-full">
@@ -905,7 +905,7 @@ export default function GroupsPage() {
                     required
                     className="orion-native-select"
                   >
-                    <option value="">-- Choose a model --</option>
+                    <option value="">{t('groups.chooseModelPlaceholder')}</option>
                     {activeGroupForItems &&
                       getModelsByCapability(
                         activeGroupForItems.capability,
@@ -922,11 +922,11 @@ export default function GroupsPage() {
 
             {activeGroupForItems?.capability === 'chat' && (
               <div className="flex flex-col gap-2">
-                <label className="text-zinc-400 text-sm font-medium">Thinking Level</label>
+                <label className="text-zinc-400 text-sm font-medium">{t('models.thinkingLevel')}</label>
                 <Input
                   value={selectedThinkingLevel}
                   onChange={(e) => setSelectedThinkingLevel(e.target.value)}
-                  placeholder="Optional (low, 1024)"
+                  placeholder={t('models.thinkingLevelPlaceholder')}
                   className="bg-black/40 border border-zinc-855 text-white rounded px-3 py-2 text-xs"
                 />
               </div>
@@ -934,7 +934,7 @@ export default function GroupsPage() {
 
             {activeGroupForItems && (activeGroupForItems.capability === 'chat' || activeGroupForItems.capability === 'tts') && (
               <div className="flex flex-col gap-2">
-                <label className="text-zinc-400 text-sm font-medium">Temperature</label>
+                <label className="text-zinc-400 text-sm font-medium">{t('models.temperature')}</label>
                 <Input
                   type="number"
                   min="0"
@@ -942,7 +942,7 @@ export default function GroupsPage() {
                   step="0.1"
                   value={selectedTemperature}
                   onChange={(e) => setSelectedTemperature(e.target.value)}
-                  placeholder="Optional override (0-2)"
+                  placeholder={t('groups.temperaturePlaceholder')}
                   className="bg-black/40 border border-zinc-855 text-white rounded px-3 py-2 text-xs"
                 />
               </div>
@@ -950,11 +950,11 @@ export default function GroupsPage() {
 
             {activeGroupForItems?.capability === 'chat' && (
               <div className="flex flex-col gap-2">
-                <label className="text-zinc-400 text-sm font-medium">System Prompt</label>
+                <label className="text-zinc-400 text-sm font-medium">{t('models.systemPrompt')}</label>
                 <Textarea
                   value={selectedSystemPrompt}
                   onChange={(e) => setSelectedSystemPrompt(e.target.value)}
-                  placeholder="Optional system instructions..."
+                  placeholder={t('models.systemPromptPlaceholder')}
                   className="bg-black/40 border border-zinc-850 text-white rounded px-3 py-2 text-xs h-14 resize-none custom-scrollbar overflow-y-auto no-field-sizing"
                 />
               </div>
@@ -967,7 +967,7 @@ export default function GroupsPage() {
                 onClick={() => setShowAddGroupItemModal(false)}
                 className="border-zinc-800 text-white hover:bg-zinc-900 rounded font-medium"
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button
                 type="submit"
@@ -980,7 +980,7 @@ export default function GroupsPage() {
                 }
                 className="bg-white text-black hover:bg-zinc-200 rounded font-medium disabled:opacity-50"
               >
-                Add Model
+                {t('groups.addModelItem')}
               </Button>
             </DialogFooter>
           </form>
@@ -991,13 +991,13 @@ export default function GroupsPage() {
       <Dialog open={showEditGroupItemModal} onOpenChange={setShowEditGroupItemModal}>
         <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-xl font-heading font-semibold text-white">Edit Group Item</DialogTitle>
+            <DialogTitle className="text-xl font-heading font-semibold text-white">{t('groups.editItemModalTitle')}</DialogTitle>
           </DialogHeader>
 
           {editingGroupItem && (
             <form onSubmit={handleUpdateGroupItem} className="flex flex-col gap-4 my-2">
               <div className="flex flex-col gap-2">
-                <label className="text-zinc-400 text-sm font-medium">Model</label>
+                <label className="text-zinc-400 text-sm font-medium">{t('common.model')}</label>
                 <div className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3 font-mono text-sm opacity-70">
                   {editingGroupItem.name} ({editingGroupItem.provider})
                 </div>
@@ -1005,11 +1005,11 @@ export default function GroupsPage() {
 
               {groups.find((g) => g.id === editingGroupItem.groupId)?.capability === 'chat' && (
                 <div className="flex flex-col gap-2">
-                  <label className="text-zinc-400 text-sm font-medium">Thinking Level</label>
+                  <label className="text-zinc-400 text-sm font-medium">{t('models.thinkingLevel')}</label>
                   <Input
                     value={editingGroupItem.thinking_level}
                     onChange={(e) => setEditingGroupItem({ ...editingGroupItem, thinking_level: e.target.value })}
-                    placeholder="Optional (low, 1024)"
+                    placeholder={t('models.thinkingLevelPlaceholder')}
                     className="bg-black/40 border border-zinc-850 text-white rounded px-3 py-2 text-xs"
                   />
                 </div>
@@ -1019,7 +1019,7 @@ export default function GroupsPage() {
                 const capability = groups.find((g) => g.id === editingGroupItem.groupId)?.capability;
                 return (capability === 'chat' || capability === 'tts') && (
                   <div className="flex flex-col gap-2">
-                    <label className="text-zinc-400 text-sm font-medium">Temperature</label>
+                    <label className="text-zinc-400 text-sm font-medium">{t('models.temperature')}</label>
                     <Input
                       type="number"
                       min="0"
@@ -1027,7 +1027,7 @@ export default function GroupsPage() {
                       step="0.1"
                       value={editingGroupItem.temperature}
                       onChange={(e) => setEditingGroupItem({ ...editingGroupItem, temperature: e.target.value })}
-                      placeholder="Optional override (0-2)"
+                      placeholder={t('groups.temperaturePlaceholder')}
                       className="bg-black/40 border border-zinc-855 text-white rounded px-3 py-2 text-xs"
                     />
                   </div>
@@ -1036,11 +1036,11 @@ export default function GroupsPage() {
 
               {groups.find((g) => g.id === editingGroupItem.groupId)?.capability === 'chat' && (
                 <div className="flex flex-col gap-2">
-                  <label className="text-zinc-400 text-sm font-medium">System Prompt</label>
+                  <label className="text-zinc-400 text-sm font-medium">{t('models.systemPrompt')}</label>
                   <Textarea
                     value={editingGroupItem.system_prompt}
                     onChange={(e) => setEditingGroupItem({ ...editingGroupItem, system_prompt: e.target.value })}
-                    placeholder="Optional system instructions..."
+                    placeholder={t('models.systemPromptPlaceholder')}
                     className="bg-black/40 border border-zinc-850 text-white rounded px-3 py-2 text-xs h-14 resize-none custom-scrollbar overflow-y-auto no-field-sizing"
                   />
                 </div>
@@ -1057,7 +1057,7 @@ export default function GroupsPage() {
                   type="button"
                   className="bg-transparent border border-red-500/20 text-red-500 hover:bg-red-500/10 rounded font-medium flex items-center gap-1.5"
                 >
-                  <Trash2 className="w-4 h-4" /> Delete
+                  <Trash2 className="w-4 h-4" /> {t('common.delete')}
                 </Button>
                 <div className="flex gap-3 justify-end">
                   <Button
@@ -1066,13 +1066,13 @@ export default function GroupsPage() {
                     onClick={() => setShowEditGroupItemModal(false)}
                     className="border-zinc-800 text-white hover:bg-zinc-900 rounded font-medium"
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </Button>
                   <Button
                     type="submit"
                     className="bg-white text-black hover:bg-zinc-200 rounded font-medium"
                   >
-                    Save Changes
+                    {t('common.saveChanges')}
                   </Button>
                 </div>
               </DialogFooter>

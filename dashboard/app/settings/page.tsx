@@ -45,15 +45,15 @@ export default function SettingsPage() {
     const confirmNewSec = confirmNewSecret.trim();
 
     if (!currentSec) {
-      showToast('Current admin secret is required', 'error');
+      showToast(t('settings.auth.error.currentRequired'), 'error');
       return;
     }
     if (!newSec) {
-      showToast('New admin secret cannot be empty', 'error');
+      showToast(t('settings.auth.error.newRequired'), 'error');
       return;
     }
     if (newSec !== confirmNewSec) {
-      showToast('New secrets do not match', 'error');
+      showToast(t('settings.auth.error.mismatch'), 'error');
       return;
     }
 
@@ -79,7 +79,7 @@ export default function SettingsPage() {
       }
     } catch (err) {
       console.error(err);
-      showToast('Network error updating admin secret', 'error');
+      showToast(t('settings.auth.error.networkUpdate'), 'error');
     } finally {
       setUpdatingKey(false);
     }
@@ -89,7 +89,7 @@ export default function SettingsPage() {
     e.preventDefault();
     const key = confirmAdminKey.trim();
     if (!key) {
-      showToast('Admin key is required for confirmation.', 'error');
+      showToast(t('settings.danger.error.keyRequired'), 'error');
       return;
     }
 
@@ -104,20 +104,20 @@ export default function SettingsPage() {
       });
 
       if (res.ok) {
-        showToast('All logs have been cleared and usage stats reset!');
+        showToast(t('settings.danger.success.cleared'));
         setShowClearLogsModal(false);
         setConfirmAdminKey('');
       } else {
         const data = await res.json().catch(() => ({}));
         if (res.status === 401) {
-          showToast('Incorrect admin key. Verification failed.', 'error');
+          showToast(t('settings.danger.error.incorrectKey'), 'error');
         } else {
-          showToast(data.detail || 'Failed to clear logs', 'error');
+          showToast(data.detail || t('settings.danger.error.failedClear'), 'error');
         }
       }
     } catch (err) {
       console.error(err);
-      showToast('Network error clearing logs', 'error');
+      showToast(t('settings.danger.error.networkClear'), 'error');
     } finally {
       setClearing(false);
     }
@@ -210,12 +210,12 @@ export default function SettingsPage() {
 
           <form onSubmit={handleClearLogs} className="flex flex-col gap-4 my-4">
             <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">Verify Admin Secret</label>
+              <label className="text-zinc-400 text-sm font-medium">{t('settings.auth.verifyAdminSecret')}</label>
               <Input
                 type="password"
                 value={confirmAdminKey}
                 onChange={(e) => setConfirmAdminKey(e.target.value)}
-                placeholder="Enter admin key to confirm"
+                placeholder={t('settings.auth.enterAdminKeyToConfirm')}
                 className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
                 required
               />
@@ -258,36 +258,36 @@ export default function SettingsPage() {
 
           <form onSubmit={handleChangeAdminSecret} className="flex flex-col gap-4 my-4">
             <div className="flex flex-col gap-2">
-              <label className="text-zinc-450 text-sm font-medium">Current Admin Secret</label>
+              <label className="text-zinc-450 text-sm font-medium">{t('settings.auth.currentAdminSecret')}</label>
               <Input
                 type="password"
                 value={currentSecret}
                 onChange={(e) => setCurrentSecret(e.target.value)}
-                placeholder="Enter current secret"
+                placeholder={t('settings.auth.enterCurrentSecret')}
                 className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
                 required
               />
             </div>
             
             <div className="flex flex-col gap-2">
-              <label className="text-zinc-450 text-sm font-medium">New Admin Secret</label>
+              <label className="text-zinc-450 text-sm font-medium">{t('settings.auth.newAdminSecret')}</label>
               <Input
                 type="password"
                 value={newSecret}
                 onChange={(e) => setNewSecret(e.target.value)}
-                placeholder="Enter new secret"
+                placeholder={t('settings.auth.enterNewSecret')}
                 className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
                 required
               />
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="text-zinc-450 text-sm font-medium">Confirm New Admin Secret</label>
+              <label className="text-zinc-450 text-sm font-medium">{t('settings.auth.confirmNewAdminSecret')}</label>
               <Input
                 type="password"
                 value={confirmNewSecret}
                 onChange={(e) => setConfirmNewSecret(e.target.value)}
-                placeholder="Re-enter new secret"
+                placeholder={t('settings.auth.reEnterNewSecret')}
                 className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
                 required
               />

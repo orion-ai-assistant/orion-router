@@ -239,7 +239,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       <Dialog open={showLogin} onOpenChange={() => {}} modal>
         <DialogContent
           showCloseButton={false}
-          className="max-w-[440px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl"
+          className="max-w-[500px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl"
         >
           <DialogHeader>
             <DialogTitle className="text-xl font-heading font-semibold text-white">{t('auth.title')}</DialogTitle>
@@ -264,8 +264,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               </div>
             )}
             {isDefaultPassword && (
-              <div className="mt-3 text-zinc-500 text-[11px] text-center leading-relaxed">
-                {t('auth.defaultPasswordInfo')} <code className="ml-1.5 px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-white font-mono text-[11px] cursor-pointer hover:bg-zinc-800 hover:border-zinc-700 transition-colors active:scale-95 duration-100 inline-block align-middle" title={t('common.copy')} onClick={() => { navigator.clipboard.writeText(defaultPasswordValue); showToast(t('common.copied'), 'success'); }}>{defaultPasswordValue}</code>
+              <div className="mt-3 w-full [container-type:inline-size]">
+                <div 
+                  className="text-zinc-500 text-center leading-relaxed whitespace-nowrap overflow-hidden text-ellipsis flex items-center justify-center gap-1.5"
+                  style={{ fontSize: 'clamp(8px, 2.6cqw, 11px)' }}
+                >
+                  <span>{t('auth.defaultPasswordInfo')}</span>
+                  <code 
+                    className="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-white font-mono cursor-pointer hover:bg-zinc-800 hover:border-zinc-700 transition-colors active:scale-95 duration-100 inline-block align-middle" 
+                    style={{ fontSize: 'clamp(8px, 2.6cqw, 11px)' }}
+                    title={t('common.copy')} 
+                    onClick={() => { 
+                      navigator.clipboard.writeText(defaultPasswordValue); 
+                      showToast(t('common.copied'), 'success'); 
+                    }}
+                  >
+                    {defaultPasswordValue}
+                  </code>
+                </div>
               </div>
             )}
           </div>

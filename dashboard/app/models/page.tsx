@@ -162,7 +162,7 @@ export default function ModelsPage() {
       }
     } catch (err) {
       console.error('Failed to load models:', err);
-      showToast('Failed to load models', 'error');
+      showToast(t('models.toast.loadFailed'), 'error');
     } finally {
       setLoading(false);
     }
@@ -211,13 +211,13 @@ export default function ModelsPage() {
     const capability = addForm.capability;
 
     if (!name || !provider) {
-      showToast('Please enter a model name and select a provider.', 'error');
+      showToast(t('models.toast.enterNameSelectProvider'), 'error');
       return;
     }
 
     const tempVal = normalizeTemperature(addForm.temperature);
     if (tempVal !== null && (tempVal < 0 || tempVal > 2)) {
-      showToast('Temperature must be a number between 0.0 and 2.0', 'error');
+      showToast(t('models.toast.invalidTemperature'), 'error');
       return;
     }
 
@@ -250,15 +250,15 @@ export default function ModelsPage() {
           system_prompt: '',
         });
         setShowAddModal(false);
-        showToast('Model added successfully!');
+        showToast(t('models.toast.addSuccess'));
         await loadModels();
       } else {
         const err = await res.json();
-        showToast('Error: ' + (err.detail || 'Failed to add model'), 'error');
+        showToast(t('common.error') + ': ' + (err.detail || t('models.toast.addFailed')), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast('Failed to add model', 'error');
+      showToast(t('models.toast.addFailed'), 'error');
     }
   };
 
@@ -268,13 +268,13 @@ export default function ModelsPage() {
     const provider = editingModel.provider.trim();
 
     if (!name || !provider) {
-      showToast('Model name and provider cannot be empty.', 'error');
+      showToast(t('models.toast.nameProviderEmpty'), 'error');
       return;
     }
 
     const tempVal = normalizeTemperature(editingModel.temperature);
     if (tempVal !== null && (tempVal < 0 || tempVal > 2)) {
-      showToast('Temperature must be a number between 0.0 and 2.0', 'error');
+      showToast(t('models.toast.invalidTemperature'), 'error');
       return;
     }
 
@@ -295,22 +295,22 @@ export default function ModelsPage() {
         }),
       });
       if (res.ok) {
-        showToast('Model updated successfully!');
+        showToast(t('models.toast.updateSuccess'));
         setShowEditModal(false);
         await loadModels();
       } else {
         const err = await res.json();
-        showToast('Error: ' + (err.detail || 'Failed to update model'), 'error');
+        showToast(t('common.error') + ': ' + (err.detail || t('models.toast.updateFailed')), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast('Failed to update model', 'error');
+      showToast(t('models.toast.updateFailed'), 'error');
     }
   };
 
   const handleDelete = async (modelId: string, confirmed = false) => {
     if (!confirmed) {
-      confirmAction('Are you sure you want to delete this model?', () =>
+      confirmAction(t('common.confirm.deleteModel'), () =>
         handleDelete(modelId, true)
       );
       return;
@@ -321,15 +321,15 @@ export default function ModelsPage() {
       });
       if (res.ok) {
         setShowEditModal(false);
-        showToast('Model deleted successfully!');
+        showToast(t('models.toast.deleteSuccess'));
         await loadModels();
       } else {
         const err = await res.json();
-        showToast('Error: ' + (err.detail || 'Failed to delete model'), 'error');
+        showToast(t('common.error') + ': ' + (err.detail || t('models.toast.deleteFailed')), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast('Failed to delete model', 'error');
+      showToast(t('models.toast.deleteFailed'), 'error');
     }
   };
 
@@ -378,10 +378,10 @@ export default function ModelsPage() {
       {/* Provider Group List */}
       <div className="group-list flex flex-col gap-6">
         {loading ? (
-          <div className="glass-panel p-8 text-center text-zinc-400">Loading models registry...</div>
+          <div className="glass-panel p-8 text-center text-zinc-400">{t('models.loading')}</div>
         ) : Object.keys(groupedModels).length === 0 ? (
           <div className="glass-panel p-8 text-center text-zinc-400">
-            No registered models found. Add one to start routing.
+            {t('models.empty')}
           </div>
         ) : (
           Object.entries(groupedModels).map(([provider, providerModels]) => (
@@ -391,9 +391,9 @@ export default function ModelsPage() {
                   <Badge className="bg-blue-500/10 text-blue-300 border border-blue-500/20 text-[10px] font-medium tracking-wide rounded uppercase px-2.5 py-0.5 capitalize">
                     {provider}
                   </Badge>
-                  <h3 className="font-heading text-lg font-semibold text-white capitalize">{provider} Models</h3>
+                  <h3 className="font-heading text-lg font-semibold text-white capitalize">{provider} {t('models.providerModels')}</h3>
                   <div className="flex gap-2 ml-auto items-center text-xs text-zinc-500">
-                    {providerModels.length} {providerModels.length === 1 ? 'model' : 'models'}
+                    {providerModels.length} {providerModels.length === 1 ? t('models.modelCount') : t('models.modelsCount')}
                   </div>
                 </div>
               </div>
@@ -413,18 +413,18 @@ export default function ModelsPage() {
                         {model.capability}
                       </Badge>
                       {model.thinking_level && (
-                        <Badge className="bg-purple-500/10 text-purple-300 border border-purple-500/20 text-[9px] font-normal tracking-wide rounded uppercase px-1.5 py-0">
-                          Think: {model.thinking_level}
+                        <Badge className="bg-purple-500/10 text-purple-300 border border-purple-500/20 text-[9px] font-normal tracking-wide rounded uppercase px-1.5 py-0 normal-case">
+                          {t('models.think')}: {model.thinking_level}
                         </Badge>
                       )}
                       {model.system_prompt && (
-                        <Badge className="bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-[9px] font-normal tracking-wide rounded uppercase px-1.5 py-0">
-                          System Prompt
+                        <Badge className="bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-[9px] font-normal tracking-wide rounded normal-case px-1.5 py-0">
+                          {t('models.systemPrompt')}
                         </Badge>
                       )}
                       {model.temperature !== null && (
-                        <Badge className="bg-orange-500/10 text-orange-300 border border-orange-500/20 text-[9px] font-normal tracking-wide rounded uppercase px-1.5 py-0">
-                          Temp: {model.temperature}
+                        <Badge className="bg-orange-500/10 text-orange-300 border border-orange-500/20 text-[9px] font-normal tracking-wide rounded uppercase px-1.5 py-0 normal-case">
+                          {t('models.temp')}: {model.temperature}
                         </Badge>
                       )}
                     </div>
@@ -432,7 +432,7 @@ export default function ModelsPage() {
                     <div className="flex items-center">
                       {!model.is_active && (
                         <Badge className="bg-red-500/10 text-red-500 border border-red-500/20 text-[9px] font-semibold tracking-wide uppercase px-1.5 py-0 rounded">
-                          Inactive
+                          {t('models.inactive')}
                         </Badge>
                       )}
                     </div>
@@ -440,19 +440,19 @@ export default function ModelsPage() {
                     <div className="pricing-container flex items-center gap-4">
                       {(model.capability === 'chat' || model.capability === 'tts' || model.capability === 'embed') && (
                         <div className="flex flex-col items-center justify-center gap-0.5">
-                          <span className="text-[9px] font-semibold text-zinc-500 uppercase tracking-wider">in</span>
+                          <span className="text-[9px] font-semibold text-zinc-500 capitalize tracking-wider">{t('models.in')}</span>
                           <span className="text-xs font-mono text-zinc-300">{money(model.input_price)}</span>
                         </div>
                       )}
                       {(model.capability === 'chat' || model.capability === 'tts') && (
                         <div className="flex flex-col items-center justify-center gap-0.5">
-                          <span className="text-[9px] font-semibold text-zinc-500 uppercase tracking-wider">out</span>
+                          <span className="text-[9px] font-semibold text-zinc-500 capitalize tracking-wider">{t('models.out')}</span>
                           <span className="text-xs font-mono text-zinc-300">{money(model.output_price)}</span>
                         </div>
                       )}
                       {model.capability === 'chat' && Number(model.think_price) > 0 && (
                         <div className="flex flex-col items-center justify-center gap-0.5">
-                          <span className="text-[9px] font-semibold text-zinc-500 uppercase tracking-wider">think</span>
+                          <span className="text-[9px] font-semibold text-zinc-500 capitalize tracking-wider">{t('models.thinkPrice')}</span>
                           <span className="text-xs font-mono text-zinc-300">{money(model.think_price)}</span>
                         </div>
                       )}
@@ -465,7 +465,7 @@ export default function ModelsPage() {
                         className="border-zinc-850 text-white hover:bg-zinc-800/50 hover:text-white text-xs px-3 py-1 h-8 rounded"
                         title="Edit Model"
                       >
-                        Edit
+                        {t('common.edit')}
                       </Button>
                     </div>
                   </div>
@@ -490,7 +490,7 @@ export default function ModelsPage() {
                 value={addForm.name}
                 onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
                 required
-                placeholder="e.g. gemini-2.5-pro"
+                placeholder={t('models.modelNamePlaceholder')}
                 className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
               />
             </div>
@@ -537,20 +537,20 @@ export default function ModelsPage() {
             {((addForm.capability === 'chat') || (addForm.capability === 'tts')) && (
               <div className="flex gap-3">
                 {addForm.capability === 'chat' && (
-                  <div className="flex-1 flex flex-col gap-1.5">
-                    <span className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider">Thinking Level</span>
+                  <div className="flex-1 flex flex-col gap-2">
+                    <label className="text-zinc-400 text-sm font-medium">{t('models.thinkingLevel')}</label>
                     <Input
                       value={addForm.thinking_level}
                       onChange={(e) => setAddForm({ ...addForm, thinking_level: e.target.value })}
-                      placeholder="Optional (low, 1024)"
-                      className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-[9.5px]"
+                      placeholder={t('models.thinkingLevelPlaceholder')}
+                      className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs"
                     />
                   </div>
                 )}
 
                 {(addForm.capability === 'chat' || addForm.capability === 'tts') && (
-                  <div className="flex-1 flex flex-col gap-1.5">
-                    <span className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider">Temperature</span>
+                  <div className="flex-1 flex flex-col gap-2">
+                    <label className="text-zinc-400 text-sm font-medium">{t('models.temperature')}</label>
                     <Input
                       type="number"
                       min="0"
@@ -558,8 +558,8 @@ export default function ModelsPage() {
                       step="0.1"
                       value={addForm.temperature}
                       onChange={(e) => setAddForm({ ...addForm, temperature: e.target.value })}
-                      placeholder="Optional (0-2)"
-                      className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-[9.5px]"
+                      placeholder={t('models.temperaturePlaceholder')}
+                      className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs"
                     />
                   </div>
                 )}
@@ -568,11 +568,11 @@ export default function ModelsPage() {
 
             {(addForm.capability === 'chat') && (
               <div className="flex flex-col gap-2">
-                <label className="text-zinc-400 text-sm font-medium">System Prompt</label>
+                <label className="text-zinc-400 text-sm font-medium">{t('models.systemPrompt')}</label>
                 <Textarea
                   value={addForm.system_prompt || ''}
                   onChange={(e) => setAddForm({ ...addForm, system_prompt: e.target.value })}
-                  placeholder="Optional system instructions..."
+                  placeholder={t('models.systemPromptPlaceholder')}
                   className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3 h-14 resize-none custom-scrollbar overflow-y-auto no-field-sizing"
                 />
               </div>
@@ -583,7 +583,7 @@ export default function ModelsPage() {
               <div className="flex gap-3">
                 {(addForm.capability === 'chat' || addForm.capability === 'tts' || addForm.capability === 'embed') && (
                   <div className="flex-1 flex flex-col gap-1">
-                    <span className="text-[11px] text-zinc-500 font-semibold uppercase">Input</span>
+                    <span className="text-[11px] text-zinc-500 font-semibold">Input</span>
                     <Input
                       type="number"
                       min="0"
@@ -598,7 +598,7 @@ export default function ModelsPage() {
 
                 {(addForm.capability === 'chat' || addForm.capability === 'tts') && (
                   <div className="flex-1 flex flex-col gap-1">
-                    <span className="text-[11px] text-zinc-500 font-semibold uppercase">Output</span>
+                    <span className="text-[11px] text-zinc-500 font-semibold">Output</span>
                     <Input
                       type="number"
                       min="0"
@@ -613,7 +613,7 @@ export default function ModelsPage() {
 
                 {addForm.capability === 'chat' && (
                   <div className="flex-1 flex flex-col gap-1">
-                    <span className="text-[11px] text-zinc-500 font-semibold uppercase">Think</span>
+                    <span className="text-[11px] text-zinc-500 font-semibold">Think</span>
                     <Input
                       type="number"
                       min="0"
@@ -709,20 +709,20 @@ export default function ModelsPage() {
             {((editingModel.capability === 'chat') || (editingModel.capability === 'tts')) && (
               <div className="flex gap-3">
                 {editingModel.capability === 'chat' && (
-                  <div className="flex-1 flex flex-col gap-1.5">
-                    <span className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider">Thinking Level</span>
+                  <div className="flex-1 flex flex-col gap-2">
+                    <label className="text-zinc-400 text-sm font-medium">{t('models.thinkingLevel')}</label>
                     <Input
                       value={editingModel.thinking_level || ''}
                       onChange={(e) => setEditingModel({ ...editingModel, thinking_level: e.target.value })}
-                      placeholder="Optional (low, 1024)"
-                      className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-[9.5px]"
+                      placeholder={t('models.thinkingLevelPlaceholder')}
+                      className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs"
                     />
                   </div>
                 )}
 
                 {(editingModel.capability === 'chat' || editingModel.capability === 'tts') && (
-                  <div className="flex-1 flex flex-col gap-1.5">
-                    <span className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider">Temperature</span>
+                  <div className="flex-1 flex flex-col gap-2">
+                    <label className="text-zinc-400 text-sm font-medium">{t('models.temperature')}</label>
                     <Input
                       type="number"
                       min="0"
@@ -730,8 +730,8 @@ export default function ModelsPage() {
                       step="0.1"
                       value={editingModel.temperature === null ? '' : editingModel.temperature}
                       onChange={(e) => setEditingModel({ ...editingModel, temperature: e.target.value === '' ? null : parseFloat(e.target.value) })}
-                      placeholder="Optional (0-2)"
-                      className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-[9.5px]"
+                      placeholder={t('models.temperaturePlaceholder')}
+                      className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs"
                     />
                   </div>
                 )}
@@ -740,11 +740,11 @@ export default function ModelsPage() {
 
             {(editingModel.capability === 'chat') && (
               <div className="flex flex-col gap-2">
-                <label className="text-zinc-400 text-sm font-medium">System Prompt</label>
+                <label className="text-zinc-400 text-sm font-medium">{t('models.systemPrompt')}</label>
                 <Textarea
                   value={editingModel.system_prompt || ''}
                   onChange={(e) => setEditingModel({ ...editingModel, system_prompt: e.target.value })}
-                  placeholder="Optional system instructions..."
+                  placeholder={t('models.systemPromptPlaceholder')}
                   className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3 h-14 resize-none custom-scrollbar overflow-y-auto no-field-sizing"
                 />
               </div>
@@ -755,7 +755,7 @@ export default function ModelsPage() {
               <div className="flex gap-3">
                 {(editingModel.capability === 'chat' || editingModel.capability === 'tts' || editingModel.capability === 'embed') && (
                   <div className="flex-1 flex flex-col gap-1">
-                    <span className="text-[11px] text-zinc-500 font-semibold uppercase">Input</span>
+                    <span className="text-[11px] text-zinc-500 font-semibold">Input</span>
                     <Input
                       type="number"
                       min="0"
@@ -770,7 +770,7 @@ export default function ModelsPage() {
 
                 {(editingModel.capability === 'chat' || editingModel.capability === 'tts') && (
                   <div className="flex-1 flex flex-col gap-1">
-                    <span className="text-[11px] text-zinc-500 font-semibold uppercase">Output</span>
+                    <span className="text-[11px] text-zinc-500 font-semibold">Output</span>
                     <Input
                       type="number"
                       min="0"
@@ -785,7 +785,7 @@ export default function ModelsPage() {
 
                 {editingModel.capability === 'chat' && (
                   <div className="flex-1 flex flex-col gap-1">
-                    <span className="text-[11px] text-zinc-500 font-semibold uppercase">Think</span>
+                    <span className="text-[11px] text-zinc-500 font-semibold">Think</span>
                     <Input
                       type="number"
                       min="0"
@@ -809,7 +809,7 @@ export default function ModelsPage() {
               }`}
             >
               <div className="flex flex-col gap-0.5">
-                <span className={`font-semibold text-sm ${editingModel.is_active ? 'text-purple-400' : 'text-white'}`}>Active Status</span>
+                <span className={`font-semibold text-sm ${editingModel.is_active ? 'text-purple-400' : 'text-white'}`}>{t('common.activeStatus')}</span>
               </div>
               <Switch
                 checked={editingModel.is_active}
@@ -823,7 +823,7 @@ export default function ModelsPage() {
                 type="button"
                 className="bg-transparent border border-red-500/20 text-red-500 hover:bg-red-500/10 rounded font-medium flex items-center gap-1.5"
               >
-                <Trash2 className="w-4 h-4" /> Delete
+                <Trash2 className="w-4 h-4" /> {t('common.delete')}
               </Button>
               <div className="flex gap-3 justify-end">
                 <Button
@@ -832,14 +832,14 @@ export default function ModelsPage() {
                   onClick={() => setShowEditModal(false)}
                   className="border-zinc-800 text-white hover:bg-zinc-900 rounded font-medium"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
                 <Button
                   type="submit"
                   disabled={!isModelDirty(editingModel)}
                   className="bg-white text-black hover:bg-zinc-200 rounded font-medium disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  Save Changes
+                  {t('common.saveChanges')}
                 </Button>
               </div>
             </DialogFooter>

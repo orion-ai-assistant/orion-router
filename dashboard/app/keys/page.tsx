@@ -53,7 +53,7 @@ export default function VirtualKeysPage() {
       }
     } catch (err) {
       console.error('Failed to load virtual keys:', err);
-      showToast('Failed to load virtual keys', 'error');
+      showToast(t('keys.toast.loadFailed'), 'error');
     } finally {
       setLoading(false);
     }
@@ -74,12 +74,12 @@ export default function VirtualKeysPage() {
   const handleCreateKey = async () => {
     const name = virtualKeyForm.name.trim();
     if (!name) {
-      showToast('Please enter a key name.', 'error');
+      showToast(t('keys.toast.enterKeyName'), 'error');
       return;
     }
     const budget = parseFloat(virtualKeyForm.budget.toString());
     if (isNaN(budget) || budget < 0) {
-      showToast('Budget limit must be a positive number.', 'error');
+      showToast(t('keys.toast.invalidBudget'), 'error');
       return;
     }
 
@@ -94,27 +94,27 @@ export default function VirtualKeysPage() {
         setNewRawKey(data.raw_key);
         setRawKeyDialogOpen(true);
         setVirtualKeyForm({ name: '', budget: 0 });
-        showToast('Virtual key created successfully!');
+        showToast(t('keys.toast.createSuccess'));
         await loadVirtualKeys();
       } else {
         const err = await res.json();
-        showToast('Error: ' + (err.detail || 'Failed to create key'), 'error');
+        showToast(t('common.error') + ': ' + (err.detail || t('keys.toast.createFailed')), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast('Failed to create key', 'error');
+      showToast(t('keys.toast.createFailed'), 'error');
     }
   };
 
   const handleUpdateKey = async () => {
     const name = editingVirtualKey.name.trim();
     if (!name) {
-      showToast('Please enter a key name.', 'error');
+      showToast(t('keys.toast.enterKeyName'), 'error');
       return;
     }
     const budget = parseFloat(editingVirtualKey.budget.toString());
     if (isNaN(budget) || budget < 0) {
-      showToast('Budget limit must be a positive number.', 'error');
+      showToast(t('keys.toast.invalidBudget'), 'error');
       return;
     }
 
@@ -129,21 +129,21 @@ export default function VirtualKeysPage() {
       });
       if (res.ok) {
         setShowEditKeyModal(false);
-        showToast('Virtual key updated successfully!');
+        showToast(t('keys.toast.updateSuccess'));
         await loadVirtualKeys();
       } else {
         const err = await res.json();
-        showToast('Error: ' + (err.detail || 'Failed to update key'), 'error');
+        showToast(t('common.error') + ': ' + (err.detail || t('keys.toast.updateFailed')), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast('Failed to update key', 'error');
+      showToast(t('keys.toast.updateFailed'), 'error');
     }
   };
 
   const handleDeleteKey = async (keyId: string, confirmed = false) => {
     if (!confirmed) {
-      confirmAction('Are you sure you want to delete this virtual key?', () =>
+      confirmAction(t('common.confirm.deleteKey'), () =>
         handleDeleteKey(keyId, true)
       );
       return;
@@ -154,22 +154,22 @@ export default function VirtualKeysPage() {
       });
       if (res.ok) {
         setShowEditKeyModal(false);
-        showToast('Virtual key deleted successfully!');
+        showToast(t('keys.toast.deleteSuccess'));
         await loadVirtualKeys();
       } else {
         const err = await res.json();
-        showToast('Error: ' + (err.detail || 'Failed to delete key'), 'error');
+        showToast(t('common.error') + ': ' + (err.detail || t('keys.toast.deleteFailed')), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast('Failed to delete key', 'error');
+      showToast(t('keys.toast.deleteFailed'), 'error');
     }
   };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     setCopied(true);
-    showToast('API key copied to clipboard!');
+    showToast(t('keys.toast.copied'));
     setRawKeyDialogOpen(false);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -210,13 +210,13 @@ export default function VirtualKeysPage() {
             {loading ? (
               <TableRow className="hover:bg-transparent">
                 <TableCell colSpan={5} className="text-center text-zinc-400 py-8">
-                  Loading virtual keys...
+                  {t('keys.loading')}
                 </TableCell>
               </TableRow>
             ) : virtualKeys.length === 0 ? (
               <TableRow className="hover:bg-transparent">
                 <TableCell colSpan={5} className="text-center text-zinc-400 py-8">
-                  No virtual keys found. Create one to get started.
+                  {t('keys.empty')}
                 </TableCell>
               </TableRow>
             ) : (
@@ -233,7 +233,7 @@ export default function VirtualKeysPage() {
                     </div>
                   </TableCell>
                   <TableCell className="py-4 text-left font-mono text-xs text-zinc-300">
-                    {key.budget > 0 ? money(key.budget, 2) : 'Unlimited'}
+                    {key.budget > 0 ? money(key.budget, 2) : t('common.unlimited')}
                   </TableCell>
                   <TableCell className="py-4 text-left font-mono text-xs text-zinc-300">
                     {(!key.used_amount || Number(key.used_amount) === 0)

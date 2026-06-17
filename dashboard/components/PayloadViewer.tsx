@@ -10,6 +10,9 @@ interface PayloadViewerProps {
   fullText: string;
   copied: boolean;
   onCopy: () => void;
+  copyLabel?: string;
+  copiedLabel?: string;
+  loadingLabel?: string;
 }
 
 export const PayloadViewer = React.memo(function PayloadViewer({
@@ -18,6 +21,9 @@ export const PayloadViewer = React.memo(function PayloadViewer({
   fullText,
   copied,
   onCopy,
+  copyLabel = 'Copy Full',
+  copiedLabel = 'Copied',
+  loadingLabel = 'Loading...',
 }: PayloadViewerProps) {
   const isLoading = !displayHtml || displayHtml === 'Loading...';
 
@@ -33,7 +39,7 @@ export const PayloadViewer = React.memo(function PayloadViewer({
             className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-white text-xs px-2.5 py-1 h-auto flex items-center gap-1 rounded"
           >
             {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-            {copied ? 'Copied' : 'Copy Full'}
+            {copied ? copiedLabel : copyLabel}
           </Button>
         ) : null}
       </div>
@@ -42,7 +48,7 @@ export const PayloadViewer = React.memo(function PayloadViewer({
         aria-label={label}
       >
         {isLoading ? (
-          'Loading...'
+          loadingLabel
         ) : (
           <code dangerouslySetInnerHTML={{ __html: displayHtml }} />
         )}

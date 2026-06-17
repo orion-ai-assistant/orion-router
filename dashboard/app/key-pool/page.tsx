@@ -125,7 +125,7 @@ export default function KeyPoolPage() {
       }
     } catch (err) {
       console.error('Failed to load key pool:', err);
-      showToast('Failed to load provider keys', 'error');
+      showToast(t('keyPool.toast.loadFailed'), 'error');
     } finally {
       setLoading(false);
     }
@@ -239,7 +239,7 @@ export default function KeyPoolPage() {
       await persistPriorities(keysToUpdate);
     } catch (err) {
       console.error(err);
-      showToast('Failed to update order', 'error');
+      showToast(t('groups.toast.updateOrderFailed'), 'error'); // Shared translation
       await loadKeyPool();
     }
   };
@@ -272,7 +272,7 @@ export default function KeyPoolPage() {
     const api_key = addForm.api_key.trim();
 
     if (!provider || !label || !api_key) {
-      showToast('Please fill out all fields.', 'error');
+      showToast(t('keyPool.toast.fillFields'), 'error');
       return;
     }
 
@@ -288,15 +288,15 @@ export default function KeyPoolPage() {
       if (res.ok) {
         setAddForm({ provider: providers[0] || '', label: '', api_key: '' });
         setShowAddModal(false);
-        showToast('Provider key added successfully!');
+        showToast(t('keyPool.toast.addSuccess'));
         await loadKeyPool();
       } else {
         const err = await res.json();
-        showToast('Error: ' + (err.detail || 'Failed to add provider key'), 'error');
+        showToast(t('common.error') + ': ' + (err.detail || t('keyPool.toast.addFailed')), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast('Failed to add provider key', 'error');
+      showToast(t('keyPool.toast.addFailed'), 'error');
     }
   };
 
@@ -305,7 +305,7 @@ export default function KeyPoolPage() {
     const label = editingKey.label.trim();
 
     if (!label) {
-      showToast('Label cannot be empty.', 'error');
+      showToast(t('keyPool.toast.labelEmpty'), 'error');
       return;
     }
 
@@ -321,22 +321,22 @@ export default function KeyPoolPage() {
         }),
       });
       if (res.ok) {
-        showToast('Provider key updated successfully!');
+        showToast(t('keyPool.toast.updateSuccess'));
         setShowEditModal(false);
         await loadKeyPool();
       } else {
         const err = await res.json();
-        showToast('Error: ' + (err.detail || 'Failed to update key'), 'error');
+        showToast(t('common.error') + ': ' + (err.detail || t('keyPool.toast.updateFailed')), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast('Failed to update key', 'error');
+      showToast(t('keyPool.toast.updateFailed'), 'error');
     }
   };
 
   const handleDelete = async (keyId: string, confirmed = false) => {
     if (!confirmed) {
-      confirmAction('Are you sure you want to delete this provider key?', () =>
+      confirmAction(t('common.confirm.deleteProviderKey'), () =>
         handleDelete(keyId, true)
       );
       return;
@@ -347,15 +347,15 @@ export default function KeyPoolPage() {
       });
       if (res.ok) {
         setShowEditModal(false);
-        showToast('Provider key deleted successfully!');
+        showToast(t('keyPool.toast.deleteSuccess'));
         await loadKeyPool();
       } else {
         const err = await res.json();
-        showToast('Error: ' + (err.detail || 'Failed to delete key'), 'error');
+        showToast(t('common.error') + ': ' + (err.detail || t('keyPool.toast.deleteFailed')), 'error');
       }
     } catch (err) {
       console.error(err);
-      showToast('Failed to delete key', 'error');
+      showToast(t('keyPool.toast.deleteFailed'), 'error');
     }
   };
 
@@ -472,10 +472,10 @@ export default function KeyPoolPage() {
       {/* Provider Group List */}
       <div className="group-list flex flex-col gap-6">
         {loading ? (
-          <div className="glass-panel p-8 text-center text-zinc-400">Loading provider keys...</div>
+          <div className="glass-panel p-8 text-center text-zinc-400">{t('keyPool.loading')}</div>
         ) : Object.keys(groupedKeys).length === 0 ? (
           <div className="glass-panel p-8 text-center text-zinc-400">
-            No provider keys configured yet.
+            {t('keyPool.empty')}
           </div>
         ) : (
           Object.entries(groupedKeys).map(([provider, keys]) => (
@@ -485,9 +485,11 @@ export default function KeyPoolPage() {
                   <Badge className="bg-blue-500/10 text-blue-300 border border-blue-500/20 text-[10px] font-medium tracking-wide rounded uppercase px-2.5 py-0.5 capitalize">
                     {provider}
                   </Badge>
-                  <h3 className="font-heading text-lg font-semibold text-white capitalize">{provider} Keys</h3>
+                  <h3 className="font-heading text-lg font-semibold text-white capitalize">
+                    {t('keyPool.providerKeys', { provider: provider === 'openai' ? 'OpenAI' : provider.charAt(0).toUpperCase() + provider.slice(1) })}
+                  </h3>
                   <div className="flex gap-2 ml-auto items-center text-xs text-zinc-500">
-                    {keys.length} {keys.length === 1 ? 'key' : 'keys'}
+                    {keys.length} {keys.length === 1 ? t('keyPool.keyCount') : t('keyPool.keysCount')}
                   </div>
                 </div>
               </div>
@@ -500,7 +502,7 @@ export default function KeyPoolPage() {
               >
                 {keys.length === 0 ? (
                   <div className="text-zinc-500 text-xs py-4 text-center border border-dashed border-zinc-850 rounded bg-black/10">
-                    No keys. Add one above.
+                    {t('keyPool.emptyItems')}
                   </div>
                 ) : (
                   <>
@@ -577,9 +579,9 @@ export default function KeyPoolPage() {
                               variant="outline"
                               onClick={() => openEditModal(key)}
                               className="border-zinc-850 text-white hover:bg-zinc-800/50 hover:text-white text-xs px-3 py-1 h-8 rounded ml-5"
-                              title="Edit Key"
+                              title={t('keyPool.editModalTitle')}
                             >
-                              Edit
+                              {t('common.edit')}
                             </Button>
                           </div>
                         </div>
@@ -631,7 +633,7 @@ export default function KeyPoolPage() {
                 value={addForm.label}
                 onChange={(e) => setAddForm({ ...addForm, label: e.target.value })}
                 required
-                placeholder="e.g. Gemini Production Key"
+                placeholder={t('keyPool.labelPlaceholder')}
                 className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
               />
             </div>
@@ -643,7 +645,7 @@ export default function KeyPoolPage() {
                 value={addForm.api_key}
                 onChange={(e) => setAddForm({ ...addForm, api_key: e.target.value })}
                 required
-                placeholder="Provider API key"
+                placeholder={t('keyPool.apiKeyPlaceholder')}
                 className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
               />
             </div>
@@ -682,6 +684,7 @@ export default function KeyPoolPage() {
                 value={editingKey.label}
                 onChange={(e) => setEditingKey({ ...editingKey, label: e.target.value })}
                 required
+                placeholder={t('keyPool.labelPlaceholder')}
                 className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
               />
             </div>
@@ -692,7 +695,7 @@ export default function KeyPoolPage() {
                 type="password"
                 value={editingKey.api_key}
                 onChange={(e) => setEditingKey({ ...editingKey, api_key: e.target.value })}
-                placeholder="leave blank to keep existing key"
+                placeholder={t('keyPool.leaveBlankToKeep')}
                 className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
               />
             </div>

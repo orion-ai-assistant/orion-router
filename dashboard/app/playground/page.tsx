@@ -505,7 +505,7 @@ export default function PlaygroundPage() {
   const handleGenerateTTS = async () => {
     const text = ttsInput.trim();
     if (!text) {
-      showToast('Please enter text.', 'error');
+      showToast(t('playground.toast.enterText'), 'error');
       return;
     }
 
@@ -542,7 +542,7 @@ export default function PlaygroundPage() {
 
       const blob = await res.blob();
       setTtsUrl(URL.createObjectURL(blob));
-      showToast('Audio synthesized successfully!');
+      showToast(t('playground.toast.audioSuccess'));
     } catch (e: any) {
       if (e.name !== 'AbortError') {
         setTtsError('❌ Error: ' + e.message);
@@ -556,7 +556,7 @@ export default function PlaygroundPage() {
   const handleGenerateEmbedding = async () => {
     const text = embedInput.trim();
     if (!text) {
-      showToast('Please enter text.', 'error');
+      showToast(t('playground.toast.enterText'), 'error');
       return;
     }
 
@@ -606,7 +606,7 @@ export default function PlaygroundPage() {
         ],
       };
       setEmbedJson(JSON.stringify(truncated, null, 2));
-      showToast('Embedding vector generated!');
+      showToast(t('playground.toast.embeddingSuccess'));
     } catch (e: any) {
       if (e.name !== 'AbortError') {
         setEmbedError('❌ Error: ' + e.message);
@@ -658,9 +658,9 @@ export default function PlaygroundPage() {
         <div className="playground-layout flex flex-col md:flex-row gap-4">
           {/* Settings Sidebar */}
           <div className="pg-sidebar md:w-[250px] p-4 glass-panel bg-[#18181b] border border-zinc-850 rounded-lg flex flex-col gap-3 shrink-0">
-            <h3 className="panel-title text-white font-heading font-semibold pb-1.5 border-b border-zinc-850 text-xs tracking-wide uppercase">{t('playground.config')}</h3>
+            <h3 className="panel-title text-white font-heading font-semibold pb-1.5 border-b border-zinc-850 text-xs tracking-wide capitalize">{t('playground.config')}</h3>
             <div className="flex flex-col gap-1">
-              <label className="text-zinc-400 text-[10px] font-semibold uppercase">{t('playground.modelOrGroup')}</label>
+              <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.modelOrGroup')}</label>
               <div className="custom-select-wrapper select-wrapper w-full">
                 <select
                   value={chatModel}
@@ -677,14 +677,14 @@ export default function PlaygroundPage() {
             </div>
             <div className="flex flex-col gap-1">
               <div className="flex justify-between items-center mb-1 relative group">
-                <label className="text-zinc-400 text-[10px] font-semibold uppercase">{t('playground.temperature')}</label>
+                <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.temperature')}</label>
                 {selectedChatGroup ? (
                   <>
                     <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all cursor-help ${hasTempOverride
                         ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
                         : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
                       }`}>
-                      Default: Group
+                      {t('playground.defaultGroup')}
                     </span>
                     <div className="absolute top-full right-0 mt-1 hidden group-hover:block z-50 bg-[#242427]/98 border border-zinc-700/60 text-zinc-200 text-[10px] p-2.5 rounded shadow-xl whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar pointer-events-none min-w-[220px]">
                       <div className="font-semibold text-[9px] text-purple-400 mb-1.5 uppercase tracking-wide">Group Temperature:</div>
@@ -714,12 +714,12 @@ export default function PlaygroundPage() {
                       ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
                       : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
                     }`} title={hasTempOverride ? "Default is overridden by your input" : "Database default value for this model"}>
-                    Default: {resolvedDefaults.temperature}
+                    {t('playground.default')}: {resolvedDefaults.temperature}
                   </span>
                 ) : (
                   <span className={`text-[9px] font-medium transition-all ${hasTempOverride ? 'text-zinc-700 line-through opacity-50' : 'text-zinc-500'
                     }`}>
-                    Default: -
+                    {t('playground.default')}: -
                   </span>
                 )}
               </div>
@@ -730,20 +730,20 @@ export default function PlaygroundPage() {
                 step="0.1"
                 value={chatTemp}
                 onChange={(e) => setChatTemp(e.target.value)}
-                placeholder="optional (e.g. 0.7)"
+                placeholder={t('playground.optionalTemp')}
                 className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs placeholder:text-zinc-600"
               />
             </div>
             <div className="flex flex-col gap-1">
               <div className="flex justify-between items-center mb-1 relative group">
-                <label className="text-zinc-400 text-[10px] font-semibold uppercase">{t('playground.thinking')}</label>
+                <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.thinking')}</label>
                 {selectedChatGroup ? (
                   <>
                     <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all cursor-help ${hasThinkingOverride
                         ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
                         : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
                       }`}>
-                      Default: Group
+                      {t('playground.defaultGroup')}
                     </span>
                     <div className="absolute top-full right-0 mt-1 hidden group-hover:block z-50 bg-[#242427]/98 border border-zinc-700/60 text-zinc-200 text-[10px] p-2.5 rounded shadow-xl whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar pointer-events-none min-w-[220px]">
                       <div className="font-semibold text-[9px] text-purple-400 mb-1.5 uppercase tracking-wide">Group Thinking:</div>
@@ -771,32 +771,32 @@ export default function PlaygroundPage() {
                       ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
                       : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
                     }`} title={hasThinkingOverride ? "Default is overridden by your input" : "Database default value for this model"}>
-                    Default: {resolvedDefaults.thinking_level}
+                    {t('playground.default')}: {resolvedDefaults.thinking_level}
                   </span>
                 ) : (
                   <span className={`text-[9px] font-medium transition-all ${hasThinkingOverride ? 'text-zinc-700 line-through opacity-50' : 'text-zinc-500'
                     }`}>
-                    Default: -
+                    {t('playground.default')}: -
                   </span>
                 )}
               </div>
               <Input
                 value={chatThinking}
                 onChange={(e) => setChatThinking(e.target.value)}
-                placeholder="optional (e.g. low, 1024)"
+                placeholder={t('playground.optionalThinking')}
                 className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs placeholder:text-zinc-600"
               />
             </div>
             <div className="flex flex-col gap-1">
               <div className="flex justify-between items-center mb-1 relative group">
-                <label className="text-zinc-400 text-[10px] font-semibold uppercase">{t('playground.systemPrompt')}</label>
+                <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.systemPrompt')}</label>
                 {selectedChatGroup ? (
                   <>
                     <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all cursor-help ${hasSystemPromptOverride
                         ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
                         : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
                       }`}>
-                      Default: Group
+                      {t('playground.defaultGroup')}
                     </span>
                     <div className="absolute top-full right-0 mt-1 hidden group-hover:block z-50 bg-[#242427]/98 border border-zinc-700/60 text-zinc-200 text-[10px] p-2.5 rounded shadow-xl whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar pointer-events-none min-w-[220px]">
                       <div className="font-semibold text-[9px] text-purple-400 mb-1.5 uppercase tracking-wide">Group System Prompt:</div>
@@ -828,24 +828,24 @@ export default function PlaygroundPage() {
                         ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
                         : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
                       }`}>
-                      Default: {resolvedDefaults.system_prompt.length > 15 ? resolvedDefaults.system_prompt.slice(0, 15) + '...' : resolvedDefaults.system_prompt}
+                      {t('playground.default')}: {resolvedDefaults.system_prompt.length > 15 ? resolvedDefaults.system_prompt.slice(0, 15) + '...' : resolvedDefaults.system_prompt}
                     </span>
                     <div className="absolute top-full left-0 right-0 mt-1 hidden group-hover:block z-50 bg-[#242427]/98 border border-zinc-700/60 text-zinc-200 text-[10px] p-3 rounded shadow-xl whitespace-pre-wrap max-h-40 overflow-y-auto custom-scrollbar pointer-events-none">
-                      <div className="font-semibold text-[9px] text-purple-400 mb-1 uppercase tracking-wide">Default:</div>
+                      <div className="font-semibold text-[9px] text-purple-400 mb-1 uppercase tracking-wide">{t('playground.default')}:</div>
                       {resolvedDefaults.system_prompt}
                     </div>
                   </>
                 ) : (
                   <span className={`text-[9px] font-medium transition-all ${hasSystemPromptOverride ? 'text-zinc-700 line-through opacity-50' : 'text-zinc-500'
                     }`}>
-                    Default: -
+                    {t('playground.default')}: -
                   </span>
                 )}
               </div>
               <Textarea
                 value={chatSystemPrompt}
                 onChange={(e) => setChatSystemPrompt(e.target.value)}
-                placeholder="Enter system instructions..."
+                placeholder={t('playground.systemPromptPlaceholder')}
                 className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs h-20 resize-none custom-scrollbar overflow-y-auto no-field-sizing placeholder:text-zinc-600"
               />
             </div>
@@ -856,7 +856,7 @@ export default function PlaygroundPage() {
             <div className="chat-messages flex-1 overflow-y-auto pr-2 flex flex-col gap-3 custom-scrollbar mb-3">
               {chatMessages.length === 0 ? (
                 <div className="text-zinc-500 text-xs flex items-center justify-center h-full">
-                  No messages yet. Send a query to test your routing setup.
+                  {t('playground.noMessages')}
                 </div>
               ) : (
                 chatMessages.map((msg) => (
@@ -887,29 +887,29 @@ export default function PlaygroundPage() {
                     }
                   }
                 }}
-                placeholder="Type a message to the AI..."
+                placeholder={t('playground.chatPlaceholder')}
                 className="flex-1 bg-black/40 border border-zinc-850 text-white rounded p-2.5 text-xs h-10 min-h-10 resize-none custom-scrollbar"
               />
               <Button
                 onClick={() => setChatMessages([])}
                 className="bg-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-700 font-medium px-4 h-10 text-xs rounded-lg"
-                title="Clear Chat"
+                title={t('playground.clearChat')}
               >
-                Clear
+                {t('common.clear')}
               </Button>
               {isGenerating ? (
                 <Button
                   onClick={() => abortControllerRef.current?.abort()}
                   className="bg-red-600 text-white hover:bg-red-700 font-semibold px-5 h-10 text-xs rounded-lg min-w-[70px]"
                 >
-                  Stop
+                  {t('playground.stop')}
                 </Button>
               ) : (
                 <Button
                   onClick={handleSendChat}
                   className="bg-white text-black hover:bg-zinc-200 font-semibold px-5 h-10 text-xs rounded-lg min-w-[70px]"
                 >
-                  Send
+                  {t('common.send')}
                 </Button>
               )}
             </div>
@@ -922,9 +922,9 @@ export default function PlaygroundPage() {
         <div className="playground-layout flex flex-col md:flex-row gap-4">
           {/* Settings Sidebar */}
           <div className="pg-sidebar md:w-[250px] p-4 glass-panel bg-[#18181b] border border-zinc-850 rounded-lg flex flex-col gap-3 shrink-0">
-            <h3 className="panel-title text-white font-heading font-semibold pb-1.5 border-b border-zinc-850 text-xs tracking-wide uppercase">{t('playground.audioSettings')}</h3>
+            <h3 className="panel-title text-white font-heading font-semibold pb-1.5 border-b border-zinc-850 text-xs tracking-wide capitalize">{t('playground.audioSettings')}</h3>
             <div className="flex flex-col gap-1">
-              <label className="text-zinc-400 text-[10px] font-semibold uppercase">{t('playground.modelOrGroup')}</label>
+              <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.modelOrGroup')}</label>
               <div className="custom-select-wrapper select-wrapper w-full">
                 <select
                   value={ttsModel}
@@ -940,7 +940,7 @@ export default function PlaygroundPage() {
               </div>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-zinc-400 text-[10px] font-semibold uppercase">{t('playground.voicePersona')}</label>
+              <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.voicePersona')}</label>
               <div className="custom-select-wrapper select-wrapper w-full">
                 <select
                   value={ttsVoice}
@@ -957,14 +957,14 @@ export default function PlaygroundPage() {
             </div>
             <div className="flex flex-col gap-1">
               <div className="flex justify-between items-center mb-1 relative group">
-                <label className="text-zinc-400 text-[10px] font-semibold uppercase">{t('playground.temperature')}</label>
+                <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.temperature')}</label>
                 {selectedTtsGroup ? (
                   <>
                     <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all cursor-help ${hasTtsTempOverride
                         ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
                         : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
                       }`}>
-                      Default: Group
+                      {t('playground.defaultGroup')}
                     </span>
                     <div className="absolute top-full right-0 mt-1 hidden group-hover:block z-50 bg-[#242427]/98 border border-zinc-700/60 text-zinc-200 text-[10px] p-2.5 rounded shadow-xl whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar pointer-events-none min-w-[220px]">
                       <div className="font-semibold text-[9px] text-purple-400 mb-1.5 uppercase tracking-wide">Group Temperature:</div>
@@ -994,12 +994,12 @@ export default function PlaygroundPage() {
                       ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
                       : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
                     }`} title={hasTtsTempOverride ? "Default is overridden by your input" : "Database default value for this model"}>
-                    Default: {resolvedTtsDefaults.temperature}
+                    {t('playground.default')}: {resolvedTtsDefaults.temperature}
                   </span>
                 ) : (
                   <span className={`text-[9px] font-medium transition-all ${hasTtsTempOverride ? 'text-zinc-700 line-through opacity-50' : 'text-zinc-500'
                     }`}>
-                    Default: -
+                    {t('playground.default')}: -
                   </span>
                 )}
               </div>
@@ -1010,7 +1010,7 @@ export default function PlaygroundPage() {
                 step="0.1"
                 value={ttsTemp}
                 onChange={(e) => setTtsTemp(e.target.value)}
-                placeholder="optional"
+                placeholder={t('playground.optional')}
                 className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs placeholder:text-zinc-600"
               />
             </div>
@@ -1019,11 +1019,11 @@ export default function PlaygroundPage() {
           {/* Main Area */}
           <div className="pg-main-area flex-1 p-4 glass-panel bg-[#18181b] border border-zinc-850 rounded-lg flex flex-col gap-3">
             <div className="flex flex-col gap-1 flex-1">
-              <label className="text-zinc-400 text-[10px] font-semibold uppercase">{t('playground.textToSynthesize')}</label>
+              <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.textToSynthesize')}</label>
               <Textarea
                 value={ttsInput}
                 onChange={(e) => setTtsInput(e.target.value)}
-                placeholder="Text to synthesize..."
+                placeholder={t('playground.textToSynthesizePlaceholder')}
                 className="flex-1 bg-black/40 border border-zinc-850 text-white rounded p-3 text-xs min-h-[120px] max-h-[220px]"
               />
             </div>
@@ -1073,9 +1073,9 @@ export default function PlaygroundPage() {
         <div className="playground-layout flex flex-col md:flex-row gap-4">
           {/* Settings Sidebar */}
           <div className="pg-sidebar md:w-[250px] p-4 glass-panel bg-[#18181b] border border-zinc-850 rounded-lg flex flex-col gap-3 shrink-0">
-            <h3 className="panel-title text-white font-heading font-semibold pb-1.5 border-b border-zinc-850 text-xs tracking-wide uppercase">{t('playground.embeddingSettings')}</h3>
+            <h3 className="panel-title text-white font-heading font-semibold pb-1.5 border-b border-zinc-850 text-xs tracking-wide capitalize">{t('playground.embeddingSettings')}</h3>
             <div className="flex flex-col gap-1">
-              <label className="text-zinc-400 text-[10px] font-semibold uppercase">{t('playground.modelOrGroup')}</label>
+              <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.modelOrGroup')}</label>
               <div className="custom-select-wrapper select-wrapper w-full">
                 <select
                   value={embedModel}
@@ -1095,11 +1095,11 @@ export default function PlaygroundPage() {
           {/* Main Area */}
           <div className="pg-main-area flex-1 p-4 glass-panel bg-[#18181b] border border-zinc-850 rounded-lg flex flex-col gap-3">
             <div className="flex flex-col gap-1 flex-1">
-              <label className="text-zinc-400 text-[10px] font-semibold uppercase">{t('playground.textToEmbed')}</label>
+              <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.textToEmbed')}</label>
               <Textarea
                 value={embedInput}
                 onChange={(e) => setEmbedInput(e.target.value)}
-                placeholder="Text to embed..."
+                placeholder={t('playground.textToEmbedPlaceholder')}
                 className="flex-1 bg-black/40 border border-zinc-850 text-white rounded p-3 text-xs min-h-[120px] max-h-[220px]"
               />
             </div>
