@@ -19,21 +19,30 @@ while True:
     resp = client.chat.completions.create(
         model='gemini-3.1-flash-lite',
         messages=messages,
-        stream=True,
         extra_body={"thinking_level": "high"}  # e.g. "low" | 1024
     )
     
     print("+ ", end="")
     full_content = ""
-    for chunk in resp:
-        delta = chunk.choices[0].delta
-        reasoning = delta.model_extra.get("reasoning_content")
-        content = delta.content
+    
+    if hasattr(resp, 'choices'):
+        # Non-stream (Tek seferde dönen yanıt)
+        msg = resp.choices[0].message
+        reasoning = msg.model_extra.get("reasoning_content") if msg.model_extra else None
         if reasoning:
-            print(f"\033[90m{reasoning}\033[0m", end="", flush=True)
-        if content:
-            full_content += content
-            print(content, end="", flush=True)
-            
+            print(f"\033[90m{reasoning}\033[0m", end="")
+        full_content = msg.content or ""
+        print(full_content, end="")
+    else:
+        # Stream (Parça parça dönen yanıt)
+        for chunk in resp:
+            delta = chunk.choices[0].delta
+            reasoning = delta.model_extra.get("reasoning_content") if delta.model_extra else None
+            content = delta.content
+            if reasoning:
+                print(f"\033[90m{reasoning}\033[0m", end="", flush=True)
+            if content:
+                full_content += content
+                print(content, end="", flush=True)
     print("\n")
     messages.append({"role": "assistant", "content": full_content})
