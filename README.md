@@ -30,7 +30,7 @@ import openai
 
 # Routing the OpenAI client to Orion Router
 client = openai.OpenAI(
-    base_url="http://localhost:20128/v1", # Your Orion Router server address
+    base_url="http://127.0.0.1:20128/v1", # Your Orion Router server address
     api_key="your-orion-virtual-key"      # The virtual key you generated via Dashboard
 )
 
@@ -40,7 +40,7 @@ response = client.chat.completions.create(
     temperature=0.7, 
     tools=[], 
     extra_body={
-        "thinking_level": "medium" # Thinking capacity; "low" - "high" or token budget: 1024, 8192, etc. (must be supported by the model)
+        "thinking_level": "high" # e.g. "low" | 1024
     }
 )
 

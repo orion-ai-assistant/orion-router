@@ -397,15 +397,17 @@ body {
     border-radius: 8px;
     display: flex;
     cursor: pointer;
-    opacity: 0;
+    opacity: 0.7;
     transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
 }
 
-.panel-body:hover .copy-btn {
+.panel-body:hover .copy-btn,
+.editor-panel:hover .copy-btn {
     opacity: 1;
 }
 
 .copy-btn:hover {
+    opacity: 1;
     background: rgba(255, 255, 255, 0.06);
     color: #fff;
     border-color: var(--brand-light);
@@ -545,6 +547,24 @@ body {
     margin: 0 auto;
     overflow: hidden;
     padding: 5px;
+}
+
+.editor-header-actions {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 10;
+}
+
+.editor-header-actions .lang {
+    position: static !important;
+}
+
+.editor-header-actions .copy-btn {
+    position: static !important;
 }
 
 .editor-panel .lang {
@@ -798,7 +818,7 @@ footer a:hover {
         right: 12px;
     }
 
-    .editor-panel .lang {
+    .editor-header-actions {
         top: 24px;
         right: 24px;
     }
@@ -892,7 +912,7 @@ footer a:hover {
         font-size: 0.75rem;
     }
 
-    .editor-panel .lang {
+    .editor-header-actions {
         top: 20px;
         right: 20px;
     }

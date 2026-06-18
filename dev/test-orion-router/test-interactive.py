@@ -11,7 +11,7 @@ client = openai.OpenAI(
     api_key='sk-orion-T4wlYzqt11Af2omYK9IjKoj-qpUlwppFcyTpCRWfzOg'
 )
 
-# Bağlantıyı önden ısıtma (Warm-up)
+# Bağlantıyı önden ısıtma (Warm-up) bu hiçbir işe yaramıyor olabilir?
 try:
     client._client.get("/health", timeout=5.0)
 except Exception:

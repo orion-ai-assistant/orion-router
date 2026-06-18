@@ -30,7 +30,7 @@ import openai
 
 # 将 OpenAI 客户端路由到 Orion Router
 client = openai.OpenAI(
-    base_url="http://localhost:20128/v1", # 您的 Orion Router 服务器地址
+    base_url="http://127.0.0.1:20128/v1", # 您的 Orion Router 服务器地址
     api_key="your-orion-virtual-key"      # 您通过仪表板生成的虚拟密钥
 )
 
@@ -40,7 +40,7 @@ response = client.chat.completions.create(
     temperature=0.7, 
     tools=[], 
     extra_body={
-        "thinking_level": "medium" # 思考能力； "low" - "high" 或 token 预算：1024、8192 等（必须由模型支持）
+        "thinking_level": "high" # e.g. "low" | 1024
     }
 )
 

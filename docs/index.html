@@ -127,8 +127,8 @@
             </div>
 
             <div class="panel-footer" id="showcase-status-bar">
-                <span data-i18n="install_complete">Kurulum tamamlandıktan sonra:</span> <a href="http://localhost:20128" target="_blank"
-                    class="status-link">localhost:20128</a>
+                <span data-i18n="install_complete">Kurulum tamamlandıktan sonra:</span> <a href="http://127.0.0.1:20128" target="_blank"
+                    class="status-link">127.0.0.1:20128</a>
             </div>
         </div>
     </main>
@@ -186,25 +186,55 @@
             <span class="tag" data-i18n="usage_tag">Entegrasyon</span>
             <h2 data-i18n="usage_title">OpenAI SDK Uyumluluğu</h2>
         </div>
-        <div class="glass-panel editor-panel reveal delay-2" id="orion-integration-editor">
-            <span class="lang">PYTHON</span>
+        <div class="glass-panel editor-panel reveal delay-2" id="orion-integration-editor" style="position: relative;">
+            <div class="editor-header-actions">
+                <span class="lang">PYTHON</span>
+                <button class="copy-btn" id="copy-python-code-btn" aria-label="Kodu kopyala">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                    </svg>
+                </button>
+            </div>
             <pre class="editor-body" id="python-code-field"><code><span class="keyword">import</span> openai
 
 client = openai.OpenAI(
-&nbsp;&nbsp;&nbsp;&nbsp;base_url=<span class="string">"http://localhost:20128/v1"</span>,
-&nbsp;&nbsp;&nbsp;&nbsp;api_key=<span class="string">"orion_virtual_key"</span>
+&nbsp;&nbsp;&nbsp;&nbsp;base_url=<span class="string">"http://127.0.0.1:20128/v1"</span>,
+&nbsp;&nbsp;&nbsp;&nbsp;api_key=<span class="string">"sk-orion-YourVirtualKeyHere"</span>
 )
 
-response = client.chat.completions.create(
-&nbsp;&nbsp;&nbsp;&nbsp;model=<span class="string">"gemini-2.5-pro"</span>, 
-&nbsp;&nbsp;&nbsp;&nbsp;messages=[&#123;<span class="string">"role"</span>: <span class="string">"user"</span>, <span class="string">"content"</span>: <span class="string">"Merhaba Orion!"</span>&#125;],
-&nbsp;&nbsp;&nbsp;&nbsp;temperature=<span class="number">0.7</span>,
-&nbsp;&nbsp;&nbsp;&nbsp;extra_body=&#123;
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">"thinking_level"</span>: <span class="string">"high"</span> 
-&nbsp;&nbsp;&nbsp;&nbsp;&#125;
-)
+messages = []
 
-<span class="keyword">print</span>(response.choices[<span class="number">0</span>].message.content)</code></pre>
+<span class="keyword">while True</span>:
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">try</span>: user_input = <span class="keyword">input</span>(<span class="string">"- "</span>)
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">except</span> (KeyboardInterrupt, EOFError): <span class="keyword">break</span>
+&nbsp;&nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">if</span> user_input.lower() <span class="keyword">in</span> (<span class="string">'q'</span>, <span class="string">'quit'</span>): <span class="keyword">break</span>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">if not</span> user_input.strip(): <span class="keyword">continue</span>
+&nbsp;&nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;messages.append(&#123;<span class="string">"role"</span>: <span class="string">"user"</span>, <span class="string">"content"</span>: user_input&#125;)
+&nbsp;&nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;resp = client.chat.completions.create(
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;model=<span class="string">"gemini-3.1-flash-lite"</span>, 
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;messages=messages,
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;stream=<span class="keyword">True</span>,
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;extra_body=&#123;<span class="string">"thinking_level"</span>: <span class="string">"high"</span>&#125; <span class="comment"># e.g. "low" | 1024</span>
+&nbsp;&nbsp;&nbsp;&nbsp;)
+&nbsp;&nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">print</span>(<span class="string">"+ "</span>, end=<span class="string">""</span>)
+&nbsp;&nbsp;&nbsp;&nbsp;full_content = <span class="string">""</span>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">for</span> chunk <span class="keyword">in</span> resp:
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;delta = chunk.choices[<span class="number">0</span>].delta
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;reasoning = delta.model_extra.get(<span class="string">"reasoning_content"</span>)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;content = delta.content
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">if</span> reasoning:
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">print</span>(f<span class="string">"\033[90m&#123;reasoning&#125;\033[0m"</span>, end=<span class="string">""</span>, flush=<span class="keyword">True</span>)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">if</span> content:
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;full_content += content
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">print</span>(content, end=<span class="string">""</span>, flush=<span class="keyword">True</span>)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">print</span>(<span class="string">"\n"</span>)
+&nbsp;&nbsp;&nbsp;&nbsp;messages.append(&#123;<span class="string">"role"</span>: <span class="string">"assistant"</span>, <span class="string">"content"</span>: full_content&#125;)</code></pre>
         </div>
     </section>
 
@@ -217,6 +247,19 @@ response = client.chat.completions.create(
 
     <script src="i18n.js"></script>
     <script src="script.js"></script>
+    <script>
+        document.getElementById('copy-python-code-btn').addEventListener('click', function() {
+            const code = document.getElementById('python-code-field').innerText;
+            navigator.clipboard.writeText(code).then(() => {
+                const btn = this;
+                const originalSvg = btn.innerHTML;
+                btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2" style="width: 16px; height: 16px;"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>`;
+                setTimeout(() => {
+                    btn.innerHTML = originalSvg;
+                }, 2000);
+            });
+        });
+    </script>
 </body>
 
 </html>

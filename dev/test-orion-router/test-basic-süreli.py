@@ -1,3 +1,4 @@
+import time
 import openai
 
 client = openai.OpenAI(
@@ -16,24 +17,29 @@ while True:
     
     messages.append({"role": "user", "content": user_input})
     
+    t0 = time.perf_counter()
     resp = client.chat.completions.create(
-        model='gemini-3.1-flash-lite',
+        model='gemini-2.5-flash-lite',
         messages=messages,
         stream=True,
-        extra_body={"thinking_level": "high"}  # e.g. "low" | 1024
+        extra_body={"thinking_level": "1024"}
     )
     
     print("+ ", end="")
     full_content = ""
+    ttfb = None
     for chunk in resp:
         delta = chunk.choices[0].delta
         reasoning = delta.model_extra.get("reasoning_content")
         content = delta.content
+        
+        if not ttfb and (content or reasoning):
+            ttfb = (time.perf_counter() - t0) * 1000
         if reasoning:
             print(f"\033[90m{reasoning}\033[0m", end="", flush=True)
         if content:
             full_content += content
             print(content, end="", flush=True)
             
-    print("\n")
+    print(f"\n\033[90m[TTFB: {ttfb:.0f}ms]\033[0m\n" if ttfb else "\n")
     messages.append({"role": "assistant", "content": full_content})

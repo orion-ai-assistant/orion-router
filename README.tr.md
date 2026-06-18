@@ -30,7 +30,7 @@ import openai
 
 # OpenAI client'ını Orion Router'a yönlendiriyoruz
 client = openai.OpenAI(
-    base_url="http://localhost:20128/v1", # Orion Router sunucu adresiniz
+    base_url="http://127.0.0.1:20128/v1", # Orion Router sunucu adresiniz
     api_key="orion-sanal-anahtariniz"     # Dashboard üzerinden ürettiğiniz sanal anahtar
 )
 
@@ -40,7 +40,7 @@ response = client.chat.completions.create(
     temperature=0.7, 
     tools=[], 
     extra_body={
-        "thinking_level": "medium" # Düşünme kapasitesi; "low" - "high" veya token bütçesi: 1024, 8192 vb. (modelin desteklemesi gerekir)
+        "thinking_level": "high" # e.g. "low" | 1024
     }
 )
 
