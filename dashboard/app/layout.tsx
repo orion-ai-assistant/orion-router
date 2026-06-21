@@ -4,7 +4,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Orion AI Gateway - Admin Dashboard",
+  title: "Orion Router",
   description: "Enterprise Service Router and Key Management Panel",
   icons: {
     icon: "/dashboard/favicon.svg",

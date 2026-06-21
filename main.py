@@ -124,7 +124,7 @@ class LocalhostWarningMiddleware(BaseHTTPMiddleware):
 # ---------------------------------------------------------------------------
 #  Uygulama
 # ---------------------------------------------------------------------------
-app = FastAPI(title="Orion Custom Service Router", lifespan=lifespan)
+app = FastAPI(title="Orion Router", lifespan=lifespan)
 app.add_middleware(LocalhostWarningMiddleware)
 
 # CORS ayarları: frontend geliştirme sunucusunun (localhost:3001) API'ye doğrudan erişebilmesi için
