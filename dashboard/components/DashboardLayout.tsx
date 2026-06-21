@@ -32,7 +32,6 @@ const TABS: SidebarTab[] = [
   { id: 'models', i18nKey: 'nav.models', icon: Bot, url: '/models' },
   { id: 'groups', i18nKey: 'nav.groups', icon: Network, url: '/groups' },
   { id: 'playground', i18nKey: 'nav.playground', icon: Terminal, url: '/playground' },
-  { id: 'model-info', i18nKey: 'nav.modelInfo', icon: Info, url: '/model-info' },
   { id: 'settings', i18nKey: 'nav.settings', icon: Settings, url: '/settings' }
 ];
 

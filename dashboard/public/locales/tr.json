@@ -21,7 +21,6 @@
   "nav.models": "Modeller",
   "nav.groups": "Gruplar",
   "nav.playground": "Oyun Alanı",
-  "nav.modelInfo": "Model Bilgisi",
   "nav.settings": "Ayarlar",
   "nav.signOut": "Çıkış Yap",
   "auth.title": "Orion Dashboard",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "Vektör Gösterim Ayarları",
   "playground.textToEmbed": "Vektörleştirilecek metin",
   "playground.generateVector": "Vektör Oluştur",
-  "modelInfo.title": "Model Bilgileri",
-  "modelInfo.description": "Model bazlı kurallar ve notlar",
-  "modelInfo.selectFamily": "Lütfen soldan bir model ailesi seçin.",
-  "modelInfo.noRules": "Bu aile için kural bulunamadı.",
-  "modelInfo.loading": "Aileler yükleniyor...",
-  "modelInfo.noFamilies": "Aile bulunamadı.",
-  "modelInfo.rules.gemmaBudget": "Düşünme (thinking) bütçesini 50'nin altında tutmak modelin yapısal bozulmalarına ve saçmalamasına yol açabilir.",
-  "modelInfo.rules.geminiBudget": "Düşünme (thinking) özelliği aktif edildiğinde, bütçe en az 1024 token olarak ayarlanmalıdır. Daha düşük bütçeler desteklenmez.",
-  "modelInfo.rules.geminiOptional": "Gemini 3.1 modellerinde düşünme bütçesi opsiyoneldir.",
-  "modelInfo.rules.gptOssBudget": "Düşünme bütçesinde bir alt sınır yoktur, bütçe 1 bile ayarlansa model stabil çalışmaya devam edebilir.",
-  "modelInfo.rules.gptxBudget": "x bütçesinde bir alt sınır yoktur, bütçe 1 bile ayarlansa model stabil çalışmaya devam edebilir.",
   "keys.table.budget": "Bütçe",
   "keys.table.used": "Kullanılan",
   "common.unlimited": "Sınırsız",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "Vektör gösterimi başarıyla oluşturuldu!",
   "logs.toast.loadFailed": "Loglar yüklenemedi",
   "logs.toast.loadDetailsFailed": "Log detayları yüklenemedi",
-  "logs.toast.copied": "Yük panoya kopyalandı!",
-  "modelInfo.toast.fetchFailed": "Model bilgileri alınamadı"
+  "logs.toast.copied": "Yük panoya kopyalandı!"
 }

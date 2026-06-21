@@ -21,7 +21,6 @@
   "nav.models": "ماڈلز",
   "nav.groups": "گروپس",
   "nav.playground": "پلے گراؤنڈ",
-  "nav.modelInfo": "ماڈل کی معلومات",
   "nav.settings": "ترتیبات",
   "nav.signOut": "سائن آؤٹ",
   "auth.title": "اورین ڈیش بورڈ",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "ایمبیڈنگ ترتیبات",
   "playground.textToEmbed": "ایمبیڈ کرنے کی تحریر",
   "playground.generateVector": "ویکٹر تخلیق کریں",
-  "modelInfo.title": "ماڈل کی معلومات",
-  "modelInfo.description": "ماڈل پر مبنی قواعد اور نوٹس",
-  "modelInfo.selectFamily": "براہ کرم بائیں طرف سے ماڈل فیملی منتخب کریں۔",
-  "modelInfo.noRules": "اس فیملی کے لیے کوئی قواعد نہیں ملے؛",
-  "modelInfo.loading": "فیملیز لوڈ ہو رہی ہیں...",
-  "modelInfo.noFamilies": "کوئی فیملیز نہیں ملیں۔",
-  "modelInfo.rules.gemmaBudget": "سوچنے والے بجٹ کو 50 سے کم رکھنے سے ساختی خرابی اور ماڈل سے بے ہودہ آؤٹ پٹ ہو سکتا ہے۔",
-  "modelInfo.rules.geminiBudget": "سوچ فعال ہونے پر، بجٹ کو کم از کم 1024 ٹوکنز پر سیٹ ہونا چاہیے۔ کم بجٹ کی حمایت نہیں کی جاتی ہے۔",
-  "modelInfo.rules.geminiOptional": "جیمنی 3.1 ماڈلز میں سوچنے والا بجٹ اختیاری ہے۔",
-  "modelInfo.rules.gptOssBudget": "سوچنے والے بجٹ پر کوئی کم حد نہیں ہے۔ ماڈل 1 کے بجٹ کے ساتھ بھی مستحکم طور پر چل سکتا ہے۔",
-  "modelInfo.rules.gptxBudget": "ایکس بجٹ پر کوئی کم حد نہیں ہے؛ ماڈل 1 کے بجٹ کے ساتھ بھی مستحکم طور پر چل سکتا ہے۔",
   "keys.table.budget": "بجٹ",
   "keys.table.used": "استعمال شدہ",
   "common.unlimited": "لامحدود",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "ایمبیڈنگ ویکٹر پیدا ہوا!",
   "logs.toast.loadFailed": "لاگز لوڈ کرنے میں ناکام",
   "logs.toast.loadDetailsFailed": "لاگ کی تفصیلات لوڈ کرنے میں ناکام",
-  "logs.toast.copied": "پے لوڈ کلپ بورڈ پر کاپی ہو گیا!",
-  "modelInfo.toast.fetchFailed": "ماڈل کی معلومات حاصل کرنے میں ناکام"
+  "logs.toast.copied": "پے لوڈ کلپ بورڈ پر کاپی ہو گیا!"
 }

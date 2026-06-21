@@ -21,7 +21,6 @@
   "nav.models": "Modelos",
   "nav.groups": "Grupos",
   "nav.playground": "Área de pruebas",
-  "nav.modelInfo": "Info del modelo",
   "nav.settings": "Configuración",
   "nav.signOut": "Cerrar sesión",
   "auth.title": "Panel Orion",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "Configuración de embedding",
   "playground.textToEmbed": "Texto a incrustar",
   "playground.generateVector": "Generar vector",
-  "modelInfo.title": "Info del modelo",
-  "modelInfo.description": "Reglas y notas basadas en el modelo",
-  "modelInfo.selectFamily": "Por favor, seleccione una familia de modelos a la izquierda.",
-  "modelInfo.noRules": "No se encontraron reglas para esta familia.",
-  "modelInfo.loading": "Cargando familias...",
-  "modelInfo.noFamilies": "No se encontraron familias.",
-  "modelInfo.rules.gemmaBudget": "Mantener el presupuesto de pensamiento por debajo de 50 puede provocar deformaciones estructurales y resultados sin sentido del modelo.",
-  "modelInfo.rules.geminiBudget": "Cuando el pensamiento está habilitado, el presupuesto debe establecerse en al menos 1024 tokens. No se admiten presupuestos más bajos.",
-  "modelInfo.rules.geminiOptional": "En los modelos Gemini 3.1, el presupuesto de pensamiento es opcional.",
-  "modelInfo.rules.gptOssBudget": "No hay límite inferior para el presupuesto de pensamiento; el modelo puede funcionar de forma estable incluso con un presupuesto de 1.",
-  "modelInfo.rules.gptxBudget": "No hay límite inferior para el presupuesto de x; el modelo puede funcionar de forma estable incluso con un presupuesto de 1.",
   "keys.table.budget": "Presupuesto",
   "keys.table.used": "Usado",
   "common.unlimited": "Ilimitado",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "¡Vector de incrustación generado!",
   "logs.toast.loadFailed": "No se pudieron cargar los registros",
   "logs.toast.loadDetailsFailed": "No se pudieron cargar los detalles del registro",
-  "logs.toast.copied": "¡Carga útil copiada al portapapeles!",
-  "modelInfo.toast.fetchFailed": "No se pudo recuperar la información del modelo"
+  "logs.toast.copied": "¡Carga útil copiada al portapapeles!"
 }

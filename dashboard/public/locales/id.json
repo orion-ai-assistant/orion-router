@@ -21,7 +21,6 @@
   "nav.models": "Model",
   "nav.groups": "Grup",
   "nav.playground": "Playground",
-  "nav.modelInfo": "Info Model",
   "nav.settings": "Pengaturan",
   "nav.signOut": "Keluar",
   "auth.title": "Dasbor Orion",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "Pengaturan Embedding",
   "playground.textToEmbed": "Teks untuk di-embed",
   "playground.generateVector": "Hasilkan Vektor",
-  "modelInfo.title": "Info Model",
-  "modelInfo.description": "Aturan dan catatan berbasis model",
-  "modelInfo.selectFamily": "Pilih keluarga model dari kiri.",
-  "modelInfo.noRules": "Tidak ada aturan yang ditemukan untuk keluarga ini.",
-  "modelInfo.loading": "Memuat keluarga...",
-  "modelInfo.noFamilies": "Tidak ada keluarga yang ditemukan.",
-  "modelInfo.rules.gemmaBudget": "Menjaga anggaran berpikir di bawah 50 dapat menyebabkan deformasi struktural dan hasil yang tidak masuk akal dari model.",
-  "modelInfo.rules.geminiBudget": "Ketika fitur berpikir diaktifkan, anggaran harus disetel setidaknya 1024 token. Anggaran yang lebih rendah tidak didukung.",
-  "modelInfo.rules.geminiOptional": "Pada model Gemini 3.1, anggaran berpikir bersifat opsional.",
-  "modelInfo.rules.gptOssBudget": "Tidak ada batas bawah pada anggaran berpikir; model dapat berjalan dengan stabil bahkan dengan anggaran sebesar 1.",
-  "modelInfo.rules.gptxBudget": "Tidak ada batas bawah pada anggaran x; model dapat berjalan dengan stabil bahkan dengan anggaran sebesar 1.",
   "keys.table.budget": "Anggaran",
   "keys.table.used": "Digunakan",
   "common.unlimited": "Tak Terbatas",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "Penyematan vektor dihasilkan!",
   "logs.toast.loadFailed": "Gagal memuat log",
   "logs.toast.loadDetailsFailed": "Gagal memuat detail log",
-  "logs.toast.copied": "Payload disalin ke clipboard!",
-  "modelInfo.toast.fetchFailed": "Gagal mengambil info model"
+  "logs.toast.copied": "Payload disalin ke clipboard!"
 }

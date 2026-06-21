@@ -21,7 +21,6 @@
   "nav.models": "Модели",
   "nav.groups": "Группы",
   "nav.playground": "Песочница",
-  "nav.modelInfo": "Информация о модели",
   "nav.settings": "Настройки",
   "nav.signOut": "Выйти",
   "auth.title": "Панель управления Orion",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "Настройки эмбеддинга",
   "playground.textToEmbed": "Текст для эмбеддинга",
   "playground.generateVector": "Создать вектор",
-  "modelInfo.title": "Информация о модели",
-  "modelInfo.description": "Правила и примечания на основе модели",
-  "modelInfo.selectFamily": "Пожалуйста, выберите семейство моделей слева.",
-  "modelInfo.noRules": "Правила для этого семейства не найдены.",
-  "modelInfo.loading": "Загрузка семейств...",
-  "modelInfo.noFamilies": "Семейства не найдены.",
-  "modelInfo.rules.gemmaBudget": "Сохранение бюджета мышления ниже 50 может привести к структурной деформации и бессмысленным результатам модели.",
-  "modelInfo.rules.geminiBudget": "Когда мышление включено, бюджет должен быть установлен как минимум на 1024 токена. Меньшие бюджеты не поддерживаются.",
-  "modelInfo.rules.geminiOptional": "В моделях Gemini 3.1 расчет бюджета не является обязательным.",
-  "modelInfo.rules.gptOssBudget": "Не существует нижнего предела бюджета мышления; модель может стабильно работать даже при бюджете 1.",
-  "modelInfo.rules.gptxBudget": "Нижнего предела бюджета x не существует; модель может стабильно работать даже при бюджете 1.",
   "keys.table.budget": "Бюджет",
   "keys.table.used": "Использовано",
   "common.unlimited": "Безлимитно",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "Вектор внедрения создан!",
   "logs.toast.loadFailed": "Не удалось загрузить журналы",
   "logs.toast.loadDetailsFailed": "Не удалось загрузить данные журнала.",
-  "logs.toast.copied": "Полезная нагрузка скопирована в буфер обмена!",
-  "modelInfo.toast.fetchFailed": "Не удалось получить информацию о модели."
+  "logs.toast.copied": "Полезная нагрузка скопирована в буфер обмена!"
 }

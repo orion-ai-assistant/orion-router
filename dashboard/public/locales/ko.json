@@ -21,7 +21,6 @@
   "nav.models": "모델",
   "nav.groups": "그룹",
   "nav.playground": "플레이그라운드",
-  "nav.modelInfo": "모델 정보",
   "nav.settings": "설정",
   "nav.signOut": "로그아웃",
   "auth.title": "Orion 대시보드",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "임베딩 설정",
   "playground.textToEmbed": "임베드할 텍스트",
   "playground.generateVector": "벡터 생성",
-  "modelInfo.title": "모델 정보",
-  "modelInfo.description": "모델 기반 규칙 및 메모",
-  "modelInfo.selectFamily": "왼쪽에서 모델 패밀리를 선택하세요.",
-  "modelInfo.noRules": "이 패밀리에 대한 규칙을 찾을 수 없습니다.",
-  "modelInfo.loading": "패밀리 로딩 중...",
-  "modelInfo.noFamilies": "패밀리를 찾을 수 없습니다.",
-  "modelInfo.rules.gemmaBudget": "사고 예산을 50 미만으로 유지하면 모델의 구조적 왜곡 및 불합리한 출력이 발생할 수 있습니다.",
-  "modelInfo.rules.geminiBudget": "사고 기능이 활성화된 경우 예산은 최소 1024 토큰으로 설정해야 합니다. 더 낮은 예산은 지원되지 않습니다.",
-  "modelInfo.rules.geminiOptional": "Gemini 3.1 모델에서 사고 예산은 선택 사항입니다.",
-  "modelInfo.rules.gptOssBudget": "사고 예산에는 하한선이 없습니다. 예산이 1이라도 모델은 안정적으로 실행될 수 있습니다.",
-  "modelInfo.rules.gptxBudget": "x 예산에는 하한선이 없습니다. 예산이 1이라도 모델은 안정적으로 실행될 수 있습니다.",
   "keys.table.budget": "예산",
   "keys.table.used": "사용됨",
   "common.unlimited": "무제한",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "임베딩 벡터가 생성되었습니다!",
   "logs.toast.loadFailed": "로그를 로드하지 못했습니다.",
   "logs.toast.loadDetailsFailed": "로그 세부정보를 로드하지 못했습니다.",
-  "logs.toast.copied": "페이로드가 클립보드에 복사되었습니다!",
-  "modelInfo.toast.fetchFailed": "모델 정보를 가져오지 못했습니다."
+  "logs.toast.copied": "페이로드가 클립보드에 복사되었습니다!"
 }

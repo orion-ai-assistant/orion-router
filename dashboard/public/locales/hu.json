@@ -21,7 +21,6 @@
   "nav.models": "Modellek",
   "nav.groups": "Csoportok",
   "nav.playground": "Homokozó",
-  "nav.modelInfo": "Modell-infó",
   "nav.settings": "Beállítások",
   "nav.signOut": "Kijelentkezés",
   "auth.title": "Orion Vezérlőpult",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "Beágyazási beállítások",
   "playground.textToEmbed": "Beágyazandó szöveg",
   "playground.generateVector": "Vektor generálása",
-  "modelInfo.title": "Modell-infó",
-  "modelInfo.description": "Modellen alapuló szabályok és megjegyzések",
-  "modelInfo.selectFamily": "Kérjük, válasszon egy modelcsaládot a bal oldalon.",
-  "modelInfo.noRules": "Ehhez a családhoz nem találhatók szabályok.",
-  "modelInfo.loading": "Családok betöltése...",
-  "modelInfo.noFamilies": "Nem találhatók családok.",
-  "modelInfo.rules.gemmaBudget": "A gondolkodási keret 50 alatt tartása szerkezeti torzulásokhoz és a modell értelmetlen kimeneteihez vezethet.",
-  "modelInfo.rules.geminiBudget": "Ha a gondolkodás engedélyezve van, a keretet legalább 1024 tokenre kell beállítani. Alacsonyabb értékek nem támogatottak.",
-  "modelInfo.rules.geminiOptional": "A Gemini 3.1 modelleknél a gondolkodási keret opcionális.",
-  "modelInfo.rules.gptOssBudget": "Nincs alsó határa a gondolkodási keretnek; a modell stabilan működhet akár 1-es kerettel is.",
-  "modelInfo.rules.gptxBudget": "Nincs alsó határa az x keretnek; a modell stabilan működhet akár 1-es kerettel is.",
   "keys.table.budget": "Keret",
   "keys.table.used": "Felhasznált",
   "common.unlimited": "Korlátlan",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "Beágyazási vektor generálva!",
   "logs.toast.loadFailed": "Nem sikerült betölteni a naplókat",
   "logs.toast.loadDetailsFailed": "Nem sikerült betölteni a napló részleteit",
-  "logs.toast.copied": "A hasznos adat a vágólapra másolva!",
-  "modelInfo.toast.fetchFailed": "Nem sikerült lekérni a modelladatokat"
+  "logs.toast.copied": "A hasznos adat a vágólapra másolva!"
 }

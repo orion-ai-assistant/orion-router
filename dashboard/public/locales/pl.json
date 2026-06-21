@@ -21,7 +21,6 @@
   "nav.models": "Modele",
   "nav.groups": "Grupy",
   "nav.playground": "Plac zabaw",
-  "nav.modelInfo": "Informacje o modelu",
   "nav.settings": "Ustawienia",
   "nav.signOut": "Wyloguj się",
   "auth.title": "Panel Orion",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "Ustawienia osadzania",
   "playground.textToEmbed": "Tekst do osadzenia",
   "playground.generateVector": "Generuj wektor",
-  "modelInfo.title": "Informacje o modelu",
-  "modelInfo.description": "Zasady i uwagi dotyczące modeli",
-  "modelInfo.selectFamily": "Wybierz rodzinę modeli z lewej strony.",
-  "modelInfo.noRules": "Brak zasad dla tej rodziny.",
-  "modelInfo.loading": "Ładowanie rodzin...",
-  "modelInfo.noFamilies": "Nie znaleziono rodzin.",
-  "modelInfo.rules.gemmaBudget": "Utrzymywanie budżetu myślenia poniżej 50 może prowadzić do deformacji strukturalnej i nonsensownych wyników modelu.",
-  "modelInfo.rules.geminiBudget": "Gdy myślenie jest włączone, budżet musi być ustawiony na co najmniej 1024 tokeny. Niższe budżety nie są obsługiwane.",
-  "modelInfo.rules.geminiOptional": "W modelach Gemini 3.1 budżet myślący jest opcjonalny.",
-  "modelInfo.rules.gptOssBudget": "Nie ma dolnej granicy budżetu myślącego; model może działać stabilnie nawet przy budżecie 1.",
-  "modelInfo.rules.gptxBudget": "Nie ma dolnej granicy budżetu x; model może działać stabilnie nawet przy budżecie 1.",
   "keys.table.budget": "Budżet",
   "keys.table.used": "Użyte",
   "common.unlimited": "Nieograniczony",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "Wygenerowano wektor osadzania!",
   "logs.toast.loadFailed": "Nie udało się załadować dzienników",
   "logs.toast.loadDetailsFailed": "Nie udało się załadować szczegółów dziennika",
-  "logs.toast.copied": "Ładunek skopiowany do schowka!",
-  "modelInfo.toast.fetchFailed": "Nie udało się pobrać informacji o modelu"
+  "logs.toast.copied": "Ładunek skopiowany do schowka!"
 }

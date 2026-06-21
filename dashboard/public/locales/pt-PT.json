@@ -21,7 +21,6 @@
   "nav.models": "Modelos",
   "nav.groups": "Grupos",
   "nav.playground": "Playground",
-  "nav.modelInfo": "Informações do Modelo",
   "nav.settings": "Definições",
   "nav.signOut": "Sair",
   "auth.title": "Painel Orion",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "Definições de Embedding",
   "playground.textToEmbed": "Texto para embedar",
   "playground.generateVector": "Gerar Vetor",
-  "modelInfo.title": "Informações do Modelo",
-  "modelInfo.description": "Regras e observações baseadas no modelo",
-  "modelInfo.selectFamily": "Selecione uma família de modelos à esquerda.",
-  "modelInfo.noRules": "Nenhuma regra encontrada para esta família.",
-  "modelInfo.loading": "A carregar famílias...",
-  "modelInfo.noFamilies": "Nenhuma família encontrada.",
-  "modelInfo.rules.gemmaBudget": "Manter o orçamento de pensamento abaixo de 50 pode levar a deformações estruturais e resultados absurdos do modelo.",
-  "modelInfo.rules.geminiBudget": "Quando o pensamento está ativado, o orçamento deve ser definido para pelo menos 1.024 tokens. Orçamentos mais baixos não são suportados.",
-  "modelInfo.rules.geminiOptional": "Nos modelos Gemini 3.1, o orçamento pensado é opcional.",
-  "modelInfo.rules.gptOssBudget": "Não há limite inferior para o orçamento de reflexão; o modelo pode funcionar de forma estável mesmo com um orçamento de 1.",
-  "modelInfo.rules.gptxBudget": "Não há limite inferior para o orçamento x; o modelo pode funcionar de forma estável mesmo com um orçamento de 1.",
   "keys.table.budget": "Limite",
   "keys.table.used": "Usado",
   "common.unlimited": "Ilimitado",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "Incorporação de vetor gerado!",
   "logs.toast.loadFailed": "Falha ao carregar registros",
   "logs.toast.loadDetailsFailed": "Falha ao carregar detalhes do registro",
-  "logs.toast.copied": "Carga copiada para a área de transferência!",
-  "modelInfo.toast.fetchFailed": "Falha ao buscar informações do modelo"
+  "logs.toast.copied": "Carga copiada para a área de transferência!"
 }

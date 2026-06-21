@@ -148,7 +148,3 @@ async def chat_completions(
         }
 
 
-@router.get("/v1/model-info")
-async def get_model_info(request: Request):
-    """Önbellekteki model bilgisini döner."""
-    return request.app.state.model_info_cache

@@ -143,7 +143,6 @@ POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
 _DATA_DIR = _ROOT / "data"
 
 MODEL_PRICING_PATH = _DATA_DIR / "model_pricing.json"
-MODEL_INFO_PATH = _DATA_DIR / "model_info.json"
 
 # --- OpenRouter App Identification Headers ---
 OPENROUTER_REFERER = os.getenv("OPENROUTER_REFERER")

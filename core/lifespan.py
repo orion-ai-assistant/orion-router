@@ -18,7 +18,7 @@ from fastapi import FastAPI
 
 from database import db_manager
 from dynamic_router import DynamicLLMRouter
-from core.config import MODEL_PRICING_PATH, MODEL_INFO_PATH, ROUTER_PORT
+from core.config import MODEL_PRICING_PATH, ROUTER_PORT
 
 logger = logging.getLogger("service-router")
 
@@ -200,25 +200,12 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error(f"Error seeding pricing: {e}")
 
-    # --- Model bilgisini seed et ---
-    if MODEL_INFO_PATH.exists():
-        try:
-            with open(MODEL_INFO_PATH, "r", encoding="utf-8") as f:
-                info_data = json.load(f)
-
-            # JSON dosyasındaki verilerin tam yetkili olmasını (DB'yi tamamen ezmesini) istiyoruz.
-            # Böylece JSON'da yapılan tüm silme/güncelleme/ekleme işlemleri anında aktif olur.
-            await db_manager.upsert_config("model_info", json.dumps(info_data))
-            logger.info("Synced model_info from JSON to DB (JSON is source of truth).")
-        except Exception as e:
-            logger.error(f"Error seeding model_info: {e}")
 
     # --- Cache'i yükle ---
     from core.dependencies import prewarm_vkey_cache
     await prewarm_vkey_cache()
     
     app.state.pricing_cache = await db_manager.get_all_pricing()
-    app.state.model_info_cache = await db_manager.get_config("model_info") or {"families": []}
 
     # Provider API key'lerini DB'den yükle (runtime'da güncellenebilir)
     raw_keys = await db_manager.get_config("provider_api_keys")

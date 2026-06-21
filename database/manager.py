@@ -108,7 +108,7 @@ class DatabaseManager:
             """
         )
         
-        # 5. Configurations (for model_info.json etc.)
+        # 5. Configurations (for admin secret hash, etc.)
         await conn.execute(
             """
             CREATE TABLE IF NOT EXISTS router_configs (

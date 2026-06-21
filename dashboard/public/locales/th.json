@@ -21,7 +21,6 @@
   "nav.models": "โมเดล",
   "nav.groups": "กลุ่ม",
   "nav.playground": "สนามทดลอง",
-  "nav.modelInfo": "ข้อมูลโมเดล",
   "nav.settings": "ตั้งค่า",
   "nav.signOut": "ออกจากระบบ",
   "auth.title": "แดชบอร์ด Orion",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "การตั้งค่าการฝังข้อมูล",
   "playground.textToEmbed": "ข้อความที่ต้องการฝังข้อมูล",
   "playground.generateVector": "สร้างเวกเตอร์",
-  "modelInfo.title": "ข้อมูลโมเดล",
-  "modelInfo.description": "กฎและหมายเหตุตามโมเดล",
-  "modelInfo.selectFamily": "กรุณาเลือกตระกูลโมเดลจากด้านซ้าย",
-  "modelInfo.noRules": "ไม่พบกฎสำหรับตระกูลโมเดลนี้",
-  "modelInfo.loading": "กำลังโหลดตระกูลโมเดล...",
-  "modelInfo.noFamilies": "ไม่พบตระกูลโมเดล",
-  "modelInfo.rules.gemmaBudget": "การรักษางบประมาณการคิดให้ต่ำกว่า 50 อาจนำไปสู่การเสียรูปของโครงสร้างและผลลัพธ์ที่ไร้สาระจากแบบจำลอง",
-  "modelInfo.rules.geminiBudget": "เมื่อเปิดใช้การคิดแล้ว จะต้องตั้งงบประมาณไว้อย่างน้อย 1,024 โทเค็น ไม่รองรับงบประมาณที่ต่ำกว่า",
-  "modelInfo.rules.geminiOptional": "ในรุ่น Gemini 3.1 งบประมาณการคิดเป็นทางเลือก",
-  "modelInfo.rules.gptOssBudget": "ไม่มีขีดจำกัดล่างของงบประมาณการคิด โมเดลสามารถทำงานได้อย่างเสถียรแม้จะมีงบประมาณเพียง 1",
-  "modelInfo.rules.gptxBudget": "ไม่มีขีดจำกัดล่างสำหรับงบประมาณ x; โมเดลสามารถทำงานได้อย่างเสถียรแม้จะมีงบประมาณเพียง 1",
   "keys.table.budget": "งบประมาณ",
   "keys.table.used": "ใช้แล้ว",
   "common.unlimited": "ไม่จำกัด",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "สร้างเวกเตอร์การฝังแล้ว!",
   "logs.toast.loadFailed": "โหลดบันทึกไม่สำเร็จ",
   "logs.toast.loadDetailsFailed": "โหลดรายละเอียดบันทึกไม่สำเร็จ",
-  "logs.toast.copied": "คัดลอกเพย์โหลดไปยังคลิปบอร์ดแล้ว!",
-  "modelInfo.toast.fetchFailed": "ดึงข้อมูลโมเดลไม่สำเร็จ"
+  "logs.toast.copied": "คัดลอกเพย์โหลดไปยังคลิปบอร์ดแล้ว!"
 }

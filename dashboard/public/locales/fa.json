@@ -21,7 +21,6 @@
   "nav.models": "مدل‌ها",
   "nav.groups": "گروه‌ها",
   "nav.playground": "محیط آزمایش",
-  "nav.modelInfo": "اطلاعات مدل",
   "nav.settings": "تنظیمات",
   "nav.signOut": "خروج",
   "auth.title": "داشبورد Orion",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "تنظیمات جاسازی",
   "playground.textToEmbed": "متن برای جاسازی",
   "playground.generateVector": "تولید بردار",
-  "modelInfo.title": "اطلاعات مدل",
-  "modelInfo.description": "قوانین و یادداشت‌های مبتنی بر مدل",
-  "modelInfo.selectFamily": "لطفاً یک خانواده مدل از سمت چپ انتخاب کنید.",
-  "modelInfo.noRules": "هیچ قانونی برای این خانواده یافت نشد.",
-  "modelInfo.loading": "در حال بارگذاری خانواده‌ها...",
-  "modelInfo.noFamilies": "هیچ خانواده‌ای یافت نشد.",
-  "modelInfo.rules.gemmaBudget": "پایین نگه داشتن بودجه تفکر زیر ۵۰ ممکن است منجر به تغییر شکل ساختاری و خروجی‌های نامفهوم مدل شود.",
-  "modelInfo.rules.geminiBudget": "هنگامی که تفکر فعال است، بودجه باید حداقل روی ۱۰۲۴ توکن تنظیم شود. بودجه‌های کمتر پشتیبانی نمی‌شوند.",
-  "modelInfo.rules.geminiOptional": "در مدل‌های Gemini 3.1، بودجه تفکر اختیاری است.",
-  "modelInfo.rules.gptOssBudget": "هیچ حد پایینی برای بودجه تفکر وجود ندارد؛ مدل می‌تواند حتی با بودجه ۱ به طور پایدار اجرا شود.",
-  "modelInfo.rules.gptxBudget": "هیچ حد پایینی برای بودجه x وجود ندارد؛ مدل می‌تواند حتی با بودجه ۱ به طور پایدار اجرا شود.",
   "keys.table.budget": "بودجه",
   "keys.table.used": "مصرف شده",
   "common.unlimited": "نامحدود",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "بردار جاسازی ایجاد شد!",
   "logs.toast.loadFailed": "گزارش‌ها بارگیری نشد",
   "logs.toast.loadDetailsFailed": "جزئیات گزارش بارگیری نشد",
-  "logs.toast.copied": "محموله در کلیپ بورد کپی شد!",
-  "modelInfo.toast.fetchFailed": "اطلاعات مدل واکشی نشد"
+  "logs.toast.copied": "محموله در کلیپ بورد کپی شد!"
 }

@@ -21,7 +21,6 @@
   "nav.models": "Modelli",
   "nav.groups": "Gruppi",
   "nav.playground": "Area di prova",
-  "nav.modelInfo": "Info modello",
   "nav.settings": "Impostazioni",
   "nav.signOut": "Disconnetti",
   "auth.title": "Dashboard Orion",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "Impostazioni embedding",
   "playground.textToEmbed": "Testo da incorporare",
   "playground.generateVector": "Genera vettore",
-  "modelInfo.title": "Info modello",
-  "modelInfo.description": "Regole e note basate sul modello",
-  "modelInfo.selectFamily": "Seleziona una famiglia di modelli dalla sinistra.",
-  "modelInfo.noRules": "Nessuna regola trovata per questa famiglia.",
-  "modelInfo.loading": "Caricamento famiglie...",
-  "modelInfo.noFamilies": "Nessuna famiglia trovata.",
-  "modelInfo.rules.gemmaBudget": "Mantenere il budget di pensiero al di sotto di 50 può portare a deformazioni strutturali e a output privi di senso del modello.",
-  "modelInfo.rules.geminiBudget": "Quando il pensiero è abilitato, il budget deve essere impostato su almeno 1024 token. I budget inferiori non sono supportati.",
-  "modelInfo.rules.geminiOptional": "Nei modelli Gemini 3.1, il budget di pensiero è opzionale.",
-  "modelInfo.rules.gptOssBudget": "Non c'è un limite inferiore per il budget di pensiero; il modello può funzionare in modo stabile anche con un budget pari a 1.",
-  "modelInfo.rules.gptxBudget": "Non c'è un limite inferiore per il budget x; il modello può funzionare in modo stabile anche con un budget pari a 1.",
   "keys.table.budget": "Budget",
   "keys.table.used": "Usato",
   "common.unlimited": "Illimitato",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "Vettore di incorporamento generato!",
   "logs.toast.loadFailed": "Impossibile caricare i log",
   "logs.toast.loadDetailsFailed": "Impossibile caricare i dettagli del registro",
-  "logs.toast.copied": "Payload copiato negli appunti!",
-  "modelInfo.toast.fetchFailed": "Impossibile recuperare le informazioni sul modello"
+  "logs.toast.copied": "Payload copiato negli appunti!"
 }

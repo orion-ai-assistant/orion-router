@@ -21,7 +21,6 @@
   "nav.models": "మోడల్స్",
   "nav.groups": "సమూహాలు",
   "nav.playground": "ప్లేగ్రౌండ్",
-  "nav.modelInfo": "మోడల్ సమాచారం",
   "nav.settings": "సెట్టింగ్స్",
   "nav.signOut": "సైన్ అవుట్",
   "auth.title": "ఓరియన్ డాష్‌బోర్డ్",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "ఎంబెడ్డింగ్ సెట్టింగ్స్",
   "playground.textToEmbed": "ఎంబెడ్ చేయాల్సిన టెక్స్ట్",
   "playground.generateVector": "వెక్టార్‌ను సృష్టించు",
-  "modelInfo.title": "మోడల్ సమాచారం",
-  "modelInfo.description": "మోడల్ ఆధారిత నియమాలు మరియు గమనికలు",
-  "modelInfo.selectFamily": "ఎడమ వైపు నుండి మోడల్ కుటుంబాన్ని ఎంచుకోండి.",
-  "modelInfo.noRules": "ఈ కుటుంబానికి నియమాలు లేవు.",
-  "modelInfo.loading": "కుటుంబాలు లోడ్ అవుతున్నాయి...",
-  "modelInfo.noFamilies": "కుటుంబాలు ఏవీ లేవు.",
-  "modelInfo.rules.gemmaBudget": "థింకింగ్ బడ్జెట్‌ను 50 కంటే తక్కువగా ఉంచడం వల్ల మోడల్ నుండి నిర్మాణ వైకల్యానికి మరియు అర్ధంలేని అవుట్‌పుట్‌కు దారితీయవచ్చు.",
-  "modelInfo.rules.geminiBudget": "ఆలోచన ప్రారంభించబడినప్పుడు, బడ్జెట్ తప్పనిసరిగా కనీసం 1024 టోకెన్‌లకు సెట్ చేయబడాలి. తక్కువ బడ్జెట్‌లకు మద్దతు లేదు.",
-  "modelInfo.rules.geminiOptional": "జెమిని 3.1 మోడల్‌లలో, ఆలోచన బడ్జెట్ ఐచ్ఛికం.",
-  "modelInfo.rules.gptOssBudget": "ఆలోచన బడ్జెట్‌లో తక్కువ పరిమితి లేదు; మోడల్ 1 బడ్జెట్‌తో కూడా స్థిరంగా నడుస్తుంది.",
-  "modelInfo.rules.gptxBudget": "x బడ్జెట్‌పై తక్కువ పరిమితి లేదు; మోడల్ 1 బడ్జెట్‌తో కూడా స్థిరంగా నడుస్తుంది.",
   "keys.table.budget": "బడ్జెట్",
   "keys.table.used": "వాడబడినవి",
   "common.unlimited": "పరిమితి లేనిది",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "ఎంబెడ్డింగ్ వెక్టర్ రూపొందించబడింది!",
   "logs.toast.loadFailed": "లాగ్‌లను లోడ్ చేయడంలో విఫలమైంది",
   "logs.toast.loadDetailsFailed": "లాగ్ వివరాలను లోడ్ చేయడంలో విఫలమైంది",
-  "logs.toast.copied": "పేలోడ్ క్లిప్‌బోర్డ్‌కి కాపీ చేయబడింది!",
-  "modelInfo.toast.fetchFailed": "మోడల్ సమాచారాన్ని పొందడంలో విఫలమైంది"
+  "logs.toast.copied": "పేలోడ్ క్లిప్‌బోర్డ్‌కి కాపీ చేయబడింది!"
 }

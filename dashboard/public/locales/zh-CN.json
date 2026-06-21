@@ -21,7 +21,6 @@
   "nav.models": "模型",
   "nav.groups": "模型组",
   "nav.playground": "游乐场",
-  "nav.modelInfo": "模型信息",
   "nav.settings": "设置",
   "nav.signOut": "退出登录",
   "auth.title": "Orion 控制台",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "嵌入设置",
   "playground.textToEmbed": "待嵌入文本",
   "playground.generateVector": "生成向量",
-  "modelInfo.title": "模型信息",
-  "modelInfo.description": "基于模型的规则和说明",
-  "modelInfo.selectFamily": "请从左侧选择模型系列。",
-  "modelInfo.noRules": "未找到此系列的规则。",
-  "modelInfo.loading": "加载系列中...",
-  "modelInfo.noFamilies": "未找到系列。",
-  "modelInfo.rules.gemmaBudget": "将思维预算保持在 50 以下可能会导致模型出现结构变形和无意义的输出。",
-  "modelInfo.rules.geminiBudget": "当启用思考时，预算必须设置为至少 1024 个代币。不支持较低的预算。",
-  "modelInfo.rules.geminiOptional": "在 Gemini 3.1 模型中，思维预算是可选的。",
-  "modelInfo.rules.gptOssBudget": "思维预算没有下限；即使预算为1，模型也能稳定运行。",
-  "modelInfo.rules.gptxBudget": "x预算没有下限；即使预算为1，模型也能稳定运行。",
   "keys.table.budget": "预算",
   "keys.table.used": "已用",
   "common.unlimited": "无限制",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "向量生成成功！",
   "logs.toast.loadFailed": "加载日志失败",
   "logs.toast.loadDetailsFailed": "加载日志详细信息失败",
-  "logs.toast.copied": "数据载荷已复制到剪贴板！",
-  "modelInfo.toast.fetchFailed": "获取模型信息失败"
+  "logs.toast.copied": "数据载荷已复制到剪贴板！"
 }

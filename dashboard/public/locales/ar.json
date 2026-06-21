@@ -21,7 +21,6 @@
   "nav.models": "النماذج",
   "nav.groups": "المجموعات",
   "nav.playground": "ساحة الاختبار",
-  "nav.modelInfo": "معلومات النموذج",
   "nav.settings": "الإعدادات",
   "nav.signOut": "تسجيل الخروج",
   "auth.title": "لوحة تحكم Orion",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "إعدادات التضمين",
   "playground.textToEmbed": "النص المراد تضمينه",
   "playground.generateVector": "إنشاء متجه",
-  "modelInfo.title": "معلومات النموذج",
-  "modelInfo.description": "قواعد وملاحظات مستندة إلى النموذج",
-  "modelInfo.selectFamily": "يرجى تحديد عائلة نموذج من اليسار.",
-  "modelInfo.noRules": "لم يتم العثور على قواعد لهذه العائلة.",
-  "modelInfo.loading": "جارٍ تحميل العائلات...",
-  "modelInfo.noFamilies": "لم يتم العثور على عائلات.",
-  "modelInfo.rules.gemmaBudget": "قد يؤدي إبقاء ميزانية التفكير أقل من 50 إلى تشوهات هيكلية ومخرجات غير منطقية من النموذج.",
-  "modelInfo.rules.geminiBudget": "عند تمكين التفكير، يجب تعيين الميزانية إلى 1024 رمزًا على الأقل. الميزانيات الأقل غير مدعومة.",
-  "modelInfo.rules.geminiOptional": "في طرز Gemini 3.1، تكون ميزانية التفكير اختيارية.",
-  "modelInfo.rules.gptOssBudget": "لا يوجد حد أدنى لميزانية التفكير؛ يمكن للنموذج أن يعمل بشكل مستقر حتى مع ميزانية قدرها 1.",
-  "modelInfo.rules.gptxBudget": "لا يوجد حد أدنى لميزانية x؛ يمكن للنموذج أن يعمل بشكل مستقر حتى مع ميزانية قدرها 1.",
   "keys.table.budget": "الميزانية",
   "keys.table.used": "المستخدم",
   "common.unlimited": "غير محدود",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "تم إنشاء ناقل التضمين!",
   "logs.toast.loadFailed": "فشل تحميل السجلات",
   "logs.toast.loadDetailsFailed": "فشل تحميل تفاصيل السجل",
-  "logs.toast.copied": "تم نسخ الحمولة إلى الحافظة!",
-  "modelInfo.toast.fetchFailed": "فشل جلب معلومات النموذج"
+  "logs.toast.copied": "تم نسخ الحمولة إلى الحافظة!"
 }

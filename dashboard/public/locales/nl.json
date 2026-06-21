@@ -21,7 +21,6 @@
   "nav.models": "Modellen",
   "nav.groups": "Groepen",
   "nav.playground": "Speeltuin",
-  "nav.modelInfo": "Modelinfo",
   "nav.settings": "Instellingen",
   "nav.signOut": "Afmelden",
   "auth.title": "Orion Dashboard",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "Insluitingsinstellingen",
   "playground.textToEmbed": "In te sluiten tekst",
   "playground.generateVector": "Vector genereren",
-  "modelInfo.title": "Modelinfo",
-  "modelInfo.description": "Modelgebaseerde regels en notities",
-  "modelInfo.selectFamily": "Selecteer een modelfamilie aan de linkerkant.",
-  "modelInfo.noRules": "Geen regels gevonden voor deze familie.",
-  "modelInfo.loading": "Families laden...",
-  "modelInfo.noFamilies": "Geen families gevonden.",
-  "modelInfo.rules.gemmaBudget": "Het onder de 50 houden van het denkbudget kan leiden tot structurele vervorming en onzinnige output van het model.",
-  "modelInfo.rules.geminiBudget": "Wanneer het denken is ingeschakeld, moet het budget op minimaal 1024 tokens worden ingesteld. Lagere budgetten worden niet ondersteund.",
-  "modelInfo.rules.geminiOptional": "In Gemini 3.1-modellen is het denkbudget optioneel.",
-  "modelInfo.rules.gptOssBudget": "Er is geen ondergrens voor het denkbudget; het model kan stabiel draaien, zelfs met een budget van 1.",
-  "modelInfo.rules.gptxBudget": "Er is geen ondergrens voor het x-budget; het model kan stabiel draaien, zelfs met een budget van 1.",
   "keys.table.budget": "Budget",
   "keys.table.used": "Gebruikt",
   "common.unlimited": "Onbegrensd",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "Inbedden vector gegenereerd!",
   "logs.toast.loadFailed": "Kan logboeken niet laden",
   "logs.toast.loadDetailsFailed": "Kan loggegevens niet laden",
-  "logs.toast.copied": "Payload gekopieerd naar klembord!",
-  "modelInfo.toast.fetchFailed": "Kan modelinformatie niet ophalen"
+  "logs.toast.copied": "Payload gekopieerd naar klembord!"
 }

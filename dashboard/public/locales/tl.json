@@ -21,7 +21,6 @@
   "nav.models": "Mga Modelo",
   "nav.groups": "Mga Grupo",
   "nav.playground": "Playground",
-  "nav.modelInfo": "Impormasyon ng Modelo",
   "nav.settings": "Mga Setting",
   "nav.signOut": "Mag-sign Out",
   "auth.title": "Orion Dashboard",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "Mga Setting ng Embedding",
   "playground.textToEmbed": "Tekstong i-eembed",
   "playground.generateVector": "Gumawa ng Vector",
-  "modelInfo.title": "Impormasyon ng Modelo",
-  "modelInfo.description": "Mga patakaran at tala na batay sa modelo",
-  "modelInfo.selectFamily": "Mangyaring pumili ng pamilya ng modelo sa kaliwa.",
-  "modelInfo.noRules": "Walang nahanap na mga patakaran para sa pamilyang ito.",
-  "modelInfo.loading": "Naglo-load ng mga pamilya...",
-  "modelInfo.noFamilies": "Walang nahanap na mga pamilya.",
-  "modelInfo.rules.gemmaBudget": "Ang pagpapanatiling mababa sa 50 ang badyet sa pag-iisip ay maaaring humantong sa pagpapapangit ng istruktura at walang katuturang output mula sa modelo.",
-  "modelInfo.rules.geminiBudget": "Kapag pinagana ang pag-iisip, dapat itakda ang badyet sa hindi bababa sa 1024 na mga token. Hindi sinusuportahan ang mas mababang badyet.",
-  "modelInfo.rules.geminiOptional": "Sa mga modelong Gemini 3.1, opsyonal ang badyet sa pag-iisip.",
-  "modelInfo.rules.gptOssBudget": "Walang mas mababang limitasyon sa badyet ng pag-iisip; ang modelo ay maaaring tumakbo nang matatag kahit na may badyet na 1.",
-  "modelInfo.rules.gptxBudget": "Walang mas mababang limitasyon sa x na badyet; ang modelo ay maaaring tumakbo nang matatag kahit na may badyet na 1.",
   "keys.table.budget": "Budget",
   "keys.table.used": "Ginamit",
   "common.unlimited": "Walang Limitasyon",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "Nabuo ang pag-embed ng vector!",
   "logs.toast.loadFailed": "Nabigong i-load ang mga log",
   "logs.toast.loadDetailsFailed": "Nabigong i-load ang mga detalye ng log",
-  "logs.toast.copied": "Nakopya ang payload sa clipboard!",
-  "modelInfo.toast.fetchFailed": "Nabigong makuha ang impormasyon ng modelo"
+  "logs.toast.copied": "Nakopya ang payload sa clipboard!"
 }

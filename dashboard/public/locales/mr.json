@@ -21,7 +21,6 @@
   "nav.models": "मॉडेल्स",
   "nav.groups": "गट",
   "nav.playground": "प्लेग्राउंड",
-  "nav.modelInfo": "मॉडेल माहिती",
   "nav.settings": "सेटिंग्ज",
   "nav.signOut": "साइन आउट",
   "auth.title": "Orion डॅशबोर्ड",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "एम्बेडिंग सेटिंग्ज",
   "playground.textToEmbed": "एम्बेड करायचा मजकूर",
   "playground.generateVector": "व्हेक्टर तयार करा",
-  "modelInfo.title": "मॉडेल माहिती",
-  "modelInfo.description": "मॉडेल-आधारित नियम आणि नोट्स",
-  "modelInfo.selectFamily": "कृपया डावीकडून एक मॉडेल कुटुंब निवडा.",
-  "modelInfo.noRules": "या कुटुंबासाठी कोणतेही नियम आढळले नाहीत.",
-  "modelInfo.loading": "कुटुंबे लोड होत आहेत...",
-  "modelInfo.noFamilies": "कोणतेही कुटुंब आढळले नाही.",
-  "modelInfo.rules.gemmaBudget": "विचार बजेट ५० पेक्षा कमी ठेवल्यास मॉडेलमध्ये संरचनात्मक विकृती आणि निरर्थक परिणाम होऊ शकतात।",
-  "modelInfo.rules.geminiBudget": "विचार करणे सक्षम केल्यावर, बजेट किमान १०२४ टोकन्सवर सेट केले पाहिजे. यापेक्षा कमी बजेट समर्थित नाहीत।",
-  "modelInfo.rules.geminiOptional": "Gemini ३.१ मॉडेल्समध्ये, विचार बजेट पर्यायी आहे।",
-  "modelInfo.rules.gptOssBudget": "विचार बजेटवर कोणतीही किमान मर्यादा नाही; मॉडेल १ बजेटसह देखील स्थिरपणे काम करू शकते।",
-  "modelInfo.rules.gptxBudget": "x बजेटवर कोणतीही किमान मर्यादा नाही; मॉडेल १ बजेटसह देखील स्थिरपणे काम करू शकते।",
   "keys.table.budget": "बजेट",
   "keys.table.used": "वापरले",
   "common.unlimited": "अमर्यादित",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "एम्बेडिंग वेक्टर तयार केला गेला!",
   "logs.toast.loadFailed": "लॉग लोड करण्यात अपयशी",
   "logs.toast.loadDetailsFailed": "लॉग तपशील लोड करण्यात अपयशी",
-  "logs.toast.copied": "पेलोड क्लिपबोर्डवर कॉपी केला गेला!",
-  "modelInfo.toast.fetchFailed": "मॉडेल माहिती मिळवण्यात अपयशी"
+  "logs.toast.copied": "पेलोड क्लिपबोर्डवर कॉपी केला गेला!"
 }

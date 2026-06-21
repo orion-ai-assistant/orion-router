@@ -21,7 +21,6 @@
   "nav.models": "மாதிரிகள்",
   "nav.groups": "குழுக்கள்",
   "nav.playground": "விளையாட்டு மைதானம்",
-  "nav.modelInfo": "மாதிரி தகவல்",
   "nav.settings": "அமைப்புகள்",
   "nav.signOut": "வெளியேறு",
   "auth.title": "ஓரியன் டாஷ்போர்டு",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "உட்பொதிவு அமைப்புகள்",
   "playground.textToEmbed": "உட்பொதிக்க வேண்டிய உரை",
   "playground.generateVector": "வெக்டாரை உருவாக்கு",
-  "modelInfo.title": "மாதிரி தகவல்",
-  "modelInfo.description": "மாதிரி சார்ந்த விதிகள் மற்றும் குறிப்புகள்",
-  "modelInfo.selectFamily": "இடதுபுறத்தில் இருந்து மாதிரி குடும்பத்தைத் தேர்ந்தெடுக்கவும்.",
-  "modelInfo.noRules": "இந்த குடும்பத்திற்கு விதிகள் இல்லை.",
-  "modelInfo.loading": "குடும்பங்கள் ஏற்றப்படுகின்றன...",
-  "modelInfo.noFamilies": "குடும்பங்கள் எதுவும் இல்லை.",
-  "modelInfo.rules.gemmaBudget": "சிந்தனை வரவுசெலவுத் திட்டத்தை 50 க்குக் கீழே வைத்திருப்பது மாதிரியிலிருந்து கட்டமைப்பு சிதைவு மற்றும் முட்டாள்தனமான வெளியீட்டிற்கு வழிவகுக்கும்.",
-  "modelInfo.rules.geminiBudget": "சிந்தனை இயக்கப்படும் போது, ​​பட்ஜெட் குறைந்தபட்சம் 1024 டோக்கன்களாக அமைக்கப்பட வேண்டும். குறைந்த பட்ஜெட்டுகள் ஆதரிக்கப்படவில்லை.",
-  "modelInfo.rules.geminiOptional": "ஜெமினி 3.1 மாடல்களில், சிந்தனை பட்ஜெட் விருப்பமானது.",
-  "modelInfo.rules.gptOssBudget": "சிந்தனை பட்ஜெட்டில் குறைந்த வரம்பு இல்லை; மாடல் 1 பட்ஜெட்டில் கூட நிலையானதாக இயங்கும்.",
-  "modelInfo.rules.gptxBudget": "x பட்ஜெட்டில் குறைந்த வரம்பு இல்லை; மாடல் 1 பட்ஜெட்டில் கூட நிலையானதாக இயங்கும்.",
   "keys.table.budget": "பட்ஜெட்",
   "keys.table.used": "பயன்படுத்தப்பட்டது",
   "common.unlimited": "வரம்பற்றது",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "உட்பொதித்தல் திசையன் உருவாக்கப்பட்டது!",
   "logs.toast.loadFailed": "பதிவுகளை ஏற்றுவதில் தோல்வி",
   "logs.toast.loadDetailsFailed": "பதிவு விவரங்களை ஏற்றுவதில் தோல்வி",
-  "logs.toast.copied": "பேலோட் கிளிப்போர்டுக்கு நகலெடுக்கப்பட்டது!",
-  "modelInfo.toast.fetchFailed": "மாதிரித் தகவலைப் பெறுவதில் தோல்வி"
+  "logs.toast.copied": "பேலோட் கிளிப்போர்டுக்கு நகலெடுக்கப்பட்டது!"
 }

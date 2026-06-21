@@ -21,7 +21,6 @@
   "nav.models": "Modele",
   "nav.groups": "Grupuri",
   "nav.playground": "Loc de joacă",
-  "nav.modelInfo": "Info Model",
   "nav.settings": "Setări",
   "nav.signOut": "Deconectare",
   "auth.title": "Panou Orion",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "Setări de embedding",
   "playground.textToEmbed": "Text de vectorizat",
   "playground.generateVector": "Generează vector",
-  "modelInfo.title": "Info Model",
-  "modelInfo.description": "Reguli și note specifice modelului",
-  "modelInfo.selectFamily": "Selectează o familie de modele din stânga.",
-  "modelInfo.noRules": "Nu s-au găsit reguli pentru această familie.",
-  "modelInfo.loading": "Se încarcă familiile...",
-  "modelInfo.noFamilies": "Nu s-au găsit familii.",
-  "modelInfo.rules.gemmaBudget": "Menținerea bugetului de gândire sub 50 poate duce la deformare structurală și rezultate nesens din model.",
-  "modelInfo.rules.geminiBudget": "Când gândirea este activată, bugetul trebuie setat la cel puțin 1024 de jetoane. Bugetele mai mici nu sunt acceptate.",
-  "modelInfo.rules.geminiOptional": "În modelele Gemini 3.1, bugetul de gândire este opțional.",
-  "modelInfo.rules.gptOssBudget": "Nu există o limită inferioară a bugetului de gândire; modelul poate funcționa stabil chiar și cu un buget de 1.",
-  "modelInfo.rules.gptxBudget": "Nu există o limită inferioară a bugetului x; modelul poate funcționa stabil chiar și cu un buget de 1.",
   "keys.table.budget": "Buget",
   "keys.table.used": "Utilizat",
   "common.unlimited": "Nelimitat",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "Vector de încorporare generat!",
   "logs.toast.loadFailed": "Nu s-au încărcat jurnalele",
   "logs.toast.loadDetailsFailed": "Nu s-au încărcat detaliile jurnalului",
-  "logs.toast.copied": "Sarcina utilă a fost copiată în clipboard!",
-  "modelInfo.toast.fetchFailed": "Nu s-au putut prelua informațiile despre model"
+  "logs.toast.copied": "Sarcina utilă a fost copiată în clipboard!"
 }

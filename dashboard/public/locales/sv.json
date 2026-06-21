@@ -21,7 +21,6 @@
   "nav.models": "Modeller",
   "nav.groups": "Grupper",
   "nav.playground": "Lekplats",
-  "nav.modelInfo": "Modellinfo",
   "nav.settings": "Inställningar",
   "nav.signOut": "Logga ut",
   "auth.title": "Orion Dashboard",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "Inbäddningsinställningar",
   "playground.textToEmbed": "Text att bädda in",
   "playground.generateVector": "Generera vektor",
-  "modelInfo.title": "Modellinfo",
-  "modelInfo.description": "Modellbaserade regler och anteckningar",
-  "modelInfo.selectFamily": "Välj en modellfamilj till vänster.",
-  "modelInfo.noRules": "Inga regler hittades för den här familjen.",
-  "modelInfo.loading": "Laddar familjer...",
-  "modelInfo.noFamilies": "Inga familjer hittades.",
-  "modelInfo.rules.gemmaBudget": "Att hålla tankebudgeten under 50 kan leda till strukturell deformation och orimligt resultat från modellen.",
-  "modelInfo.rules.geminiBudget": "När tänkande är aktiverat måste budgeten vara inställd på minst 1024 tokens. Lägre budgetar stöds inte.",
-  "modelInfo.rules.geminiOptional": "I Gemini 3.1-modeller är tankebudgeten valfri.",
-  "modelInfo.rules.gptOssBudget": "Det finns ingen nedre gräns för tänkande budget; modellen kan köras stabilt även med en budget på 1.",
-  "modelInfo.rules.gptxBudget": "Det finns ingen nedre gräns för x-budgeten; modellen kan köras stabilt även med en budget på 1.",
   "keys.table.budget": "Budget",
   "keys.table.used": "Använt",
   "common.unlimited": "Obegränsat",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "Inbäddningsvektor genererad!",
   "logs.toast.loadFailed": "Det gick inte att ladda loggar",
   "logs.toast.loadDetailsFailed": "Det gick inte att läsa in loggdetaljer",
-  "logs.toast.copied": "Nyttolasten kopierad till urklipp!",
-  "modelInfo.toast.fetchFailed": "Det gick inte att hämta modellinformation"
+  "logs.toast.copied": "Nyttolasten kopierad till urklipp!"
 }

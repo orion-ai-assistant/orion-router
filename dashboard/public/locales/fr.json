@@ -21,7 +21,6 @@
   "nav.models": "Modèles",
   "nav.groups": "Groupes",
   "nav.playground": "Bac à sable",
-  "nav.modelInfo": "Infos modèle",
   "nav.settings": "Paramètres",
   "nav.signOut": "Se déconnecter",
   "auth.title": "Tableau de bord Orion",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "Paramètres d'embedding",
   "playground.textToEmbed": "Texte à intégrer",
   "playground.generateVector": "Générer le vecteur",
-  "modelInfo.title": "Infos modèle",
-  "modelInfo.description": "Règles et notes basées sur le modèle",
-  "modelInfo.selectFamily": "Veuillez sélectionner une famille de modèles à gauche.",
-  "modelInfo.noRules": "Aucune règle trouvée pour cette famille.",
-  "modelInfo.loading": "Chargement des familles...",
-  "modelInfo.noFamilies": "Aucune famille trouvée.",
-  "modelInfo.rules.gemmaBudget": "Garder le budget de pensée inférieur à 50 peut entraîner des déformations structurelles et des sorties absurdes du modèle.",
-  "modelInfo.rules.geminiBudget": "Lorsque la pensée est activée, le budget doit être fixé à au moins 1024 tokens. Les budgets inférieurs ne sont pas pris en charge.",
-  "modelInfo.rules.geminiOptional": "Dans les modèles Gemini 3.1, le budget de pensée est facultatif.",
-  "modelInfo.rules.gptOssBudget": "Il n'y a pas de limite inférieure pour le budget de pensée ; le modèle peut fonctionner de manière stable même avec un budget de 1.",
-  "modelInfo.rules.gptxBudget": "Il n'y a pas de limite inférieure pour le budget x ; le modèle peut fonctionner de manière stable même avec un budget de 1.",
   "keys.table.budget": "Budget",
   "keys.table.used": "Utilisé",
   "common.unlimited": "Illimité",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "Vecteur d'intégration généré !",
   "logs.toast.loadFailed": "Échec du chargement des journaux",
   "logs.toast.loadDetailsFailed": "Échec du chargement des détails du journal",
-  "logs.toast.copied": "Charge utile copiée dans le presse-papier !",
-  "modelInfo.toast.fetchFailed": "Échec de la récupération des informations sur le modèle"
+  "logs.toast.copied": "Charge utile copiée dans le presse-papier !"
 }

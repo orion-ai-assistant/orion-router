@@ -21,7 +21,6 @@
   "nav.models": "Mallit",
   "nav.groups": "Ryhmät",
   "nav.playground": "Hiekkalaatikko",
-  "nav.modelInfo": "Mallitiedot",
   "nav.settings": "Asetukset",
   "nav.signOut": "Kirjaudu ulos",
   "auth.title": "Orion-kojelauta",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "Upotusasetukset",
   "playground.textToEmbed": "Upotettava teksti",
   "playground.generateVector": "Luo vektori",
-  "modelInfo.title": "Mallitiedot",
-  "modelInfo.description": "Malliperustaiset säännöt ja muistiinpanot",
-  "modelInfo.selectFamily": "Valitse malliperhe vasemmalta.",
-  "modelInfo.noRules": "Tälle perheelle ei löydy sääntöjä.",
-  "modelInfo.loading": "Ladataan perheitä...",
-  "modelInfo.noFamilies": "Perheitä ei löydy.",
-  "modelInfo.rules.gemmaBudget": "Ajattelubudjetin pitäminen alle 50:ssä voi johtaa mallin rakenteellisiin vääristymiin ja järjettömiin tuloksiin.",
-  "modelInfo.rules.geminiBudget": "Kun ajattelu on käytössä, budjetiksi on asetettava vähintään 1024 tokenia. Pienempiä budjetteja ei tueta.",
-  "modelInfo.rules.geminiOptional": "Gemini 3.1 -malleissa ajattelubudjetti on valinnainen.",
-  "modelInfo.rules.gptOssBudget": "Ajattelubudjetilla ei ole alarajaa; malli voi toimia vakaasti jopa budjetilla 1.",
-  "modelInfo.rules.gptxBudget": "X-budjetilla ei ole alarajaa; malli voi toimia vakaasti jopa budjetilla 1.",
   "keys.table.budget": "Budjetti",
   "keys.table.used": "Käytetty",
   "common.unlimited": "Rajoittamaton",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "Upotusvektori luotu!",
   "logs.toast.loadFailed": "Lokien lataaminen epäonnistui",
   "logs.toast.loadDetailsFailed": "Lokin tietojen lataaminen epäonnistui",
-  "logs.toast.copied": "Hyötykuorma kopioitu leikepöydälle!",
-  "modelInfo.toast.fetchFailed": "Mallitietojen nouto epäonnistui"
+  "logs.toast.copied": "Hyötykuorma kopioitu leikepöydälle!"
 }

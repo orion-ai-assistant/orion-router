@@ -21,7 +21,6 @@
   "nav.models": "Mô hình",
   "nav.groups": "Nhóm",
   "nav.playground": "Khu thử nghiệm",
-  "nav.modelInfo": "Thông tin mô hình",
   "nav.settings": "Cài đặt",
   "nav.signOut": "Đăng xuất",
   "auth.title": "Bảng điều khiển Orion",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "Cài đặt nhúng",
   "playground.textToEmbed": "Văn bản cần nhúng",
   "playground.generateVector": "Tạo vector",
-  "modelInfo.title": "Thông tin mô hình",
-  "modelInfo.description": "Các quy tắc và ghi chú dựa trên mô hình",
-  "modelInfo.selectFamily": "Vui lòng chọn một nhóm mô hình từ bên trái.",
-  "modelInfo.noRules": "Không tìm thấy quy tắc nào cho nhóm mô hình này.",
-  "modelInfo.loading": "Đang tải các nhóm mô hình...",
-  "modelInfo.noFamilies": "Không tìm thấy nhóm mô hình nào.",
-  "modelInfo.rules.gemmaBudget": "Việc giữ ngân sách tư duy dưới 50 có thể dẫn đến biến dạng cấu trúc và kết quả đầu ra vô nghĩa từ mô hình.",
-  "modelInfo.rules.geminiBudget": "Khi kích hoạt tư duy, ngân sách phải được đặt thành ít nhất 1024 mã thông báo. Ngân sách thấp hơn không được hỗ trợ.",
-  "modelInfo.rules.geminiOptional": "Trong mô hình Gemini 3.1, ngân sách tư duy là tùy chọn.",
-  "modelInfo.rules.gptOssBudget": "Không có giới hạn thấp hơn về ngân sách tư duy; mô hình có thể chạy ổn định ngay cả với ngân sách là 1.",
-  "modelInfo.rules.gptxBudget": "Không có giới hạn thấp hơn đối với ngân sách x; mô hình có thể chạy ổn định ngay cả với ngân sách là 1.",
   "keys.table.budget": "Ngân sách",
   "keys.table.used": "Đã dùng",
   "common.unlimited": "Không giới hạn",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "Đã tạo vectơ nhúng!",
   "logs.toast.loadFailed": "Không thể tải nhật ký",
   "logs.toast.loadDetailsFailed": "Không thể tải chi tiết nhật ký",
-  "logs.toast.copied": "Đã sao chép tải trọng vào clipboard!",
-  "modelInfo.toast.fetchFailed": "Không tìm nạp được thông tin mô hình"
+  "logs.toast.copied": "Đã sao chép tải trọng vào clipboard!"
 }

@@ -21,7 +21,6 @@
   "nav.models": "Моделі",
   "nav.groups": "Групи",
   "nav.playground": "Пісочниця",
-  "nav.modelInfo": "Інформація про модель",
   "nav.settings": "Налаштування",
   "nav.signOut": "Вийти",
   "auth.title": "Панель Orion",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "Налаштування вбудовування",
   "playground.textToEmbed": "Текст для вбудовування",
   "playground.generateVector": "Згенерувати вектор",
-  "modelInfo.title": "Інформація про модель",
-  "modelInfo.description": "Правила та примітки на основі моделі",
-  "modelInfo.selectFamily": "Будь ласка, виберіть сімейство моделей зліва.",
-  "modelInfo.noRules": "Для цього сімейства не знайдено правил.",
-  "modelInfo.loading": "Завантаження сімейств...",
-  "modelInfo.noFamilies": "Сімейств не знайдено.",
-  "modelInfo.rules.gemmaBudget": "Збереження бюджету мислення нижче 50 може призвести до структурної деформації та безглуздого результату моделі.",
-  "modelInfo.rules.geminiBudget": "Коли мислення ввімкнено, бюджет має бути встановлено щонайменше на 1024 токени. Менші бюджети не підтримуються.",
-  "modelInfo.rules.geminiOptional": "У моделях Gemini 3.1 бюджет мислення необов’язковий.",
-  "modelInfo.rules.gptOssBudget": "Немає нижньої межі бюджету мислення; модель може стабільно працювати навіть при бюджеті 1.",
-  "modelInfo.rules.gptxBudget": "Немає нижньої межі бюджету x; модель може стабільно працювати навіть при бюджеті 1.",
   "keys.table.budget": "Бюджет",
   "keys.table.used": "Використано",
   "common.unlimited": "Безлімітно",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "Створено вектор вбудовування!",
   "logs.toast.loadFailed": "Не вдалося завантажити журнали",
   "logs.toast.loadDetailsFailed": "Не вдалося завантажити деталі журналу",
-  "logs.toast.copied": "Корисне навантаження скопійовано в буфер обміну!",
-  "modelInfo.toast.fetchFailed": "Не вдалося отримати інформацію про модель"
+  "logs.toast.copied": "Корисне навантаження скопійовано в буфер обміну!"
 }

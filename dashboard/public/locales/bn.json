@@ -21,7 +21,6 @@
   "nav.models": "মডেল",
   "nav.groups": "গ্রুপ",
   "nav.playground": "প্লেগ্রাউন্ড",
-  "nav.modelInfo": "মডেল তথ্য",
   "nav.settings": "সেটিংস",
   "nav.signOut": "সাইন আউট",
   "auth.title": "Orion ড্যাশবোর্ড",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "এমবেডিং সেটিংস",
   "playground.textToEmbed": "এমবেড করার টেক্সট",
   "playground.generateVector": "ভেক্টর তৈরি করুন",
-  "modelInfo.title": "মডেল তথ্য",
-  "modelInfo.description": "মডেল-ভিত্তিক নিয়ম ও নোট",
-  "modelInfo.selectFamily": "অনুগ্রহ করে বাম দিক থেকে একটি মডেল পরিবার বেছে নিন।",
-  "modelInfo.noRules": "এই পরিবারের জন্য কোনো নিয়ম পাওয়া যায়নি।",
-  "modelInfo.loading": "পরিবার লোড হচ্ছে...",
-  "modelInfo.noFamilies": "কোনো পরিবার পাওয়া যায়নি।",
-  "modelInfo.rules.gemmaBudget": "চিন্তার বাজেট ৫০-এর নিচে রাখলে মডেলের গঠনগত বিকৃতি এবং অর্থহীন আউটপুট হতে পারে।",
-  "modelInfo.rules.geminiBudget": "যখন চিন্তা করা সক্রিয় থাকে, তখন বাজেট অবশ্যই অন্তত ১০২৪ টোকেন হতে হবে। এর চেয়ে কম বাজেট সমর্থিত নয়।",
-  "modelInfo.rules.geminiOptional": "Gemini ৩.১ মডেলগুলিতে চিন্তার বাজেট ঐচ্ছিক।",
-  "modelInfo.rules.gptOssBudget": "চিন্তার বাজেটের কোনো নিম্ন সীমা নেই; এমনকি ১ বাজেট নির্ধারণ করলেও модельটি স্থিতিশীলভাবে চলতে পারে।",
-  "modelInfo.rules.gptxBudget": "x বাজেটের কোনো নিম্ন সীমা নেই; এমনকি ১ বাজেট নির্ধারণ করলেও মডেলটি স্থিতিশীলভাবে চলতে পারে।",
   "keys.table.budget": "বাজেট",
   "keys.table.used": "ব্যবহৃত",
   "common.unlimited": "অসীম",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "এমবেডিং ভেক্টর উত্পন্ন!",
   "logs.toast.loadFailed": "লগ লোড করতে ব্যর্থ হয়েছে",
   "logs.toast.loadDetailsFailed": "লগ বিবরণ লোড করতে ব্যর্থ",
-  "logs.toast.copied": "পেলোড ক্লিপবোর্ডে অনুলিপি করা হয়েছে!",
-  "modelInfo.toast.fetchFailed": "মডেল তথ্য আনা ব্যর্থ হয়েছে"
+  "logs.toast.copied": "পেলোড ক্লিপবোর্ডে অনুলিপি করা হয়েছে!"
 }

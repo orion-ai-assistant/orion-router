@@ -21,7 +21,6 @@
   "nav.models": "Model",
   "nav.groups": "Kumpulan",
   "nav.playground": "Taman Permainan",
-  "nav.modelInfo": "Info Model",
   "nav.settings": "Tetapan",
   "nav.signOut": "Log Keluar",
   "auth.title": "Papan Pemuka Orion",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "Tetapan Embedding",
   "playground.textToEmbed": "Teks untuk di-embed",
   "playground.generateVector": "Jana Vektor",
-  "modelInfo.title": "Info Model",
-  "modelInfo.description": "Peraturan dan nota berasaskan model",
-  "modelInfo.selectFamily": "Sila pilih keluarga model dari kiri.",
-  "modelInfo.noRules": "Tiada peraturan ditemui untuk keluarga ini.",
-  "modelInfo.loading": "Memuatkan keluarga...",
-  "modelInfo.noFamilies": "Tiada keluarga ditemui.",
-  "modelInfo.rules.gemmaBudget": "Mengekalkan belanjawan pemikiran di bawah 50 boleh membawa kepada ubah bentuk struktur dan output yang tidak masuk akal daripada model.",
-  "modelInfo.rules.geminiBudget": "Apabila pemikiran didayakan, belanjawan mesti ditetapkan kepada sekurang-kurangnya 1024 token. Belanjawan yang lebih rendah tidak disokong.",
-  "modelInfo.rules.geminiOptional": "Dalam model Gemini 3.1, belanjawan pemikiran adalah pilihan.",
-  "modelInfo.rules.gptOssBudget": "Tiada had yang lebih rendah pada belanjawan berfikir; model boleh berjalan dengan stabil walaupun dengan bajet 1.",
-  "modelInfo.rules.gptxBudget": "Tiada had yang lebih rendah pada bajet x; model boleh berjalan dengan stabil walaupun dengan bajet 1.",
   "keys.table.budget": "Belanjawan",
   "keys.table.used": "Digunakan",
   "common.unlimited": "Tanpa Had",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "Benamkan vektor dijana!",
   "logs.toast.loadFailed": "Gagal memuatkan log",
   "logs.toast.loadDetailsFailed": "Gagal memuatkan butiran log",
-  "logs.toast.copied": "Muatan disalin ke papan keratan!",
-  "modelInfo.toast.fetchFailed": "Gagal mengambil maklumat model"
+  "logs.toast.copied": "Muatan disalin ke papan keratan!"
 }

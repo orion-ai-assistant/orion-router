@@ -21,7 +21,6 @@
   "nav.models": "Mifano",
   "nav.groups": "Vikundi",
   "nav.playground": "Uwanja wa majaribio",
-  "nav.modelInfo": "Maelezo ya Mfano",
   "nav.settings": "Mipangilio",
   "nav.signOut": "Ondoka",
   "auth.title": "Dashboard ya Orion",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "Mipangilio ya Vichochezi",
   "playground.textToEmbed": "Maandishi ya uingizaji",
   "playground.generateVector": "Unda Vector",
-  "modelInfo.title": "Maelezo ya Mfano",
-  "modelInfo.description": "Sheria na maelezo kulingana na mfano",
-  "modelInfo.selectFamily": "Tafadhali chagua familia ya mfano kutoka kushoto.",
-  "modelInfo.noRules": "Hakuna sheria zilizopatikana kwa familia hii.",
-  "modelInfo.loading": "Inapakia familia...",
-  "modelInfo.noFamilies": "Hakuna familia zilizopatikana.",
-  "modelInfo.rules.gemmaBudget": "Kuweka bajeti ya kufikiri chini ya 50 kunaweza kusababisha deformation ya muundo na matokeo yasiyo ya maana kutoka kwa mfano.",
-  "modelInfo.rules.geminiBudget": "Wakati kufikiria kumewezeshwa, bajeti lazima iwekwe kwa angalau tokeni 1024. Bajeti za chini hazitumiki.",
-  "modelInfo.rules.geminiOptional": "Katika mifano ya Gemini 3.1, bajeti ya kufikiri ni ya hiari.",
-  "modelInfo.rules.gptOssBudget": "Hakuna kikomo cha chini kwenye bajeti ya kufikiria; mfano unaweza kukimbia kwa utulivu hata kwa bajeti ya 1.",
-  "modelInfo.rules.gptxBudget": "Hakuna kikomo cha chini kwenye bajeti ya x; mfano unaweza kukimbia kwa utulivu hata kwa bajeti ya 1.",
   "keys.table.budget": "Bajeti",
   "keys.table.used": "Imetumika",
   "common.unlimited": "Bila Kikomo",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "Vekta ya kupachika imezalishwa!",
   "logs.toast.loadFailed": "Imeshindwa kupakia kumbukumbu",
   "logs.toast.loadDetailsFailed": "Imeshindwa kupakia maelezo ya kumbukumbu",
-  "logs.toast.copied": "Upakiaji umenakiliwa kwenye ubao wa kunakili!",
-  "modelInfo.toast.fetchFailed": "Imeshindwa kuleta maelezo ya muundo"
+  "logs.toast.copied": "Upakiaji umenakiliwa kwenye ubao wa kunakili!"
 }

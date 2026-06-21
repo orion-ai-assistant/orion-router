@@ -21,7 +21,6 @@
   "nav.models": "Модели",
   "nav.groups": "Групи",
   "nav.playground": "Пясъчник",
-  "nav.modelInfo": "Информация за модела",
   "nav.settings": "Настройки",
   "nav.signOut": "Изход",
   "auth.title": "Orion Табло",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "Настройки за вграждане",
   "playground.textToEmbed": "Текст за вграждане",
   "playground.generateVector": "Генерирай вектор",
-  "modelInfo.title": "Информация за модела",
-  "modelInfo.description": "Правила и бележки базирани на модела",
-  "modelInfo.selectFamily": "Моля, изберете семейство модели от ляво.",
-  "modelInfo.noRules": "Не са намерени правила за това семейство.",
-  "modelInfo.loading": "Зарежда семейства...",
-  "modelInfo.noFamilies": "Не са намерени семейства.",
-  "modelInfo.rules.gemmaBudget": "Поддържането на бюджета за мислене под 50 може да доведе до структурни деформации и безсмислени резултати от модела.",
-  "modelInfo.rules.geminiBudget": "Когато мисленето е активирано, бюджетът трябва да бъде зададен на поне 1024 токена. По-ниски бюджети не се поддържат.",
-  "modelInfo.rules.geminiOptional": "При моделите Gemini 3.1 бюджетът за мислене е по избор.",
-  "modelInfo.rules.gptOssBudget": "Няма долна граница за бюджета за мислене; моделът може да работи стабилно дори с бюджет от 1.",
-  "modelInfo.rules.gptxBudget": "Няма долна граница за x бюджета; моделът може да работи стабилно дори с бюджет от 1.",
   "keys.table.budget": "Бюджет",
   "keys.table.used": "Използван",
   "common.unlimited": "Неограничен",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "Генериран вектор за вграждане!",
   "logs.toast.loadFailed": "Неуспешно зареждане на регистрационни файлове",
   "logs.toast.loadDetailsFailed": "Неуспешно зареждане на подробности за регистрационния файл",
-  "logs.toast.copied": "Полезният товар е копиран в клипборда!",
-  "modelInfo.toast.fetchFailed": "Неуспешно извличане на информация за модела"
+  "logs.toast.copied": "Полезният товар е копиран в клипборда!"
 }

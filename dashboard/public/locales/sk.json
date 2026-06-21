@@ -21,7 +21,6 @@
   "nav.models": "Modely",
   "nav.groups": "Skupiny",
   "nav.playground": "Ihrisko",
-  "nav.modelInfo": "Informácie o modeli",
   "nav.settings": "Nastavenia",
   "nav.signOut": "Odhlásiť sa",
   "auth.title": "Orion Dashboard",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "Nastavenia vektorov",
   "playground.textToEmbed": "Text na vektorizáciu",
   "playground.generateVector": "Generovať vektor",
-  "modelInfo.title": "Informácie o modeli",
-  "modelInfo.description": "Pravidlá a poznámky týkajúce sa modelov",
-  "modelInfo.selectFamily": "Vyberte rodinu modelov zľava.",
-  "modelInfo.noRules": "Pre túto rodinu neboli nájdené žiadne pravidlá.",
-  "modelInfo.loading": "Načítavajú sa rodiny...",
-  "modelInfo.noFamilies": "Nenašli sa žiadne rodiny.",
-  "modelInfo.rules.gemmaBudget": "Udržiavanie rozpočtu na myslenie pod 50 môže viesť k štrukturálnej deformácii a nezmyselnému výstupu z modelu.",
-  "modelInfo.rules.geminiBudget": "Keď je myslenie povolené, rozpočet musí byť nastavený na minimálne 1024 tokenov. Nižšie rozpočty nie sú podporované.",
-  "modelInfo.rules.geminiOptional": "V modeloch Gemini 3.1 je rozpočet na myslenie voliteľný.",
-  "modelInfo.rules.gptOssBudget": "Neexistuje žiadna spodná hranica rozpočtu na myslenie; model môže fungovať stabilne aj s rozpočtom 1.",
-  "modelInfo.rules.gptxBudget": "Neexistuje žiadny spodný limit rozpočtu x; model môže fungovať stabilne aj s rozpočtom 1.",
   "keys.table.budget": "Rozpočet",
   "keys.table.used": "Použité",
   "common.unlimited": "Neobmedzene",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "Vygenerovaný vektor vkladania!",
   "logs.toast.loadFailed": "Nepodarilo sa načítať denníky",
   "logs.toast.loadDetailsFailed": "Nepodarilo sa načítať podrobnosti denníka",
-  "logs.toast.copied": "Užitočné zaťaženie bolo skopírované do schránky!",
-  "modelInfo.toast.fetchFailed": "Nepodarilo sa načítať informácie o modeli"
+  "logs.toast.copied": "Užitočné zaťaženie bolo skopírované do schránky!"
 }

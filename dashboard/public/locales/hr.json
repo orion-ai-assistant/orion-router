@@ -21,7 +21,6 @@
   "nav.models": "Modeli",
   "nav.groups": "Grupe",
   "nav.playground": "Igralište",
-  "nav.modelInfo": "Informacije o modelu",
   "nav.settings": "Postavke",
   "nav.signOut": "Odjava",
   "auth.title": "Orion Nadzorna ploča",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "Postavke ugradnje",
   "playground.textToEmbed": "Tekst za ugradnju",
   "playground.generateVector": "Generiraj vektor",
-  "modelInfo.title": "Informacije o modelu",
-  "modelInfo.description": "Pravila i napomene temeljene na modelu",
-  "modelInfo.selectFamily": "Odaberite obitelj modela s lijeve strane.",
-  "modelInfo.noRules": "Za ovu obitelj nisu pronađena pravila.",
-  "modelInfo.loading": "Učitavanje obitelji...",
-  "modelInfo.noFamilies": "Nisu pronađene obitelji.",
-  "modelInfo.rules.gemmaBudget": "Držanje proračuna za razmišljanje ispod 50 može dovesti do strukturalnih deformacija i besmislenih rezultata modela.",
-  "modelInfo.rules.geminiBudget": "Kada je razmišljanje omogućeno, proračun mora biti postavljen na najmanje 1024 tokena. Manji proračuni nisu podržani.",
-  "modelInfo.rules.geminiOptional": "Kod modela Gemini 3.1, proračun za razmišljanje je neobavezan.",
-  "modelInfo.rules.gptOssBudget": "Ne postoji donja granica za proračun za razmišljanje; model može raditi stabilno čak i s proračunom 1.",
-  "modelInfo.rules.gptxBudget": "Ne postoji donja granica za x proračun; model može raditi stabilno čak i s proračunom 1.",
   "keys.table.budget": "Proračun",
   "keys.table.used": "Iskorišteno",
   "common.unlimited": "Neograničeno",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "Vektor za ugrađivanje generiran!",
   "logs.toast.loadFailed": "Učitavanje zapisa nije uspjelo",
   "logs.toast.loadDetailsFailed": "Učitavanje pojedinosti dnevnika nije uspjelo",
-  "logs.toast.copied": "Korisni teret kopiran u međuspremnik!",
-  "modelInfo.toast.fetchFailed": "Dohvaćanje informacija o modelu nije uspjelo"
+  "logs.toast.copied": "Korisni teret kopiran u međuspremnik!"
 }

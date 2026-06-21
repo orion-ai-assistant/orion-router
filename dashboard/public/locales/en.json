@@ -21,7 +21,6 @@
   "nav.models": "Models",
   "nav.groups": "Groups",
   "nav.playground": "Playground",
-  "nav.modelInfo": "Model Info",
   "nav.settings": "Settings",
   "nav.signOut": "Sign Out",
   "auth.title": "Orion Dashboard",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "Embedding Settings",
   "playground.textToEmbed": "Text to embed",
   "playground.generateVector": "Generate Vector",
-  "modelInfo.title": "Model Info",
-  "modelInfo.description": "Model-based rules and notes",
-  "modelInfo.selectFamily": "Please select a model family from the left.",
-  "modelInfo.noRules": "No rules found for this family.",
-  "modelInfo.loading": "Loading families...",
-  "modelInfo.noFamilies": "No families found.",
-  "modelInfo.rules.gemmaBudget": "Keeping the thinking budget below 50 may lead to structural deformation and nonsensical output from the model.",
-  "modelInfo.rules.geminiBudget": "When thinking is enabled, the budget must be set to at least 1024 tokens. Lower budgets are not supported.",
-  "modelInfo.rules.geminiOptional": "In Gemini 3.1 models, the thinking budget is optional.",
-  "modelInfo.rules.gptOssBudget": "There is no lower limit on the thinking budget; the model can run stably even with a budget of 1.",
-  "modelInfo.rules.gptxBudget": "There is no lower limit on the x budget; the model can run stably even with a budget of 1.",
   "keys.table.budget": "Budget",
   "keys.table.used": "Used",
   "common.unlimited": "Unlimited",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "Embedding vector generated!",
   "logs.toast.loadFailed": "Failed to load logs",
   "logs.toast.loadDetailsFailed": "Failed to load log details",
-  "logs.toast.copied": "Payload copied to clipboard!",
-  "modelInfo.toast.fetchFailed": "Failed to fetch model info"
+  "logs.toast.copied": "Payload copied to clipboard!"
 }

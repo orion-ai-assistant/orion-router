@@ -21,7 +21,6 @@
   "nav.models": "Modeli",
   "nav.groups": "Grupe",
   "nav.playground": "Igralište",
-  "nav.modelInfo": "Informacije o modelu",
   "nav.settings": "Podešavanja",
   "nav.signOut": "Odjavi se",
   "auth.title": "Orion kontrolna tabla",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "Podešavanja ugrađivanja",
   "playground.textToEmbed": "Tekst za ugrađivanje",
   "playground.generateVector": "Generiši vektor",
-  "modelInfo.title": "Informacije o modelu",
-  "modelInfo.description": "Pravila i napomene zasnovane na modelu",
-  "modelInfo.selectFamily": "Izaberite porodicu modela sa leve strane.",
-  "modelInfo.noRules": "Nisu pronađena pravila za ovu porodicu.",
-  "modelInfo.loading": "Učitavanje porodica...",
-  "modelInfo.noFamilies": "Nisu pronađene porodice.",
-  "modelInfo.rules.gemmaBudget": "Одржавање буџета за размишљање испод 50 може довести до структурне деформације и бесмисленог резултата модела.",
-  "modelInfo.rules.geminiBudget": "Када је размишљање омогућено, буџет мора бити подешен на најмање 1024 токена. Нижи буџети нису подржани.",
-  "modelInfo.rules.geminiOptional": "У Гемини 3.1 моделима, буџет за размишљање је опционалан.",
-  "modelInfo.rules.gptOssBudget": "Не постоји доња граница у буџету за размишљање; модел може да ради стабилно чак и са буџетом од 1.",
-  "modelInfo.rules.gptxBudget": "Не постоји доња граница за к буџет; модел може да ради стабилно чак и са буџетом од 1.",
   "keys.table.budget": "Budžet",
   "keys.table.used": "Iskorišćeno",
   "common.unlimited": "Neograničeno",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "Вектор за уграђивање је генерисан!",
   "logs.toast.loadFailed": "Учитавање евиденције није успело",
   "logs.toast.loadDetailsFailed": "Учитавање детаља дневника није успело",
-  "logs.toast.copied": "Корисно оптерећење је копирано у међуспремник!",
-  "modelInfo.toast.fetchFailed": "Преузимање информација о моделу није успело"
+  "logs.toast.copied": "Корисно оптерећење је копирано у међуспремник!"
 }

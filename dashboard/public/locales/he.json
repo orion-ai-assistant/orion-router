@@ -21,7 +21,6 @@
   "nav.models": "מודלים",
   "nav.groups": "קבוצות",
   "nav.playground": "מגרש משחקים",
-  "nav.modelInfo": "מידע מודל",
   "nav.settings": "הגדרות",
   "nav.signOut": "התנתק",
   "auth.title": "לוח הבקרה Orion",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "הגדרות הטמעה",
   "playground.textToEmbed": "טקסט להטמעה",
   "playground.generateVector": "צור וקטור",
-  "modelInfo.title": "מידע מודל",
-  "modelInfo.description": "כללים והערות מבוססי מודל",
-  "modelInfo.selectFamily": "אנא בחר משפחת מודלים מהצד השמאלי.",
-  "modelInfo.noRules": "לא נמצאו כללים עבור משפחה זו.",
-  "modelInfo.loading": "טוען משפחות...",
-  "modelInfo.noFamilies": "לא נמצאו משפחות.",
-  "modelInfo.rules.gemmaBudget": "שמירה על תקציב חשיבה מתחת ל-50 עלולה להוביל לעיוותים מבניים ולפלט חסר משמעות מהמודל.",
-  "modelInfo.rules.geminiBudget": "כאשר חשיבה מופעלת, יש להגדיר את התקציב ל-1024 אסימונים לפחות. תקציבים נמוכים יותר אינם נתמכים.",
-  "modelInfo.rules.geminiOptional": "במודלים של Gemini 3.1, תקציב החשיבה הוא אופציונלי.",
-  "modelInfo.rules.gptOssBudget": "אין גבול תחתون לתקציב החשיבה; המודל יכול לפעול ביציבות אפילו עם תקציב של 1.",
-  "modelInfo.rules.gptxBudget": "אין גבול תחתون לתקציב x; המודל יכול לפעול ביציבות אפילו עם תקציב של 1.",
   "keys.table.budget": "תקציב",
   "keys.table.used": "בשימוש",
   "common.unlimited": "ללא הגבלה",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "וקטור הטבעה נוצר!",
   "logs.toast.loadFailed": "טעינת היומנים נכשלה",
   "logs.toast.loadDetailsFailed": "טעינת פרטי היומן נכשלה",
-  "logs.toast.copied": "מטען הועתק ללוח!",
-  "modelInfo.toast.fetchFailed": "אחזור פרטי הדגם נכשל"
+  "logs.toast.copied": "מטען הועתק ללוח!"
 }

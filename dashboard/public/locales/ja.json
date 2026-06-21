@@ -21,7 +21,6 @@
   "nav.models": "モデル",
   "nav.groups": "グループ",
   "nav.playground": "プレイグラウンド",
-  "nav.modelInfo": "モデル情報",
   "nav.settings": "設定",
   "nav.signOut": "サインアウト",
   "auth.title": "Orion ダッシュボード",
@@ -134,17 +133,6 @@
   "playground.embeddingSettings": "埋め込み設定",
   "playground.textToEmbed": "埋め込むテキスト",
   "playground.generateVector": "ベクターを生成",
-  "modelInfo.title": "モデル情報",
-  "modelInfo.description": "モデルに基づくルールとメモ",
-  "modelInfo.selectFamily": "左からモデルファミリーを選択してください。",
-  "modelInfo.noRules": "このファミリーのルールが見つかりません。",
-  "modelInfo.loading": "ファミリーを読み込み中...",
-  "modelInfo.noFamilies": "ファミリーが見つかりません。",
-  "modelInfo.rules.gemmaBudget": "思考バジェットを50未満に設定すると、モデルの構造的崩壊や不合理な出力が発生する可能性があります。",
-  "modelInfo.rules.geminiBudget": "思考機能が有効な場合、バジェットは少なくとも1024トークンに設定する必要があります。これ未満のバジェットはサポートされていません。",
-  "modelInfo.rules.geminiOptional": "Gemini 3.1モデルでは、思考バジェットは任意です。",
-  "modelInfo.rules.gptOssBudget": "思考バジェットに下限はありません。バジェットが1であっても、モデルは安定して動作します。",
-  "modelInfo.rules.gptxBudget": "xバジェットに下限はありません。バジェットが1であっても、モデルは安定して動作します。",
   "keys.table.budget": "予算",
   "keys.table.used": "使用量",
   "common.unlimited": "無制限",
@@ -282,6 +270,5 @@
   "playground.toast.embeddingSuccess": "埋め込みベクトルが生成されました!",
   "logs.toast.loadFailed": "ログのロードに失敗しました",
   "logs.toast.loadDetailsFailed": "ログの詳細をロードできませんでした",
-  "logs.toast.copied": "ペイロードがクリップボードにコピーされました!",
-  "modelInfo.toast.fetchFailed": "モデル情報の取得に失敗しました"
+  "logs.toast.copied": "ペイロードがクリップボードにコピーされました!"
 }
