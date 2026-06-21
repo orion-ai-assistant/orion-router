@@ -24,8 +24,7 @@ services:
       - ADMIN_SECRET=${ADMIN_SECRET:-orion}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY} # Restart'larda API key'lerin bozulmaması için şart
       - CLI_LANG=${CLI_LANG:-en}
-      - OPENROUTER_REFERER=${OPENROUTER_REFERER:-https://github.com/krstalacam/orion-router}
-      - OPENROUTER_TITLE=${OPENROUTER_TITLE:-Orion Router}
+
     networks:
       - orion-network
     depends_on:
