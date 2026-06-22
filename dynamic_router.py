@@ -180,9 +180,11 @@ class DynamicLLMRouter:
         """
         BASE_CLASSES = (BaseChat, BaseEmbed, BaseTTS, BaseFileUpload)
 
-        def _register(obj):
+        def _register(obj, default_name: str):
             """Bir sınıfı ilgili provider sözlüğüne kaydeder."""
             pname = getattr(obj, "provider_name", None)
+            if not pname:
+                pname = default_name
             if not pname:
                 return
 
@@ -245,7 +247,7 @@ class DynamicLLMRouter:
                     if not any(issubclass(obj, bc) for bc in BASE_CLASSES):
                         continue
                     seen_classes.add(obj)
-                    _register(obj)
+                    _register(obj, name)
 
 
     def _get_db_key(self, provider: str) -> str | None:
@@ -443,7 +445,7 @@ class DynamicLLMRouter:
 
     async def run_combo(
         self,
-        provider: str,
+        provider: str | None,
         model: str,
         messages: list[dict[str, Any]],
         api_key: str | None = None,
@@ -588,7 +590,7 @@ class DynamicLLMRouter:
 
     async def run_embeddings(
         self,
-        provider: str,
+        provider: str | None,
         model: str,
         input_text: str | list[str],
         api_key: str | None = None,
@@ -707,7 +709,7 @@ class DynamicLLMRouter:
 
     async def run_speech(
         self,
-        provider: str,
+        provider: str | None,
         model: str,
         input_text: str,
         voice: str | None = None,

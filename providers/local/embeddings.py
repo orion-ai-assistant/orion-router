@@ -16,7 +16,7 @@ logger = logging.getLogger("service-router.local.embed")
 
 
 class LocalEmbedProvider(BaseEmbed):
-    provider_name = "local"
+
 
     async def generate_embeddings(
         self,

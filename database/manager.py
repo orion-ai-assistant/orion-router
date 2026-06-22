@@ -157,6 +157,7 @@ class DatabaseManager:
         )
         await conn.execute("ALTER TABLE router_models ADD COLUMN IF NOT EXISTS thinking_level TEXT;")
         await conn.execute("ALTER TABLE router_models ADD COLUMN IF NOT EXISTS system_prompt TEXT;")
+        await conn.execute("ALTER TABLE router_models ADD COLUMN IF NOT EXISTS default_config JSONB DEFAULT '{}'::jsonb;")
         await conn.execute(
             """
             CREATE TABLE IF NOT EXISTS router_model_groups (

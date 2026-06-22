@@ -14,7 +14,7 @@ _BASE_URL = "https://openrouter.ai"
 
 
 class OpenRouterChatProvider(BaseChat):
-    provider_name = "openrouter"
+
 
     async def stream_chat(
         self,

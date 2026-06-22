@@ -25,7 +25,7 @@ async def chat_completions(
 ):
     """OpenAI uyumlu chat completions endpoint'i (yalnızca streaming)."""
     # --- Başlıkları parse et ---
-    provider = request.headers.get("x-orion-provider", "local")
+    provider = request.headers.get("x-orion-provider")
     api_key = request.headers.get("x-orion-api-key")
     auth_header = request.headers.get("authorization")
 

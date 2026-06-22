@@ -25,6 +25,7 @@ interface ModelItem {
   think_price: number | string;
   thinking_level?: string | null;
   system_prompt?: string | null;
+  default_config?: Record<string, any>;
   _original?: {
     name: string;
     provider: string;
@@ -36,7 +37,77 @@ interface ModelItem {
     think_price: number;
     thinking_level?: string | null;
     system_prompt?: string | null;
+    default_config?: Record<string, any>;
   };
+}
+
+class TTSDefaultConfig {
+  voice: string;
+  gender: string;
+  age: string;
+  pitch: string;
+  style: string;
+  accent: string;
+  language: string;
+  speed: string;
+  steps: string;
+  seed: string;
+
+  constructor(data?: Partial<TTSDefaultConfig>) {
+    this.voice = data?.voice || '';
+    this.gender = data?.gender || 'Auto';
+    this.age = data?.age || 'Auto';
+    this.pitch = data?.pitch || 'Auto';
+    this.style = data?.style || 'Auto';
+    this.accent = data?.accent || 'Auto';
+    this.language = data?.language || 'Auto';
+    this.speed = data?.speed ? String(data.speed) : '';
+    this.steps = data?.steps ? String(data.steps) : '';
+    this.seed = data?.seed ? String(data.seed) : '';
+  }
+
+  static fromObject(obj: any): TTSDefaultConfig {
+    if (!obj) {
+      return new TTSDefaultConfig();
+    }
+    if (typeof obj === 'string') {
+      try {
+        obj = JSON.parse(obj);
+      } catch (e) {
+        return new TTSDefaultConfig();
+      }
+    }
+    if (typeof obj !== 'object') {
+      return new TTSDefaultConfig();
+    }
+    return new TTSDefaultConfig({
+      voice: obj.voice,
+      gender: obj.gender,
+      age: obj.age,
+      pitch: obj.pitch,
+      style: obj.style,
+      accent: obj.accent,
+      language: obj.language,
+      speed: obj.speed,
+      steps: obj.steps,
+      seed: obj.seed,
+    });
+  }
+
+  toObject(): Record<string, any> {
+    const obj: Record<string, any> = {};
+    if (this.voice) obj.voice = this.voice;
+    if (this.gender && this.gender !== 'Auto') obj.gender = this.gender;
+    if (this.age && this.age !== 'Auto') obj.age = this.age;
+    if (this.pitch && this.pitch !== 'Auto') obj.pitch = this.pitch;
+    if (this.style && this.style !== 'Auto') obj.style = this.style;
+    if (this.accent && this.accent !== 'Auto') obj.accent = this.accent;
+    if (this.language && this.language !== 'Auto') obj.language = this.language;
+    if (this.speed) obj.speed = this.speed;
+    if (this.steps) obj.steps = this.steps;
+    if (this.seed) obj.seed = this.seed;
+    return obj;
+  }
 }
 
 const formatPriceForInput = (val: number | string | null | undefined): string => {
@@ -66,6 +137,8 @@ export default function ModelsPage() {
   const { showToast, confirmAction, t } = useApp();
   const [models, setModels] = useState<ModelItem[]>([]);
   const [providers, setProviders] = useState<string[]>([]);
+  const [voicesByProvider, setVoicesByProvider] = useState<Record<string, string[]>>({});
+  const [languagesByProvider, setLanguagesByProvider] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState<boolean>(true);
 
   // Modals visibility
@@ -83,6 +156,7 @@ export default function ModelsPage() {
     think_price: '0' as string | number,
     thinking_level: '',
     system_prompt: '',
+    default_config: {} as Record<string, any>,
   });
 
   const [editingModel, setEditingModel] = useState<ModelItem>({
@@ -99,6 +173,9 @@ export default function ModelsPage() {
     system_prompt: null,
   });
 
+  const [showAddTtsDefaults, setShowAddTtsDefaults] = useState(false);
+  const [showEditTtsDefaults, setShowEditTtsDefaults] = useState(false);
+
   const loadProviders = async () => {
     try {
       const res = await adminFetch('/dashboard/api/providers');
@@ -112,6 +189,30 @@ export default function ModelsPage() {
       }
     } catch (e) {
       console.error('Failed to load providers:', e);
+    }
+  };
+
+  const loadVoices = async () => {
+    try {
+      const res = await adminFetch('/dashboard/api/voices');
+      if (res.ok) {
+        const data = await res.json();
+        setVoicesByProvider(data.voices || {});
+      }
+    } catch (e) {
+      console.error('Failed to load voices:', e);
+    }
+  };
+
+  const loadLanguages = async () => {
+    try {
+      const res = await adminFetch('/dashboard/api/tts-languages');
+      if (res.ok) {
+        const data = await res.json();
+        setLanguagesByProvider(data.languages || {});
+      }
+    } catch (e) {
+      console.error('Failed to load languages:', e);
     }
   };
 
@@ -131,6 +232,7 @@ export default function ModelsPage() {
           const think_price = model.think_price || 0;
           const thinking_level = model.thinking_level || null;
           const system_prompt = model.system_prompt || null;
+          const default_config = TTSDefaultConfig.fromObject(model.default_config).toObject();
 
           return {
             ...model,
@@ -144,6 +246,7 @@ export default function ModelsPage() {
             think_price,
             thinking_level,
             system_prompt,
+            default_config,
             _original: {
               name,
               provider,
@@ -155,6 +258,7 @@ export default function ModelsPage() {
               think_price,
               thinking_level,
               system_prompt,
+              default_config,
             },
           };
         });
@@ -171,6 +275,8 @@ export default function ModelsPage() {
   useEffect(() => {
     const initData = async () => {
       await loadProviders();
+      await loadVoices();
+      await loadLanguages();
       await loadModels();
     };
     initData();
@@ -198,10 +304,39 @@ export default function ModelsPage() {
     return groups;
   }, [models]);
 
+  const getAvailableVoices = (provider: string) => {
+    let nextVoices: string[] = [];
+    if (provider && voicesByProvider[provider]) {
+      nextVoices = voicesByProvider[provider].filter(v => v.toLowerCase() !== 'none');
+    }
+    return nextVoices;
+  };
+
+  const getAvailableLanguages = (provider: string) => {
+    if (provider && languagesByProvider[provider]) {
+      return languagesByProvider[provider];
+    }
+    return [];
+  };
+
   const normalizeTemperature = (value: string | number | null | undefined): number | null => {
     if (value === '' || value === null || value === undefined) return null;
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const updateDefaultConfig = (
+    formState: any,
+    setFormState: Function,
+    key: keyof TTSDefaultConfig,
+    value: any
+  ) => {
+    const config = TTSDefaultConfig.fromObject(formState.default_config);
+    (config as any)[key] = value;
+    setFormState({
+      ...formState,
+      default_config: config.toObject()
+    });
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -222,6 +357,18 @@ export default function ModelsPage() {
     }
 
     try {
+      let configObj = {};
+      if (capability === 'tts') {
+        const config = TTSDefaultConfig.fromObject(addForm.default_config);
+        if (!config.voice && provider !== 'local') {
+          const providerVoices = getAvailableVoices(provider);
+          if (providerVoices.length > 0) {
+            config.voice = providerVoices[0];
+          }
+        }
+        configObj = config.toObject();
+      }
+
       const res = await adminFetch('/dashboard/api/models', {
         method: 'POST',
         body: JSON.stringify({
@@ -235,6 +382,7 @@ export default function ModelsPage() {
           think_price: parseFloat(addForm.think_price as string) || 0,
           thinking_level: addForm.thinking_level || null,
           system_prompt: addForm.system_prompt || null,
+          default_config: configObj,
         }),
       });
       if (res.ok) {
@@ -248,6 +396,7 @@ export default function ModelsPage() {
           think_price: '0',
           thinking_level: '',
           system_prompt: '',
+          default_config: {},
         });
         setShowAddModal(false);
         showToast(t('models.toast.addSuccess'));
@@ -279,6 +428,18 @@ export default function ModelsPage() {
     }
 
     try {
+      let configObj = {};
+      if (editingModel.capability === 'tts') {
+        const config = TTSDefaultConfig.fromObject(editingModel.default_config);
+        if (!config.voice && provider !== 'local') {
+          const providerVoices = getAvailableVoices(provider);
+          if (providerVoices.length > 0) {
+            config.voice = providerVoices[0];
+          }
+        }
+        configObj = config.toObject();
+      }
+
       const res = await adminFetch(`/dashboard/api/models/${editingModel.id}`, {
         method: 'PUT',
         body: JSON.stringify({
@@ -292,6 +453,7 @@ export default function ModelsPage() {
           think_price: parseFloat(editingModel.think_price as string) || 0,
           thinking_level: editingModel.thinking_level || null,
           system_prompt: editingModel.system_prompt || null,
+          default_config: configObj,
         }),
       });
       if (res.ok) {
@@ -345,7 +507,8 @@ export default function ModelsPage() {
       Number(model.output_price || 0) !== Number(model._original.output_price || 0) ||
       Number(model.think_price || 0) !== Number(model._original.think_price || 0) ||
       (model.thinking_level || null) !== (model._original.thinking_level || null) ||
-      (model.system_prompt || null) !== (model._original.system_prompt || null)
+      (model.system_prompt || null) !== (model._original.system_prompt || null) ||
+      JSON.stringify(model.default_config || {}) !== JSON.stringify(model._original.default_config || {})
     );
   };
 
@@ -357,7 +520,222 @@ export default function ModelsPage() {
       output_price: formatPriceForInput(model.output_price),
       think_price: formatPriceForInput(model.think_price),
     });
+    setShowEditTtsDefaults(false);
     setShowEditModal(true);
+  };
+
+  const renderTtsDefaults = (formState: any, setFormState: Function, showDefaults: boolean, setShowDefaults: Function) => {
+    if (formState.capability !== 'tts') return null;
+
+    const voices = getAvailableVoices(formState.provider);
+    const languages = getAvailableLanguages(formState.provider);
+    const hasPersona = !!formState.default_config?.voice;
+    const isLocal = formState.provider === 'local';
+
+    return (
+      <div className="flex flex-col gap-2">
+        <button
+          type="button"
+          onClick={() => setShowDefaults(!showDefaults)}
+          className="flex items-center justify-between text-left text-zinc-300 text-[11px] font-semibold uppercase tracking-wider py-1.5 cursor-pointer hover:text-white transition-colors w-full border-t border-zinc-800 pt-3"
+        >
+          <span>🎛️ TTS Ayarları (Varsayılan)</span>
+          <span className="text-[10px]">{showDefaults ? '▼' : '►'}</span>
+        </button>
+
+        {showDefaults && (
+          <div className="flex flex-col gap-3 pl-2 border-l border-zinc-800">
+            <div className="flex flex-col gap-1">
+              <label className="text-zinc-500 text-[11px] font-medium">Voice Persona (Kişi)</label>
+              {voices.length > 0 ? (
+                <div className="custom-select-wrapper select-wrapper w-full">
+                  <select
+                    value={formState.default_config?.voice || (isLocal ? '' : (voices[0] || ''))}
+                    onChange={(e) => updateDefaultConfig(formState, setFormState, 'voice', e.target.value)}
+                    className="orion-native-select"
+                  >
+                    {isLocal && <option value="">None</option>}
+                    {voices.map((v) => (
+                      <option key={v} value={v}>{v}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <Input
+                  value={formState.default_config?.voice || ''}
+                  onChange={(e) => updateDefaultConfig(formState, setFormState, 'voice', e.target.value)}
+                  placeholder="alloy, nova, vs."
+                  className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs"
+                />
+              )}
+            </div>
+
+            {isLocal && (
+              <>
+                <div className={`flex flex-col gap-3 ${hasPersona ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-zinc-400 text-[10px] font-semibold uppercase">🎭 Karakter Tasarımı</span>
+                    {hasPersona && (
+                      <span className="text-[8px] text-zinc-600 font-medium bg-black/40 px-1 py-0.5 rounded border border-zinc-800 normal-case">Persona Aktif</span>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-zinc-500 text-[10px]">Cinsiyet (Gender)</label>
+                      <div className="custom-select-wrapper select-wrapper w-full">
+                        <select
+                          value={formState.default_config?.gender || 'Auto'}
+                          onChange={(e) => updateDefaultConfig(formState, setFormState, 'gender', e.target.value)}
+                          className="orion-native-select orion-native-select-sm"
+                        >
+                          <option value="Auto">Auto</option>
+                          <option value="male">male (Erkek)</option>
+                          <option value="female">female (Kadın)</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-zinc-500 text-[10px]">Yaş Grubu (Age)</label>
+                      <div className="custom-select-wrapper select-wrapper w-full">
+                        <select
+                          value={formState.default_config?.age || 'Auto'}
+                          onChange={(e) => updateDefaultConfig(formState, setFormState, 'age', e.target.value)}
+                          className="orion-native-select orion-native-select-sm"
+                        >
+                          <option value="Auto">Auto</option>
+                          <option value="child">child (Çocuk)</option>
+                          <option value="teenager">teenager (Genç)</option>
+                          <option value="young adult">young adult (Genç Yt.)</option>
+                          <option value="middle-aged">middle-aged (Orta)</option>
+                          <option value="elderly">elderly (Yaşlı)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-zinc-500 text-[10px]">Ton (Pitch)</label>
+                      <div className="custom-select-wrapper select-wrapper w-full">
+                        <select
+                          value={formState.default_config?.pitch || 'Auto'}
+                          onChange={(e) => updateDefaultConfig(formState, setFormState, 'pitch', e.target.value)}
+                          className="orion-native-select orion-native-select-sm"
+                        >
+                          <option value="Auto">Auto</option>
+                          <option value="very high pitch">very high (Çok Tiz)</option>
+                          <option value="high pitch">high (Tiz)</option>
+                          <option value="moderate pitch">moderate (Normal)</option>
+                          <option value="low pitch">low (Pes)</option>
+                          <option value="very low pitch">very low (Çok Pes)</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-zinc-500 text-[10px]">Stil (Style)</label>
+                      <div className="custom-select-wrapper select-wrapper w-full">
+                        <select
+                          value={formState.default_config?.style || 'Auto'}
+                          onChange={(e) => updateDefaultConfig(formState, setFormState, 'style', e.target.value)}
+                          className="orion-native-select orion-native-select-sm"
+                        >
+                          <option value="Auto">Auto</option>
+                          <option value="whisper">whisper (Fısıltı)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-zinc-500 text-[10px]">Aksan (Accent)</label>
+                    <div className="custom-select-wrapper select-wrapper w-full">
+                      <select
+                        value={formState.default_config?.accent || 'Auto'}
+                        onChange={(e) => updateDefaultConfig(formState, setFormState, 'accent', e.target.value)}
+                        className="orion-native-select orion-native-select-sm"
+                      >
+                        <option value="Auto">Auto</option>
+                        <option value="american accent">american accent</option>
+                        <option value="australian accent">australian accent</option>
+                        <option value="british accent">british accent</option>
+                        <option value="canadian accent">canadian accent</option>
+                        <option value="chinese accent">chinese accent</option>
+                        <option value="indian accent">indian accent</option>
+                        <option value="japanese accent">japanese accent</option>
+                        <option value="korean accent">korean accent</option>
+                        <option value="portuguese accent">portuguese accent</option>
+                        <option value="russian accent">russian accent</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-zinc-800/50">
+                  <span className="text-zinc-400 text-[10px] font-semibold uppercase">⚙️ Gelişmiş Ayarlar</span>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-zinc-500 text-[11px] font-medium">Dil (Language)</label>
+                  {languages.length > 0 ? (
+                    <div className="custom-select-wrapper select-wrapper w-full">
+                      <select
+                        value={formState.default_config?.language || 'Auto'}
+                        onChange={(e) => updateDefaultConfig(formState, setFormState, 'language', e.target.value)}
+                        className="orion-native-select"
+                      >
+                        <option value="Auto">Auto</option>
+                        {languages.map((l) => (
+                          <option key={l} value={l}>{l}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <Input
+                      value={formState.default_config?.language || ''}
+                      onChange={(e) => updateDefaultConfig(formState, setFormState, 'language', e.target.value)}
+                      placeholder="Auto, English, Turkish..."
+                      className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs"
+                    />
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-zinc-500 text-[11px] font-medium">Hız (Speed)</label>
+                    <Input
+                      type="number" min="0.1" max="5" step="0.1"
+                      value={formState.default_config?.speed || ''}
+                      onChange={(e) => updateDefaultConfig(formState, setFormState, 'speed', e.target.value)}
+                      placeholder="1.0"
+                      className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-zinc-500 text-[11px] font-medium">Adım (Steps)</label>
+                    <Input
+                      type="number" min="1" max="50" step="1"
+                      value={formState.default_config?.steps || ''}
+                      onChange={(e) => updateDefaultConfig(formState, setFormState, 'steps', e.target.value)}
+                      placeholder="15"
+                      className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs"
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-zinc-500 text-[11px] font-medium">Seed (-1: Rastgele)</label>
+                  <Input
+                    type="number"
+                    value={formState.default_config?.seed || ''}
+                    onChange={(e) => updateDefaultConfig(formState, setFormState, 'seed', e.target.value)}
+                    placeholder="-1"
+                    className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -628,6 +1006,8 @@ export default function ModelsPage() {
               </div>
             </div>
 
+            {renderTtsDefaults(addForm, setAddForm, showAddTtsDefaults, setShowAddTtsDefaults)}
+
             <DialogFooter className="mt-4 flex gap-3 justify-end">
               <Button
                 variant="outline"
@@ -799,6 +1179,8 @@ export default function ModelsPage() {
                 )}
               </div>
             </div>
+
+            {renderTtsDefaults(editingModel, setEditingModel, showEditTtsDefaults, setShowEditTtsDefaults)}
 
             <div
               onClick={() => setEditingModel({ ...editingModel, is_active: !editingModel.is_active })}

@@ -49,12 +49,13 @@ async def audio_speech(
     input_text = body.get("input", "")
     model = (body.get("model", "") or "").strip()
     voice = body.get("voice")
-    temperature = body.get("temperature")
 
     if not input_text:
         raise HTTPException(status_code=400, detail="'input' field is required")
 
     dynamic_router: DynamicLLMRouter = request.app.state.dynamic_router
+
+    extra_kwargs = {k: v for k, v in body.items() if k not in ("input", "model", "voice")}
 
     try:
         audio_bytes, content_type = await run_with_disconnect_check(
@@ -67,7 +68,7 @@ async def audio_speech(
                 api_key=api_key,
                 auth_header=auth_header,
                 key_id=auth.get("key_id") if auth else None,
-                temperature=temperature,
+                **extra_kwargs,
             )
         )
         return Response(

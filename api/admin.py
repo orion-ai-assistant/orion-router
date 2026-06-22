@@ -35,6 +35,19 @@ def _require_text(value, field_name: str) -> str:
         raise HTTPException(status_code=400, detail=f"{field_name} is required")
     return value
 
+def _parse_default_config(val):
+    if not val:
+        return {}
+    if isinstance(val, str):
+        import json as _json
+        try:
+            val = _json.loads(val)
+        except Exception:
+            return {}
+    if isinstance(val, dict):
+        return val
+    return {}
+
 
 
 @router.get("/api/settings/is-default-password")
@@ -399,6 +412,22 @@ async def get_admin_voices(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/api/tts-languages", dependencies=[Depends(verify_admin)])
+async def get_admin_tts_languages(request: Request):
+    """Her TTS sağlayıcısı için desteklenen dilleri döner."""
+    try:
+        router_instance = request.app.state.dynamic_router
+        languages_by_provider = {}
+        for provider_name, provider_inst in router_instance.tts_providers.items():
+            if hasattr(provider_inst, "get_languages"):
+                languages_by_provider[provider_name] = provider_inst.get_languages()
+            else:
+                languages_by_provider[provider_name] = []
+        return {"languages": languages_by_provider}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ---------------------------------------------------------------------------
 #  Provider Key Pool
 # ---------------------------------------------------------------------------
@@ -497,6 +526,7 @@ async def list_models():
     rows = await db_manager.fetch(
         """
         SELECT m.id, m.name, m.provider, m.capability, m.temperature, m.is_active, m.created_at, m.thinking_level, m.system_prompt,
+               m.default_config,
                p.input_price, p.output_price, p.think_price
         FROM router_models m
         LEFT JOIN router_model_pricing p ON m.name = p.model_name
@@ -510,6 +540,7 @@ async def list_models():
         item["input_price"] = float(item["input_price"]) if item["input_price"] is not None else 0.0
         item["output_price"] = float(item["output_price"]) if item["output_price"] is not None else 0.0
         item["think_price"] = float(item["think_price"]) if item["think_price"] is not None else 0.0
+        item["default_config"] = _parse_default_config(item.get("default_config"))
         models.append(item)
     return {"models": models}
 
@@ -533,12 +564,15 @@ async def create_model(request: Request):
     thinking_level = str(thinking_level).strip() if thinking_level not in (None, "") else None
     system_prompt = body.get("system_prompt")
     system_prompt = str(system_prompt).strip() if system_prompt not in (None, "") else None
+    default_config = _parse_default_config(body.get("default_config"))
+    import json as _json
+    default_config_json = _json.dumps(default_config)
 
     row = await db_manager.fetchrow(
         """
-        INSERT INTO router_models (name, provider, capability, temperature, is_active, thinking_level, system_prompt)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        RETURNING id, name, provider, capability, temperature, is_active, thinking_level, system_prompt, created_at
+        INSERT INTO router_models (name, provider, capability, temperature, is_active, thinking_level, system_prompt, default_config)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+        RETURNING id, name, provider, capability, temperature, is_active, thinking_level, system_prompt, default_config, created_at
         """,
         name,
         provider,
@@ -547,6 +581,7 @@ async def create_model(request: Request):
         is_active,
         thinking_level,
         system_prompt,
+        default_config_json,
     )
     await db_manager.upsert_pricing(name, input_price, output_price, think_price)
 
@@ -558,12 +593,12 @@ async def create_model(request: Request):
             "think": think_price
         }
 
-
     item = dict(row)
     item["temperature"] = float(item["temperature"]) if item["temperature"] is not None else None
     item["input_price"] = input_price
     item["output_price"] = output_price
     item["think_price"] = think_price
+    item["default_config"] = _parse_default_config(item.get("default_config"))
     return item
 
 
@@ -571,7 +606,7 @@ async def create_model(request: Request):
 async def update_model(model_id: str, request: Request):
     body = await request.json()
     existing = await db_manager.fetchrow(
-        "SELECT name, provider, capability, temperature, is_active, thinking_level, system_prompt FROM router_models WHERE id = $1",
+        "SELECT name, provider, capability, temperature, is_active, thinking_level, system_prompt, default_config FROM router_models WHERE id = $1",
         model_id,
     )
     if not existing:
@@ -594,14 +629,17 @@ async def update_model(model_id: str, request: Request):
     thinking_level = str(new_thinking).strip() if new_thinking not in (None, "") else None
     new_system_prompt = body.get("system_prompt", existing["system_prompt"])
     system_prompt = str(new_system_prompt).strip() if new_system_prompt not in (None, "") else None
+    default_config = _parse_default_config(body.get("default_config", existing["default_config"]))
+    import json as _json
+    default_config_json = _json.dumps(default_config)
 
     row = await db_manager.fetchrow(
         """
         UPDATE router_models
         SET name = $2, provider = $3, capability = $4, temperature = $5,
-            is_active = $6, thinking_level = $7, system_prompt = $8, updated_at = NOW()
+            is_active = $6, thinking_level = $7, system_prompt = $8, default_config = $9::jsonb, updated_at = NOW()
         WHERE id = $1
-        RETURNING id, name, provider, capability, temperature, is_active, thinking_level, system_prompt, created_at
+        RETURNING id, name, provider, capability, temperature, is_active, thinking_level, system_prompt, default_config, created_at
         """,
         model_id,
         name,
@@ -611,6 +649,7 @@ async def update_model(model_id: str, request: Request):
         is_active,
         thinking_level,
         system_prompt,
+        default_config_json,
     )
     await db_manager.upsert_pricing(name, input_price, output_price, think_price)
 
@@ -622,12 +661,12 @@ async def update_model(model_id: str, request: Request):
             "think": think_price
         }
 
-
     item = dict(row)
     item["temperature"] = float(item["temperature"]) if item["temperature"] is not None else None
     item["input_price"] = input_price
     item["output_price"] = output_price
     item["think_price"] = think_price
+    item["default_config"] = _parse_default_config(item.get("default_config"))
     return item
 
 

@@ -14,7 +14,7 @@ logger = logging.getLogger("service-router.openai.tts")
 
 
 class OpenAITTSProvider(BaseTTS):
-    provider_name = "openai"
+
 
     def get_voices(self) -> list[str]:
         """OpenAI tarafından desteklenen seslerin listesini döner."""

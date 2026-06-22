@@ -42,7 +42,7 @@ async def embeddings(
     x-orion-provider başlığı ile hangi provider kullanılacağı belirlenir.
     Desteklenen provider'lar: dynamic_router.embed_providers'da kayıtlı olanlar.
     """
-    provider = request.headers.get("x-orion-provider", "local")
+    provider = request.headers.get("x-orion-provider")
     api_key = request.headers.get("x-orion-api-key")
     auth_header = request.headers.get("authorization")
 
@@ -56,12 +56,7 @@ async def embeddings(
 
     dynamic_router: DynamicLLMRouter = request.app.state.dynamic_router
 
-    if provider not in dynamic_router.embed_providers:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Embed not supported for provider '{provider}'. "
-                   f"Available: {list(dynamic_router.embed_providers.keys())}",
-        )
+
 
     try:
         result = await run_with_disconnect_check(

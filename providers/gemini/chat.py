@@ -23,7 +23,7 @@ logger = logging.getLogger("service-router.gemini")
 
 
 class GeminiChatProvider(BaseChat):
-    provider_name = "gemini"
+
 
     async def stream_chat(
         self,

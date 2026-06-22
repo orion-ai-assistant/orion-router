@@ -34,7 +34,7 @@ _POLL_TIMEOUT = 120  # maksimum bekleme süresi
 
 
 class GeminiFileProvider(BaseFileUpload):
-    provider_name = "gemini"
+
 
     async def upload_file(
         self,

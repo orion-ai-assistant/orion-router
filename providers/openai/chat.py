@@ -14,7 +14,7 @@ _BASE_URL = "https://api.openai.com"
 
 
 class OpenAIChatProvider(BaseChat):
-    provider_name = "openai"
+
 
     async def stream_chat(
         self,

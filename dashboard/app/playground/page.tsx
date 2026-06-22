@@ -35,9 +35,13 @@ export default function PlaygroundPage() {
   const [groups, setGroups] = useState<any[]>([]);
   const [voicesByProvider, setVoicesByProvider] = useState<Record<string, string[]>>({});
   const [voices, setVoices] = useState<string[]>([]);
+  const [languagesByProvider, setLanguagesByProvider] = useState<Record<string, string[]>>({});
+  const [languages, setLanguages] = useState<string[]>([]);
 
   // Chat State
   const [chatModel, setChatModel] = useState(getSavedState('pg_chatModel', ''));
+  const savedChatModel = getSavedState('pg_chatModel', '');
+  const initialChatModelRef = useRef<string | null>(savedChatModel);
   const [chatTemp, setChatTemp] = useState(getSavedState('pg_chatTemp', ''));
   const [chatThinking, setChatThinking] = useState(getSavedState('pg_chatThinking', ''));
   const [chatSystemPrompt, setChatSystemPrompt] = useState(getSavedState('pg_chatSystemPrompt', ''));
@@ -57,8 +61,23 @@ export default function PlaygroundPage() {
 
   // TTS State
   const [ttsModel, setTtsModel] = useState(getSavedState('pg_ttsModel', ''));
+  const savedTtsModel = getSavedState('pg_ttsModel', '');
+  const initialTtsModelRef = useRef<string | null>(savedTtsModel);
   const [ttsVoice, setTtsVoice] = useState(getSavedState('pg_ttsVoice', 'alloy'));
   const [ttsTemp, setTtsTemp] = useState(getSavedState('pg_ttsTemp', ''));
+  const [ttsSpeed, setTtsSpeed] = useState(getSavedState('pg_ttsSpeed', '1.0'));
+  const [ttsLanguage, setTtsLanguage] = useState(getSavedState('pg_ttsLanguage', 'Auto'));
+  const [ttsSteps, setTtsSteps] = useState(getSavedState('pg_ttsSteps', '15'));
+  const [ttsSeed, setTtsSeed] = useState(getSavedState('pg_ttsSeed', '-1'));
+  const [ttsGender, setTtsGender] = useState(getSavedState('pg_ttsGender', 'Auto'));
+  const [ttsAge, setTtsAge] = useState(getSavedState('pg_ttsAge', 'Auto'));
+  const [ttsPitch, setTtsPitch] = useState(getSavedState('pg_ttsPitch', 'Auto'));
+  const [ttsStyle, setTtsStyle] = useState(getSavedState('pg_ttsStyle', 'Auto'));
+  const [ttsAccent, setTtsAccent] = useState(getSavedState('pg_ttsAccent', 'Auto'));
+  const [showCharacterDesign, setShowCharacterDesign] = useState(false);
+  const [showStreamingSettings, setShowStreamingSettings] = useState(false);
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+  const [isLocalTts, setIsLocalTts] = useState(false);
   const [ttsInput, setTtsInput] = useState('');
   const [ttsUrl, setTtsUrl] = useState('');
   const [ttsError, setTtsError] = useState('');
@@ -111,11 +130,24 @@ export default function PlaygroundPage() {
     }
   };
 
+  const loadLanguages = async () => {
+    try {
+      const res = await adminFetch('/dashboard/api/tts-languages');
+      if (res.ok) {
+        const data = await res.json();
+        setLanguagesByProvider(data.languages || {});
+      }
+    } catch (e) {
+      console.error('Failed to load languages:', e);
+    }
+  };
+
   useEffect(() => {
     const initData = async () => {
       await loadModels();
       await loadGroups();
       await loadVoices();
+      await loadLanguages();
     };
     initData();
   }, []);
@@ -140,10 +172,12 @@ export default function PlaygroundPage() {
     }
   }, [models, groups]);
 
-  // Update TTS voices persona when model selection changes
+  // Update TTS voices persona and languages when model selection changes
   useEffect(() => {
     if (!ttsModel) {
       setVoices([]);
+      setLanguages([]);
+      setIsLocalTts(false);
       return;
     }
 
@@ -158,20 +192,168 @@ export default function PlaygroundPage() {
       }
     }
 
+    let nextVoices: string[] = [];
     if (provider && voicesByProvider[provider]) {
-      const providerVoices = voicesByProvider[provider];
-      setVoices(providerVoices);
-      if (providerVoices.length > 0 && !providerVoices.includes(ttsVoice)) {
-        setTtsVoice(providerVoices[0]);
-      }
+      nextVoices = voicesByProvider[provider].filter(v => v.toLowerCase() !== 'none');
     } else {
-      const allVoices = Object.values(voicesByProvider).flat();
-      setVoices(allVoices);
-      if (allVoices.length > 0 && !allVoices.includes(ttsVoice)) {
-        setTtsVoice(allVoices[0]);
-      }
+      nextVoices = Object.values(voicesByProvider).flat().filter(v => v.toLowerCase() !== 'none');
     }
-  }, [ttsModel, groups, models, voicesByProvider]);
+
+    setVoices(nextVoices);
+    setIsLocalTts(provider === 'local');
+
+    const isInitialLoadForSavedModel = initialTtsModelRef.current === ttsModel;
+
+    if (isInitialLoadForSavedModel) {
+      // Keeping values loaded from localStorage on page refresh
+      if (provider === 'local') {
+        if (ttsVoice !== '' && !nextVoices.includes(ttsVoice)) {
+          setTtsVoice('');
+        }
+      } else {
+        if (!nextVoices.includes(ttsVoice)) {
+          setTtsVoice(nextVoices[0] || '');
+        }
+      }
+
+      if (provider && languagesByProvider[provider]) {
+        const providerLangs = languagesByProvider[provider];
+        setLanguages(providerLangs);
+        if (providerLangs.length > 0 && !providerLangs.includes(ttsLanguage)) {
+          setTtsLanguage(providerLangs[0]);
+        }
+      } else {
+        setLanguages(['Auto', 'Turkish', 'English']);
+      }
+
+      initialTtsModelRef.current = null;
+    } else {
+      // Apply default configuration values for the selected model
+      const findModelConfig = (mName: string) => {
+        const modelDetail = models.find((m) => m.name === mName && m.capability === 'tts');
+        return {
+          temperature: modelDetail?.temperature ?? null,
+          ...(modelDetail?.default_config || {})
+        };
+      };
+
+      let defaults: any = {};
+      if (group) {
+        const primaryItem = group.items?.[0];
+        if (primaryItem) {
+          defaults = findModelConfig(primaryItem.name);
+        }
+      } else {
+        defaults = findModelConfig(ttsModel);
+      }
+
+      const getVal = (field: string, fallback: string) => {
+        if (defaults[field] !== undefined && defaults[field] !== null && defaults[field] !== '') {
+          return String(defaults[field]);
+        }
+        return fallback;
+      };
+
+      // 1. Voice
+      const defVoice = getVal('voice', '');
+      if (defVoice) {
+        setTtsVoice(defVoice);
+      } else {
+        if (provider === 'local') {
+          setTtsVoice('');
+        } else {
+          setTtsVoice(nextVoices[0] || '');
+        }
+      }
+
+      // 2. Language
+      let providerLangs: string[] = [];
+      if (provider && languagesByProvider[provider]) {
+        providerLangs = languagesByProvider[provider];
+        setLanguages(providerLangs);
+      } else {
+        providerLangs = ['Auto', 'Turkish', 'English'];
+        setLanguages(providerLangs);
+      }
+      const defLang = getVal('language', providerLangs[0] || 'Auto');
+      setTtsLanguage(defLang);
+
+      // 3. Temperature
+      const defTemp = getVal('temperature', '');
+      setTtsTemp(defTemp);
+
+      // 4. Speed
+      const defSpeed = getVal('speed', '1.0');
+      setTtsSpeed(defSpeed);
+
+      // 5. Steps
+      const defSteps = getVal('steps', '15');
+      setTtsSteps(defSteps);
+
+      // 6. Seed
+      const defSeed = getVal('seed', '-1');
+      setTtsSeed(defSeed);
+
+      // 7. Gender
+      const defGender = getVal('gender', 'Auto');
+      setTtsGender(defGender);
+
+      // 8. Age
+      const defAge = getVal('age', 'Auto');
+      setTtsAge(defAge);
+
+      // 9. Pitch
+      const defPitch = getVal('pitch', 'Auto');
+      setTtsPitch(defPitch);
+
+      // 10. Style
+      const defStyle = getVal('style', 'Auto');
+      setTtsStyle(defStyle);
+
+      // 11. Accent
+      const defAccent = getVal('accent', 'Auto');
+      setTtsAccent(defAccent);
+    }
+  }, [ttsModel, groups, models, voicesByProvider, languagesByProvider]);
+
+  // Update Chat settings when model selection changes
+  useEffect(() => {
+    if (!chatModel) return;
+
+    const isInitialLoadForSavedModel = initialChatModelRef.current === chatModel;
+
+    if (isInitialLoadForSavedModel) {
+      initialChatModelRef.current = null;
+    } else {
+      // Apply defaults
+      const group = groups.find((g) => g.name === chatModel && g.capability === 'chat');
+      let defaults: any = {};
+      if (group) {
+        const primaryItem = group.items?.[0];
+        if (primaryItem) {
+          const modelDetail = models.find((m) => m.name === primaryItem.name && m.capability === 'chat');
+          defaults = {
+            temperature: modelDetail?.temperature ?? null,
+            thinking_level: primaryItem.thinking_level || modelDetail?.thinking_level || null,
+            system_prompt: primaryItem.system_prompt || modelDetail?.system_prompt || null,
+          };
+        }
+      } else {
+        const model = models.find((m) => m.name === chatModel && m.capability === 'chat');
+        if (model) {
+          defaults = {
+            temperature: model.temperature ?? null,
+            thinking_level: model.thinking_level || null,
+            system_prompt: model.system_prompt || null,
+          };
+        }
+      }
+
+      setChatTemp(defaults.temperature !== undefined && defaults.temperature !== null ? String(defaults.temperature) : '');
+      setChatThinking(defaults.thinking_level !== undefined && defaults.thinking_level !== null ? String(defaults.thinking_level) : '');
+      setChatSystemPrompt(defaults.system_prompt !== undefined && defaults.system_prompt !== null ? String(defaults.system_prompt) : '');
+    }
+  }, [chatModel, groups, models]);
 
   // Save states to localStorage
   useEffect(() => {
@@ -184,11 +366,20 @@ export default function PlaygroundPage() {
       localStorage.setItem('pg_ttsModel', ttsModel);
       localStorage.setItem('pg_ttsVoice', ttsVoice);
       localStorage.setItem('pg_ttsTemp', ttsTemp);
+      localStorage.setItem('pg_ttsSpeed', ttsSpeed);
+      localStorage.setItem('pg_ttsLanguage', ttsLanguage);
+      localStorage.setItem('pg_ttsSteps', ttsSteps);
+      localStorage.setItem('pg_ttsSeed', ttsSeed);
+      localStorage.setItem('pg_ttsGender', ttsGender);
+      localStorage.setItem('pg_ttsAge', ttsAge);
+      localStorage.setItem('pg_ttsPitch', ttsPitch);
+      localStorage.setItem('pg_ttsStyle', ttsStyle);
+      localStorage.setItem('pg_ttsAccent', ttsAccent);
       localStorage.setItem('pg_embedModel', embedModel);
       localStorage.setItem('pg_chatMessages', JSON.stringify(chatMessages));
       localStorage.setItem('pg_chatInput', chatInput);
     }
-  }, [activeTab, chatModel, chatTemp, chatThinking, chatSystemPrompt, ttsModel, ttsVoice, ttsTemp, embedModel, chatMessages, chatInput]);
+  }, [activeTab, chatModel, chatTemp, chatThinking, chatSystemPrompt, ttsModel, ttsVoice, ttsTemp, ttsSpeed, ttsLanguage, ttsSteps, ttsSeed, ttsGender, ttsAge, ttsPitch, ttsStyle, ttsAccent, embedModel, chatMessages, chatInput]);
 
   // Scroll chat window to bottom on new messages
   useEffect(() => {
@@ -231,26 +422,111 @@ export default function PlaygroundPage() {
   const getResolvedTtsDefaults = () => {
     if (!ttsModel) return { temperature: null };
 
+    const findModelConfig = (mName: string) => {
+      const modelDetail = models.find((m) => m.name === mName && m.capability === 'tts');
+      return {
+        temperature: modelDetail?.temperature ?? null,
+        ...(modelDetail?.default_config || {})
+      };
+    };
+
     const group = groups.find((g) => g.name === ttsModel && g.capability === 'tts');
     if (group) {
       const primaryItem = group.items?.[0];
       if (primaryItem) {
-        const modelDetail = models.find((m) => m.name === primaryItem.name && m.capability === 'tts');
-        return {
-          temperature: modelDetail?.temperature ?? null,
-        };
+        return findModelConfig(primaryItem.name);
       }
       return { temperature: null };
     }
 
-    const model = models.find((m) => m.name === ttsModel && m.capability === 'tts');
-    if (model) {
-      return {
-        temperature: model.temperature ?? null,
-      };
-    }
+    return findModelConfig(ttsModel);
+  };
 
-    return { temperature: null };
+  const getTtsFieldDefault = (field: string) => {
+    const defaults = resolvedTtsDefaults || {};
+    if (defaults[field] !== undefined && defaults[field] !== null && defaults[field] !== '') {
+      return String(defaults[field]);
+    }
+    switch (field) {
+      case 'voice':
+        {
+          let provider = '';
+          const model = models.find((m) => m.name === ttsModel && m.capability === 'tts');
+          if (model) {
+            provider = model.provider;
+          } else {
+            const group = groups.find((g) => g.name === ttsModel && g.capability === 'tts');
+            if (group && group.items && group.items.length > 0) {
+              provider = group.items[0].provider;
+            }
+          }
+          if (provider === 'openai') return 'alloy';
+          if (provider === 'gemini') return 'Achernar';
+          return '';
+        }
+      case 'gender':
+      case 'age':
+      case 'pitch':
+      case 'style':
+      case 'accent':
+      case 'language':
+        return 'Auto';
+      case 'speed':
+        return '1.0';
+      case 'steps':
+        return '15';
+      case 'seed':
+        return '-1';
+      default:
+        return '';
+    }
+  };
+
+  const renderDefaultIndicator = (field: string, userValue: string, isChat: boolean = false) => {
+    let defVal = '';
+    if (isChat) {
+      const defaults = resolvedDefaults || {};
+      const val = defaults[field as keyof typeof resolvedDefaults];
+      if (val !== undefined && val !== null && val !== '') {
+        defVal = String(val);
+      }
+    } else {
+      defVal = getTtsFieldDefault(field);
+    }
+    
+    let isOverridden = false;
+    if (field === 'voice') {
+      const normUser = (userValue || '').toLowerCase();
+      const normDef = (defVal || '').toLowerCase();
+      const isUserNone = normUser === '' || normUser === 'none';
+      const isDefNone = normDef === '' || normDef === 'none';
+      isOverridden = (isUserNone && isDefNone) ? false : (normUser !== normDef);
+    } else {
+      isOverridden = userValue !== defVal;
+    }
+    
+    let displayVal = defVal;
+    if (field === 'voice') {
+      if (!defVal || defVal.toLowerCase() === 'none') {
+        displayVal = 'None';
+      }
+    } else if (field === 'temperature' || field === 'thinking_level' || field === 'system_prompt') {
+      if (!defVal) {
+        displayVal = '-';
+      } else if (field === 'system_prompt') {
+        displayVal = defVal.length > 15 ? defVal.slice(0, 15) + '...' : defVal;
+      }
+    }
+    
+    return (
+      <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all ${
+        isOverridden 
+          ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50' 
+          : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
+      }`}>
+        {t('playground.default')}: {displayVal}
+      </span>
+    );
   };
 
   const getRouteOptions = (capability: string): RouteOption[] => {
@@ -521,6 +797,26 @@ export default function PlaygroundPage() {
       payload.temperature = parsedTemp;
     }
 
+    if (isLocalTts) {
+      payload.speed = parseFloat(ttsSpeed) || 1.0;
+      payload.language = ttsLanguage || 'Auto';
+      payload.steps = parseInt(ttsSteps, 10) || 15;
+      payload.seed = parseInt(ttsSeed, 10) || -1;
+
+      // Construct character design instructs (only when no persona is selected)
+      if (!ttsVoice) {
+        const instructs: string[] = [];
+        if (ttsGender && ttsGender !== 'Auto') instructs.push(ttsGender);
+        if (ttsAge && ttsAge !== 'Auto') instructs.push(ttsAge);
+        if (ttsPitch && ttsPitch !== 'Auto') instructs.push(ttsPitch);
+        if (ttsStyle && ttsStyle !== 'Auto') instructs.push(ttsStyle);
+        if (ttsAccent && ttsAccent !== 'Auto') instructs.push(ttsAccent);
+        payload.tts_instruct = instructs.length > 0 ? instructs.join(', ') : '';
+      } else {
+        payload.tts_instruct = '';
+      }
+    }
+
     try {
       setIsGeneratingTTS(true);
       ttsAbortControllerRef.current = new AbortController();
@@ -709,18 +1005,8 @@ export default function PlaygroundPage() {
                       </div>
                     </div>
                   </>
-                ) : resolvedDefaults.temperature !== null ? (
-                  <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all ${hasTempOverride
-                      ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
-                      : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
-                    }`} title={hasTempOverride ? "Default is overridden by your input" : "Database default value for this model"}>
-                    {t('playground.default')}: {resolvedDefaults.temperature}
-                  </span>
                 ) : (
-                  <span className={`text-[9px] font-medium transition-all ${hasTempOverride ? 'text-zinc-700 line-through opacity-50' : 'text-zinc-500'
-                    }`}>
-                    {t('playground.default')}: -
-                  </span>
+                  renderDefaultIndicator('temperature', chatTemp, true)
                 )}
               </div>
               <Input
@@ -766,18 +1052,8 @@ export default function PlaygroundPage() {
                       </div>
                     </div>
                   </>
-                ) : resolvedDefaults.thinking_level ? (
-                  <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all ${hasThinkingOverride
-                      ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
-                      : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
-                    }`} title={hasThinkingOverride ? "Default is overridden by your input" : "Database default value for this model"}>
-                    {t('playground.default')}: {resolvedDefaults.thinking_level}
-                  </span>
                 ) : (
-                  <span className={`text-[9px] font-medium transition-all ${hasThinkingOverride ? 'text-zinc-700 line-through opacity-50' : 'text-zinc-500'
-                    }`}>
-                    {t('playground.default')}: -
-                  </span>
+                  renderDefaultIndicator('thinking_level', chatThinking, true)
                 )}
               </div>
               <Input
@@ -836,10 +1112,7 @@ export default function PlaygroundPage() {
                     </div>
                   </>
                 ) : (
-                  <span className={`text-[9px] font-medium transition-all ${hasSystemPromptOverride ? 'text-zinc-700 line-through opacity-50' : 'text-zinc-500'
-                    }`}>
-                    {t('playground.default')}: -
-                  </span>
+                  renderDefaultIndicator('system_prompt', chatSystemPrompt, true)
                 )}
               </div>
               <Textarea
@@ -940,13 +1213,17 @@ export default function PlaygroundPage() {
               </div>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.voicePersona')}</label>
+              <div className="flex justify-between items-center mb-0.5">
+                <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.voicePersona')}</label>
+                {renderDefaultIndicator('voice', ttsVoice)}
+              </div>
               <div className="custom-select-wrapper select-wrapper w-full">
                 <select
                   value={ttsVoice}
                   onChange={(e) => setTtsVoice(e.target.value)}
                   className="orion-native-select orion-native-select-sm"
                 >
+                  {isLocalTts && <option value="">None</option>}
                   {voices.map((v) => (
                     <option key={v} value={v}>
                       {v}
@@ -957,7 +1234,9 @@ export default function PlaygroundPage() {
             </div>
             <div className="flex flex-col gap-1">
               <div className="flex justify-between items-center mb-1 relative group">
-                <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.temperature')}</label>
+                <label className="text-zinc-400 text-[10px] font-semibold capitalize">
+                  {isLocalTts ? t('playground.temperature') + ' (Yaratıcılık)' : t('playground.temperature')}
+                </label>
                 {selectedTtsGroup ? (
                   <>
                     <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all cursor-help ${hasTtsTempOverride
@@ -989,18 +1268,8 @@ export default function PlaygroundPage() {
                       </div>
                     </div>
                   </>
-                ) : resolvedTtsDefaults.temperature !== null ? (
-                  <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all ${hasTtsTempOverride
-                      ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
-                      : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
-                    }`} title={hasTtsTempOverride ? "Default is overridden by your input" : "Database default value for this model"}>
-                    {t('playground.default')}: {resolvedTtsDefaults.temperature}
-                  </span>
                 ) : (
-                  <span className={`text-[9px] font-medium transition-all ${hasTtsTempOverride ? 'text-zinc-700 line-through opacity-50' : 'text-zinc-500'
-                    }`}>
-                    {t('playground.default')}: -
-                  </span>
+                  renderDefaultIndicator('temperature', ttsTemp)
                 )}
               </div>
               <Input
@@ -1014,6 +1283,258 @@ export default function PlaygroundPage() {
                 className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs placeholder:text-zinc-600"
               />
             </div>
+
+            {isLocalTts && (
+              <div className="flex flex-col gap-3 pt-3 mt-1 border-t border-zinc-850">
+                {/* Karakter Tasarımı - Collapsible */}
+                <button
+                  type="button"
+                  onClick={() => setShowCharacterDesign(!showCharacterDesign)}
+                  className={`flex items-center justify-between text-left text-[10px] font-semibold uppercase tracking-wider py-1 cursor-pointer transition-colors w-full ${
+                    !!ttsVoice
+                      ? 'text-zinc-500 hover:text-zinc-400'
+                      : 'text-zinc-300 hover:text-white'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    🎭 Karakter Tasarımı
+                    {!!ttsVoice && (
+                      <span className="text-[8px] text-zinc-600 font-medium bg-black/40 px-1 py-0.5 rounded border border-zinc-800 normal-case">Persona Aktif</span>
+                    )}
+                  </span>
+                  <span>{showCharacterDesign ? '▼' : '►'}</span>
+                </button>
+
+                {showCharacterDesign && (
+                <div className={`flex flex-col gap-3 pl-1 border-l border-zinc-800 ${!!ttsVoice ? 'opacity-50 pointer-events-none' : ''}`}>
+                {/* Cinsiyet */}
+                <div className="flex flex-col gap-1">
+                  <div className="flex justify-between items-center mb-0.5">
+                    <label className="text-zinc-400 text-[10px] font-semibold capitalize">Cinsiyet (Gender)</label>
+                    {renderDefaultIndicator('gender', ttsGender)}
+                  </div>
+                  <div className="custom-select-wrapper select-wrapper w-full">
+                    <select
+                      value={ttsGender}
+                      onChange={(e) => setTtsGender(e.target.value)}
+                      className="orion-native-select orion-native-select-sm"
+                    >
+                      <option value="Auto">Auto</option>
+                      <option value="male">male (Erkek)</option>
+                      <option value="female">female (Kadın)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Yaş Grubu */}
+                <div className="flex flex-col gap-1">
+                  <div className="flex justify-between items-center mb-0.5">
+                    <label className="text-zinc-400 text-[10px] font-semibold capitalize">Yaş Grubu (Age Group)</label>
+                    {renderDefaultIndicator('age', ttsAge)}
+                  </div>
+                  <div className="custom-select-wrapper select-wrapper w-full">
+                    <select
+                      value={ttsAge}
+                      onChange={(e) => setTtsAge(e.target.value)}
+                      className="orion-native-select orion-native-select-sm"
+                    >
+                      <option value="Auto">Auto</option>
+                      <option value="child">child (Çocuk)</option>
+                      <option value="teenager">teenager (Genç)</option>
+                      <option value="young adult">young adult (Genç Yetişkin)</option>
+                      <option value="middle-aged">middle-aged (Orta Yaşlı)</option>
+                      <option value="elderly">elderly (Yaşlı)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Ton */}
+                <div className="flex flex-col gap-1">
+                  <div className="flex justify-between items-center mb-0.5">
+                    <label className="text-zinc-400 text-[10px] font-semibold capitalize">Ton (Pitch)</label>
+                    {renderDefaultIndicator('pitch', ttsPitch)}
+                  </div>
+                  <div className="custom-select-wrapper select-wrapper w-full">
+                    <select
+                      value={ttsPitch}
+                      onChange={(e) => setTtsPitch(e.target.value)}
+                      className="orion-native-select orion-native-select-sm"
+                    >
+                      <option value="Auto">Auto</option>
+                      <option value="very high pitch">very high pitch (Çok Tiz)</option>
+                      <option value="high pitch">high pitch (Tiz)</option>
+                      <option value="moderate pitch">moderate pitch (Normal)</option>
+                      <option value="low pitch">low pitch (Pes/Bas)</option>
+                      <option value="very low pitch">very low pitch (Çok Pes/Bas)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Stil */}
+                <div className="flex flex-col gap-1">
+                  <div className="flex justify-between items-center mb-0.5">
+                    <label className="text-zinc-400 text-[10px] font-semibold capitalize">Stil (Style)</label>
+                    {renderDefaultIndicator('style', ttsStyle)}
+                  </div>
+                  <div className="custom-select-wrapper select-wrapper w-full">
+                    <select
+                      value={ttsStyle}
+                      onChange={(e) => setTtsStyle(e.target.value)}
+                      className="orion-native-select orion-native-select-sm"
+                    >
+                      <option value="Auto">Auto</option>
+                      <option value="whisper">whisper (Fısıltı)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Aksan */}
+                <div className="flex flex-col gap-1">
+                  <div className="flex justify-between items-center mb-0.5">
+                    <label className="text-zinc-400 text-[10px] font-semibold capitalize">Aksan (Accent)</label>
+                    {renderDefaultIndicator('accent', ttsAccent)}
+                  </div>
+                  <div className="custom-select-wrapper select-wrapper w-full">
+                    <select
+                      value={ttsAccent}
+                      onChange={(e) => setTtsAccent(e.target.value)}
+                      className="orion-native-select orion-native-select-sm"
+                    >
+                      <option value="Auto">Auto</option>
+                      <option value="american accent">american accent</option>
+                      <option value="australian accent">australian accent</option>
+                      <option value="british accent">british accent</option>
+                      <option value="canadian accent">canadian accent</option>
+                      <option value="chinese accent">chinese accent</option>
+                      <option value="indian accent">indian accent</option>
+                      <option value="japanese accent">japanese accent</option>
+                      <option value="korean accent">korean accent</option>
+                      <option value="portuguese accent">portuguese accent</option>
+                      <option value="russian accent">russian accent</option>
+                    </select>
+                  </div>
+                </div>
+
+                </div>
+                )}
+
+                {/* 🌊 Streaming Ayarları */}
+                <button
+                  type="button"
+                  onClick={() => setShowStreamingSettings(!showStreamingSettings)}
+                  className="flex items-center justify-between text-left text-zinc-300 text-[10px] font-semibold uppercase tracking-wider mt-2 py-1 border-t border-zinc-850 cursor-pointer hover:text-white transition-colors w-full"
+                >
+                  <span>🌊 Streaming Ayarları</span>
+                  <span>{showStreamingSettings ? '▼' : '►'}</span>
+                </button>
+
+                {showStreamingSettings && (
+                  <div className="flex flex-col gap-2 pl-1 border-l border-zinc-800">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        disabled
+                        checked={false}
+                        className="rounded border-zinc-800 bg-black/40 text-purple-600 focus:ring-purple-600 focus:ring-offset-black"
+                      />
+                      <label className="text-zinc-500 text-[10px] select-none">
+                        Stream Audio (Not supported)
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                {/* ⚙️ Gelişmiş Ayarlar */}
+                <button
+                  type="button"
+                  onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
+                  className="flex items-center justify-between text-left text-zinc-300 text-[10px] font-semibold uppercase tracking-wider mt-1 py-1 border-t border-zinc-850 cursor-pointer hover:text-white transition-colors w-full"
+                >
+                  <span>⚙️ Gelişmiş Ayarlar</span>
+                  <span>{showAdvancedSettings ? '▼' : '►'}</span>
+                </button>
+
+                {showAdvancedSettings && (
+                  <div className="flex flex-col gap-3 pl-1 border-l border-zinc-800">
+                    <div className="flex flex-col gap-1">
+                      <div className="flex justify-between items-center mb-0.5">
+                        <label className="text-zinc-400 text-[10px] font-semibold capitalize">Dil (Language)</label>
+                        {renderDefaultIndicator('language', ttsLanguage)}
+                      </div>
+                      <div className="custom-select-wrapper select-wrapper w-full">
+                        <select
+                          value={ttsLanguage}
+                          onChange={(e) => setTtsLanguage(e.target.value)}
+                          className="orion-native-select orion-native-select-sm"
+                        >
+                          {languages.length > 0 ? (
+                            languages.map((lang) => (
+                              <option key={lang} value={lang}>
+                                {lang === 'Auto' ? 'Otomatik Algıla (Auto)' : lang}
+                              </option>
+                            ))
+                          ) : (
+                            <>
+                              <option value="Auto">Otomatik Algıla (Auto)</option>
+                              <option value="Turkish">Turkish</option>
+                              <option value="English">English</option>
+                            </>
+                          )}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <div className="flex justify-between items-center mb-0.5">
+                        <label className="text-zinc-400 text-[10px] font-semibold capitalize">Konuşma Hızı (Speed)</label>
+                        {renderDefaultIndicator('speed', ttsSpeed)}
+                      </div>
+                      <Input
+                        type="number"
+                        min="0.1"
+                        max="5"
+                        step="0.1"
+                        value={ttsSpeed}
+                        onChange={(e) => setTtsSpeed(e.target.value)}
+                        placeholder={getTtsFieldDefault('speed')}
+                        className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs placeholder:text-zinc-600"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <div className="flex justify-between items-center mb-0.5">
+                        <label className="text-zinc-400 text-[10px] font-semibold capitalize">Kalite Adımı (Steps)</label>
+                        {renderDefaultIndicator('steps', ttsSteps)}
+                      </div>
+                      <Input
+                        type="number"
+                        min="1"
+                        max="50"
+                        step="1"
+                        value={ttsSteps}
+                        onChange={(e) => setTtsSteps(e.target.value)}
+                        placeholder={getTtsFieldDefault('steps')}
+                        className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs placeholder:text-zinc-600"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <div className="flex justify-between items-center mb-0.5">
+                        <label className="text-zinc-400 text-[10px] font-semibold capitalize">Sabit Seed (-1: Rastgele)</label>
+                        {renderDefaultIndicator('seed', ttsSeed)}
+                      </div>
+                      <Input
+                        type="number"
+                        value={ttsSeed}
+                        onChange={(e) => setTtsSeed(e.target.value)}
+                        placeholder={getTtsFieldDefault('seed')}
+                        className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs placeholder:text-zinc-600"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Main Area */}

@@ -13,7 +13,7 @@ from core.config import LLM_HOST, LLM_PORT
 
 
 class LocalChatProvider(BaseChat):
-    provider_name = "local"
+
 
     async def stream_chat(
         self,

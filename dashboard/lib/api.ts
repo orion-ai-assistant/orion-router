@@ -23,8 +23,8 @@ export async function adminFetch(url: string, options: RequestInit = {}): Promis
   const headers = new Headers(options.headers || {});
   headers.set('X-Admin-Key', encodeURIComponent(adminKey));
   
-  // Set default body type as JSON if it's an object and not FormData
-  if (options.body && typeof options.body === 'object' && !(options.body instanceof FormData)) {
+  // Set default body type as JSON if it's not FormData
+  if (options.body && !(options.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
   

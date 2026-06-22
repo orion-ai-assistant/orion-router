@@ -15,7 +15,7 @@ logger = logging.getLogger("service-router.gemini.embed")
 
 
 class GeminiEmbedProvider(BaseEmbed):
-    provider_name = "gemini"
+
 
     async def generate_embeddings(
         self,

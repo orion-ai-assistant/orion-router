@@ -107,6 +107,10 @@ class BaseTTS(_ProviderMixin, ABC):
         """Desteklenen seslerin listesini döner."""
         return []
 
+    def get_languages(self) -> list[str]:
+        """Desteklenen dillerin listesini döner."""
+        return []
+
 
 class BaseFileUpload(_ProviderMixin, ABC):
     """Dosya yükleme (video, görsel vb.) yetenekleri için temel sınıf."""

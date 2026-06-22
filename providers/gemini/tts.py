@@ -91,7 +91,7 @@ def _extract_audio_from_response(response) -> bytes:
 
 
 class GeminiTTSProvider(BaseTTS):
-    provider_name = "gemini"
+
 
     def get_voices(self) -> list[str]:
         """Gemini tarafından desteklenen prebuilt seslerin listesini döner."""
