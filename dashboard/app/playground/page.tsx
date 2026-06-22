@@ -83,6 +83,15 @@ export default function PlaygroundPage() {
   const [ttsError, setTtsError] = useState('');
   const [isGeneratingTTS, setIsGeneratingTTS] = useState(false);
   const ttsAbortControllerRef = useRef<AbortController | null>(null);
+  
+  // Custom tts_instruct and active engine info state for local TTS
+  const [ttsInstruct, setTtsInstruct] = useState(getSavedState('pg_ttsInstruct', ''));
+  const [localTtsInfo, setLocalTtsInfo] = useState<{
+    active: boolean;
+    engine: string | null;
+    voices: string[];
+    languages: string[];
+  }>({ active: false, engine: null, voices: [], languages: [] });
 
   // Embed State
   const [embedModel, setEmbedModel] = useState(getSavedState('pg_embedModel', ''));
@@ -142,12 +151,25 @@ export default function PlaygroundPage() {
     }
   };
 
+  const loadLocalTtsInfo = async () => {
+    try {
+      const res = await adminFetch('/dashboard/api/local-tts-info');
+      if (res.ok) {
+        const data = await res.json();
+        setLocalTtsInfo(data);
+      }
+    } catch (e) {
+      console.error('Failed to load local TTS info:', e);
+    }
+  };
+
   useEffect(() => {
     const initData = async () => {
       await loadModels();
       await loadGroups();
       await loadVoices();
       await loadLanguages();
+      await loadLocalTtsInfo();
     };
     initData();
   }, []);
@@ -182,33 +204,68 @@ export default function PlaygroundPage() {
     }
 
     let provider = '';
+    let selectedModelObj: any = null;
     const group = groups.find((g) => g.name === ttsModel && g.capability === 'tts');
     if (group && group.items && group.items.length > 0) {
       provider = group.items[0].provider;
+      selectedModelObj = models.find((m) => m.name === group.items[0].name && m.capability === 'tts');
     } else {
       const model = models.find((m) => m.name === ttsModel && m.capability === 'tts');
       if (model) {
         provider = model.provider;
+        selectedModelObj = model;
       }
     }
 
+    const isLocal = provider === 'local';
+    const resolvedEngine = isLocal ? (selectedModelObj?.default_config?.engine || 'omnivoice') : 'omnivoice';
+
     let nextVoices: string[] = [];
-    if (provider && voicesByProvider[provider]) {
-      nextVoices = voicesByProvider[provider].filter(v => v.toLowerCase() !== 'none');
+    if (isLocal) {
+      if (localTtsInfo.active && localTtsInfo.engine === resolvedEngine) {
+        nextVoices = localTtsInfo.voices;
+      } else {
+        nextVoices = []; // Will show manual text input instead
+      }
     } else {
-      nextVoices = Object.values(voicesByProvider).flat().filter(v => v.toLowerCase() !== 'none');
+      if (provider && voicesByProvider[provider]) {
+        nextVoices = voicesByProvider[provider].filter(v => v.toLowerCase() !== 'none');
+      } else {
+        nextVoices = Object.values(voicesByProvider).flat().filter(v => v.toLowerCase() !== 'none');
+      }
     }
 
     setVoices(nextVoices);
-    setIsLocalTts(provider === 'local');
+    setIsLocalTts(isLocal);
+
+    // Languages list:
+    let nextLangs: string[] = [];
+    if (isLocal) {
+      if (resolvedEngine === 'omnivoice') {
+        if (localTtsInfo.active && localTtsInfo.engine === 'omnivoice') {
+          nextLangs = localTtsInfo.languages;
+        } else {
+          nextLangs = ['Auto', 'Turkish', 'English'];
+        }
+      } else {
+        nextLangs = []; // Will show manual text input for voxcpm2
+      }
+    } else {
+      if (provider && languagesByProvider[provider]) {
+        nextLangs = languagesByProvider[provider];
+      } else {
+        nextLangs = ['Auto', 'Turkish', 'English'];
+      }
+    }
+    setLanguages(nextLangs);
 
     const isInitialLoadForSavedModel = initialTtsModelRef.current === ttsModel;
 
     if (isInitialLoadForSavedModel) {
       // Keeping values loaded from localStorage on page refresh
-      if (provider === 'local') {
-        if (ttsVoice !== '' && !nextVoices.includes(ttsVoice)) {
-          setTtsVoice('');
+      if (isLocal) {
+        if (ttsVoice !== '' && nextVoices.length > 0 && !nextVoices.includes(ttsVoice)) {
+          // Keep manual text if it wasn't a dropdown or if dropdown contains it
         }
       } else {
         if (!nextVoices.includes(ttsVoice)) {
@@ -216,14 +273,13 @@ export default function PlaygroundPage() {
         }
       }
 
-      if (provider && languagesByProvider[provider]) {
-        const providerLangs = languagesByProvider[provider];
-        setLanguages(providerLangs);
-        if (providerLangs.length > 0 && !providerLangs.includes(ttsLanguage)) {
-          setTtsLanguage(providerLangs[0]);
+      if (!isLocal) {
+        if (provider && languagesByProvider[provider]) {
+          const providerLangs = languagesByProvider[provider];
+          if (providerLangs.length > 0 && !providerLangs.includes(ttsLanguage)) {
+            setTtsLanguage(providerLangs[0]);
+          }
         }
-      } else {
-        setLanguages(['Auto', 'Turkish', 'English']);
       }
 
       initialTtsModelRef.current = null;
@@ -259,7 +315,7 @@ export default function PlaygroundPage() {
       if (defVoice) {
         setTtsVoice(defVoice);
       } else {
-        if (provider === 'local') {
+        if (isLocal) {
           setTtsVoice('');
         } else {
           setTtsVoice(nextVoices[0] || '');
@@ -267,15 +323,7 @@ export default function PlaygroundPage() {
       }
 
       // 2. Language
-      let providerLangs: string[] = [];
-      if (provider && languagesByProvider[provider]) {
-        providerLangs = languagesByProvider[provider];
-        setLanguages(providerLangs);
-      } else {
-        providerLangs = ['Auto', 'Turkish', 'English'];
-        setLanguages(providerLangs);
-      }
-      const defLang = getVal('language', providerLangs[0] || 'Auto');
+      const defLang = getVal('language', nextLangs[0] || 'Auto');
       setTtsLanguage(defLang);
 
       // 3. Temperature
@@ -313,8 +361,12 @@ export default function PlaygroundPage() {
       // 11. Accent
       const defAccent = getVal('accent', 'Auto');
       setTtsAccent(defAccent);
+
+      // 12. tts_instruct
+      const defInstruct = getVal('tts_instruct', '');
+      setTtsInstruct(defInstruct);
     }
-  }, [ttsModel, groups, models, voicesByProvider, languagesByProvider]);
+  }, [ttsModel, groups, models, voicesByProvider, languagesByProvider, localTtsInfo]);
 
   // Update Chat settings when model selection changes
   useEffect(() => {
@@ -375,11 +427,12 @@ export default function PlaygroundPage() {
       localStorage.setItem('pg_ttsPitch', ttsPitch);
       localStorage.setItem('pg_ttsStyle', ttsStyle);
       localStorage.setItem('pg_ttsAccent', ttsAccent);
+      localStorage.setItem('pg_ttsInstruct', ttsInstruct);
       localStorage.setItem('pg_embedModel', embedModel);
       localStorage.setItem('pg_chatMessages', JSON.stringify(chatMessages));
       localStorage.setItem('pg_chatInput', chatInput);
     }
-  }, [activeTab, chatModel, chatTemp, chatThinking, chatSystemPrompt, ttsModel, ttsVoice, ttsTemp, ttsSpeed, ttsLanguage, ttsSteps, ttsSeed, ttsGender, ttsAge, ttsPitch, ttsStyle, ttsAccent, embedModel, chatMessages, chatInput]);
+  }, [activeTab, chatModel, chatTemp, chatThinking, chatSystemPrompt, ttsModel, ttsVoice, ttsTemp, ttsSpeed, ttsLanguage, ttsSteps, ttsSeed, ttsGender, ttsAge, ttsPitch, ttsStyle, ttsAccent, ttsInstruct, embedModel, chatMessages, chatInput]);
 
   // Scroll chat window to bottom on new messages
   useEffect(() => {
@@ -805,13 +858,17 @@ export default function PlaygroundPage() {
 
       // Construct character design instructs (only when no persona is selected)
       if (!ttsVoice) {
-        const instructs: string[] = [];
-        if (ttsGender && ttsGender !== 'Auto') instructs.push(ttsGender);
-        if (ttsAge && ttsAge !== 'Auto') instructs.push(ttsAge);
-        if (ttsPitch && ttsPitch !== 'Auto') instructs.push(ttsPitch);
-        if (ttsStyle && ttsStyle !== 'Auto') instructs.push(ttsStyle);
-        if (ttsAccent && ttsAccent !== 'Auto') instructs.push(ttsAccent);
-        payload.tts_instruct = instructs.length > 0 ? instructs.join(', ') : '';
+        if (resolvedTtsEngine === 'voxcpm2') {
+          payload.tts_instruct = ttsInstruct || '';
+        } else {
+          const instructs: string[] = [];
+          if (ttsGender && ttsGender !== 'Auto') instructs.push(ttsGender);
+          if (ttsAge && ttsAge !== 'Auto') instructs.push(ttsAge);
+          if (ttsPitch && ttsPitch !== 'Auto') instructs.push(ttsPitch);
+          if (ttsStyle && ttsStyle !== 'Auto') instructs.push(ttsStyle);
+          if (ttsAccent && ttsAccent !== 'Auto') instructs.push(ttsAccent);
+          payload.tts_instruct = instructs.length > 0 ? instructs.join(', ') : '';
+        }
       } else {
         payload.tts_instruct = '';
       }
@@ -915,6 +972,16 @@ export default function PlaygroundPage() {
 
   const resolvedDefaults = getResolvedDefaults();
   const resolvedTtsDefaults = getResolvedTtsDefaults();
+  const resolvedTtsEngine = (() => {
+    if (!isLocalTts) return 'omnivoice';
+    const group = groups.find((g) => g.name === ttsModel && g.capability === 'tts');
+    let primaryName = ttsModel;
+    if (group && group.items && group.items.length > 0) {
+      primaryName = group.items[0].name;
+    }
+    const modelDetail = models.find((m) => m.name === primaryName && m.capability === 'tts');
+    return modelDetail?.default_config?.engine || 'omnivoice';
+  })();
 
   const selectedChatGroup = groups.find((g) => g.name === chatModel && g.capability === 'chat');
   const selectedTtsGroup = groups.find((g) => g.name === ttsModel && g.capability === 'tts');
@@ -1196,6 +1263,23 @@ export default function PlaygroundPage() {
           {/* Settings Sidebar */}
           <div className="pg-sidebar md:w-[250px] p-4 glass-panel bg-[#18181b] border border-zinc-850 rounded-lg flex flex-col gap-3 shrink-0">
             <h3 className="panel-title text-white font-heading font-semibold pb-1.5 border-b border-zinc-850 text-xs tracking-wide capitalize">{t('playground.audioSettings')}</h3>
+
+            {isLocalTts && (
+              <div className="flex flex-col gap-1 border-b border-zinc-850 pb-2 mb-1">
+                <span className="text-zinc-500 text-[9px] font-semibold uppercase tracking-wider">Yerel Motor Durumu</span>
+                <span className="text-[10px] text-white">
+                  {localTtsInfo.active ? (
+                    <>🟢 Aktif: <strong className="text-emerald-400">{localTtsInfo.engine}</strong></>
+                  ) : (
+                    <>🔴 Servis Çevrimdışı</>
+                  )}
+                </span>
+                <span className="text-[9px] text-zinc-400">
+                  Model Motoru: <strong>{resolvedTtsEngine}</strong>
+                </span>
+              </div>
+            )}
+
             <div className="flex flex-col gap-1">
               <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.modelOrGroup')}</label>
               <div className="custom-select-wrapper select-wrapper w-full">
@@ -1212,25 +1296,35 @@ export default function PlaygroundPage() {
                 </select>
               </div>
             </div>
+
             <div className="flex flex-col gap-1">
               <div className="flex justify-between items-center mb-0.5">
                 <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.voicePersona')}</label>
                 {renderDefaultIndicator('voice', ttsVoice)}
               </div>
-              <div className="custom-select-wrapper select-wrapper w-full">
-                <select
+              {!isLocalTts || (localTtsInfo.active && localTtsInfo.engine === resolvedTtsEngine && voices.length > 0) ? (
+                <div className="custom-select-wrapper select-wrapper w-full">
+                  <select
+                    value={ttsVoice}
+                    onChange={(e) => setTtsVoice(e.target.value)}
+                    className="orion-native-select orion-native-select-sm"
+                  >
+                    {isLocalTts && <option value="">None</option>}
+                    {voices.map((v) => (
+                      <option key={v} value={v}>
+                        {v}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <Input
                   value={ttsVoice}
                   onChange={(e) => setTtsVoice(e.target.value)}
-                  className="orion-native-select orion-native-select-sm"
-                >
-                  {isLocalTts && <option value="">None</option>}
-                  {voices.map((v) => (
-                    <option key={v} value={v}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  placeholder="Ses adını elle yazın (Klon/Persona)..."
+                  className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs"
+                />
+              )}
             </div>
             <div className="flex flex-col gap-1">
               <div className="flex justify-between items-center mb-1 relative group">
@@ -1283,8 +1377,22 @@ export default function PlaygroundPage() {
                 className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs placeholder:text-zinc-600"
               />
             </div>
+            {isLocalTts && resolvedTtsEngine === 'voxcpm2' && (
+              <div className="flex flex-col gap-1 border-t border-zinc-850 pt-3 mt-1">
+                <div className="flex justify-between items-center mb-0.5">
+                  <label className="text-zinc-400 text-[10px] font-semibold capitalize">Konuşma Tarzı Açıklaması</label>
+                  {renderDefaultIndicator('tts_instruct', ttsInstruct)}
+                </div>
+                <Textarea
+                  value={ttsInstruct}
+                  onChange={(e) => setTtsInstruct(e.target.value)}
+                  placeholder="Karakteri betimleyin. Örn: A young girl with a soft, sweet voice. Speaks slowly with a melancholic tone."
+                  className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs h-20 resize-none custom-scrollbar overflow-y-auto"
+                />
+              </div>
+            )}
 
-            {isLocalTts && (
+            {isLocalTts && resolvedTtsEngine === 'omnivoice' && (
               <div className="flex flex-col gap-3 pt-3 mt-1 border-t border-zinc-850">
                 {/* Karakter Tasarımı - Collapsible */}
                 <button
@@ -1306,117 +1414,118 @@ export default function PlaygroundPage() {
                 </button>
 
                 {showCharacterDesign && (
-                <div className={`flex flex-col gap-3 pl-1 border-l border-zinc-800 ${!!ttsVoice ? 'opacity-50 pointer-events-none' : ''}`}>
-                {/* Cinsiyet */}
-                <div className="flex flex-col gap-1">
-                  <div className="flex justify-between items-center mb-0.5">
-                    <label className="text-zinc-400 text-[10px] font-semibold capitalize">Cinsiyet (Gender)</label>
-                    {renderDefaultIndicator('gender', ttsGender)}
-                  </div>
-                  <div className="custom-select-wrapper select-wrapper w-full">
-                    <select
-                      value={ttsGender}
-                      onChange={(e) => setTtsGender(e.target.value)}
-                      className="orion-native-select orion-native-select-sm"
-                    >
-                      <option value="Auto">Auto</option>
-                      <option value="male">male (Erkek)</option>
-                      <option value="female">female (Kadın)</option>
-                    </select>
-                  </div>
-                </div>
+                  <div className={`flex flex-col gap-3 pl-1 border-l border-zinc-800 ${!!ttsVoice ? 'opacity-50 pointer-events-none' : ''}`}>
+                    {/* Cinsiyet */}
+                    <div className="flex flex-col gap-1">
+                      <div className="flex justify-between items-center mb-0.5">
+                        <label className="text-zinc-400 text-[10px] font-semibold capitalize">Cinsiyet (Gender)</label>
+                        {renderDefaultIndicator('gender', ttsGender)}
+                      </div>
+                      <div className="custom-select-wrapper select-wrapper w-full">
+                        <select
+                          value={ttsGender}
+                          onChange={(e) => setTtsGender(e.target.value)}
+                          className="orion-native-select orion-native-select-sm"
+                        >
+                          <option value="Auto">Auto</option>
+                          <option value="male">male (Erkek)</option>
+                          <option value="female">female (Kadın)</option>
+                        </select>
+                      </div>
+                    </div>
 
-                {/* Yaş Grubu */}
-                <div className="flex flex-col gap-1">
-                  <div className="flex justify-between items-center mb-0.5">
-                    <label className="text-zinc-400 text-[10px] font-semibold capitalize">Yaş Grubu (Age Group)</label>
-                    {renderDefaultIndicator('age', ttsAge)}
-                  </div>
-                  <div className="custom-select-wrapper select-wrapper w-full">
-                    <select
-                      value={ttsAge}
-                      onChange={(e) => setTtsAge(e.target.value)}
-                      className="orion-native-select orion-native-select-sm"
-                    >
-                      <option value="Auto">Auto</option>
-                      <option value="child">child (Çocuk)</option>
-                      <option value="teenager">teenager (Genç)</option>
-                      <option value="young adult">young adult (Genç Yetişkin)</option>
-                      <option value="middle-aged">middle-aged (Orta Yaşlı)</option>
-                      <option value="elderly">elderly (Yaşlı)</option>
-                    </select>
-                  </div>
-                </div>
+                    {/* Yaş Grubu */}
+                    <div className="flex flex-col gap-1">
+                      <div className="flex justify-between items-center mb-0.5">
+                        <label className="text-zinc-400 text-[10px] font-semibold capitalize">Yaş Grubu (Age Group)</label>
+                        {renderDefaultIndicator('age', ttsAge)}
+                      </div>
+                      <div className="custom-select-wrapper select-wrapper w-full">
+                        <select
+                          value={ttsAge}
+                          onChange={(e) => setTtsAge(e.target.value)}
+                          className="orion-native-select orion-native-select-sm"
+                        >
+                          <option value="Auto">Auto</option>
+                          <option value="child">child (Çocuk)</option>
+                          <option value="teenager">teenager (Genç)</option>
+                          <option value="young adult">young adult (Genç Yetişkin)</option>
+                          <option value="middle-aged">middle-aged (Orta Yaşlı)</option>
+                          <option value="elderly">elderly (Yaşlı)</option>
+                        </select>
+                      </div>
+                    </div>
 
-                {/* Ton */}
-                <div className="flex flex-col gap-1">
-                  <div className="flex justify-between items-center mb-0.5">
-                    <label className="text-zinc-400 text-[10px] font-semibold capitalize">Ton (Pitch)</label>
-                    {renderDefaultIndicator('pitch', ttsPitch)}
-                  </div>
-                  <div className="custom-select-wrapper select-wrapper w-full">
-                    <select
-                      value={ttsPitch}
-                      onChange={(e) => setTtsPitch(e.target.value)}
-                      className="orion-native-select orion-native-select-sm"
-                    >
-                      <option value="Auto">Auto</option>
-                      <option value="very high pitch">very high pitch (Çok Tiz)</option>
-                      <option value="high pitch">high pitch (Tiz)</option>
-                      <option value="moderate pitch">moderate pitch (Normal)</option>
-                      <option value="low pitch">low pitch (Pes/Bas)</option>
-                      <option value="very low pitch">very low pitch (Çok Pes/Bas)</option>
-                    </select>
-                  </div>
-                </div>
+                    {/* Ton */}
+                    <div className="flex flex-col gap-1">
+                      <div className="flex justify-between items-center mb-0.5">
+                        <label className="text-zinc-400 text-[10px] font-semibold capitalize">Ton (Pitch)</label>
+                        {renderDefaultIndicator('pitch', ttsPitch)}
+                      </div>
+                      <div className="custom-select-wrapper select-wrapper w-full">
+                        <select
+                          value={ttsPitch}
+                          onChange={(e) => setTtsPitch(e.target.value)}
+                          className="orion-native-select orion-native-select-sm"
+                        >
+                          <option value="Auto">Auto</option>
+                          <option value="very high pitch">very high pitch (Çok Tiz)</option>
+                          <option value="high pitch">high pitch (Tiz)</option>
+                          <option value="moderate pitch">moderate pitch (Normal)</option>
+                          <option value="low pitch">low pitch (Pes/Bas)</option>
+                          <option value="very low pitch">very low pitch (Çok Pes/Bas)</option>
+                        </select>
+                      </div>
+                    </div>
 
-                {/* Stil */}
-                <div className="flex flex-col gap-1">
-                  <div className="flex justify-between items-center mb-0.5">
-                    <label className="text-zinc-400 text-[10px] font-semibold capitalize">Stil (Style)</label>
-                    {renderDefaultIndicator('style', ttsStyle)}
-                  </div>
-                  <div className="custom-select-wrapper select-wrapper w-full">
-                    <select
-                      value={ttsStyle}
-                      onChange={(e) => setTtsStyle(e.target.value)}
-                      className="orion-native-select orion-native-select-sm"
-                    >
-                      <option value="Auto">Auto</option>
-                      <option value="whisper">whisper (Fısıltı)</option>
-                    </select>
-                  </div>
-                </div>
+                    {/* Stil */}
+                    <div className="flex flex-col gap-1">
+                      <div className="flex justify-between items-center mb-0.5">
+                        <label className="text-zinc-400 text-[10px] font-semibold capitalize">Stil (Style)</label>
+                        {renderDefaultIndicator('style', ttsStyle)}
+                      </div>
+                      <div className="custom-select-wrapper select-wrapper w-full">
+                        <select
+                          value={ttsStyle}
+                          onChange={(e) => setTtsStyle(e.target.value)}
+                          className="orion-native-select orion-native-select-sm"
+                        >
+                          <option value="Auto">Auto</option>
+                          <option value="whisper">whisper (Fısıltı)</option>
+                        </select>
+                      </div>
+                    </div>
 
-                {/* Aksan */}
-                <div className="flex flex-col gap-1">
-                  <div className="flex justify-between items-center mb-0.5">
-                    <label className="text-zinc-400 text-[10px] font-semibold capitalize">Aksan (Accent)</label>
-                    {renderDefaultIndicator('accent', ttsAccent)}
+                    {/* Aksan */}
+                    <div className="flex flex-col gap-1">
+                      <div className="flex justify-between items-center mb-0.5">
+                        <label className="text-zinc-400 text-[10px] font-semibold capitalize">Aksan (Accent)</label>
+                        {renderDefaultIndicator('accent', ttsAccent)}
+                      </div>
+                      <div className="custom-select-wrapper select-wrapper w-full">
+                        <select
+                          value={ttsAccent}
+                          onChange={(e) => setTtsAccent(e.target.value)}
+                          className="orion-native-select orion-native-select-sm"
+                        >
+                          <option value="Auto">Auto</option>
+                          <option value="american accent">american accent</option>
+                          <option value="australian accent">australian accent</option>
+                          <option value="british accent">british accent</option>
+                          <option value="canadian accent">canadian accent</option>
+                          <option value="chinese accent">chinese accent</option>
+                          <option value="indian accent">indian accent</option>
+                          <option value="japanese accent">japanese accent</option>
+                          <option value="korean accent">korean accent</option>
+                          <option value="portuguese accent">portuguese accent</option>
+                          <option value="russian accent">russian accent</option>
+                        </select>
+                      </div>
+                    </div>
                   </div>
-                  <div className="custom-select-wrapper select-wrapper w-full">
-                    <select
-                      value={ttsAccent}
-                      onChange={(e) => setTtsAccent(e.target.value)}
-                      className="orion-native-select orion-native-select-sm"
-                    >
-                      <option value="Auto">Auto</option>
-                      <option value="american accent">american accent</option>
-                      <option value="australian accent">australian accent</option>
-                      <option value="british accent">british accent</option>
-                      <option value="canadian accent">canadian accent</option>
-                      <option value="chinese accent">chinese accent</option>
-                      <option value="indian accent">indian accent</option>
-                      <option value="japanese accent">japanese accent</option>
-                      <option value="korean accent">korean accent</option>
-                      <option value="portuguese accent">portuguese accent</option>
-                      <option value="russian accent">russian accent</option>
-                    </select>
-                  </div>
-                </div>
-
-                </div>
                 )}
+              </div>
+            )}
 
                 {/* 🌊 Streaming Ayarları */}
                 <button
@@ -1461,27 +1570,36 @@ export default function PlaygroundPage() {
                         <label className="text-zinc-400 text-[10px] font-semibold capitalize">Dil (Language)</label>
                         {renderDefaultIndicator('language', ttsLanguage)}
                       </div>
-                      <div className="custom-select-wrapper select-wrapper w-full">
-                        <select
+                      {!isLocalTts || resolvedTtsEngine === 'omnivoice' ? (
+                        <div className="custom-select-wrapper select-wrapper w-full">
+                          <select
+                            value={ttsLanguage}
+                            onChange={(e) => setTtsLanguage(e.target.value)}
+                            className="orion-native-select orion-native-select-sm"
+                          >
+                            {languages.length > 0 ? (
+                              languages.map((lang) => (
+                                <option key={lang} value={lang}>
+                                  {lang === 'Auto' ? 'Otomatik Algıla (Auto)' : lang}
+                                </option>
+                              ))
+                            ) : (
+                              <>
+                                <option value="Auto">Otomatik Algıla (Auto)</option>
+                                <option value="Turkish">Turkish</option>
+                                <option value="English">English</option>
+                              </>
+                            )}
+                          </select>
+                        </div>
+                      ) : (
+                        <Input
                           value={ttsLanguage}
                           onChange={(e) => setTtsLanguage(e.target.value)}
-                          className="orion-native-select orion-native-select-sm"
-                        >
-                          {languages.length > 0 ? (
-                            languages.map((lang) => (
-                              <option key={lang} value={lang}>
-                                {lang === 'Auto' ? 'Otomatik Algıla (Auto)' : lang}
-                              </option>
-                            ))
-                          ) : (
-                            <>
-                              <option value="Auto">Otomatik Algıla (Auto)</option>
-                              <option value="Turkish">Turkish</option>
-                              <option value="English">English</option>
-                            </>
-                          )}
-                        </select>
-                      </div>
+                          placeholder="Dil elle yazın. Örn: Turkish, English..."
+                          className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs"
+                        />
+                      )}
                     </div>
 
                     <div className="flex flex-col gap-1">
@@ -1533,8 +1651,6 @@ export default function PlaygroundPage() {
                     </div>
                   </div>
                 )}
-              </div>
-            )}
           </div>
 
           {/* Main Area */}

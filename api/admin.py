@@ -428,6 +428,28 @@ async def get_admin_tts_languages(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/api/local-tts-info", dependencies=[Depends(verify_admin)])
+async def get_local_tts_info():
+    """Yerel TTS servisinin aktif model/motor bilgisini döner."""
+    from core.config import TTS_HOST, TTS_PORT
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=1.5) as client:
+            res = await client.get(f"http://{TTS_HOST}:{TTS_PORT}/v1/model_info")
+            if res.status_code == 200:
+                data = res.json()
+                return {
+                    "active": True,
+                    "engine": data.get("engine", "omnivoice"),
+                    "voices": data.get("voices", []),
+                    "languages": data.get("languages", []),
+                    "low_vram": data.get("low_vram", False),
+                    "idle_cleanup_mins": data.get("idle_cleanup_mins", None)
+                }
+    except Exception as e:
+        logger.debug(f"Could not fetch model info from local TTS: {e}")
+    return {"active": False, "engine": None, "voices": [], "languages": []}
+
 # ---------------------------------------------------------------------------
 #  Provider Key Pool
 # ---------------------------------------------------------------------------
