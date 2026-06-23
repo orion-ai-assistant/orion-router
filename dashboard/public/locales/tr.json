@@ -321,6 +321,21 @@
   "tts.steps": "Adım (Steps)",
   "tts.steps.quality": "Kalite Adımı (Steps)",
   "tts.seed": "Seed (-1: Rastgele)",
-  "tts.seed.fixed": "Sabit Seed (-1: Rastgele)"
+  "tts.seed.fixed": "Sabit Seed (-1: Rastgele)",
+  "common.none": "Yok",
+  "tts.engine.omnivoice": "Omni Ses (omnivoice)",
+  "tts.engine.voxcpm2": "VOXCPM2 (voxcpm2)",
+  "tts.language.turkish": "Türkçe",
+  "tts.language.english": "İngilizce",
+  "tts.accent.american": "Amerikan Aksanı",
+  "tts.accent.australian": "Avustralya Aksanı",
+  "tts.accent.british": "İngiliz Aksanı",
+  "tts.accent.canadian": "Kanada Aksanı",
+  "tts.accent.chinese": "Çin Aksanı",
+  "tts.accent.indian": "Hint Aksanı",
+  "tts.accent.japanese": "Japon Aksanı",
+  "tts.accent.korean": "Kore Aksanı",
+  "tts.accent.portuguese": "Portekiz Aksanı",
+  "tts.accent.russian": "Rus Aksanı"
 }
 

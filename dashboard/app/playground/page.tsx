@@ -95,6 +95,8 @@ export default function PlaygroundPage() {
     languages: string[];
   }>({ active: false, engine: null, voices: [], languages: [] });
 
+  const ttsHasPersona = !!ttsVoice && ttsVoice.toLowerCase() !== 'none';
+
   // Embed State
   const [embedModel, setEmbedModel] = useState(getSavedState('pg_embedModel', ''));
   const [embedInput, setEmbedInput] = useState('');
@@ -280,7 +282,7 @@ export default function PlaygroundPage() {
       // Keeping values loaded from localStorage on page refresh
       if (isLocal) {
         if (ttsVoice !== '' && nextVoices.length > 0 && !nextVoices.includes(ttsVoice)) {
-          // Keep manual text if it wasn't a dropdown or if dropdown contains it
+          setTtsVoice('');
         }
       } else {
         if (!nextVoices.includes(ttsVoice)) {
@@ -329,7 +331,7 @@ export default function PlaygroundPage() {
 
       // 1. Voice
       const defVoice = getVal('voice', '');
-      if (defVoice) {
+      if (defVoice && defVoice.toLowerCase() !== 'none') {
         setTtsVoice(defVoice);
       } else {
         if (isLocal) {
@@ -875,7 +877,8 @@ export default function PlaygroundPage() {
       payload.seed = parseInt(ttsSeed, 10) || -1;
 
       // Construct character design instructs (only when no persona is selected)
-      if (!ttsVoice) {
+      const hasPersona = !!ttsVoice && ttsVoice.toLowerCase() !== 'none';
+      if (!hasPersona) {
         if (resolvedTtsEngine === 'voxcpm2') {
           payload.tts_instruct = ttsInstruct || '';
         } else {
@@ -1328,7 +1331,10 @@ export default function PlaygroundPage() {
                         onChange={(e) => setTtsVoice(e.target.value)}
                         className="orion-native-select orion-native-select-sm"
                       >
-                        {isLocalTts && <option value="">None</option>}
+                        {isLocalTts && <option value="">{t('common.none')}</option>}
+                        {ttsVoice && !voices.includes(ttsVoice) && ttsVoice.toLowerCase() !== 'none' && (
+                          <option value={ttsVoice}>{ttsVoice} ⚠️</option>
+                        )}
                         {voices.map((v) => (
                           <option key={v} value={v}>
                             {v}
@@ -1393,15 +1399,15 @@ export default function PlaygroundPage() {
                     value={ttsTemp}
                     onChange={(e) => setTtsTemp(e.target.value)}
                     placeholder={t('playground.optional')}
-                    className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs placeholder:text-zinc-600"
+                    className="bg-black/40 border border-zinc-855 text-white rounded px-2.5 py-1.5 text-xs placeholder:text-zinc-600"
                   />
                 </div>
                 {isLocalTts && resolvedTtsEngine === 'voxcpm2' && (
-                  <div className={`flex flex-col gap-1 border-t border-zinc-855 pt-3 mt-1 ${!!ttsVoice ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <div className={`flex flex-col gap-1 border-t border-zinc-855 pt-3 mt-1 ${ttsHasPersona ? 'opacity-50 pointer-events-none' : ''}`}>
                     <div className="flex justify-between items-center mb-0.5">
                       <div className="flex items-center gap-2">
                         <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('tts.speech.style')}</label>
-                        {!!ttsVoice && (
+                        {ttsHasPersona && (
                           <span className="text-[8px] text-zinc-600 font-medium bg-black/40 px-1 py-0.5 rounded border border-zinc-800 normal-case">{t('tts.persona.active')}</span>
                         )}
                       </div>
@@ -1422,14 +1428,14 @@ export default function PlaygroundPage() {
                     <button
                       type="button"
                       onClick={() => setShowCharacterDesign(!showCharacterDesign)}
-                      className={`flex items-center justify-between text-left text-[10px] font-semibold uppercase tracking-wider py-1 cursor-pointer transition-colors w-full ${!!ttsVoice
+                      className={`flex items-center justify-between text-left text-[10px] font-semibold uppercase tracking-wider py-1 cursor-pointer transition-colors w-full ${ttsHasPersona
                           ? 'text-zinc-500 hover:text-zinc-400'
                           : 'text-zinc-300 hover:text-white'
                         }`}
                     >
                       <span className="flex items-center gap-2">
                         {t('tts.character.design')}
-                        {!!ttsVoice && (
+                        {ttsHasPersona && (
                           <span className="text-[8px] text-zinc-600 font-medium bg-black/40 px-1 py-0.5 rounded border border-zinc-800 normal-case">{t('tts.persona.active')}</span>
                         )}
                       </span>
@@ -1437,7 +1443,7 @@ export default function PlaygroundPage() {
                     </button>
 
                     {showCharacterDesign && (
-                      <div className={`flex flex-col gap-3 pl-1 border-l border-zinc-800 ${!!ttsVoice ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <div className={`flex flex-col gap-3 pl-1 border-l border-zinc-800 ${ttsHasPersona ? 'opacity-50 pointer-events-none' : ''}`}>
                         {/* Cinsiyet */}
                         <div className="flex flex-col gap-1">
                           <div className="flex justify-between items-center mb-0.5">
@@ -1537,16 +1543,16 @@ export default function PlaygroundPage() {
                                 className="orion-native-select orion-native-select-sm"
                               >
                                 <option value="Auto">{t('tts.accent.auto')}</option>
-                                <option value="american accent">american accent</option>
-                                <option value="australian accent">australian accent</option>
-                                <option value="british accent">british accent</option>
-                                <option value="canadian accent">canadian accent</option>
-                                <option value="chinese accent">chinese accent</option>
-                                <option value="indian accent">indian accent</option>
-                                <option value="japanese accent">japanese accent</option>
-                                <option value="korean accent">korean accent</option>
-                                <option value="portuguese accent">portuguese accent</option>
-                                <option value="russian accent">russian accent</option>
+                                <option value="american accent">{t('tts.accent.american')}</option>
+                                <option value="australian accent">{t('tts.accent.australian')}</option>
+                                <option value="british accent">{t('tts.accent.british')}</option>
+                                <option value="canadian accent">{t('tts.accent.canadian')}</option>
+                                <option value="chinese accent">{t('tts.accent.chinese')}</option>
+                                <option value="indian accent">{t('tts.accent.indian')}</option>
+                                <option value="japanese accent">{t('tts.accent.japanese')}</option>
+                                <option value="korean accent">{t('tts.accent.korean')}</option>
+                                <option value="portuguese accent">{t('tts.accent.portuguese')}</option>
+                                <option value="russian accent">{t('tts.accent.russian')}</option>
                               </select>
                             </div>
                           </div>
@@ -1648,8 +1654,8 @@ export default function PlaygroundPage() {
                               ) : (
                                 <>
                                   <option value="Auto">{t('tts.language.auto')}</option>
-                                  <option value="Turkish">Turkish</option>
-                                  <option value="English">English</option>
+                                  <option value="Turkish">{t('tts.language.turkish')}</option>
+                                  <option value="English">{t('tts.language.english')}</option>
                                 </>
                               )}
                             </select>

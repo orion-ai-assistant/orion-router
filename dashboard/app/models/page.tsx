@@ -57,7 +57,7 @@ class TTSDefaultConfig {
   tts_instruct: string;
 
   constructor(data?: Partial<TTSDefaultConfig>) {
-    this.voice = data?.voice || '';
+    this.voice = data?.voice && data.voice.toLowerCase() !== 'none' ? data.voice : '';
     this.gender = data?.gender || 'Auto';
     this.age = data?.age || 'Auto';
     this.pitch = data?.pitch || 'Auto';
@@ -607,8 +607,9 @@ export default function ModelsPage() {
       languages = getAvailableLanguages(formState.provider);
       showLangSelect = languages.length > 0;
     }
-
-    const hasPersona = !!formState.default_config?.voice;
+    const hasPersona = !!formState.default_config?.voice &&
+                       formState.default_config.voice !== '' &&
+                       formState.default_config.voice.toLowerCase() !== 'none';
 
     return (
       <div className="flex flex-col gap-2">
@@ -633,8 +634,8 @@ export default function ModelsPage() {
                     onChange={(e) => updateDefaultConfig(formState, setFormState, 'engine', e.target.value)}
                     className="orion-native-select"
                   >
-                    <option value="omnivoice">Omni Voice (omnivoice)</option>
-                    <option value="voxcpm2">VOXCPM2 (voxcpm2)</option>
+                    <option value="omnivoice">{t('tts.engine.omnivoice')}</option>
+                    <option value="voxcpm2">{t('tts.engine.voxcpm2')}</option>
                   </select>
                 </div>
               </div>
@@ -649,7 +650,10 @@ export default function ModelsPage() {
                     onChange={(e) => updateDefaultConfig(formState, setFormState, 'voice', e.target.value)}
                     className="orion-native-select"
                   >
-                    {isLocal && <option value="">None</option>}
+                    {isLocal && <option value="">{t('common.none')}</option>}
+                    {formState.default_config?.voice && !voices.includes(formState.default_config.voice) && formState.default_config.voice.toLowerCase() !== 'none' && (
+                      <option value={formState.default_config.voice}>{formState.default_config.voice} ⚠️</option>
+                    )}
                     {voices.map((v) => (
                       <option key={v} value={v}>{v}</option>
                     ))}
@@ -686,10 +690,10 @@ export default function ModelsPage() {
               <>
                 <div className={`flex flex-col gap-3 ${hasPersona ? 'opacity-50 pointer-events-none' : ''}`}>
                   <div className="flex items-center justify-between mt-1">
-                    <span className="text-zinc-400 text-[10px] font-semibold uppercase">{t('tts.character.design')}</span>
-                    {hasPersona && (
-                      <span className="text-[8px] text-zinc-600 font-medium bg-black/40 px-1 py-0.5 rounded border border-zinc-800 normal-case">{t('tts.persona.active')}</span>
-                    )}
+                     <span className="text-zinc-400 text-[10px] font-semibold uppercase">{t('tts.character.design')}</span>
+                     {hasPersona && (
+                       <span className="text-[8px] text-zinc-600 font-medium bg-black/40 px-1 py-0.5 rounded border border-zinc-800 normal-case">{t('tts.persona.active')}</span>
+                     )}
                   </div>
                   
                   <div className="grid grid-cols-2 gap-2">
@@ -767,16 +771,16 @@ export default function ModelsPage() {
                           className="orion-native-select orion-native-select-sm"
                         >
                           <option value="Auto">{t('tts.accent.auto')}</option>
-                          <option value="american accent">american accent</option>
-                          <option value="australian accent">australian accent</option>
-                          <option value="british accent">british accent</option>
-                          <option value="canadian accent">canadian accent</option>
-                          <option value="chinese accent">chinese accent</option>
-                          <option value="indian accent">indian accent</option>
-                          <option value="japanese accent">japanese accent</option>
-                          <option value="korean accent">korean accent</option>
-                          <option value="portuguese accent">portuguese accent</option>
-                          <option value="russian accent">russian accent</option>
+                          <option value="american accent">{t('tts.accent.american')}</option>
+                          <option value="australian accent">{t('tts.accent.australian')}</option>
+                          <option value="british accent">{t('tts.accent.british')}</option>
+                          <option value="canadian accent">{t('tts.accent.canadian')}</option>
+                          <option value="chinese accent">{t('tts.accent.chinese')}</option>
+                          <option value="indian accent">{t('tts.accent.indian')}</option>
+                          <option value="japanese accent">{t('tts.accent.japanese')}</option>
+                          <option value="korean accent">{t('tts.accent.korean')}</option>
+                          <option value="portuguese accent">{t('tts.accent.portuguese')}</option>
+                          <option value="russian accent">{t('tts.accent.russian')}</option>
                         </select>
                       </div>
                     </div>
@@ -795,7 +799,7 @@ export default function ModelsPage() {
                           <option value="宁夏话">Ningxia (宁夏话)</option>
                           <option value="桂林话">Guilin (桂林话)</option>
                           <option value="河南话">Henan (河南话)</option>
-                          <option value="济南话">Jinan (济南话)</option>
+                          <option value="济nan话">Jinan (济南话)</option>
                           <option value="甘肃话">Gansu (甘肃话)</option>
                           <option value="石家庄话">Shijiazhuang (石家庄话)</option>
                           <option value="贵州话">Guizhou (贵州话)</option>

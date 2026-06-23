@@ -321,6 +321,21 @@
   "tts.steps": "Steps",
   "tts.steps.quality": "Quality Steps",
   "tts.seed": "Seed (-1: Random)",
-  "tts.seed.fixed": "Fixed Seed (-1: Random)"
+  "tts.seed.fixed": "Fixed Seed (-1: Random)",
+  "common.none": "None",
+  "tts.engine.omnivoice": "Omni Voice (omnivoice)",
+  "tts.engine.voxcpm2": "VOXCPM2 (voxcpm2)",
+  "tts.language.turkish": "Turkish",
+  "tts.language.english": "English",
+  "tts.accent.american": "American Accent",
+  "tts.accent.australian": "Australian Accent",
+  "tts.accent.british": "British Accent",
+  "tts.accent.canadian": "Canadian Accent",
+  "tts.accent.chinese": "Chinese Accent",
+  "tts.accent.indian": "Indian Accent",
+  "tts.accent.japanese": "Japanese Accent",
+  "tts.accent.korean": "Korean Accent",
+  "tts.accent.portuguese": "Portuguese Accent",
+  "tts.accent.russian": "Russian Accent"
 }
 
