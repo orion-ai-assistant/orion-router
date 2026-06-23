@@ -31,6 +31,7 @@
     "starting_pg": "در حال راه‌اندازی PostgreSQL...",
     "pg_log_lock_warning": "    امکان آزاد کردن pg.log وجود ندارد، استفاده از جایگزین: {name}",
     "waiting_for_pg": "در حال انتظار برای آماده شدن PostgreSQL...",
+    "waiting_for_backend": "در انتظار آماده شدن بک‌اند FastAPI...",
     "pg_accepting_conns": "PostgreSQL آماده و در حال پذیرش اتصالات است.",
     "pg_timeout_warning": "زمان آماده‌سازی PostgreSQL به پایان رسید، با این حال ادامه داده می‌شود...",
     "configuring_db_user": "در حال پیکربندی پایگاه داده و کاربر...",

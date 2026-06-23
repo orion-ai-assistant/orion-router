@@ -31,6 +31,7 @@
     "starting_pg": "Pokretanje PostgreSQL...",
     "pg_log_lock_warning": "    pg.log se ne može osloboditi, koristi se alternativa: {name}",
     "waiting_for_pg": "Čekanje da PostgreSQL bude spreman...",
+    "waiting_for_backend": "Čekanje da FastAPI pozadina bude spremna...",
     "pg_accepting_conns": "PostgreSQL je spreman i prihvaća veze.",
     "pg_timeout_warning": "Vrijeme čekanja na PostgreSQL je isteklo, ipak se nastavlja...",
     "configuring_db_user": "Konfiguriranje baze podataka i korisnika...",

@@ -31,6 +31,7 @@
     "starting_pg": "Spouštění PostgreSQL...",
     "pg_log_lock_warning": "    pg.log nelze uvolnit, používá se alternativní: {name}",
     "waiting_for_pg": "Čekání na spuštění PostgreSQL...",
+    "waiting_for_backend": "Čekání na připravenost backendu FastAPI...",
     "pg_accepting_conns": "PostgreSQL je připraven a přijímá připojení.",
     "pg_timeout_warning": "Časový limit pro připravenost PostgreSQL vypršel, pokračuje se...",
     "configuring_db_user": "Konfigurace databáze a uživatele...",

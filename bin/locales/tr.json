@@ -32,6 +32,7 @@
     "starting_pg": "PostgreSQL başlatılıyor...",
     "pg_log_lock_warning": "    pg.log serbest bırakılamadı, alternatif kullanılıyor: {name}",
     "waiting_for_pg": "PostgreSQL'in hazır olması bekleniyor...",
+    "waiting_for_backend": "FastAPI backendinin hazır olması bekleniyor...",
     "pg_accepting_conns": "PostgreSQL hazır ve bağlantıları kabul ediyor.",
     "pg_timeout_warning": "PostgreSQL hazır olma zaman aşımına uğradı, yine de devam ediliyor...",
     "configuring_db_user": "Veritabanı ve kullanıcı yapılandırılıyor...",

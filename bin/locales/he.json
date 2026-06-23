@@ -31,6 +31,7 @@
     "starting_pg": "מפעיל את PostgreSQL...",
     "pg_log_lock_warning": "    לא ניתן לשחרר את pg.log, משתמש בחלופה: {name}",
     "waiting_for_pg": "ממתין ש-PostgreSQL יהיה מוכן...",
+    "waiting_for_backend": "ממתין למוכנות של backend של FastAPI...",
     "pg_accepting_conns": "PostgreSQL מוכן ומקבל חיבורים.",
     "pg_timeout_warning": "פג זמן המתנה למוכנות PostgreSQL, ממשיך בכל זאת...",
     "configuring_db_user": "מגדיר מסד נתונים ומשתמש...",

@@ -31,6 +31,7 @@
     "starting_pg": "بدء تشغيل PostgreSQL...",
     "pg_log_lock_warning": "    تعذر تحرير pg.log، يتم استخدام بديل: {name}",
     "waiting_for_pg": "في انتظار أن يكون PostgreSQL جاهزًا...",
+    "waiting_for_backend": "في انتظار جاهزية خلفية FastAPI...",
     "pg_accepting_conns": "قاعدة بيانات PostgreSQL جاهزة وتقبل الاتصالات.",
     "pg_timeout_warning": "انتهت مهلة جاهزية PostgreSQL، ومع ذلك يتم المتابعة...",
     "configuring_db_user": "تهيئة قاعدة البيانات والمستخدم...",

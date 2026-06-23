@@ -31,6 +31,7 @@
     "starting_pg": "Se pornește PostgreSQL...",
     "pg_log_lock_warning": "    pg.log nu a putut fi eliberat, se folosește alternativa: {name}",
     "waiting_for_pg": "Se așteaptă ca PostgreSQL să fie pregătit...",
+    "waiting_for_backend": "Se așteaptă ca backend-ul FastAPI să fie gata...",
     "pg_accepting_conns": "PostgreSQL este pregătit și acceptă conexiuni.",
     "pg_timeout_warning": "Timpul de așteptare pentru pregătirea PostgreSQL a expirat, se continuă oricum...",
     "configuring_db_user": "Se configurează baza de date și utilizatorul...",

@@ -31,6 +31,7 @@
     "starting_pg": "Käynnistetään PostgreSQL...",
     "pg_log_lock_warning": "    Tiedostoa pg.log ei voitu vapauttaa, käytetään vaihtoehtoa: {name}",
     "waiting_for_pg": "Odotetaan, että PostgreSQL on valmis...",
+    "waiting_for_backend": "Odotetaan FastAPI-taustajärjestelmän valmistumista...",
     "pg_accepting_conns": "PostgreSQL on valmis ja hyväksyy yhteyksiä.",
     "pg_timeout_warning": "PostgreSQL-valmiustarkistuksen aikakatkaisu, jatketaan silti...",
     "configuring_db_user": "Määritetään tietokantaa ja käyttäjää...",

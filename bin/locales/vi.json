@@ -31,6 +31,7 @@
     "starting_pg": "Đang khởi động PostgreSQL...",
     "pg_log_lock_warning": "    Không thể giải phóng tệp pg.log, đang sử dụng phương án thay thế: {name}",
     "waiting_for_pg": "Đang chờ PostgreSQL sẵn sàng...",
+    "waiting_for_backend": "Đang chờ backend FastAPI sẵn sàng...",
     "pg_accepting_conns": "PostgreSQL đã sẵn sàng và đang chấp nhận kết nối.",
     "pg_timeout_warning": "Quá thời gian chờ PostgreSQL sẵn sàng, vẫn tiếp tục...",
     "configuring_db_user": "Đang cấu hình cơ sở dữ liệu và người dùng...",

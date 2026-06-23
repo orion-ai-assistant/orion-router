@@ -31,6 +31,7 @@
     "starting_pg": "PostgreSQL ஐத் தொடங்குகிறது...",
     "pg_log_lock_warning": "    pg.log ஐ விடுவிக்க முடியவில்லை, மாற்றீட்டைப் பயன்படுத்துகிறது: {name}",
     "waiting_for_pg": "PostgreSQL தயாராகும் வரை காத்திருக்கிறது...",
+    "waiting_for_backend": "FastAPI பின்தளம் தயாராவதற்கு காத்திருக்கிறது...",
     "pg_accepting_conns": "PostgreSQL தயாராக உள்ளது மற்றும் இணைப்புகளை ஏற்கிறது.",
     "pg_timeout_warning": "PostgreSQL தயார் சரிபார்ப்பு நேரம் முடிந்தது, இருந்தாலும் தொடர்கிறது...",
     "configuring_db_user": "தரவுத்தளம் மற்றும் பயனரை உள்ளமைக்கிறது...",

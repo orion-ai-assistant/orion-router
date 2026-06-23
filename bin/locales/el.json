@@ -31,6 +31,7 @@
     "starting_pg": "Εκκίνηση της PostgreSQL...",
     "pg_log_lock_warning": "    Δεν ήταν δυνατή η αποδέσμευση του αρχείου pg.log, χρήση εναλλακτικού: {name}",
     "waiting_for_pg": "Αναμονή για την ετοιμότητα της PostgreSQL...",
+    "waiting_for_backend": "Αναμονή για την ετοιμότητα του backend του FastAPI...",
     "pg_accepting_conns": "Η PostgreSQL είναι έτοιμη και δέχεται συνδέσεις.",
     "pg_timeout_warning": "Έληξε το χρονικό όριο ελέγχου ετοιμότητας της PostgreSQL, συνεχίζουμε παρόλα αυτά...",
     "configuring_db_user": "Ρύθμιση παραμέτρων βάσης δεδομένων και χρήστη...",

@@ -31,6 +31,7 @@
     "starting_pg": "Sinisimulan ang PostgreSQL...",
     "pg_log_lock_warning": "    Hindi mapalaya ang pg.log, gagamit ng alternatibo: {name}",
     "waiting_for_pg": "Naghihintay na maging handa ang PostgreSQL...",
+    "waiting_for_backend": "Naghihintay na maging handa ang FastAPI backend...",
     "pg_accepting_conns": "Handa na ang PostgreSQL at tumatanggap ng mga koneksyon.",
     "pg_timeout_warning": "Nag-timeout ang pagsusuri sa kahandaan ng PostgreSQL, magpapatuloy pa rin...",
     "configuring_db_user": "Kino-configure ang database at user...",

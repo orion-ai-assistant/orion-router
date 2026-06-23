@@ -31,6 +31,7 @@
     "starting_pg": "Стартиране на PostgreSQL...",
     "pg_log_lock_warning": "    pg.log не може да бъде освободен, използва се алтернативен: {name}",
     "waiting_for_pg": "Изчакване PostgreSQL да бъде готов...",
+    "waiting_for_backend": "Изчакване на готовност на FastAPI бекенда...",
     "pg_accepting_conns": "PostgreSQL е готов и приема връзки.",
     "pg_timeout_warning": "Времето за изчакване на готовност на PostgreSQL изтече, продължава се...",
     "configuring_db_user": "Конфигуриране на база данни и потребител...",

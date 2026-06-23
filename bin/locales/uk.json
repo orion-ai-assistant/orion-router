@@ -31,6 +31,7 @@
     "starting_pg": "Запуск PostgreSQL...",
     "pg_log_lock_warning": "    Не вдалося вивільнити pg.log, використовується альтернативний: {name}",
     "waiting_for_pg": "Очікування готовності PostgreSQL...",
+    "waiting_for_backend": "Очікування готовності бекенду FastAPI...",
     "pg_accepting_conns": "PostgreSQL готовий до роботи та приймає з'єднання.",
     "pg_timeout_warning": "Час очікування готовності PostgreSQL вичерпано, продовжуємо все одно...",
     "configuring_db_user": "Налаштування бази даних та користувача...",

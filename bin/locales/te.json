@@ -31,6 +31,7 @@
     "starting_pg": "PostgreSQL ప్రారంభించబడుతోంది...",
     "pg_log_lock_warning": "    pg.log ని విడిపించలేకపోయింది, ప్రత్యామ్నాయాన్ని ఉపయోగిస్తోంది: {name}",
     "waiting_for_pg": "PostgreSQL సిద్ధంగా ఉండటానికి వేచి ఉంది...",
+    "waiting_for_backend": "FastAPI బ్యాకెండ్ సిద్ధంగా ఉండటానికి వేచి ఉంది...",
     "pg_accepting_conns": "PostgreSQL సిద్ధంగా ఉంది మరియు కనెక్షన్‌లను అంగీకరిస్తోంది.",
     "pg_timeout_warning": "PostgreSQL సిద్ధంగా ఉండటానికి గడువు ముగిసింది, అయినా కొనసాగుతోంది...",
     "configuring_db_user": "డేటాబేస్ మరియు వినియోగదారుని కాన్ఫిగర్ చేస్తోంది...",

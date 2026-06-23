@@ -31,6 +31,7 @@
     "starting_pg": "กำลังเริ่ม PostgreSQL...",
     "pg_log_lock_warning": "    ไม่สามารถเคลียร์ไฟล์ pg.log ได้ กำลังใช้ไฟล์สำรอง: {name}",
     "waiting_for_pg": "กำลังรอให้ PostgreSQL พร้อมใช้งาน...",
+    "waiting_for_backend": "กำลังรอให้แบ็กเอนด์ FastAPI พร้อมใช้งาน...",
     "pg_accepting_conns": "PostgreSQL พร้อมใช้งานและกำลังยอมรับการเชื่อมต่อ",
     "pg_timeout_warning": "หมดเวลาตรวจสอบความพร้อมของ PostgreSQL กำลังดำเนินการต่อ...",
     "configuring_db_user": "กำลังกำหนดค่าฐานข้อมูลและผู้ใช้...",

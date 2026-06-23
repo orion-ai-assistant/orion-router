@@ -31,6 +31,7 @@
     "starting_pg": "PostgreSQL indítása...",
     "pg_log_lock_warning": "    A pg.log nem szabadítható fel, alternatív használata: {name}",
     "waiting_for_pg": "Várakozás a PostgreSQL készenlétére...",
+    "waiting_for_backend": "Várakozás a FastAPI háttérrendszer elkészülésére...",
     "pg_accepting_conns": "PostgreSQL készen áll és fogadja a kapcsolatokat.",
     "pg_timeout_warning": "Időtúllépés a PostgreSQL készenlétének ellenőrzésekor, folytatás ettől függetlenül...",
     "configuring_db_user": "Adatbázis és felhasználó konfigurálása...",

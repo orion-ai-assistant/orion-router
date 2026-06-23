@@ -31,6 +31,7 @@
     "starting_pg": "Uruchamianie PostgreSQL...",
     "pg_log_lock_warning": "    Nie można zwolnić pliku pg.log, użyto alternatywnego: {name}",
     "waiting_for_pg": "Oczekiwanie na gotowość PostgreSQL...",
+    "waiting_for_backend": "Oczekiwanie na gotowość backendu FastAPI...",
     "pg_accepting_conns": "PostgreSQL jest gotowy i akceptuje połączenia.",
     "pg_timeout_warning": "Przekroczono limit czasu gotowości PostgreSQL, kontynuowanie mimo to...",
     "configuring_db_user": "Konfigurowanie bazy danych i użytkownika...",

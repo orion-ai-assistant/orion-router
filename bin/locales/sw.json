@@ -31,6 +31,7 @@
     "starting_pg": "Inaanzisha PostgreSQL...",
     "pg_log_lock_warning": "    pg.log haikuweza kuachiliwa, kwa kutumia mbadala: {name}",
     "waiting_for_pg": "Inasubiri PostgreSQL iwe tayari...",
+    "waiting_for_backend": "Inasubiri backend ya FastAPI kuwa tayari...",
     "pg_accepting_conns": "PostgreSQL iko tayari na inakubali viunganisho.",
     "pg_timeout_warning": "Muda wa kuangalia utayari wa PostgreSQL umeisha, ikiendelea hata hivyo...",
     "configuring_db_user": "Inasanidi hifadhidata na mtumiaji...",

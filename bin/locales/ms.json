@@ -31,6 +31,7 @@
     "starting_pg": "Memulakan PostgreSQL...",
     "pg_log_lock_warning": "    pg.log tidak dapat dibebaskan, menggunakan alternatif: {name}",
     "waiting_for_pg": "Menunggu PostgreSQL sedia...",
+    "waiting_for_backend": "Menunggu backend FastAPI sedia...",
     "pg_accepting_conns": "PostgreSQL sedia dan menerima sambungan.",
     "pg_timeout_warning": "Pemeriksaan sedia PostgreSQL tamat masa, meneruskan juga...",
     "configuring_db_user": "Mengkonfigurasi pangkalan data dan pengguna...",

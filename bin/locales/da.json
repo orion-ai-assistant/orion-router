@@ -31,6 +31,7 @@
     "starting_pg": "Starter PostgreSQL...",
     "pg_log_lock_warning": "    pg.log kunne ikke frigøres, bruger alternativ: {name}",
     "waiting_for_pg": "Venter på, at PostgreSQL er klar...",
+    "waiting_for_backend": "Venter på, at FastAPI-backend er klar...",
     "pg_accepting_conns": "PostgreSQL er klar og accepterer forbindelser.",
     "pg_timeout_warning": "PostgreSQL klar-tjek fik timeout, fortsætter alligevel...",
     "configuring_db_user": "Konfigurerer database og bruger...",

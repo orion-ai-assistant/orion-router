@@ -31,6 +31,7 @@
     "starting_pg": "PostgreSQL を起動しています...",
     "pg_log_lock_warning": "    pg.log を解放できませんでした。代替を使用します: {name}",
     "waiting_for_pg": "PostgreSQL の起動を待機しています...",
+    "waiting_for_backend": "FastAPIバックエンドの準備ができるのを待っています...",
     "pg_accepting_conns": "PostgreSQL は準備が完了し、接続を受け入れています。",
     "pg_timeout_warning": "PostgreSQL の起動待機がタイムアウトしました。処理を続行します...",
     "configuring_db_user": "データベースとユーザーを設定しています...",

@@ -61,6 +61,22 @@ def launch(router_port: str) -> list[tuple[str, subprocess.Popen]]:
     )
     procs.append(("FastAPI", backend))
 
+    # Wait for FastAPI backend to be ready before launching Next.js dev server
+    # to prevent ECONNREFUSED error on startup proxying
+    info(t("waiting_for_backend"))
+    backend_url = f"http://127.0.0.1:{router_port}/health"
+    start_time = time.time()
+    while time.time() - start_time < 30:
+        if backend.poll() is not None:
+            break
+        try:
+            with urllib.request.urlopen(backend_url, timeout=1.0) as resp:
+                if resp.status == 200:
+                    break
+        except Exception:
+            pass
+        time.sleep(0.5)
+
     # Next.js frontend
     if npm_needs_install(DASHBOARD):
         dim(t("npm_installing_deps"))

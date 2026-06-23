@@ -31,6 +31,7 @@
     "starting_pg": "PostgreSQL शुरू किया जा रहा है...",
     "pg_log_lock_warning": "    pg.log को मुक्त नहीं किया जा सका, विकल्प का उपयोग किया जा रहा है: {name}",
     "waiting_for_pg": "PostgreSQL के तैयार होने की प्रतीक्षा की जा रही है...",
+    "waiting_for_backend": "FastAPI बैकएंड के तैयार होने की प्रतीक्षा की जा रही है...",
     "pg_accepting_conns": "PostgreSQL तैयार है और कनेक्शन स्वीकार कर रहा है.",
     "pg_timeout_warning": "PostgreSQL तैयार होने की प्रतीक्षा अवधि समाप्त हो गई, फिर भी जारी रखा जा रहा है...",
     "configuring_db_user": "डेटाबेस और उपयोगकर्ता को कॉन्फ़िगर किया जा रहा है...",

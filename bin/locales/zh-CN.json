@@ -31,6 +31,7 @@
     "starting_pg": "正在启动 PostgreSQL...",
     "pg_log_lock_warning": "    无法释放 pg.log，正在使用备用日志: {name}",
     "waiting_for_pg": "正在等待 PostgreSQL 就绪...",
+    "waiting_for_backend": "正在等待 FastAPI 后端就绪...",
     "pg_accepting_conns": "PostgreSQL 已就绪并接受连接。",
     "pg_timeout_warning": "等待 PostgreSQL 就绪超时，正在继续...",
     "configuring_db_user": "正在配置数据库和用户...",
