@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { ChevronDown, Check } from 'lucide-react';
-import { SUPPORTED_LOCALES, LOCALE_NAMES } from '@/lib/i18n';
+import { SUPPORTED_LOCALES, LOCALE_NAMES, Locale } from '@/lib/i18n';
 
 export default function SettingsPage() {
   const { showToast, updateAdminKey, t, locale, setLocale } = useApp();
@@ -26,7 +26,14 @@ export default function SettingsPage() {
 
   // Locale dropdown states
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
+  const [highlightedLocale, setHighlightedLocale] = useState<Locale | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const searchTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
+  const listRef = React.useRef<HTMLDivElement>(null);
+
+  const highlightedRef = React.useRef<Locale | null>(null);
+  highlightedRef.current = highlightedLocale;
 
   React.useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -37,6 +44,141 @@ export default function SettingsPage() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  React.useEffect(() => {
+    if (langDropdownOpen) {
+      setHighlightedLocale(locale as Locale);
+      setSearchQuery('');
+    }
+  }, [langDropdownOpen, locale]);
+
+  React.useEffect(() => {
+    if (!langDropdownOpen) return;
+
+    function normalizeString(str: string): string {
+      return str
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.ctrlKey || event.altKey || event.metaKey) return;
+
+      const key = event.key;
+
+      if (key === 'Escape') {
+        event.preventDefault();
+        setLangDropdownOpen(false);
+        return;
+      }
+
+      if (key === 'Enter' || key === ' ') {
+        event.preventDefault();
+        const currentHighlight = highlightedRef.current;
+        if (currentHighlight) {
+          setLocale(currentHighlight);
+        }
+        setLangDropdownOpen(false);
+        return;
+      }
+
+      if (key === 'ArrowDown') {
+        event.preventDefault();
+        const currentHighlight = highlightedRef.current;
+        const currentIndex = currentHighlight ? SUPPORTED_LOCALES.indexOf(currentHighlight as any) : -1;
+        const nextIndex = currentIndex < SUPPORTED_LOCALES.length - 1 ? currentIndex + 1 : 0;
+        const nextLocale = SUPPORTED_LOCALES[nextIndex];
+        setHighlightedLocale(nextLocale);
+        
+        const activeEl = listRef.current?.querySelector(`[data-locale="${nextLocale}"]`);
+        if (activeEl) {
+          activeEl.scrollIntoView({ block: 'nearest' });
+        }
+        return;
+      }
+
+      if (key === 'ArrowUp') {
+        event.preventDefault();
+        const currentHighlight = highlightedRef.current;
+        const currentIndex = currentHighlight ? SUPPORTED_LOCALES.indexOf(currentHighlight as any) : -1;
+        const prevIndex = currentIndex > 0 ? currentIndex - 1 : SUPPORTED_LOCALES.length - 1;
+        const prevLocale = SUPPORTED_LOCALES[prevIndex];
+        setHighlightedLocale(prevLocale);
+
+        const activeEl = listRef.current?.querySelector(`[data-locale="${prevLocale}"]`);
+        if (activeEl) {
+          activeEl.scrollIntoView({ block: 'nearest' });
+        }
+        return;
+      }
+
+      if (key.length === 1) {
+        event.preventDefault();
+
+        if (searchTimeoutRef.current) {
+          clearTimeout(searchTimeoutRef.current);
+        }
+
+        const lowerKey = key.toLowerCase();
+        setSearchQuery((prevQuery) => {
+          let newQuery = prevQuery + lowerKey;
+          const isRepeatedKey = prevQuery.length > 0 && prevQuery.split('').every(char => char === lowerKey);
+          let match: Locale | null = null;
+          const currentHighlight = highlightedRef.current;
+
+          if (isRepeatedKey && lowerKey === prevQuery[0]) {
+            const singleChar = lowerKey;
+            const normalizedChar = normalizeString(singleChar);
+            const matches = SUPPORTED_LOCALES.filter(l => {
+              const name = normalizeString(LOCALE_NAMES[l] || l);
+              const code = l.toLowerCase();
+              return name.startsWith(normalizedChar) || code.startsWith(normalizedChar);
+            });
+
+            if (matches.length > 0) {
+              const currentIndex = currentHighlight ? matches.indexOf(currentHighlight) : -1;
+              const nextIndex = (currentIndex + 1) % matches.length;
+              match = matches[nextIndex];
+            }
+            newQuery = singleChar;
+          } else {
+            const found = SUPPORTED_LOCALES.find(l => {
+              const name = normalizeString(LOCALE_NAMES[l] || l);
+              const code = l.toLowerCase();
+              const normalizedQuery = normalizeString(newQuery);
+              return name.startsWith(normalizedQuery) || code.startsWith(normalizedQuery);
+            });
+            if (found) {
+              match = found;
+            }
+          }
+
+          if (match) {
+            setHighlightedLocale(match);
+            const activeEl = listRef.current?.querySelector(`[data-locale="${match}"]`);
+            if (activeEl) {
+              activeEl.scrollIntoView({ block: 'nearest' });
+            }
+          }
+
+          searchTimeoutRef.current = setTimeout(() => {
+            setSearchQuery('');
+          }, 1000);
+
+          return newQuery;
+        });
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [langDropdownOpen, setLocale]);
 
   const handleChangeAdminSecret = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,15 +288,26 @@ export default function SettingsPage() {
           </button>
           
           {langDropdownOpen && (
-            <div className="absolute top-[calc(100%+4px)] left-0 w-[240px] bg-zinc-900 border border-zinc-700 rounded-md shadow-2xl z-50 max-h-64 overflow-y-auto custom-scrollbar py-1">
+            <div
+              ref={listRef}
+              className="absolute top-[calc(100%+4px)] left-0 w-[240px] bg-zinc-900 border border-zinc-700 rounded-md shadow-2xl z-50 max-h-64 overflow-y-auto custom-scrollbar py-1"
+            >
               {SUPPORTED_LOCALES.map((l) => (
                 <button
                   key={l}
+                  data-locale={l}
+                  onMouseEnter={() => setHighlightedLocale(l)}
                   onClick={() => {
                     setLocale(l);
                     setLangDropdownOpen(false);
                   }}
-                  className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between hover:bg-zinc-800 transition-colors ${locale === l ? 'bg-zinc-800 text-white font-medium' : 'text-zinc-300'}`}
+                  className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between transition-colors ${
+                    highlightedLocale === l
+                      ? 'bg-zinc-800 text-white font-medium'
+                      : locale === l
+                      ? 'bg-zinc-800/40 text-white/95 font-medium'
+                      : 'text-zinc-300'
+                  }`}
                 >
                   <span dir="auto">{LOCALE_NAMES[l] || l}</span>
                   {locale === l && <Check className="w-4 h-4 text-emerald-500 shrink-0" />}
