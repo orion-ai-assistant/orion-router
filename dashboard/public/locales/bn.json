@@ -341,5 +341,8 @@
   "tts.accent.japanese": "জাপানি অ্যাকসেন্ট",
   "tts.accent.korean": "কোরিয়ান অ্যাকসেন্ট",
   "tts.accent.portuguese": "পর্তুগিজ অ্যাকসেন্ট",
-  "tts.accent.russian": "রাশিয়ান অ্যাকসেন্ট"
+  "tts.accent.russian": "রাশিয়ান অ্যাকসেন্ট",
+  "settings.banner.title": "ওভারভিউ ব্যানার",
+  "settings.banner.description": "আপনার ড্যাশবোর্ড ওভারভিউ ব্যানারের জন্য একটি ব্যাকগ্রাউন্ড স্টাইল চয়ন করুন।",
+  "settings.banner.toast.success": "ড্যাশবোর্ড ব্যানার আপডেট করা হয়েছে!"
 }

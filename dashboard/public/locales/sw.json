@@ -341,5 +341,8 @@
   "tts.accent.japanese": "Lafudhi ya Kijapani",
   "tts.accent.korean": "Lafudhi ya Kikorea",
   "tts.accent.portuguese": "Lafudhi ya Kireno",
-  "tts.accent.russian": "Lafudhi ya Kirusi"
+  "tts.accent.russian": "Lafudhi ya Kirusi",
+  "settings.banner.title": "Bango la Muhtasari",
+  "settings.banner.description": "Chagua mtindo wa mandharinyuma kwa bango lako la muhtasari wa dashibodi.",
+  "settings.banner.toast.success": "Bango la dashibodi limesasishwa!"
 }

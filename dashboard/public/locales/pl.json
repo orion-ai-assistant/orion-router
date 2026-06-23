@@ -341,5 +341,8 @@
   "tts.accent.japanese": "Japoński akcent",
   "tts.accent.korean": "Koreański akcent",
   "tts.accent.portuguese": "Portugalski akcent",
-  "tts.accent.russian": "Rosyjski akcent"
+  "tts.accent.russian": "Rosyjski akcent",
+  "settings.banner.title": "Baner przeglądu",
+  "settings.banner.description": "Wybierz styl tła dla baneru przeglądu pulpitu nawigacyjnego.",
+  "settings.banner.toast.success": "Baner pulpitu nawigacyjnego zaktualizowany!"
 }

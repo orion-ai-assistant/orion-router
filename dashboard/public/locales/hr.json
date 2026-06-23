@@ -341,5 +341,8 @@
   "tts.accent.japanese": "Japanski naglasak",
   "tts.accent.korean": "Korejski naglasak",
   "tts.accent.portuguese": "portugalski naglasak",
-  "tts.accent.russian": "ruski naglasak"
+  "tts.accent.russian": "ruski naglasak",
+  "settings.banner.title": "Banner pregleda",
+  "settings.banner.description": "Odaberite stil pozadine za banner pregleda na upravljačkoj ploči.",
+  "settings.banner.toast.success": "Banner upravljačke ploče je ažuriran!"
 }

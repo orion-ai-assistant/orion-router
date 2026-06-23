@@ -341,5 +341,8 @@
   "tts.accent.japanese": "Японски акцент",
   "tts.accent.korean": "Корейски акцент",
   "tts.accent.portuguese": "португалски акцент",
-  "tts.accent.russian": "Руски акцент"
+  "tts.accent.russian": "Руски акцент",
+  "settings.banner.title": "Банер за преглед",
+  "settings.banner.description": "Изберете фонов стил за вашия банер за преглед на таблото.",
+  "settings.banner.toast.success": "Банерът на таблото е актуализиран!"
 }

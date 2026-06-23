@@ -341,5 +341,8 @@
   "tts.accent.japanese": "لهجة يابانية",
   "tts.accent.korean": "اللهجة الكورية",
   "tts.accent.portuguese": "لهجة البرتغالية",
-  "tts.accent.russian": "لهجة روسية"
+  "tts.accent.russian": "لهجة روسية",
+  "settings.banner.title": "لافتة النظرة العامة",
+  "settings.banner.description": "اختر نمط خلفية للافتة النظرة العامة للوحة التحكم الخاصة بك.",
+  "settings.banner.toast.success": "تم تحديث لافتة لوحة التحكم!"
 }

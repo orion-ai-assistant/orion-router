@@ -341,5 +341,8 @@
   "tts.accent.japanese": "Sotaque Japonês",
   "tts.accent.korean": "Sotaque Coreano",
   "tts.accent.portuguese": "Sotaque Português",
-  "tts.accent.russian": "Sotaque Russo"
+  "tts.accent.russian": "Sotaque Russo",
+  "settings.banner.title": "Banner de Visão Geral",
+  "settings.banner.description": "Escolha um estilo de fundo para o banner de visão geral do seu painel.",
+  "settings.banner.toast.success": "Banner do painel atualizado!"
 }

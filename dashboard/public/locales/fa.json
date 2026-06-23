@@ -341,5 +341,8 @@
   "tts.accent.japanese": "لهجه ژاپنی",
   "tts.accent.korean": "لهجه کره ای",
   "tts.accent.portuguese": "لهجه پرتغالی",
-  "tts.accent.russian": "لهجه روسی"
+  "tts.accent.russian": "لهجه روسی",
+  "settings.banner.title": "بنر نمای کلی",
+  "settings.banner.description": "یک سبک پس‌زمینه برای بنر نمای کلی داشبورد خود انتخاب کنید.",
+  "settings.banner.toast.success": "بنر داشبورد به‌روزرسانی شد!"
 }

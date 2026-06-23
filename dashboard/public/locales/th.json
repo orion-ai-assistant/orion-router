@@ -341,5 +341,8 @@
   "tts.accent.japanese": "สำเนียงญี่ปุ่น",
   "tts.accent.korean": "สำเนียงเกาหลี",
   "tts.accent.portuguese": "สำเนียงโปรตุเกส",
-  "tts.accent.russian": "สำเนียงรัสเซีย"
+  "tts.accent.russian": "สำเนียงรัสเซีย",
+  "settings.banner.title": "แบนเนอร์ภาพรวม",
+  "settings.banner.description": "เลือกรูปแบบพื้นหลังสำหรับแบนเนอร์ภาพรวมของแดชบอร์ดของคุณ",
+  "settings.banner.toast.success": "อัปเดตแบนเนอร์แดชบอร์ดแล้ว!"
 }

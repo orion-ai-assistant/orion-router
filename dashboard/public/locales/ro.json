@@ -341,5 +341,8 @@
   "tts.accent.japanese": "Accent japonez",
   "tts.accent.korean": "Accent coreean",
   "tts.accent.portuguese": "Accent portughez",
-  "tts.accent.russian": "Accent rusesc"
+  "tts.accent.russian": "Accent rusesc",
+  "settings.banner.title": "Banner de prezentare generală",
+  "settings.banner.description": "Alegeți un stil de fundal pentru bannerul de prezentare generală a tabloului de bord.",
+  "settings.banner.toast.success": "Bannerul tabloului de bord a fost actualizat!"
 }

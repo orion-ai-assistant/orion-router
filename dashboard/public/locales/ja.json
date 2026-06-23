@@ -341,5 +341,8 @@
   "tts.accent.japanese": "日本語のアクセント",
   "tts.accent.korean": "韓国語のアクセント",
   "tts.accent.portuguese": "ポルトガル語のアクセント",
-  "tts.accent.russian": "ロシア訛り"
+  "tts.accent.russian": "ロシア訛り",
+  "settings.banner.title": "概要バナー",
+  "settings.banner.description": "ダッシュボードの概要バナーの背景スタイルを選択してください。",
+  "settings.banner.toast.success": "ダッシュボードのバナーが更新されました！"
 }

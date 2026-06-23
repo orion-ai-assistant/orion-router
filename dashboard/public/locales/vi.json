@@ -341,5 +341,8 @@
   "tts.accent.japanese": "Giọng Nhật",
   "tts.accent.korean": "Giọng Hàn Quốc",
   "tts.accent.portuguese": "Giọng Bồ Đào Nha",
-  "tts.accent.russian": "Giọng Nga"
+  "tts.accent.russian": "Giọng Nga",
+  "settings.banner.title": "Banner tổng quan",
+  "settings.banner.description": "Chọn kiểu nền cho banner tổng quan bảng điều khiển của bạn.",
+  "settings.banner.toast.success": "Đã cập nhật banner bảng điều khiển!"
 }

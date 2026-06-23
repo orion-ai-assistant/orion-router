@@ -341,5 +341,8 @@
   "tts.accent.japanese": "日本口音",
   "tts.accent.korean": "韩国口音",
   "tts.accent.portuguese": "葡萄牙口音",
-  "tts.accent.russian": "俄罗斯口音"
+  "tts.accent.russian": "俄罗斯口音",
+  "settings.banner.title": "概览横幅",
+  "settings.banner.description": "为您的仪表板概览横幅选择背景样式。",
+  "settings.banner.toast.success": "仪表板横幅已更新！"
 }

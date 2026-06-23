@@ -341,5 +341,8 @@
   "tts.accent.japanese": "Loghat Jepun",
   "tts.accent.korean": "Loghat Korea",
   "tts.accent.portuguese": "Loghat Portugis",
-  "tts.accent.russian": "Loghat Rusia"
+  "tts.accent.russian": "Loghat Rusia",
+  "settings.banner.title": "Banner Gambaran Keseluruhan",
+  "settings.banner.description": "Pilih gaya latar belakang untuk banner gambaran keseluruhan papan pemuka anda.",
+  "settings.banner.toast.success": "Banner papan pemuka dikemas kini!"
 }

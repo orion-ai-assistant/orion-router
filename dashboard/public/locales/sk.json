@@ -341,5 +341,8 @@
   "tts.accent.japanese": "Japonský prízvuk",
   "tts.accent.korean": "Kórejský prízvuk",
   "tts.accent.portuguese": "Portugalský prízvuk",
-  "tts.accent.russian": "Ruský prízvuk"
+  "tts.accent.russian": "Ruský prízvuk",
+  "settings.banner.title": "Prehľadový banner",
+  "settings.banner.description": "Vyberte štýl pozadia pre prehľadový banner vášho panela.",
+  "settings.banner.toast.success": "Banner panela bol aktualizovaný!"
 }

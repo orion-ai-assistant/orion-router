@@ -341,5 +341,8 @@
   "tts.accent.japanese": "Accent japonais",
   "tts.accent.korean": "Accent coréen",
   "tts.accent.portuguese": "Accent portugais",
-  "tts.accent.russian": "Accent russe"
+  "tts.accent.russian": "Accent russe",
+  "settings.banner.title": "Bannière d'aperçu",
+  "settings.banner.description": "Choisissez un style d'arrière-plan pour la bannière d'aperçu de votre tableau de bord.",
+  "settings.banner.toast.success": "Bannière du tableau de bord mise à jour !"
 }

@@ -341,5 +341,8 @@
   "tts.accent.japanese": "Japansk accent",
   "tts.accent.korean": "Koreansk accent",
   "tts.accent.portuguese": "Portugisisk accent",
-  "tts.accent.russian": "Russisk accent"
+  "tts.accent.russian": "Russisk accent",
+  "settings.banner.title": "Oversigtsbanner",
+  "settings.banner.description": "Vælg en baggrundsstil til din dashboards oversigtsbanner.",
+  "settings.banner.toast.success": "Dashboard-banner opdateret!"
 }

@@ -341,5 +341,8 @@
   "tts.accent.japanese": "జపనీస్ యాస",
   "tts.accent.korean": "కొరియన్ యాస",
   "tts.accent.portuguese": "పోర్చుగీస్ యాస",
-  "tts.accent.russian": "రష్యన్ యాస"
+  "tts.accent.russian": "రష్యన్ యాస",
+  "settings.banner.title": "అవలోకనం బ్యానర్",
+  "settings.banner.description": "మీ డ్యాష్‌బోర్డ్ అవలోకనం బ్యానర్ కోసం నేపథ్య శైలిని ఎంచుకోండి.",
+  "settings.banner.toast.success": "డ్యాష్‌బోర్డ్ బ్యానర్ నవీకరించబడింది!"
 }

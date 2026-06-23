@@ -341,5 +341,8 @@
   "tts.accent.japanese": "Aksen Jepang",
   "tts.accent.korean": "Aksen Korea",
   "tts.accent.portuguese": "Aksen Portugis",
-  "tts.accent.russian": "Aksen Rusia"
+  "tts.accent.russian": "Aksen Rusia",
+  "settings.banner.title": "Banner Ikhtisar",
+  "settings.banner.description": "Pilih gaya latar belakang untuk banner ikhtisar dasbor Anda.",
+  "settings.banner.toast.success": "Banner dasbor berhasil diperbarui!"
 }

@@ -341,5 +341,8 @@
   "tts.accent.japanese": "Японский акцент",
   "tts.accent.korean": "Корейский акцент",
   "tts.accent.portuguese": "Португальский акцент",
-  "tts.accent.russian": "Русский акцент"
+  "tts.accent.russian": "Русский акцент",
+  "settings.banner.title": "Баннер обзора",
+  "settings.banner.description": "Выберите стиль фона для баннера обзора вашей панели управления.",
+  "settings.banner.toast.success": "Баннер панели управления обновлен!"
 }

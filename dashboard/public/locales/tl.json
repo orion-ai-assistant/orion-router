@@ -341,5 +341,8 @@
   "tts.accent.japanese": "Japanese Accent",
   "tts.accent.korean": "Korean Accent",
   "tts.accent.portuguese": "Portuguese Accent",
-  "tts.accent.russian": "Russian Accent"
+  "tts.accent.russian": "Russian Accent",
+  "settings.banner.title": "Banner ng Pangkalahatang-ideya",
+  "settings.banner.description": "Pumili ng estilo ng background para sa banner ng pangkalahatang-ideya ng iyong dashboard.",
+  "settings.banner.toast.success": "Na-update ang banner ng dashboard!"
 }

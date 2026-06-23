@@ -341,5 +341,8 @@
   "tts.accent.japanese": "जपानी उच्चारण",
   "tts.accent.korean": "कोरियन उच्चारण",
   "tts.accent.portuguese": "पोर्तुगीज उच्चारण",
-  "tts.accent.russian": "रशियन उच्चारण"
+  "tts.accent.russian": "रशियन उच्चारण",
+  "settings.banner.title": "आढावा बॅनर",
+  "settings.banner.description": "तुमच्या डॅशबोर्ड आढावा बॅनरसाठी पार्श्वभूमी शैली निवडा.",
+  "settings.banner.toast.success": "डॅशबोर्ड बॅनर अद्यतनित केले!"
 }

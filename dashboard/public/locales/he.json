@@ -341,5 +341,8 @@
   "tts.accent.japanese": "מבטא יפני",
   "tts.accent.korean": "מבטא קוריאני",
   "tts.accent.portuguese": "מבטא פורטוגלי",
-  "tts.accent.russian": "מבטא רוסי"
+  "tts.accent.russian": "מבטא רוסי",
+  "settings.banner.title": "באנר סקירה כללית",
+  "settings.banner.description": "בחר סגנון רקע עבור באנר הסקירה הכללית של לוח הבקרה שלך.",
+  "settings.banner.toast.success": "באנר לוח הבקרה עודכן!"
 }

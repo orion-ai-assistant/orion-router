@@ -341,5 +341,8 @@
   "tts.accent.japanese": "Japanischer Akzent",
   "tts.accent.korean": "Koreanischer Akzent",
   "tts.accent.portuguese": "Portugiesischer Akzent",
-  "tts.accent.russian": "Russischer Akzent"
+  "tts.accent.russian": "Russischer Akzent",
+  "settings.banner.title": "Übersichts-Banner",
+  "settings.banner.description": "Wählen Sie einen Hintergrundstil für das Übersichts-Banner Ihres Dashboards.",
+  "settings.banner.toast.success": "Dashboard-Banner aktualisiert!"
 }

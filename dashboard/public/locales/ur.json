@@ -341,5 +341,8 @@
   "tts.accent.japanese": "جاپانی لہجہ",
   "tts.accent.korean": "کوریائی لہجہ",
   "tts.accent.portuguese": "پرتگالی لہجہ",
-  "tts.accent.russian": "روسی لہجہ"
+  "tts.accent.russian": "روسی لہجہ",
+  "settings.banner.title": "جائزہ بینر",
+  "settings.banner.description": "اپنے ڈیش بورڈ کے جائزہ بینر کے لیے بیک گراؤنڈ اسٹائل منتخب کریں۔",
+  "settings.banner.toast.success": "ڈیش بورڈ بینر اپ ڈیٹ ہو گیا!"
 }

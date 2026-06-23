@@ -341,5 +341,8 @@
   "tts.accent.japanese": "Japán akcentussal",
   "tts.accent.korean": "Koreai akcentussal",
   "tts.accent.portuguese": "portugál akcentussal",
-  "tts.accent.russian": "Orosz akcentussal"
+  "tts.accent.russian": "Orosz akcentussal",
+  "settings.banner.title": "Áttekintő banner",
+  "settings.banner.description": "Válasszon háttérstílust az irányítópult áttekintő banneréhez.",
+  "settings.banner.toast.success": "Irányítópult banner frissítve!"
 }

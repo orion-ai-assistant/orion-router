@@ -341,5 +341,8 @@
   "tts.accent.japanese": "ஜப்பானிய உச்சரிப்பு",
   "tts.accent.korean": "கொரிய உச்சரிப்பு",
   "tts.accent.portuguese": "போர்த்துகீசிய உச்சரிப்பு",
-  "tts.accent.russian": "ரஷ்ய உச்சரிப்பு"
+  "tts.accent.russian": "ரஷ்ய உச்சரிப்பு",
+  "settings.banner.title": "கண்ணோட்டப் பேனர்",
+  "settings.banner.description": "உங்கள் டாஷ்போர்டு கண்ணோட்டப் பேனருக்கான பின்னணி பாணியைத் தேர்ந்தெடுக்கவும்.",
+  "settings.banner.toast.success": "டாஷ்போர்டு பேனர் புதுப்பிக்கப்பட்டது!"
 }

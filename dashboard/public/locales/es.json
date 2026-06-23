@@ -341,5 +341,8 @@
   "tts.accent.japanese": "acento japonés",
   "tts.accent.korean": "acento coreano",
   "tts.accent.portuguese": "acento portugués",
-  "tts.accent.russian": "acento ruso"
+  "tts.accent.russian": "acento ruso",
+  "settings.banner.title": "Banner de vista general",
+  "settings.banner.description": "Elija un estilo de fondo para el banner de vista general de su panel.",
+  "settings.banner.toast.success": "¡Banner del panel actualizado!"
 }

@@ -341,5 +341,8 @@
   "tts.accent.japanese": "Јапанесе Аццент",
   "tts.accent.korean": "Кореан Аццент",
   "tts.accent.portuguese": "португалски нагласак",
-  "tts.accent.russian": "Руссиан Аццент"
+  "tts.accent.russian": "Руссиан Аццент",
+  "settings.banner.title": "Банер за преглед",
+  "settings.banner.description": "Изаберите стил позадине за свој банер за преглед на командној табли.",
+  "settings.banner.toast.success": "Банер командне табле је ажуриран!"
 }

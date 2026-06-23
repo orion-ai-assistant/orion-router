@@ -341,5 +341,8 @@
   "tts.accent.japanese": "일본식 억양",
   "tts.accent.korean": "한국식 억양",
   "tts.accent.portuguese": "포르투갈어 액센트",
-  "tts.accent.russian": "러시아 억양"
+  "tts.accent.russian": "러시아 억양",
+  "settings.banner.title": "개요 배너",
+  "settings.banner.description": "대시보드 개요 배너의 배경 스타일을 선택하세요.",
+  "settings.banner.toast.success": "대시보드 배너가 업데이트되었습니다!"
 }

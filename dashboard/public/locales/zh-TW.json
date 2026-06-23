@@ -341,5 +341,8 @@
   "tts.accent.japanese": "日本口音",
   "tts.accent.korean": "韓國口音",
   "tts.accent.portuguese": "葡萄牙口音",
-  "tts.accent.russian": "俄羅斯口音"
+  "tts.accent.russian": "俄羅斯口音",
+  "settings.banner.title": "概覽橫幅",
+  "settings.banner.description": "為您的資訊主頁概覽橫幅選擇背景樣式。",
+  "settings.banner.toast.success": "資訊主頁橫幅已更新！"
 }

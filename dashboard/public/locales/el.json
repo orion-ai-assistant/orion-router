@@ -341,5 +341,8 @@
   "tts.accent.japanese": "Ιαπωνική προφορά",
   "tts.accent.korean": "Κορεάτικη προφορά",
   "tts.accent.portuguese": "Πορτογαλική προφορά",
-  "tts.accent.russian": "Ρωσική προφορά"
+  "tts.accent.russian": "Ρωσική προφορά",
+  "settings.banner.title": "Banner επισκόπησης",
+  "settings.banner.description": "Επιλέξτε ένα στυλ φόντου για το banner επισκόπησης του πίνακα ελέγχου.",
+  "settings.banner.toast.success": "Το banner του πίνακα ελέγχου ενημερώθηκε!"
 }

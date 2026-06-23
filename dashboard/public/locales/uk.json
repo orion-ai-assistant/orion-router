@@ -341,5 +341,8 @@
   "tts.accent.japanese": "Японський акцент",
   "tts.accent.korean": "Корейський акцент",
   "tts.accent.portuguese": "португальський акцент",
-  "tts.accent.russian": "Російський акцент"
+  "tts.accent.russian": "Російський акцент",
+  "settings.banner.title": "Банер огляду",
+  "settings.banner.description": "Виберіть стиль фону для банера огляду вашої панелі приладів.",
+  "settings.banner.toast.success": "Банер панелі приладів оновлено!"
 }

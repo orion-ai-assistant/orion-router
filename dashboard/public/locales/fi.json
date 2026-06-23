@@ -341,5 +341,8 @@
   "tts.accent.japanese": "Japanilainen aksentti",
   "tts.accent.korean": "Korean aksentti",
   "tts.accent.portuguese": "portugalilainen aksentti",
-  "tts.accent.russian": "Venäjän aksentti"
+  "tts.accent.russian": "Venäjän aksentti",
+  "settings.banner.title": "Yleiskatsausbanneri",
+  "settings.banner.description": "Valitse taustatyyli kojelautasi yleiskatsausbannerille.",
+  "settings.banner.toast.success": "Kojelaudan banneri päivitetty!"
 }
