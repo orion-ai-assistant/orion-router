@@ -1283,7 +1283,7 @@ export default function PlaygroundPage() {
                 {isLocalTts && (
                   <div className="flex flex-col gap-1 border-b border-zinc-850 pb-2 mb-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider">Model Motoru</span>
+                      <span className="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider">{t('tts.engine.model')}</span>
                       {localTtsInfo.active ? (
                         <span className="text-[10px] text-zinc-300 flex items-center gap-1.5 font-medium">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -1292,7 +1292,7 @@ export default function PlaygroundPage() {
                       ) : (
                         <span className="text-[10px] text-red-400 font-semibold flex items-center gap-1.5">
                           <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
-                          Çevrimdışı
+                          {t('tts.engine.offline')}
                         </span>
                       )}
                     </div>
@@ -1340,7 +1340,7 @@ export default function PlaygroundPage() {
                     <Input
                       value={ttsVoice}
                       onChange={(e) => setTtsVoice(e.target.value)}
-                      placeholder="Ses adını elle yazın (Klon/Persona)..."
+                      placeholder={t('tts.voice.placeholder.manual')}
                       className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs"
                     />
                   )}
@@ -1397,12 +1397,12 @@ export default function PlaygroundPage() {
                   />
                 </div>
                 {isLocalTts && resolvedTtsEngine === 'voxcpm2' && (
-                  <div className={`flex flex-col gap-1 border-t border-zinc-850 pt-3 mt-1 ${!!ttsVoice ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <div className={`flex flex-col gap-1 border-t border-zinc-855 pt-3 mt-1 ${!!ttsVoice ? 'opacity-50 pointer-events-none' : ''}`}>
                     <div className="flex justify-between items-center mb-0.5">
                       <div className="flex items-center gap-2">
-                        <label className="text-zinc-400 text-[10px] font-semibold capitalize">Konuşma Tarzı Açıklaması</label>
+                        <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('tts.speech.style')}</label>
                         {!!ttsVoice && (
-                          <span className="text-[8px] text-zinc-600 font-medium bg-black/40 px-1 py-0.5 rounded border border-zinc-800 normal-case">Persona Aktif</span>
+                          <span className="text-[8px] text-zinc-600 font-medium bg-black/40 px-1 py-0.5 rounded border border-zinc-800 normal-case">{t('tts.persona.active')}</span>
                         )}
                       </div>
                       {renderDefaultIndicator('tts_instruct', ttsInstruct)}
@@ -1410,7 +1410,7 @@ export default function PlaygroundPage() {
                     <Textarea
                       value={ttsInstruct}
                       onChange={(e) => setTtsInstruct(e.target.value)}
-                      placeholder="Karakteri betimleyin. Örn: A young girl with a soft, sweet voice. Speaks slowly with a melancholic tone."
+                      placeholder={t('tts.speech.style.placeholder')}
                       className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs h-20 resize-none custom-scrollbar overflow-y-auto"
                     />
                   </div>
@@ -1428,9 +1428,9 @@ export default function PlaygroundPage() {
                         }`}
                     >
                       <span className="flex items-center gap-2">
-                        🎭 Karakter Tasarımı
+                        {t('tts.character.design')}
                         {!!ttsVoice && (
-                          <span className="text-[8px] text-zinc-600 font-medium bg-black/40 px-1 py-0.5 rounded border border-zinc-800 normal-case">Persona Aktif</span>
+                          <span className="text-[8px] text-zinc-600 font-medium bg-black/40 px-1 py-0.5 rounded border border-zinc-800 normal-case">{t('tts.persona.active')}</span>
                         )}
                       </span>
                       <span>{showCharacterDesign ? '▼' : '►'}</span>
@@ -1441,7 +1441,7 @@ export default function PlaygroundPage() {
                         {/* Cinsiyet */}
                         <div className="flex flex-col gap-1">
                           <div className="flex justify-between items-center mb-0.5">
-                            <label className="text-zinc-400 text-[10px] font-semibold capitalize">Cinsiyet (Gender)</label>
+                            <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('tts.gender')}</label>
                             {renderDefaultIndicator('gender', ttsGender)}
                           </div>
                           <div className="custom-select-wrapper select-wrapper w-full">
@@ -1450,9 +1450,9 @@ export default function PlaygroundPage() {
                               onChange={(e) => setTtsGender(e.target.value)}
                               className="orion-native-select orion-native-select-sm"
                             >
-                              <option value="Auto">Auto</option>
-                              <option value="male">male (Erkek)</option>
-                              <option value="female">female (Kadın)</option>
+                              <option value="Auto">{t('tts.gender.auto')}</option>
+                              <option value="male">{t('tts.gender.male')}</option>
+                              <option value="female">{t('tts.gender.female')}</option>
                             </select>
                           </div>
                         </div>
@@ -1460,7 +1460,7 @@ export default function PlaygroundPage() {
                         {/* Yaş Grubu */}
                         <div className="flex flex-col gap-1">
                           <div className="flex justify-between items-center mb-0.5">
-                            <label className="text-zinc-400 text-[10px] font-semibold capitalize">Yaş Grubu (Age Group)</label>
+                            <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('tts.age')}</label>
                             {renderDefaultIndicator('age', ttsAge)}
                           </div>
                           <div className="custom-select-wrapper select-wrapper w-full">
@@ -1469,12 +1469,12 @@ export default function PlaygroundPage() {
                               onChange={(e) => setTtsAge(e.target.value)}
                               className="orion-native-select orion-native-select-sm"
                             >
-                              <option value="Auto">Auto</option>
-                              <option value="child">child (Çocuk)</option>
-                              <option value="teenager">teenager (Genç)</option>
-                              <option value="young adult">young adult (Genç Yetişkin)</option>
-                              <option value="middle-aged">middle-aged (Orta Yaşlı)</option>
-                              <option value="elderly">elderly (Yaşlı)</option>
+                              <option value="Auto">{t('tts.age.auto')}</option>
+                              <option value="child">{t('tts.age.child')}</option>
+                              <option value="teenager">{t('tts.age.teenager')}</option>
+                              <option value="young adult">{t('tts.age.young_adult')}</option>
+                              <option value="middle-aged">{t('tts.age.middle_aged')}</option>
+                              <option value="elderly">{t('tts.age.elderly')}</option>
                             </select>
                           </div>
                         </div>
@@ -1482,7 +1482,7 @@ export default function PlaygroundPage() {
                         {/* Ton */}
                         <div className="flex flex-col gap-1">
                           <div className="flex justify-between items-center mb-0.5">
-                            <label className="text-zinc-400 text-[10px] font-semibold capitalize">Ton (Pitch)</label>
+                            <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('tts.pitch')}</label>
                             {renderDefaultIndicator('pitch', ttsPitch)}
                           </div>
                           <div className="custom-select-wrapper select-wrapper w-full">
@@ -1491,12 +1491,12 @@ export default function PlaygroundPage() {
                               onChange={(e) => setTtsPitch(e.target.value)}
                               className="orion-native-select orion-native-select-sm"
                             >
-                              <option value="Auto">Auto</option>
-                              <option value="very high pitch">very high pitch (Çok Tiz)</option>
-                              <option value="high pitch">high pitch (Tiz)</option>
-                              <option value="moderate pitch">moderate pitch (Normal)</option>
-                              <option value="low pitch">low pitch (Pes/Bas)</option>
-                              <option value="very low pitch">very low pitch (Çok Pes/Bas)</option>
+                              <option value="Auto">{t('tts.pitch.auto')}</option>
+                              <option value="very high pitch">{t('tts.pitch.very_high')}</option>
+                              <option value="high pitch">{t('tts.pitch.high')}</option>
+                              <option value="moderate pitch">{t('tts.pitch.moderate')}</option>
+                              <option value="low pitch">{t('tts.pitch.low')}</option>
+                              <option value="very low pitch">{t('tts.pitch.very_low')}</option>
                             </select>
                           </div>
                         </div>
@@ -1504,7 +1504,7 @@ export default function PlaygroundPage() {
                         {/* Stil */}
                         <div className="flex flex-col gap-1">
                           <div className="flex justify-between items-center mb-0.5">
-                            <label className="text-zinc-400 text-[10px] font-semibold capitalize">Stil (Style)</label>
+                            <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('tts.style')}</label>
                             {renderDefaultIndicator('style', ttsStyle)}
                           </div>
                           <div className="custom-select-wrapper select-wrapper w-full">
@@ -1513,8 +1513,8 @@ export default function PlaygroundPage() {
                               onChange={(e) => setTtsStyle(e.target.value)}
                               className="orion-native-select orion-native-select-sm"
                             >
-                              <option value="Auto">Auto</option>
-                              <option value="whisper">whisper (Fısıltı)</option>
+                              <option value="Auto">{t('tts.style.auto')}</option>
+                              <option value="whisper">{t('tts.style.whisper')}</option>
                             </select>
                           </div>
                         </div>
@@ -1523,7 +1523,7 @@ export default function PlaygroundPage() {
                         <div className="grid grid-cols-2 gap-2">
                           <div className="flex flex-col gap-1">
                             <div className="flex justify-between items-center mb-0.5">
-                              <label className="text-zinc-400 text-[10px] font-semibold capitalize">Aksan (Accent)</label>
+                              <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('tts.accent')}</label>
                               {renderDefaultIndicator('accent', ttsAccent)}
                             </div>
                             <div className="custom-select-wrapper select-wrapper w-full">
@@ -1536,7 +1536,7 @@ export default function PlaygroundPage() {
                                 }}
                                 className="orion-native-select orion-native-select-sm"
                               >
-                                <option value="Auto">Auto</option>
+                                <option value="Auto">{t('tts.accent.auto')}</option>
                                 <option value="american accent">american accent</option>
                                 <option value="australian accent">australian accent</option>
                                 <option value="british accent">british accent</option>
@@ -1553,7 +1553,7 @@ export default function PlaygroundPage() {
 
                           <div className="flex flex-col gap-1">
                             <div className="flex justify-between items-center mb-0.5">
-                              <label className="text-zinc-400 text-[10px] font-semibold capitalize">Çince Lehçe (Dialect)</label>
+                              <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('tts.dialect')}</label>
                               {renderDefaultIndicator('dialect', ttsDialect)}
                             </div>
                             <div className="custom-select-wrapper select-wrapper w-full">
@@ -1566,7 +1566,7 @@ export default function PlaygroundPage() {
                                 }}
                                 className="orion-native-select orion-native-select-sm"
                               >
-                                <option value="Auto">Auto</option>
+                                <option value="Auto">{t('tts.dialect.auto')}</option>
                                 <option value="东北话">Dongbei (东北话)</option>
                                 <option value="云南话">Yunnan (云南话)</option>
                                 <option value="四川话">Sichuan (四川话)</option>
@@ -1594,7 +1594,7 @@ export default function PlaygroundPage() {
                   onClick={() => setShowStreamingSettings(!showStreamingSettings)}
                   className="flex items-center justify-between text-left text-zinc-300 text-[10px] font-semibold uppercase tracking-wider mt-2 py-1 border-t border-zinc-850 cursor-pointer hover:text-white transition-colors w-full"
                 >
-                  <span>🌊 Streaming Ayarları</span>
+                  <span>{t('tts.streaming.settings')}</span>
                   <span>{showStreamingSettings ? '▼' : '►'}</span>
                 </button>
 
@@ -1608,7 +1608,7 @@ export default function PlaygroundPage() {
                         className="rounded border-zinc-800 bg-black/40 text-purple-600 focus:ring-purple-600 focus:ring-offset-black"
                       />
                       <label className="text-zinc-500 text-[10px] select-none">
-                        Stream Audio (Not supported)
+                        {t('tts.streaming.stream')}
                       </label>
                     </div>
                   </div>
@@ -1618,9 +1618,9 @@ export default function PlaygroundPage() {
                 <button
                   type="button"
                   onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
-                  className="flex items-center justify-between text-left text-zinc-300 text-[10px] font-semibold uppercase tracking-wider mt-1 py-1 border-t border-zinc-850 cursor-pointer hover:text-white transition-colors w-full"
+                  className="flex items-center justify-between text-left text-zinc-300 text-[10px] font-semibold uppercase tracking-wider mt-1 py-1 border-t border-zinc-855 cursor-pointer hover:text-white transition-colors w-full"
                 >
-                  <span>⚙️ Gelişmiş Ayarlar</span>
+                  <span>{t('tts.advanced.settings')}</span>
                   <span>{showAdvancedSettings ? '▼' : '►'}</span>
                 </button>
 
@@ -1629,7 +1629,7 @@ export default function PlaygroundPage() {
                     {!(isLocalTts && resolvedTtsEngine === 'voxcpm2') && (
                       <div className="flex flex-col gap-1">
                         <div className="flex justify-between items-center mb-0.5">
-                          <label className="text-zinc-400 text-[10px] font-semibold capitalize">Dil (Language)</label>
+                          <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('tts.language')}</label>
                           {renderDefaultIndicator('language', ttsLanguage)}
                         </div>
                         {!isLocalTts || (resolvedTtsEngine === 'omnivoice' && localTtsInfo.active && localTtsInfo.engine === 'omnivoice' && languages.length > 0) ? (
@@ -1642,12 +1642,12 @@ export default function PlaygroundPage() {
                               {languages.length > 0 ? (
                                 languages.map((lang) => (
                                   <option key={lang} value={lang}>
-                                    {lang === 'Auto' ? 'Otomatik Algıla (Auto)' : lang}
+                                    {lang === 'Auto' ? t('tts.language.auto') : lang}
                                   </option>
                                 ))
                               ) : (
                                 <>
-                                  <option value="Auto">Otomatik Algıla (Auto)</option>
+                                  <option value="Auto">{t('tts.language.auto')}</option>
                                   <option value="Turkish">Turkish</option>
                                   <option value="English">English</option>
                                 </>
@@ -1658,7 +1658,7 @@ export default function PlaygroundPage() {
                           <Input
                             value={ttsLanguage}
                             onChange={(e) => setTtsLanguage(e.target.value)}
-                            placeholder="Dil elle yazın. Örn: Turkish, English..."
+                            placeholder={t('tts.language.placeholder.manual')}
                             className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs"
                           />
                         )}
@@ -1667,7 +1667,7 @@ export default function PlaygroundPage() {
 
                     <div className="flex flex-col gap-1">
                       <div className="flex justify-between items-center mb-0.5">
-                        <label className="text-zinc-400 text-[10px] font-semibold capitalize">Konuşma Hızı (Speed)</label>
+                        <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('tts.speed.speech')}</label>
                         {renderDefaultIndicator('speed', ttsSpeed)}
                       </div>
                       <Input
@@ -1684,7 +1684,7 @@ export default function PlaygroundPage() {
 
                     <div className="flex flex-col gap-1">
                       <div className="flex justify-between items-center mb-0.5">
-                        <label className="text-zinc-400 text-[10px] font-semibold capitalize">Kalite Adımı (Steps)</label>
+                        <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('tts.steps.quality')}</label>
                         {renderDefaultIndicator('steps', ttsSteps)}
                       </div>
                       <Input
@@ -1695,13 +1695,13 @@ export default function PlaygroundPage() {
                         value={ttsSteps}
                         onChange={(e) => setTtsSteps(e.target.value)}
                         placeholder={getTtsFieldDefault('steps')}
-                        className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs placeholder:text-zinc-600"
+                        className="bg-black/40 border border-zinc-855 text-white rounded px-2.5 py-1.5 text-xs placeholder:text-zinc-600"
                       />
                     </div>
 
                     <div className="flex flex-col gap-1">
                       <div className="flex justify-between items-center mb-0.5">
-                        <label className="text-zinc-400 text-[10px] font-semibold capitalize">Sabit Seed (-1: Rastgele)</label>
+                        <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('tts.seed.fixed')}</label>
                         {renderDefaultIndicator('seed', ttsSeed)}
                       </div>
                       <Input

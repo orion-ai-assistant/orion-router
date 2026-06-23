@@ -617,7 +617,7 @@ export default function ModelsPage() {
           onClick={() => setShowDefaults(!showDefaults)}
           className="flex items-center justify-between text-left text-zinc-300 text-[11px] font-semibold uppercase tracking-wider py-1.5 cursor-pointer hover:text-white transition-colors w-full border-t border-zinc-800 pt-3"
         >
-          <span>🎛️ TTS Ayarları (Varsayılan)</span>
+          <span>{t('tts.settings.default')}</span>
           <span className="text-[10px]">{showDefaults ? '▼' : '►'}</span>
         </button>
 
@@ -626,7 +626,7 @@ export default function ModelsPage() {
 
             {isLocal && (
               <div className="flex flex-col gap-1 mb-2 pb-2 border-b border-zinc-800">
-                <label className="text-zinc-500 text-[11px] font-medium">Ayarlar Görünümü (Engine View)</label>
+                <label className="text-zinc-500 text-[11px] font-medium">{t('tts.engine.view')}</label>
                 <div className="custom-select-wrapper select-wrapper w-full">
                   <select
                     value={formState.default_config?.engine || 'omnivoice'}
@@ -641,7 +641,7 @@ export default function ModelsPage() {
             )}
 
             <div className="flex flex-col gap-1">
-              <label className="text-zinc-500 text-[11px] font-medium">Voice Persona (Kişi)</label>
+              <label className="text-zinc-500 text-[11px] font-medium">{t('tts.voice.persona')}</label>
               {showVoiceSelect ? (
                 <div className="custom-select-wrapper select-wrapper w-full">
                   <select
@@ -659,7 +659,7 @@ export default function ModelsPage() {
                 <Input
                   value={formState.default_config?.voice || ''}
                   onChange={(e) => updateDefaultConfig(formState, setFormState, 'voice', e.target.value)}
-                  placeholder={isLocal ? "Boş bırakılabilir (veya Klon/Persona adı)" : "alloy, nova, vs."}
+                  placeholder={isLocal ? t('tts.voice.placeholder.local') : t('tts.voice.placeholder.openai')}
                   className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs"
                 />
               )}
@@ -668,15 +668,15 @@ export default function ModelsPage() {
             {isLocal && selectedEngine === 'voxcpm2' && (
               <div className={`flex flex-col gap-1 ${hasPersona ? 'opacity-50 pointer-events-none' : ''}`}>
                 <div className="flex items-center justify-between">
-                  <label className="text-zinc-500 text-[11px] font-medium">Konuşma Tarzı Açıklaması</label>
+                  <label className="text-zinc-500 text-[11px] font-medium">{t('tts.speech.style')}</label>
                   {hasPersona && (
-                    <span className="text-[8px] text-zinc-600 font-medium bg-black/40 px-1 py-0.5 rounded border border-zinc-800 normal-case">Persona Aktif</span>
+                    <span className="text-[8px] text-zinc-600 font-medium bg-black/40 px-1 py-0.5 rounded border border-zinc-800 normal-case">{t('tts.persona.active')}</span>
                   )}
                 </div>
                 <Textarea
                   value={formState.default_config?.tts_instruct || ''}
                   onChange={(e) => updateDefaultConfig(formState, setFormState, 'tts_instruct', e.target.value)}
-                  placeholder="Karakteri betimleyin. Örn: A young girl with a soft, sweet voice. Speaks slowly with a melancholic tone."
+                  placeholder={t('tts.speech.style.placeholder')}
                   className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs h-16 resize-none custom-scrollbar"
                 />
               </div>
@@ -686,87 +686,87 @@ export default function ModelsPage() {
               <>
                 <div className={`flex flex-col gap-3 ${hasPersona ? 'opacity-50 pointer-events-none' : ''}`}>
                   <div className="flex items-center justify-between mt-1">
-                    <span className="text-zinc-400 text-[10px] font-semibold uppercase">🎭 Karakter Tasarımı</span>
+                    <span className="text-zinc-400 text-[10px] font-semibold uppercase">{t('tts.character.design')}</span>
                     {hasPersona && (
-                      <span className="text-[8px] text-zinc-600 font-medium bg-black/40 px-1 py-0.5 rounded border border-zinc-800 normal-case">Persona Aktif</span>
+                      <span className="text-[8px] text-zinc-600 font-medium bg-black/40 px-1 py-0.5 rounded border border-zinc-800 normal-case">{t('tts.persona.active')}</span>
                     )}
                   </div>
                   
                   <div className="grid grid-cols-2 gap-2">
                     <div className="flex flex-col gap-1">
-                      <label className="text-zinc-500 text-[10px]">Cinsiyet (Gender)</label>
+                      <label className="text-zinc-500 text-[10px]">{t('tts.gender')}</label>
                       <div className="custom-select-wrapper select-wrapper w-full">
                         <select
                            value={formState.default_config?.gender || 'Auto'}
                            onChange={(e) => updateDefaultConfig(formState, setFormState, 'gender', e.target.value)}
                            className="orion-native-select orion-native-select-sm"
                         >
-                          <option value="Auto">Auto</option>
-                          <option value="male">male (Erkek)</option>
-                          <option value="female">female (Kadın)</option>
+                          <option value="Auto">{t('tts.gender.auto')}</option>
+                          <option value="male">{t('tts.gender.male')}</option>
+                          <option value="female">{t('tts.gender.female')}</option>
                         </select>
                       </div>
                     </div>
                     <div className="flex flex-col gap-1">
-                      <label className="text-zinc-500 text-[10px]">Yaş Grubu (Age)</label>
+                      <label className="text-zinc-500 text-[10px]">{t('tts.age')}</label>
                       <div className="custom-select-wrapper select-wrapper w-full">
                         <select
                           value={formState.default_config?.age || 'Auto'}
                           onChange={(e) => updateDefaultConfig(formState, setFormState, 'age', e.target.value)}
                           className="orion-native-select orion-native-select-sm"
                         >
-                          <option value="Auto">Auto</option>
-                          <option value="child">child (Çocuk)</option>
-                          <option value="teenager">teenager (Genç)</option>
-                          <option value="young adult">young adult (Genç Yt.)</option>
-                          <option value="middle-aged">middle-aged (Orta)</option>
-                          <option value="elderly">elderly (Yaşlı)</option>
+                          <option value="Auto">{t('tts.age.auto')}</option>
+                          <option value="child">{t('tts.age.child')}</option>
+                          <option value="teenager">{t('tts.age.teenager')}</option>
+                          <option value="young adult">{t('tts.age.young_adult')}</option>
+                          <option value="middle-aged">{t('tts.age.middle_aged')}</option>
+                          <option value="elderly">{t('tts.age.elderly')}</option>
                         </select>
                       </div>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="flex flex-col gap-1">
-                      <label className="text-zinc-500 text-[10px]">Ton (Pitch)</label>
+                      <label className="text-zinc-500 text-[10px]">{t('tts.pitch')}</label>
                       <div className="custom-select-wrapper select-wrapper w-full">
                         <select
                           value={formState.default_config?.pitch || 'Auto'}
                           onChange={(e) => updateDefaultConfig(formState, setFormState, 'pitch', e.target.value)}
                           className="orion-native-select orion-native-select-sm"
                         >
-                          <option value="Auto">Auto</option>
-                          <option value="very high pitch">very high (Çok Tiz)</option>
-                          <option value="high pitch">high (Tiz)</option>
-                          <option value="moderate pitch">moderate (Normal)</option>
-                          <option value="low pitch">low (Pes)</option>
-                          <option value="very low pitch">very low (Çok Pes)</option>
+                          <option value="Auto">{t('tts.pitch.auto')}</option>
+                          <option value="very high pitch">{t('tts.pitch.very_high')}</option>
+                          <option value="high pitch">{t('tts.pitch.high')}</option>
+                          <option value="moderate pitch">{t('tts.pitch.moderate')}</option>
+                          <option value="low pitch">{t('tts.pitch.low')}</option>
+                          <option value="very low pitch">{t('tts.pitch.very_low')}</option>
                         </select>
                       </div>
                     </div>
                     <div className="flex flex-col gap-1">
-                      <label className="text-zinc-500 text-[10px]">Stil (Style)</label>
+                      <label className="text-zinc-500 text-[10px]">{t('tts.style')}</label>
                       <div className="custom-select-wrapper select-wrapper w-full">
                         <select
                           value={formState.default_config?.style || 'Auto'}
                           onChange={(e) => updateDefaultConfig(formState, setFormState, 'style', e.target.value)}
                           className="orion-native-select orion-native-select-sm"
                         >
-                          <option value="Auto">Auto</option>
-                          <option value="whisper">whisper (Fısıltı)</option>
+                          <option value="Auto">{t('tts.style.auto')}</option>
+                          <option value="whisper">{t('tts.style.whisper')}</option>
                         </select>
                       </div>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="flex flex-col gap-1">
-                      <label className="text-zinc-500 text-[10px]">Aksan (Accent)</label>
+                      <label className="text-zinc-500 text-[10px]">{t('tts.accent')}</label>
                       <div className="custom-select-wrapper select-wrapper w-full">
                         <select
                           value={formState.default_config?.accent || 'Auto'}
                           onChange={(e) => updateDefaultConfig(formState, setFormState, 'accent', e.target.value)}
                           className="orion-native-select orion-native-select-sm"
                         >
-                          <option value="Auto">Auto</option>
+                          <option value="Auto">{t('tts.accent.auto')}</option>
                           <option value="american accent">american accent</option>
                           <option value="australian accent">australian accent</option>
                           <option value="british accent">british accent</option>
@@ -781,14 +781,14 @@ export default function ModelsPage() {
                       </div>
                     </div>
                     <div className="flex flex-col gap-1">
-                      <label className="text-zinc-500 text-[10px]">Çince Lehçe (Dialect)</label>
+                      <label className="text-zinc-500 text-[10px]">{t('tts.dialect')}</label>
                       <div className="custom-select-wrapper select-wrapper w-full">
                         <select
                           value={formState.default_config?.dialect || 'Auto'}
                           onChange={(e) => updateDefaultConfig(formState, setFormState, 'dialect', e.target.value)}
                           className="orion-native-select orion-native-select-sm"
                         >
-                          <option value="Auto">Auto</option>
+                          <option value="Auto">{t('tts.dialect.auto')}</option>
                           <option value="东北话">Dongbei (东北话)</option>
                           <option value="云南话">Yunnan (云南话)</option>
                           <option value="四川话">Sichuan (四川话)</option>
@@ -811,13 +811,13 @@ export default function ModelsPage() {
 
             {isLocal && (
               <div className="flex items-center justify-between mt-2 pt-2 border-t border-zinc-800/50">
-                <span className="text-zinc-400 text-[10px] font-semibold uppercase">⚙️ Gelişmiş Ayarlar</span>
+                <span className="text-zinc-400 text-[10px] font-semibold uppercase">{t('tts.advanced.settings')}</span>
               </div>
             )}
 
             {!(isLocal && selectedEngine === 'voxcpm2') && (
               <div className="flex flex-col gap-1">
-                <label className="text-zinc-500 text-[11px] font-medium">Dil (Language)</label>
+                <label className="text-zinc-500 text-[11px] font-medium">{t('tts.language')}</label>
                 {showLangSelect ? (
                   <div className="custom-select-wrapper select-wrapper w-full">
                     <select
@@ -825,7 +825,7 @@ export default function ModelsPage() {
                       onChange={(e) => updateDefaultConfig(formState, setFormState, 'language', e.target.value)}
                       className="orion-native-select"
                     >
-                      <option value="Auto">Auto</option>
+                      <option value="Auto">{t('tts.language.auto')}</option>
                       {languages.map((l) => (
                         <option key={l} value={l}>{l}</option>
                       ))}
@@ -835,7 +835,7 @@ export default function ModelsPage() {
                   <Input
                     value={formState.default_config?.language || ''}
                     onChange={(e) => updateDefaultConfig(formState, setFormState, 'language', e.target.value)}
-                    placeholder="Auto, English, Turkish..."
+                    placeholder={t('tts.language.placeholder')}
                     className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs"
                   />
                 )}
@@ -844,7 +844,7 @@ export default function ModelsPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1">
-                <label className="text-zinc-500 text-[11px] font-medium">Hız (Speed)</label>
+                <label className="text-zinc-500 text-[11px] font-medium">{t('tts.speed')}</label>
                 <Input
                   type="number" min="0.1" max="5" step="0.1"
                   value={formState.default_config?.speed || ''}
@@ -854,7 +854,7 @@ export default function ModelsPage() {
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-zinc-500 text-[11px] font-medium">Adım (Steps)</label>
+                <label className="text-zinc-500 text-[11px] font-medium">{t('tts.steps')}</label>
                 <Input
                   type="number" min="1" max="50" step="1"
                   value={formState.default_config?.steps || ''}
@@ -865,7 +865,7 @@ export default function ModelsPage() {
               </div>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-zinc-500 text-[11px] font-medium">Seed (-1: Rastgele)</label>
+              <label className="text-zinc-500 text-[11px] font-medium">{t('tts.seed')}</label>
               <Input
                 type="number"
                 value={formState.default_config?.seed || ''}
@@ -879,6 +879,7 @@ export default function ModelsPage() {
       </div>
     );
   };
+
 
   return (
     <section id="models" className="tab-content active block pt-8">
