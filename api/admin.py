@@ -915,7 +915,7 @@ async def get_admin_ui(path: str = ""):
     # Dev mode: Next.js dev server'a (3001) otomatik yönlendir
     if os.environ.get("UVICORN_RELOAD") == "1":
         # path boşsa direkt 3001/dashboard, doluysa 3001/dashboard/path
-        target_url = f"http://localhost:3001/dashboard/{path}" if path else "http://localhost:3001/dashboard"
+        target_url = f"http://127.0.0.1:3001/dashboard/{path}" if path else "http://127.0.0.1:3001/dashboard"
         return RedirectResponse(url=target_url)
 
     from core.config import DASHBOARD_OUT_DIR
@@ -953,7 +953,7 @@ async def get_admin_ui(path: str = ""):
     return Response(
         content=(
             "Admin UI not found. Please build the Next.js project. "
-            "Dev mode: use http://localhost:3001/dashboard for the UI."
+            "Dev mode: use http://127.0.0.1:3001/dashboard for the UI."
         ),
         status_code=404,
     )

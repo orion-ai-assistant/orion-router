@@ -623,7 +623,7 @@ export default function PlaygroundPage() {
       if (typeof window !== 'undefined') {
         return `http://${window.location.hostname}:${port}`;
       }
-      return `http://localhost:${port}`;
+      return `http://127.0.0.1:${port}`;
     }
     return '';
   };

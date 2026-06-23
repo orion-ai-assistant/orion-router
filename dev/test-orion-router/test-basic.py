@@ -2,7 +2,7 @@ import openai
 
 client = openai.OpenAI(
     base_url="http://127.0.0.1:20128/v1",
-    api_key='sk-orion-T4wlYzqt11Af2omYK9IjKoj-qpUlwppFcyTpCRWfzOg'
+    api_key='sk-orion-nJmxDMjwV1HNck1VsSUsVD9-EU2EyQ3xmLm-lJOsY7Y'
 )
 
 messages = []
@@ -19,7 +19,7 @@ while True:
     resp = client.chat.completions.create(
         model='gemini-3.1-flash-lite',
         messages=messages,
-        extra_body={"thinking_level": "high"}  # e.g. "low" | 1024
+        extra_body={"thinking_level": "low"}  # e.g. "low" | 1024
     )
     
     print("+ ", end="")

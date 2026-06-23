@@ -60,7 +60,7 @@ def print_active_services_banner(
             local_ip = get_local_ip()
 
     public_port = dashboard_port or port
-    dashboard_url = f"http://localhost:{public_port}"
+    dashboard_url = f"http://127.0.0.1:{public_port}"
     local_url = f"http://{local_ip}:{public_port}"
 
     try:
