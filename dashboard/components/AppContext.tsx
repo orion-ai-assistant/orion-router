@@ -69,6 +69,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<string>(FALLBACK_LOCALE);
   const [translations, setTranslations] = useState<Record<string, string>>({});
   const [fallbackTranslations, setFallbackTranslations] = useState<Record<string, string>>({});
+  const [i18nReady, setI18nReady] = useState<boolean>(false);
 
   const t = createTranslator(translations, fallbackTranslations);
 
@@ -126,6 +127,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       } else {
         setTranslations(current);
       }
+      setI18nReady(true);
     };
     initI18n();
 
@@ -230,6 +232,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
     setConfirmDialog((prev) => ({ ...prev, show: false }));
   };
+
+  if (!i18nReady) {
+    return (
+      <div className="fixed inset-0 bg-[#09090b] flex items-center justify-center text-white font-sans">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-2 border-zinc-800 border-t-white rounded-full animate-spin"></div>
+          <span className="text-xs text-zinc-400 tracking-wider">Loading...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <AppContext.Provider value={{ adminKey, isAuthenticated, isDefaultPassword, showToast, confirmAction, logout, updateAdminKey, locale, setLocale, t }}>

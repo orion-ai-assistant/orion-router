@@ -17,9 +17,10 @@ while True:
     messages.append({"role": "user", "content": user_input})
     
     resp = client.chat.completions.create(
-        model='gemini-3.1-flash-lite',
+        model='local-model',
         messages=messages,
-        extra_body={"thinking_level": "low"}  # e.g. "low" | 1024
+        extra_body={"thinking_level": "low"},  # e.g. "low" | 1024
+        stream = True
     )
     
     print("+ ", end="")
