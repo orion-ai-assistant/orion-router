@@ -681,7 +681,8 @@ export default function ModelsPage() {
                   value={formState.default_config?.tts_instruct || ''}
                   onChange={(e) => updateDefaultConfig(formState, setFormState, 'tts_instruct', e.target.value)}
                   placeholder={t('tts.speech.style.placeholder')}
-                  className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs h-16 resize-none custom-scrollbar"
+                  className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs h-16 resize-none custom-scrollbar text-left"
+                  dir="ltr"
                 />
               </div>
             )}

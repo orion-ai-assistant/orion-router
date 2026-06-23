@@ -606,7 +606,7 @@ export default function PlaygroundPage() {
     const options: RouteOption[] = [];
     groups.forEach((g) => {
       if (g.capability === capability && g.is_active) {
-        options.push({ value: g.name, label: `[Group] ${g.name}` });
+        options.push({ value: g.name, label: `${t('playground.groupPrefix')} ${g.name}` });
       }
     });
     models.forEach((m) => {
@@ -1077,7 +1077,7 @@ export default function PlaygroundPage() {
                           {t('playground.defaultGroup')}
                         </span>
                         <div className="absolute top-full right-0 mt-1 hidden group-hover:block z-50 bg-[#242427]/98 border border-zinc-700/60 text-zinc-200 text-[10px] p-2.5 rounded shadow-xl whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar pointer-events-none min-w-[220px]">
-                          <div className="font-semibold text-[9px] text-purple-400 mb-1.5 uppercase tracking-wide">Group Temperature:</div>
+                          <div className="font-semibold text-[9px] text-purple-400 mb-1.5 uppercase tracking-wide">{t('playground.groupTemperature')}</div>
                           <div className="flex flex-col gap-1">
                             {selectedChatGroup.items?.map((item: any, idx: number) => {
                               const mDetail = models.find((m) => m.name === item.name && m.capability === 'chat');
@@ -1094,7 +1094,7 @@ export default function PlaygroundPage() {
                               );
                             })}
                             {(!selectedChatGroup.items || selectedChatGroup.items.length === 0) && (
-                              <span className="text-zinc-500 text-[9px]">No models in this group</span>
+                              <span className="text-zinc-500 text-[9px]">{t('playground.noModelsInGroup')}</span>
                             )}
                           </div>
                         </div>
@@ -1126,7 +1126,7 @@ export default function PlaygroundPage() {
                           {t('playground.defaultGroup')}
                         </span>
                         <div className="absolute top-full right-0 mt-1 hidden group-hover:block z-50 bg-[#242427]/98 border border-zinc-700/60 text-zinc-200 text-[10px] p-2.5 rounded shadow-xl whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar pointer-events-none min-w-[220px]">
-                          <div className="font-semibold text-[9px] text-purple-400 mb-1.5 uppercase tracking-wide">Group Thinking:</div>
+                          <div className="font-semibold text-[9px] text-purple-400 mb-1.5 uppercase tracking-wide">{t('playground.groupThinking')}</div>
                           <div className="flex flex-col gap-1">
                             {selectedChatGroup.items?.map((item: any, idx: number) => {
                               const mDetail = models.find((m) => m.name === item.name && m.capability === 'chat');
@@ -1141,7 +1141,7 @@ export default function PlaygroundPage() {
                               );
                             })}
                             {(!selectedChatGroup.items || selectedChatGroup.items.length === 0) && (
-                              <span className="text-zinc-500 text-[9px]">No models in this group</span>
+                              <span className="text-zinc-500 text-[9px]">{t('playground.noModelsInGroup')}</span>
                             )}
                           </div>
                         </div>
@@ -1169,7 +1169,7 @@ export default function PlaygroundPage() {
                           {t('playground.defaultGroup')}
                         </span>
                         <div className="absolute top-full right-0 mt-1 hidden group-hover:block z-50 bg-[#242427]/98 border border-zinc-700/60 text-zinc-200 text-[10px] p-2.5 rounded shadow-xl whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar pointer-events-none min-w-[220px]">
-                          <div className="font-semibold text-[9px] text-purple-400 mb-1.5 uppercase tracking-wide">Group System Prompt:</div>
+                          <div className="font-semibold text-[9px] text-purple-400 mb-1.5 uppercase tracking-wide">{t('playground.groupSystemPrompt')}</div>
                           <div className="flex flex-col gap-1">
                             {selectedChatGroup.items?.map((item: any, idx: number) => {
                               const mDetail = models.find((m) => m.name === item.name && m.capability === 'chat');
@@ -1187,7 +1187,7 @@ export default function PlaygroundPage() {
                               );
                             })}
                             {(!selectedChatGroup.items || selectedChatGroup.items.length === 0) && (
-                              <span className="text-zinc-500 text-[9px]">No models in this group</span>
+                              <span className="text-zinc-500 text-[9px]">{t('playground.noModelsInGroup')}</span>
                             )}
                           </div>
                         </div>
@@ -1362,7 +1362,7 @@ export default function PlaygroundPage() {
                 <div className="flex flex-col gap-1">
                   <div className="flex justify-between items-center mb-1 relative group">
                     <label className="text-zinc-400 text-[10px] font-semibold capitalize">
-                      {isLocalTts ? t('playground.temperature') + ' (Yaratıcılık)' : t('playground.temperature')}
+                      {t('playground.temperature')}
                     </label>
                     {selectedTtsGroup ? (
                       <>
@@ -1373,7 +1373,7 @@ export default function PlaygroundPage() {
                           {t('playground.defaultGroup')}
                         </span>
                         <div className="absolute top-full right-0 mt-1 hidden group-hover:block z-50 bg-[#242427]/98 border border-zinc-700/60 text-zinc-200 text-[10px] p-2.5 rounded shadow-xl whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar pointer-events-none min-w-[220px]">
-                          <div className="font-semibold text-[9px] text-purple-400 mb-1.5 uppercase tracking-wide">Group Temperature:</div>
+                          <div className="font-semibold text-[9px] text-purple-400 mb-1.5 uppercase tracking-wide">{t('playground.groupTemperature')}</div>
                           <div className="flex flex-col gap-1">
                             {selectedTtsGroup.items?.map((item: any, idx: number) => {
                               const mDetail = models.find((m) => m.name === item.name && m.capability === 'tts');
@@ -1390,7 +1390,7 @@ export default function PlaygroundPage() {
                               );
                             })}
                             {(!selectedTtsGroup.items || selectedTtsGroup.items.length === 0) && (
-                              <span className="text-zinc-500 text-[9px]">No models in this group</span>
+                              <span className="text-zinc-500 text-[9px]">{t('playground.noModelsInGroup')}</span>
                             )}
                           </div>
                         </div>
@@ -1425,7 +1425,8 @@ export default function PlaygroundPage() {
                       value={ttsInstruct}
                       onChange={(e) => setTtsInstruct(e.target.value)}
                       placeholder={t('tts.speech.style.placeholder')}
-                      className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs h-20 resize-none custom-scrollbar overflow-y-auto"
+                      className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs h-20 resize-none custom-scrollbar overflow-y-auto text-left"
+                      dir="ltr"
                     />
                   </div>
                 )}
