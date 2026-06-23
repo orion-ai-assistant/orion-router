@@ -209,6 +209,7 @@
   "playground.optionalThinking": "isteğe bağlı (örneğin low, 1024)",
   "playground.default": "Varsayılan",
   "playground.defaultGroup": "Varsayılan: Grup",
+  "playground.loading": "Oyun Alanı hazırlanıyor...",
   "common.clear": "Temizle",
   "common.send": "Gönder",
   "playground.noMessages": "Henüz mesaj yok. Yönlendirme yapılandırmanızı test etmek için bir sorgu gönderin.",

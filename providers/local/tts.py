@@ -12,7 +12,7 @@ class LocalTTSProvider(BaseTTS):
         cloned_voices = []
         try:
             import httpx
-            res = httpx.get(f"http://{TTS_HOST}:{TTS_PORT}/v1/voices", timeout=1.5)
+            res = httpx.get(f"http://{TTS_HOST}:{TTS_PORT}/v1/voices", timeout=1.0)
             if res.status_code == 200:
                 data = res.json()
                 cloned_voices = data.get("voices", [])
@@ -25,13 +25,13 @@ class LocalTTSProvider(BaseTTS):
         """Yerel TTS motorundan desteklenen dilleri döner."""
         try:
             import httpx
-            res = httpx.get(f"http://{TTS_HOST}:{TTS_PORT}/v1/languages", timeout=1.5)
+            res = httpx.get(f"http://{TTS_HOST}:{TTS_PORT}/v1/languages", timeout=1.0)
             if res.status_code == 200:
                 data = res.json()
                 return data.get("languages", [])
         except Exception as e:
             logger.debug(f"Could not fetch languages from local TTS: {e}")
-        return ["Turkish", "English"]
+        return []
 
     async def generate_speech(
         self,
@@ -68,27 +68,11 @@ class LocalTTSProvider(BaseTTS):
             payload_model = tts_instruct
             payload_voice = voice if voice and voice != "None" else ""
         else:
-            # Fallback for standard OpenAI requests (e.g. OpenAI client)
-            instructs = [
-                "american accent", "australian accent", "british accent", "canadian accent", 
-                "child", "chinese accent", "elderly", "female", "high pitch", "indian accent", 
-                "japanese accent", "korean accent", "low pitch", "male", "middle-aged", 
-                "moderate pitch", "portuguese accent", "russian accent", "teenager", 
-                "very high pitch", "very low pitch", "whisper", "young adult"
-            ]
-            
-            target_voice = voice or ""
-            is_voice_instruct = any(inst in target_voice for inst in instructs) if target_voice else False
-            
-            if is_voice_instruct:
-                payload_model = target_voice
-                payload_voice = ""
+            if model not in ("local", "test"):
+                payload_model = model
             else:
-                if model not in ("local", "test"):
-                    payload_model = model
-                else:
-                    payload_model = ""
-                payload_voice = voice if voice and voice != "None" else ""
+                payload_model = ""
+            payload_voice = voice if voice and voice != "None" else ""
 
         speed_val = safe_float(kwargs.get("speed"), 1.0)
         guidance_val = safe_float(

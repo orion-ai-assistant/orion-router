@@ -48,6 +48,7 @@ class TTSDefaultConfig {
   pitch: string;
   style: string;
   accent: string;
+  dialect: string;
   language: string;
   speed: string;
   steps: string;
@@ -62,6 +63,7 @@ class TTSDefaultConfig {
     this.pitch = data?.pitch || 'Auto';
     this.style = data?.style || 'Auto';
     this.accent = data?.accent || 'Auto';
+    this.dialect = data?.dialect || 'Auto';
     this.language = data?.language || 'Auto';
     this.speed = data?.speed ? String(data.speed) : '';
     this.steps = data?.steps ? String(data.steps) : '';
@@ -91,6 +93,7 @@ class TTSDefaultConfig {
       pitch: obj.pitch,
       style: obj.style,
       accent: obj.accent,
+      dialect: obj.dialect,
       language: obj.language,
       speed: obj.speed,
       steps: obj.steps,
@@ -108,6 +111,7 @@ class TTSDefaultConfig {
     if (this.pitch && this.pitch !== 'Auto') obj.pitch = this.pitch;
     if (this.style && this.style !== 'Auto') obj.style = this.style;
     if (this.accent && this.accent !== 'Auto') obj.accent = this.accent;
+    if (this.dialect && this.dialect !== 'Auto') obj.dialect = this.dialect;
     if (this.language && this.language !== 'Auto') obj.language = this.language;
     if (this.speed) obj.speed = this.speed;
     if (this.steps) obj.steps = this.steps;
@@ -299,14 +303,21 @@ export default function ModelsPage() {
   };
 
   useEffect(() => {
-    const initData = async () => {
-      await loadProviders();
-      await loadVoices();
-      await loadLanguages();
-      await loadLocalTtsInfo();
-      await loadModels();
+    const initData = () => {
+      loadProviders();
+      loadVoices();
+      loadLanguages();
+      loadLocalTtsInfo();
+      loadModels();
     };
     initData();
+
+    // Sürekli olarak arka planda TTS verilerini kontrol et
+    const interval = setInterval(() => {
+      loadLocalTtsInfo();
+      loadVoices();
+      loadLanguages();
+    }, 5000);
 
     const handleAuth = () => {
       initData();
@@ -314,6 +325,7 @@ export default function ModelsPage() {
     window.addEventListener('orion-authenticated', handleAuth);
     return () => {
       window.removeEventListener('orion-authenticated', handleAuth);
+      clearInterval(interval);
     };
   }, []);
 
@@ -360,6 +372,11 @@ export default function ModelsPage() {
   ) => {
     const config = TTSDefaultConfig.fromObject(formState.default_config);
     (config as any)[key] = value;
+    if (key === 'accent' && value !== 'Auto') {
+      config.dialect = 'Auto';
+    } else if (key === 'dialect' && value !== 'Auto') {
+      config.accent = 'Auto';
+    }
     setFormState({
       ...formState,
       default_config: config.toObject()
@@ -577,12 +594,12 @@ export default function ModelsPage() {
     let showLangSelect = false;
     if (isLocal) {
       if (selectedEngine === 'omnivoice') {
-        if (localTtsInfo.active && localTtsInfo.engine === 'omnivoice') {
+        if (localTtsInfo.active && localTtsInfo.engine === 'omnivoice' && localTtsInfo.languages && localTtsInfo.languages.length > 0) {
           languages = localTtsInfo.languages;
+          showLangSelect = true;
         } else {
-          languages = ['Auto', 'Turkish', 'English'];
+          showLangSelect = false;
         }
-        showLangSelect = true;
       } else {
         showLangSelect = false;
       }
@@ -606,18 +623,10 @@ export default function ModelsPage() {
 
         {showDefaults && (
           <div className="flex flex-col gap-3 pl-2 border-l border-zinc-800">
+
             {isLocal && (
-              <div className="flex flex-col gap-1">
-                <div className="flex justify-between items-center">
-                  <label className="text-zinc-500 text-[11px] font-medium">Yerel Motor (Engine)</label>
-                  {localTtsInfo.active ? (
-                    <span className="text-[9px] text-zinc-400">
-                      Aktif: <strong className="text-emerald-400">{localTtsInfo.engine}</strong>
-                    </span>
-                  ) : (
-                    <span className="text-[9px] text-red-400 font-semibold">Servis Çevrimdışı</span>
-                  )}
-                </div>
+              <div className="flex flex-col gap-1 mb-2 pb-2 border-b border-zinc-800">
+                <label className="text-zinc-500 text-[11px] font-medium">Ayarlar Görünümü (Engine View)</label>
                 <div className="custom-select-wrapper select-wrapper w-full">
                   <select
                     value={formState.default_config?.engine || 'omnivoice'}
@@ -650,15 +659,20 @@ export default function ModelsPage() {
                 <Input
                   value={formState.default_config?.voice || ''}
                   onChange={(e) => updateDefaultConfig(formState, setFormState, 'voice', e.target.value)}
-                  placeholder={isLocal ? "Ses adını elle yazın (Klon/Persona)..." : "alloy, nova, vs."}
+                  placeholder={isLocal ? "Boş bırakılabilir (veya Klon/Persona adı)" : "alloy, nova, vs."}
                   className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs"
                 />
               )}
             </div>
 
             {isLocal && selectedEngine === 'voxcpm2' && (
-              <div className="flex flex-col gap-1">
-                <label className="text-zinc-500 text-[11px] font-medium">Konuşma Tarzı Açıklaması (tts_instruct)</label>
+              <div className={`flex flex-col gap-1 ${hasPersona ? 'opacity-50 pointer-events-none' : ''}`}>
+                <div className="flex items-center justify-between">
+                  <label className="text-zinc-500 text-[11px] font-medium">Konuşma Tarzı Açıklaması</label>
+                  {hasPersona && (
+                    <span className="text-[8px] text-zinc-600 font-medium bg-black/40 px-1 py-0.5 rounded border border-zinc-800 normal-case">Persona Aktif</span>
+                  )}
+                </div>
                 <Textarea
                   value={formState.default_config?.tts_instruct || ''}
                   onChange={(e) => updateDefaultConfig(formState, setFormState, 'tts_instruct', e.target.value)}
@@ -743,26 +757,52 @@ export default function ModelsPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-zinc-500 text-[10px]">Aksan (Accent)</label>
-                    <div className="custom-select-wrapper select-wrapper w-full">
-                      <select
-                        value={formState.default_config?.accent || 'Auto'}
-                        onChange={(e) => updateDefaultConfig(formState, setFormState, 'accent', e.target.value)}
-                        className="orion-native-select orion-native-select-sm"
-                      >
-                        <option value="Auto">Auto</option>
-                        <option value="american accent">american accent</option>
-                        <option value="australian accent">australian accent</option>
-                        <option value="british accent">british accent</option>
-                        <option value="canadian accent">canadian accent</option>
-                        <option value="chinese accent">chinese accent</option>
-                        <option value="indian accent">indian accent</option>
-                        <option value="japanese accent">japanese accent</option>
-                        <option value="korean accent">korean accent</option>
-                        <option value="portuguese accent">portuguese accent</option>
-                        <option value="russian accent">russian accent</option>
-                      </select>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-zinc-500 text-[10px]">Aksan (Accent)</label>
+                      <div className="custom-select-wrapper select-wrapper w-full">
+                        <select
+                          value={formState.default_config?.accent || 'Auto'}
+                          onChange={(e) => updateDefaultConfig(formState, setFormState, 'accent', e.target.value)}
+                          className="orion-native-select orion-native-select-sm"
+                        >
+                          <option value="Auto">Auto</option>
+                          <option value="american accent">american accent</option>
+                          <option value="australian accent">australian accent</option>
+                          <option value="british accent">british accent</option>
+                          <option value="canadian accent">canadian accent</option>
+                          <option value="chinese accent">chinese accent</option>
+                          <option value="indian accent">indian accent</option>
+                          <option value="japanese accent">japanese accent</option>
+                          <option value="korean accent">korean accent</option>
+                          <option value="portuguese accent">portuguese accent</option>
+                          <option value="russian accent">russian accent</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-zinc-500 text-[10px]">Çince Lehçe (Dialect)</label>
+                      <div className="custom-select-wrapper select-wrapper w-full">
+                        <select
+                          value={formState.default_config?.dialect || 'Auto'}
+                          onChange={(e) => updateDefaultConfig(formState, setFormState, 'dialect', e.target.value)}
+                          className="orion-native-select orion-native-select-sm"
+                        >
+                          <option value="Auto">Auto</option>
+                          <option value="东北话">Dongbei (东北话)</option>
+                          <option value="云南话">Yunnan (云南话)</option>
+                          <option value="四川话">Sichuan (四川话)</option>
+                          <option value="宁夏话">Ningxia (宁夏话)</option>
+                          <option value="桂林话">Guilin (桂林话)</option>
+                          <option value="河南话">Henan (河南话)</option>
+                          <option value="济南话">Jinan (济南话)</option>
+                          <option value="甘肃话">Gansu (甘肃话)</option>
+                          <option value="石家庄话">Shijiazhuang (石家庄话)</option>
+                          <option value="贵州话">Guizhou (贵州话)</option>
+                          <option value="陕西话">Shaanxi (陕西话)</option>
+                          <option value="青岛话">Qingdao (青岛话)</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -775,30 +815,32 @@ export default function ModelsPage() {
               </div>
             )}
 
-            <div className="flex flex-col gap-1">
-              <label className="text-zinc-500 text-[11px] font-medium">Dil (Language)</label>
-              {showLangSelect ? (
-                <div className="custom-select-wrapper select-wrapper w-full">
-                  <select
-                    value={formState.default_config?.language || 'Auto'}
+            {!(isLocal && selectedEngine === 'voxcpm2') && (
+              <div className="flex flex-col gap-1">
+                <label className="text-zinc-500 text-[11px] font-medium">Dil (Language)</label>
+                {showLangSelect ? (
+                  <div className="custom-select-wrapper select-wrapper w-full">
+                    <select
+                      value={formState.default_config?.language || 'Auto'}
+                      onChange={(e) => updateDefaultConfig(formState, setFormState, 'language', e.target.value)}
+                      className="orion-native-select"
+                    >
+                      <option value="Auto">Auto</option>
+                      {languages.map((l) => (
+                        <option key={l} value={l}>{l}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <Input
+                    value={formState.default_config?.language || ''}
                     onChange={(e) => updateDefaultConfig(formState, setFormState, 'language', e.target.value)}
-                    className="orion-native-select"
-                  >
-                    <option value="Auto">Auto</option>
-                    {languages.map((l) => (
-                      <option key={l} value={l}>{l}</option>
-                    ))}
-                  </select>
-                </div>
-              ) : (
-                <Input
-                  value={formState.default_config?.language || ''}
-                  onChange={(e) => updateDefaultConfig(formState, setFormState, 'language', e.target.value)}
-                  placeholder="Auto, English, Turkish..."
-                  className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs"
-                />
-              )}
-            </div>
+                    placeholder="Auto, English, Turkish..."
+                    className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs"
+                  />
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1">
@@ -844,18 +886,7 @@ export default function ModelsPage() {
         <div className="header-titles">
           <h1 className="font-heading text-3xl font-semibold tracking-tight">{t('models.title')}</h1>
           <p className="text-zinc-400 text-sm mt-1">{t('models.description')}</p>
-          <div className="mt-2 flex items-center gap-2">
-            <span className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">Yerel TTS Motoru:</span>
-            {localTtsInfo.active ? (
-              <Badge className="bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-[10px] font-medium tracking-wide rounded px-2 py-0.5 uppercase">
-                🟢 {localTtsInfo.engine?.toUpperCase() || 'BİLİNMİYOR'} AKTİF
-              </Badge>
-            ) : (
-              <Badge className="bg-red-500/10 text-red-400 border border-red-500/20 text-[10px] font-medium tracking-wide rounded px-2 py-0.5 uppercase">
-                🔴 ÇEVRİMDİŞİ / BULUNAMADI
-              </Badge>
-            )}
-          </div>
+
         </div>
         <Button
           onClick={() => setShowAddModal(true)}

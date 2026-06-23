@@ -402,9 +402,10 @@ async def get_admin_voices(request: Request):
     try:
         router_instance = request.app.state.dynamic_router
         voices_by_provider = {}
+        from fastapi.concurrency import run_in_threadpool
         for provider_name, provider_inst in router_instance.tts_providers.items():
             if hasattr(provider_inst, "get_voices"):
-                voices_by_provider[provider_name] = provider_inst.get_voices()
+                voices_by_provider[provider_name] = await run_in_threadpool(provider_inst.get_voices)
             else:
                 voices_by_provider[provider_name] = []
         return {"voices": voices_by_provider}
@@ -418,9 +419,10 @@ async def get_admin_tts_languages(request: Request):
     try:
         router_instance = request.app.state.dynamic_router
         languages_by_provider = {}
+        from fastapi.concurrency import run_in_threadpool
         for provider_name, provider_inst in router_instance.tts_providers.items():
             if hasattr(provider_inst, "get_languages"):
-                languages_by_provider[provider_name] = provider_inst.get_languages()
+                languages_by_provider[provider_name] = await run_in_threadpool(provider_inst.get_languages)
             else:
                 languages_by_provider[provider_name] = []
         return {"languages": languages_by_provider}
@@ -434,15 +436,30 @@ async def get_local_tts_info():
     from core.config import TTS_HOST, TTS_PORT
     import httpx
     try:
-        async with httpx.AsyncClient(timeout=1.5) as client:
-            res = await client.get(f"http://{TTS_HOST}:{TTS_PORT}/v1/model_info")
-            if res.status_code == 200:
-                data = res.json()
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            res_info = await client.get(f"http://{TTS_HOST}:{TTS_PORT}/v1/model_info")
+            if res_info.status_code == 200:
+                data = res_info.json()
+                
+                # Fetch voices and languages as well
+                voices = []
+                languages = []
+                try:
+                    res_voices = await client.get(f"http://{TTS_HOST}:{TTS_PORT}/v1/voices")
+                    if res_voices.status_code == 200:
+                        voices = res_voices.json().get("voices", [])
+                        
+                    res_langs = await client.get(f"http://{TTS_HOST}:{TTS_PORT}/v1/languages")
+                    if res_langs.status_code == 200:
+                        languages = res_langs.json().get("languages", [])
+                except Exception as e:
+                    logger.debug(f"Could not fetch voices/languages for local-tts-info: {e}")
+
                 return {
                     "active": True,
                     "engine": data.get("engine", "omnivoice"),
-                    "voices": data.get("voices", []),
-                    "languages": data.get("languages", []),
+                    "voices": [v for v in voices if v.lower() != "none"],
+                    "languages": languages,
                     "low_vram": data.get("low_vram", False),
                     "idle_cleanup_mins": data.get("idle_cleanup_mins", None)
                 }

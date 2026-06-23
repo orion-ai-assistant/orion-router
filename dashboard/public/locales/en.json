@@ -209,6 +209,7 @@
   "playground.optionalThinking": "optional (e.g. low, 1024)",
   "playground.default": "Default",
   "playground.defaultGroup": "Default: Group",
+  "playground.loading": "Preparing Playground...",
   "common.clear": "Clear",
   "common.send": "Send",
   "playground.noMessages": "No messages yet. Send a query to test your routing setup.",

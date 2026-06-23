@@ -63,6 +63,7 @@ export default function PlaygroundPage() {
   const [ttsModel, setTtsModel] = useState(getSavedState('pg_ttsModel', ''));
   const savedTtsModel = getSavedState('pg_ttsModel', '');
   const initialTtsModelRef = useRef<string | null>(savedTtsModel);
+  const lastTtsModelRef = useRef<string | null>(savedTtsModel);
   const [ttsVoice, setTtsVoice] = useState(getSavedState('pg_ttsVoice', 'alloy'));
   const [ttsTemp, setTtsTemp] = useState(getSavedState('pg_ttsTemp', ''));
   const [ttsSpeed, setTtsSpeed] = useState(getSavedState('pg_ttsSpeed', '1.0'));
@@ -74,6 +75,7 @@ export default function PlaygroundPage() {
   const [ttsPitch, setTtsPitch] = useState(getSavedState('pg_ttsPitch', 'Auto'));
   const [ttsStyle, setTtsStyle] = useState(getSavedState('pg_ttsStyle', 'Auto'));
   const [ttsAccent, setTtsAccent] = useState(getSavedState('pg_ttsAccent', 'Auto'));
+  const [ttsDialect, setTtsDialect] = useState(getSavedState('pg_ttsDialect', 'Auto'));
   const [showCharacterDesign, setShowCharacterDesign] = useState(false);
   const [showStreamingSettings, setShowStreamingSettings] = useState(false);
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
@@ -83,7 +85,7 @@ export default function PlaygroundPage() {
   const [ttsError, setTtsError] = useState('');
   const [isGeneratingTTS, setIsGeneratingTTS] = useState(false);
   const ttsAbortControllerRef = useRef<AbortController | null>(null);
-  
+
   // Custom tts_instruct and active engine info state for local TTS
   const [ttsInstruct, setTtsInstruct] = useState(getSavedState('pg_ttsInstruct', ''));
   const [localTtsInfo, setLocalTtsInfo] = useState<{
@@ -101,6 +103,7 @@ export default function PlaygroundPage() {
   const [embedDim, setEmbedDim] = useState('');
   const [embedJson, setEmbedJson] = useState('');
   const [isGeneratingEmbed, setIsGeneratingEmbed] = useState(false);
+  const [loading, setLoading] = useState(true);
   const embedAbortControllerRef = useRef<AbortController | null>(null);
 
   const loadModels = async () => {
@@ -165,13 +168,24 @@ export default function PlaygroundPage() {
 
   useEffect(() => {
     const initData = async () => {
-      await loadModels();
-      await loadGroups();
-      await loadVoices();
-      await loadLanguages();
-      await loadLocalTtsInfo();
+      await Promise.all([
+        loadModels(),
+        loadGroups(),
+        loadVoices(),
+        loadLanguages(),
+        loadLocalTtsInfo()
+      ]);
+      setLoading(false);
     };
     initData();
+
+    const interval = setInterval(() => {
+      loadLocalTtsInfo();
+      loadVoices();
+      loadLanguages();
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, []);
 
   // Update dropdown targets on data load
@@ -218,7 +232,7 @@ export default function PlaygroundPage() {
     }
 
     const isLocal = provider === 'local';
-    const resolvedEngine = isLocal ? (selectedModelObj?.default_config?.engine || 'omnivoice') : 'omnivoice';
+    const resolvedEngine = isLocal ? (localTtsInfo.active && localTtsInfo.engine ? localTtsInfo.engine : 'omnivoice') : 'omnivoice';
 
     let nextVoices: string[] = [];
     if (isLocal) {
@@ -242,10 +256,10 @@ export default function PlaygroundPage() {
     let nextLangs: string[] = [];
     if (isLocal) {
       if (resolvedEngine === 'omnivoice') {
-        if (localTtsInfo.active && localTtsInfo.engine === 'omnivoice') {
+        if (localTtsInfo.active && localTtsInfo.engine === 'omnivoice' && localTtsInfo.languages && localTtsInfo.languages.length > 0) {
           nextLangs = localTtsInfo.languages;
         } else {
-          nextLangs = ['Auto', 'Turkish', 'English'];
+          nextLangs = []; // Show manual text input when offline or empty
         }
       } else {
         nextLangs = []; // Will show manual text input for voxcpm2
@@ -260,6 +274,7 @@ export default function PlaygroundPage() {
     setLanguages(nextLangs);
 
     const isInitialLoadForSavedModel = initialTtsModelRef.current === ttsModel;
+    const isModelChanged = lastTtsModelRef.current !== ttsModel;
 
     if (isInitialLoadForSavedModel) {
       // Keeping values loaded from localStorage on page refresh
@@ -283,7 +298,9 @@ export default function PlaygroundPage() {
       }
 
       initialTtsModelRef.current = null;
-    } else {
+      lastTtsModelRef.current = ttsModel;
+    } else if (isModelChanged) {
+      lastTtsModelRef.current = ttsModel;
       // Apply default configuration values for the selected model
       const findModelConfig = (mName: string) => {
         const modelDetail = models.find((m) => m.name === mName && m.capability === 'tts');
@@ -427,12 +444,13 @@ export default function PlaygroundPage() {
       localStorage.setItem('pg_ttsPitch', ttsPitch);
       localStorage.setItem('pg_ttsStyle', ttsStyle);
       localStorage.setItem('pg_ttsAccent', ttsAccent);
+      localStorage.setItem('pg_ttsDialect', ttsDialect);
       localStorage.setItem('pg_ttsInstruct', ttsInstruct);
       localStorage.setItem('pg_embedModel', embedModel);
       localStorage.setItem('pg_chatMessages', JSON.stringify(chatMessages));
       localStorage.setItem('pg_chatInput', chatInput);
     }
-  }, [activeTab, chatModel, chatTemp, chatThinking, chatSystemPrompt, ttsModel, ttsVoice, ttsTemp, ttsSpeed, ttsLanguage, ttsSteps, ttsSeed, ttsGender, ttsAge, ttsPitch, ttsStyle, ttsAccent, ttsInstruct, embedModel, chatMessages, chatInput]);
+  }, [activeTab, chatModel, chatTemp, chatThinking, chatSystemPrompt, ttsModel, ttsVoice, ttsTemp, ttsSpeed, ttsLanguage, ttsSteps, ttsSeed, ttsGender, ttsAge, ttsPitch, ttsStyle, ttsAccent, ttsDialect, ttsInstruct, embedModel, chatMessages, chatInput]);
 
   // Scroll chat window to bottom on new messages
   useEffect(() => {
@@ -522,6 +540,7 @@ export default function PlaygroundPage() {
       case 'pitch':
       case 'style':
       case 'accent':
+      case 'dialect':
       case 'language':
         return 'Auto';
       case 'speed':
@@ -546,7 +565,7 @@ export default function PlaygroundPage() {
     } else {
       defVal = getTtsFieldDefault(field);
     }
-    
+
     let isOverridden = false;
     if (field === 'voice') {
       const normUser = (userValue || '').toLowerCase();
@@ -557,7 +576,7 @@ export default function PlaygroundPage() {
     } else {
       isOverridden = userValue !== defVal;
     }
-    
+
     let displayVal = defVal;
     if (field === 'voice') {
       if (!defVal || defVal.toLowerCase() === 'none') {
@@ -570,13 +589,12 @@ export default function PlaygroundPage() {
         displayVal = defVal.length > 15 ? defVal.slice(0, 15) + '...' : defVal;
       }
     }
-    
+
     return (
-      <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all ${
-        isOverridden 
-          ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50' 
+      <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all ${isOverridden
+          ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
           : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
-      }`}>
+        }`}>
         {t('playground.default')}: {displayVal}
       </span>
     );
@@ -867,6 +885,7 @@ export default function PlaygroundPage() {
           if (ttsPitch && ttsPitch !== 'Auto') instructs.push(ttsPitch);
           if (ttsStyle && ttsStyle !== 'Auto') instructs.push(ttsStyle);
           if (ttsAccent && ttsAccent !== 'Auto') instructs.push(ttsAccent);
+          if (ttsDialect && ttsDialect !== 'Auto') instructs.push(ttsDialect);
           payload.tts_instruct = instructs.length > 0 ? instructs.join(', ') : '';
         }
       } else {
@@ -974,13 +993,7 @@ export default function PlaygroundPage() {
   const resolvedTtsDefaults = getResolvedTtsDefaults();
   const resolvedTtsEngine = (() => {
     if (!isLocalTts) return 'omnivoice';
-    const group = groups.find((g) => g.name === ttsModel && g.capability === 'tts');
-    let primaryName = ttsModel;
-    if (group && group.items && group.items.length > 0) {
-      primaryName = group.items[0].name;
-    }
-    const modelDetail = models.find((m) => m.name === primaryName && m.capability === 'tts');
-    return modelDetail?.default_config?.engine || 'omnivoice';
+    return localTtsInfo.active && localTtsInfo.engine ? localTtsInfo.engine : 'omnivoice';
   })();
 
   const selectedChatGroup = groups.find((g) => g.name === chatModel && g.capability === 'chat');
@@ -1000,15 +1013,14 @@ export default function PlaygroundPage() {
         </div>
       </header>
 
-      {/* Segmented Controls for Sub-tabs */}
       <div className="pg-segmented-control flex gap-1 bg-[#18181b] border border-zinc-800 p-0.5 rounded-md mb-4 max-w-max">
         {(['chat', 'tts', 'embed'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={`px-4 py-1.5 rounded-[8px] font-medium text-xs transition-all cursor-pointer ${activeTab === tab
-                ? 'bg-zinc-800 text-white shadow'
-                : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-white'
+              ? 'bg-zinc-800 text-white shadow'
+              : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-white'
               }`}
           >
             {tab === 'chat' ? t('playground.chat') : tab === 'tts' ? t('playground.tts') : t('playground.embed')}
@@ -1016,516 +1028,565 @@ export default function PlaygroundPage() {
         ))}
       </div>
 
-      {/* CHAT TAB */}
-      {activeTab === 'chat' && (
-        <div className="playground-layout flex flex-col md:flex-row gap-4">
-          {/* Settings Sidebar */}
-          <div className="pg-sidebar md:w-[250px] p-4 glass-panel bg-[#18181b] border border-zinc-850 rounded-lg flex flex-col gap-3 shrink-0">
-            <h3 className="panel-title text-white font-heading font-semibold pb-1.5 border-b border-zinc-850 text-xs tracking-wide capitalize">{t('playground.config')}</h3>
-            <div className="flex flex-col gap-1">
-              <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.modelOrGroup')}</label>
-              <div className="custom-select-wrapper select-wrapper w-full">
-                <select
-                  value={chatModel}
-                  onChange={(e) => setChatModel(e.target.value)}
-                  className="orion-native-select orion-native-select-sm"
-                >
-                  {getRouteOptions('chat').map((route) => (
-                    <option key={route.value} value={route.value}>
-                      {route.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="flex flex-col gap-1">
-              <div className="flex justify-between items-center mb-1 relative group">
-                <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.temperature')}</label>
-                {selectedChatGroup ? (
-                  <>
-                    <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all cursor-help ${hasTempOverride
-                        ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
-                        : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
-                      }`}>
-                      {t('playground.defaultGroup')}
-                    </span>
-                    <div className="absolute top-full right-0 mt-1 hidden group-hover:block z-50 bg-[#242427]/98 border border-zinc-700/60 text-zinc-200 text-[10px] p-2.5 rounded shadow-xl whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar pointer-events-none min-w-[220px]">
-                      <div className="font-semibold text-[9px] text-purple-400 mb-1.5 uppercase tracking-wide">Group Temperature:</div>
-                      <div className="flex flex-col gap-1">
-                        {selectedChatGroup.items?.map((item: any, idx: number) => {
-                          const mDetail = models.find((m) => m.name === item.name && m.capability === 'chat');
-                          const tVal = item.temperature !== undefined && item.temperature !== null
-                            ? item.temperature
-                            : (mDetail?.temperature ?? null);
-                          return (
-                            <div key={item.id} className="flex justify-between items-center gap-2 border-b border-zinc-800/50 pb-1 last:border-0 last:pb-0">
-                              <span className="text-zinc-400 font-mono text-[8px] truncate whitespace-nowrap block max-w-[145px]" title={item.name}>{idx + 1}. {item.name}</span>
-                              <span className="text-white font-mono text-[8px] shrink-0 whitespace-nowrap">
-                                {tVal !== null ? tVal : '-'}
-                              </span>
-                            </div>
-                          );
-                        })}
-                        {(!selectedChatGroup.items || selectedChatGroup.items.length === 0) && (
-                          <span className="text-zinc-500 text-[9px]">No models in this group</span>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  renderDefaultIndicator('temperature', chatTemp, true)
-                )}
-              </div>
-              <Input
-                type="number"
-                min="0"
-                max="2"
-                step="0.1"
-                value={chatTemp}
-                onChange={(e) => setChatTemp(e.target.value)}
-                placeholder={t('playground.optionalTemp')}
-                className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs placeholder:text-zinc-600"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <div className="flex justify-between items-center mb-1 relative group">
-                <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.thinking')}</label>
-                {selectedChatGroup ? (
-                  <>
-                    <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all cursor-help ${hasThinkingOverride
-                        ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
-                        : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
-                      }`}>
-                      {t('playground.defaultGroup')}
-                    </span>
-                    <div className="absolute top-full right-0 mt-1 hidden group-hover:block z-50 bg-[#242427]/98 border border-zinc-700/60 text-zinc-200 text-[10px] p-2.5 rounded shadow-xl whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar pointer-events-none min-w-[220px]">
-                      <div className="font-semibold text-[9px] text-purple-400 mb-1.5 uppercase tracking-wide">Group Thinking:</div>
-                      <div className="flex flex-col gap-1">
-                        {selectedChatGroup.items?.map((item: any, idx: number) => {
-                          const mDetail = models.find((m) => m.name === item.name && m.capability === 'chat');
-                          const thinkVal = item.thinking_level || mDetail?.thinking_level || null;
-                          return (
-                            <div key={item.id} className="flex justify-between items-center gap-2 border-b border-zinc-800/50 pb-1 last:border-0 last:pb-0">
-                              <span className="text-zinc-400 font-mono text-[8px] truncate whitespace-nowrap block max-w-[145px]" title={item.name}>{idx + 1}. {item.name}</span>
-                              <span className="text-white font-mono text-[8px] shrink-0 whitespace-nowrap">
-                                {thinkVal !== null ? thinkVal : '-'}
-                              </span>
-                            </div>
-                          );
-                        })}
-                        {(!selectedChatGroup.items || selectedChatGroup.items.length === 0) && (
-                          <span className="text-zinc-500 text-[9px]">No models in this group</span>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  renderDefaultIndicator('thinking_level', chatThinking, true)
-                )}
-              </div>
-              <Input
-                value={chatThinking}
-                onChange={(e) => setChatThinking(e.target.value)}
-                placeholder={t('playground.optionalThinking')}
-                className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs placeholder:text-zinc-600"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <div className="flex justify-between items-center mb-1 relative group">
-                <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.systemPrompt')}</label>
-                {selectedChatGroup ? (
-                  <>
-                    <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all cursor-help ${hasSystemPromptOverride
-                        ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
-                        : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
-                      }`}>
-                      {t('playground.defaultGroup')}
-                    </span>
-                    <div className="absolute top-full right-0 mt-1 hidden group-hover:block z-50 bg-[#242427]/98 border border-zinc-700/60 text-zinc-200 text-[10px] p-2.5 rounded shadow-xl whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar pointer-events-none min-w-[220px]">
-                      <div className="font-semibold text-[9px] text-purple-400 mb-1.5 uppercase tracking-wide">Group System Prompt:</div>
-                      <div className="flex flex-col gap-1">
-                        {selectedChatGroup.items?.map((item: any, idx: number) => {
-                          const mDetail = models.find((m) => m.name === item.name && m.capability === 'chat');
-                          const sysPrompt = item.system_prompt || mDetail?.system_prompt || null;
-                          const displayPrompt = sysPrompt 
-                            ? (sysPrompt.length > 8 ? `"${sysPrompt.slice(0, 8)}..."` : `"${sysPrompt}"`)
-                            : '-';
-                          return (
-                            <div key={item.id} className="flex justify-between items-center gap-2 border-b border-zinc-800/50 pb-1 last:border-0 last:pb-0">
-                              <span className="text-zinc-400 font-mono text-[8px] truncate whitespace-nowrap block max-w-[145px]" title={item.name}>{idx + 1}. {item.name}</span>
-                              <span className="text-white font-mono text-[8px] shrink-0 max-w-[60px] truncate whitespace-nowrap" title={sysPrompt || undefined}>
-                                {displayPrompt}
-                              </span>
-                            </div>
-                          );
-                        })}
-                        {(!selectedChatGroup.items || selectedChatGroup.items.length === 0) && (
-                          <span className="text-zinc-500 text-[9px]">No models in this group</span>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                ) : resolvedDefaults.system_prompt ? (
-                  <>
-                    <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all cursor-help truncate max-w-[120px] block ${hasSystemPromptOverride
-                        ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
-                        : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
-                      }`}>
-                      {t('playground.default')}: {resolvedDefaults.system_prompt.length > 15 ? resolvedDefaults.system_prompt.slice(0, 15) + '...' : resolvedDefaults.system_prompt}
-                    </span>
-                    <div className="absolute top-full left-0 right-0 mt-1 hidden group-hover:block z-50 bg-[#242427]/98 border border-zinc-700/60 text-zinc-200 text-[10px] p-3 rounded shadow-xl whitespace-pre-wrap max-h-40 overflow-y-auto custom-scrollbar pointer-events-none">
-                      <div className="font-semibold text-[9px] text-purple-400 mb-1 uppercase tracking-wide">{t('playground.default')}:</div>
-                      {resolvedDefaults.system_prompt}
-                    </div>
-                  </>
-                ) : (
-                  renderDefaultIndicator('system_prompt', chatSystemPrompt, true)
-                )}
-              </div>
-              <Textarea
-                value={chatSystemPrompt}
-                onChange={(e) => setChatSystemPrompt(e.target.value)}
-                placeholder={t('playground.systemPromptPlaceholder')}
-                className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs h-20 resize-none custom-scrollbar overflow-y-auto no-field-sizing placeholder:text-zinc-600"
-              />
-            </div>
-          </div>
-
-          {/* Main Area */}
-          <div className="pg-main-area flex-1 p-4 glass-panel bg-[#18181b] border border-zinc-850 rounded-lg flex flex-col min-h-[380px] h-[calc(100vh-340px)]">
-            <div className="chat-messages flex-1 overflow-y-auto pr-2 flex flex-col gap-3 custom-scrollbar mb-3">
-              {chatMessages.length === 0 ? (
-                <div className="text-zinc-500 text-xs flex items-center justify-center h-full">
-                  {t('playground.noMessages')}
+      {loading ? (
+        <div className="glass-panel p-8 text-center text-zinc-400">{t('playground.loading')}</div>
+      ) : (
+        <>
+          {/* CHAT TAB */}
+          {activeTab === 'chat' && (
+            <div className="playground-layout flex flex-col md:flex-row gap-4">
+              {/* Settings Sidebar */}
+              <div className="pg-sidebar md:w-[250px] p-4 glass-panel bg-[#18181b] border border-zinc-850 rounded-lg flex flex-col gap-3 shrink-0">
+                <h3 className="panel-title text-white font-heading font-semibold pb-1.5 border-b border-zinc-850 text-xs tracking-wide capitalize">{t('playground.config')}</h3>
+                <div className="flex flex-col gap-1">
+                  <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.modelOrGroup')}</label>
+                  <div className="custom-select-wrapper select-wrapper w-full">
+                    <select
+                      value={chatModel}
+                      onChange={(e) => setChatModel(e.target.value)}
+                      className="orion-native-select orion-native-select-sm"
+                    >
+                      {getRouteOptions('chat').map((route) => (
+                        <option key={route.value} value={route.value}>
+                          {route.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-              ) : (
-                chatMessages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`max-w-[85%] rounded-lg p-3 text-xs leading-relaxed ${msg.role === 'user'
-                        ? 'bg-zinc-800 text-white self-end rounded-br-none'
-                        : msg.type === 'thinking'
-                          ? 'bg-purple-950/20 border border-purple-500/10 text-purple-300 self-start rounded-bl-none font-mono text-xs'
-                          : 'bg-black/30 border border-zinc-850 text-zinc-100 self-start rounded-bl-none'
-                      }`}
-                    dangerouslySetInnerHTML={{ __html: msg.html }}
-                  />
-                ))
-              )}
-              <div ref={chatMessagesEndRef} />
-            </div>
-
-            <div className="flex gap-2 items-end">
-              <Textarea
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    if (!isGenerating) {
-                      handleSendChat();
-                    }
-                  }
-                }}
-                placeholder={t('playground.chatPlaceholder')}
-                className="flex-1 bg-black/40 border border-zinc-850 text-white rounded p-2.5 text-xs h-10 min-h-10 resize-none custom-scrollbar"
-              />
-              <Button
-                onClick={() => setChatMessages([])}
-                className="bg-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-700 font-medium px-4 h-10 text-xs rounded-lg"
-                title={t('playground.clearChat')}
-              >
-                {t('common.clear')}
-              </Button>
-              {isGenerating ? (
-                <Button
-                  onClick={() => abortControllerRef.current?.abort()}
-                  className="bg-red-600 text-white hover:bg-red-700 font-semibold px-5 h-10 text-xs rounded-lg min-w-[70px]"
-                >
-                  {t('playground.stop')}
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleSendChat}
-                  className="bg-white text-black hover:bg-zinc-200 font-semibold px-5 h-10 text-xs rounded-lg min-w-[70px]"
-                >
-                  {t('common.send')}
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TTS TAB */}
-      {activeTab === 'tts' && (
-        <div className="playground-layout flex flex-col md:flex-row gap-4">
-          {/* Settings Sidebar */}
-          <div className="pg-sidebar md:w-[250px] p-4 glass-panel bg-[#18181b] border border-zinc-850 rounded-lg flex flex-col gap-3 shrink-0">
-            <h3 className="panel-title text-white font-heading font-semibold pb-1.5 border-b border-zinc-850 text-xs tracking-wide capitalize">{t('playground.audioSettings')}</h3>
-
-            {isLocalTts && (
-              <div className="flex flex-col gap-1 border-b border-zinc-850 pb-2 mb-1">
-                <span className="text-zinc-500 text-[9px] font-semibold uppercase tracking-wider">Yerel Motor Durumu</span>
-                <span className="text-[10px] text-white">
-                  {localTtsInfo.active ? (
-                    <>🟢 Aktif: <strong className="text-emerald-400">{localTtsInfo.engine}</strong></>
-                  ) : (
-                    <>🔴 Servis Çevrimdışı</>
-                  )}
-                </span>
-                <span className="text-[9px] text-zinc-400">
-                  Model Motoru: <strong>{resolvedTtsEngine}</strong>
-                </span>
-              </div>
-            )}
-
-            <div className="flex flex-col gap-1">
-              <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.modelOrGroup')}</label>
-              <div className="custom-select-wrapper select-wrapper w-full">
-                <select
-                  value={ttsModel}
-                  onChange={(e) => setTtsModel(e.target.value)}
-                  className="orion-native-select orion-native-select-sm"
-                >
-                  {getRouteOptions('tts').map((route) => (
-                    <option key={route.value} value={route.value}>
-                      {route.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <div className="flex justify-between items-center mb-0.5">
-                <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.voicePersona')}</label>
-                {renderDefaultIndicator('voice', ttsVoice)}
-              </div>
-              {!isLocalTts || (localTtsInfo.active && localTtsInfo.engine === resolvedTtsEngine && voices.length > 0) ? (
-                <div className="custom-select-wrapper select-wrapper w-full">
-                  <select
-                    value={ttsVoice}
-                    onChange={(e) => setTtsVoice(e.target.value)}
-                    className="orion-native-select orion-native-select-sm"
-                  >
-                    {isLocalTts && <option value="">None</option>}
-                    {voices.map((v) => (
-                      <option key={v} value={v}>
-                        {v}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : (
-                <Input
-                  value={ttsVoice}
-                  onChange={(e) => setTtsVoice(e.target.value)}
-                  placeholder="Ses adını elle yazın (Klon/Persona)..."
-                  className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs"
-                />
-              )}
-            </div>
-            <div className="flex flex-col gap-1">
-              <div className="flex justify-between items-center mb-1 relative group">
-                <label className="text-zinc-400 text-[10px] font-semibold capitalize">
-                  {isLocalTts ? t('playground.temperature') + ' (Yaratıcılık)' : t('playground.temperature')}
-                </label>
-                {selectedTtsGroup ? (
-                  <>
-                    <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all cursor-help ${hasTtsTempOverride
-                        ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
-                        : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
-                      }`}>
-                      {t('playground.defaultGroup')}
-                    </span>
-                    <div className="absolute top-full right-0 mt-1 hidden group-hover:block z-50 bg-[#242427]/98 border border-zinc-700/60 text-zinc-200 text-[10px] p-2.5 rounded shadow-xl whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar pointer-events-none min-w-[220px]">
-                      <div className="font-semibold text-[9px] text-purple-400 mb-1.5 uppercase tracking-wide">Group Temperature:</div>
-                      <div className="flex flex-col gap-1">
-                        {selectedTtsGroup.items?.map((item: any, idx: number) => {
-                          const mDetail = models.find((m) => m.name === item.name && m.capability === 'tts');
-                          const tVal = item.temperature !== undefined && item.temperature !== null
-                            ? item.temperature
-                            : (mDetail?.temperature ?? null);
-                          return (
-                            <div key={item.id} className="flex justify-between items-center gap-2 border-b border-zinc-800/50 pb-1 last:border-0 last:pb-0">
-                              <span className="text-zinc-400 font-mono text-[8px] truncate whitespace-nowrap block max-w-[145px]" title={item.name}>{idx + 1}. {item.name}</span>
-                              <span className="text-white font-mono text-[8px] shrink-0 whitespace-nowrap">
-                                {tVal !== null ? tVal : '-'}
-                              </span>
-                            </div>
-                          );
-                        })}
-                        {(!selectedTtsGroup.items || selectedTtsGroup.items.length === 0) && (
-                          <span className="text-zinc-500 text-[9px]">No models in this group</span>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  renderDefaultIndicator('temperature', ttsTemp)
-                )}
-              </div>
-              <Input
-                type="number"
-                min="0"
-                max="2"
-                step="0.1"
-                value={ttsTemp}
-                onChange={(e) => setTtsTemp(e.target.value)}
-                placeholder={t('playground.optional')}
-                className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs placeholder:text-zinc-600"
-              />
-            </div>
-            {isLocalTts && resolvedTtsEngine === 'voxcpm2' && (
-              <div className="flex flex-col gap-1 border-t border-zinc-850 pt-3 mt-1">
-                <div className="flex justify-between items-center mb-0.5">
-                  <label className="text-zinc-400 text-[10px] font-semibold capitalize">Konuşma Tarzı Açıklaması</label>
-                  {renderDefaultIndicator('tts_instruct', ttsInstruct)}
-                </div>
-                <Textarea
-                  value={ttsInstruct}
-                  onChange={(e) => setTtsInstruct(e.target.value)}
-                  placeholder="Karakteri betimleyin. Örn: A young girl with a soft, sweet voice. Speaks slowly with a melancholic tone."
-                  className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs h-20 resize-none custom-scrollbar overflow-y-auto"
-                />
-              </div>
-            )}
-
-            {isLocalTts && resolvedTtsEngine === 'omnivoice' && (
-              <div className="flex flex-col gap-3 pt-3 mt-1 border-t border-zinc-850">
-                {/* Karakter Tasarımı - Collapsible */}
-                <button
-                  type="button"
-                  onClick={() => setShowCharacterDesign(!showCharacterDesign)}
-                  className={`flex items-center justify-between text-left text-[10px] font-semibold uppercase tracking-wider py-1 cursor-pointer transition-colors w-full ${
-                    !!ttsVoice
-                      ? 'text-zinc-500 hover:text-zinc-400'
-                      : 'text-zinc-300 hover:text-white'
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    🎭 Karakter Tasarımı
-                    {!!ttsVoice && (
-                      <span className="text-[8px] text-zinc-600 font-medium bg-black/40 px-1 py-0.5 rounded border border-zinc-800 normal-case">Persona Aktif</span>
+                <div className="flex flex-col gap-1">
+                  <div className="flex justify-between items-center mb-1 relative group">
+                    <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.temperature')}</label>
+                    {selectedChatGroup ? (
+                      <>
+                        <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all cursor-help ${hasTempOverride
+                          ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
+                          : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
+                          }`}>
+                          {t('playground.defaultGroup')}
+                        </span>
+                        <div className="absolute top-full right-0 mt-1 hidden group-hover:block z-50 bg-[#242427]/98 border border-zinc-700/60 text-zinc-200 text-[10px] p-2.5 rounded shadow-xl whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar pointer-events-none min-w-[220px]">
+                          <div className="font-semibold text-[9px] text-purple-400 mb-1.5 uppercase tracking-wide">Group Temperature:</div>
+                          <div className="flex flex-col gap-1">
+                            {selectedChatGroup.items?.map((item: any, idx: number) => {
+                              const mDetail = models.find((m) => m.name === item.name && m.capability === 'chat');
+                              const tVal = item.temperature !== undefined && item.temperature !== null
+                                ? item.temperature
+                                : (mDetail?.temperature ?? null);
+                              return (
+                                <div key={item.id} className="flex justify-between items-center gap-2 border-b border-zinc-800/50 pb-1 last:border-0 last:pb-0">
+                                  <span className="text-zinc-400 font-mono text-[8px] truncate whitespace-nowrap block max-w-[145px]" title={item.name}>{idx + 1}. {item.name}</span>
+                                  <span className="text-white font-mono text-[8px] shrink-0 whitespace-nowrap">
+                                    {tVal !== null ? tVal : '-'}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                            {(!selectedChatGroup.items || selectedChatGroup.items.length === 0) && (
+                              <span className="text-zinc-500 text-[9px]">No models in this group</span>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      renderDefaultIndicator('temperature', chatTemp, true)
                     )}
-                  </span>
-                  <span>{showCharacterDesign ? '▼' : '►'}</span>
-                </button>
+                  </div>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="2"
+                    step="0.1"
+                    value={chatTemp}
+                    onChange={(e) => setChatTemp(e.target.value)}
+                    placeholder={t('playground.optionalTemp')}
+                    className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs placeholder:text-zinc-600"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <div className="flex justify-between items-center mb-1 relative group">
+                    <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.thinking')}</label>
+                    {selectedChatGroup ? (
+                      <>
+                        <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all cursor-help ${hasThinkingOverride
+                          ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
+                          : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
+                          }`}>
+                          {t('playground.defaultGroup')}
+                        </span>
+                        <div className="absolute top-full right-0 mt-1 hidden group-hover:block z-50 bg-[#242427]/98 border border-zinc-700/60 text-zinc-200 text-[10px] p-2.5 rounded shadow-xl whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar pointer-events-none min-w-[220px]">
+                          <div className="font-semibold text-[9px] text-purple-400 mb-1.5 uppercase tracking-wide">Group Thinking:</div>
+                          <div className="flex flex-col gap-1">
+                            {selectedChatGroup.items?.map((item: any, idx: number) => {
+                              const mDetail = models.find((m) => m.name === item.name && m.capability === 'chat');
+                              const thinkVal = item.thinking_level || mDetail?.thinking_level || null;
+                              return (
+                                <div key={item.id} className="flex justify-between items-center gap-2 border-b border-zinc-800/50 pb-1 last:border-0 last:pb-0">
+                                  <span className="text-zinc-400 font-mono text-[8px] truncate whitespace-nowrap block max-w-[145px]" title={item.name}>{idx + 1}. {item.name}</span>
+                                  <span className="text-white font-mono text-[8px] shrink-0 whitespace-nowrap">
+                                    {thinkVal !== null ? thinkVal : '-'}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                            {(!selectedChatGroup.items || selectedChatGroup.items.length === 0) && (
+                              <span className="text-zinc-500 text-[9px]">No models in this group</span>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      renderDefaultIndicator('thinking_level', chatThinking, true)
+                    )}
+                  </div>
+                  <Input
+                    value={chatThinking}
+                    onChange={(e) => setChatThinking(e.target.value)}
+                    placeholder={t('playground.optionalThinking')}
+                    className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs placeholder:text-zinc-600"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <div className="flex justify-between items-center mb-1 relative group">
+                    <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.systemPrompt')}</label>
+                    {selectedChatGroup ? (
+                      <>
+                        <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all cursor-help ${hasSystemPromptOverride
+                          ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
+                          : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
+                          }`}>
+                          {t('playground.defaultGroup')}
+                        </span>
+                        <div className="absolute top-full right-0 mt-1 hidden group-hover:block z-50 bg-[#242427]/98 border border-zinc-700/60 text-zinc-200 text-[10px] p-2.5 rounded shadow-xl whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar pointer-events-none min-w-[220px]">
+                          <div className="font-semibold text-[9px] text-purple-400 mb-1.5 uppercase tracking-wide">Group System Prompt:</div>
+                          <div className="flex flex-col gap-1">
+                            {selectedChatGroup.items?.map((item: any, idx: number) => {
+                              const mDetail = models.find((m) => m.name === item.name && m.capability === 'chat');
+                              const sysPrompt = item.system_prompt || mDetail?.system_prompt || null;
+                              const displayPrompt = sysPrompt
+                                ? (sysPrompt.length > 8 ? `"${sysPrompt.slice(0, 8)}..."` : `"${sysPrompt}"`)
+                                : '-';
+                              return (
+                                <div key={item.id} className="flex justify-between items-center gap-2 border-b border-zinc-800/50 pb-1 last:border-0 last:pb-0">
+                                  <span className="text-zinc-400 font-mono text-[8px] truncate whitespace-nowrap block max-w-[145px]" title={item.name}>{idx + 1}. {item.name}</span>
+                                  <span className="text-white font-mono text-[8px] shrink-0 max-w-[60px] truncate whitespace-nowrap" title={sysPrompt || undefined}>
+                                    {displayPrompt}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                            {(!selectedChatGroup.items || selectedChatGroup.items.length === 0) && (
+                              <span className="text-zinc-500 text-[9px]">No models in this group</span>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    ) : resolvedDefaults.system_prompt ? (
+                      <>
+                        <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all cursor-help truncate max-w-[120px] block ${hasSystemPromptOverride
+                          ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
+                          : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
+                          }`}>
+                          {t('playground.default')}: {resolvedDefaults.system_prompt.length > 15 ? resolvedDefaults.system_prompt.slice(0, 15) + '...' : resolvedDefaults.system_prompt}
+                        </span>
+                        <div className="absolute top-full left-0 right-0 mt-1 hidden group-hover:block z-50 bg-[#242427]/98 border border-zinc-700/60 text-zinc-200 text-[10px] p-3 rounded shadow-xl whitespace-pre-wrap max-h-40 overflow-y-auto custom-scrollbar pointer-events-none">
+                          <div className="font-semibold text-[9px] text-purple-400 mb-1 uppercase tracking-wide">{t('playground.default')}:</div>
+                          {resolvedDefaults.system_prompt}
+                        </div>
+                      </>
+                    ) : (
+                      renderDefaultIndicator('system_prompt', chatSystemPrompt, true)
+                    )}
+                  </div>
+                  <Textarea
+                    value={chatSystemPrompt}
+                    onChange={(e) => setChatSystemPrompt(e.target.value)}
+                    placeholder={t('playground.systemPromptPlaceholder')}
+                    className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs h-20 resize-none custom-scrollbar overflow-y-auto no-field-sizing placeholder:text-zinc-600"
+                  />
+                </div>
+              </div>
 
-                {showCharacterDesign && (
-                  <div className={`flex flex-col gap-3 pl-1 border-l border-zinc-800 ${!!ttsVoice ? 'opacity-50 pointer-events-none' : ''}`}>
-                    {/* Cinsiyet */}
-                    <div className="flex flex-col gap-1">
-                      <div className="flex justify-between items-center mb-0.5">
-                        <label className="text-zinc-400 text-[10px] font-semibold capitalize">Cinsiyet (Gender)</label>
-                        {renderDefaultIndicator('gender', ttsGender)}
-                      </div>
-                      <div className="custom-select-wrapper select-wrapper w-full">
-                        <select
-                          value={ttsGender}
-                          onChange={(e) => setTtsGender(e.target.value)}
-                          className="orion-native-select orion-native-select-sm"
-                        >
-                          <option value="Auto">Auto</option>
-                          <option value="male">male (Erkek)</option>
-                          <option value="female">female (Kadın)</option>
-                        </select>
-                      </div>
+              {/* Main Area */}
+              <div className="pg-main-area flex-1 p-4 glass-panel bg-[#18181b] border border-zinc-850 rounded-lg flex flex-col min-h-[380px] h-[calc(100vh-340px)]">
+                <div className="chat-messages flex-1 overflow-y-auto pr-2 flex flex-col gap-3 custom-scrollbar mb-3">
+                  {chatMessages.length === 0 ? (
+                    <div className="text-zinc-500 text-xs flex items-center justify-center h-full">
+                      {t('playground.noMessages')}
                     </div>
+                  ) : (
+                    chatMessages.map((msg) => (
+                      <div
+                        key={msg.id}
+                        className={`max-w-[85%] rounded-lg p-3 text-xs leading-relaxed ${msg.role === 'user'
+                          ? 'bg-zinc-800 text-white self-end rounded-br-none'
+                          : msg.type === 'thinking'
+                            ? 'bg-purple-950/20 border border-purple-500/10 text-purple-300 self-start rounded-bl-none font-mono text-xs'
+                            : 'bg-black/30 border border-zinc-850 text-zinc-100 self-start rounded-bl-none'
+                          }`}
+                        dangerouslySetInnerHTML={{ __html: msg.html }}
+                      />
+                    ))
+                  )}
+                  <div ref={chatMessagesEndRef} />
+                </div>
 
-                    {/* Yaş Grubu */}
-                    <div className="flex flex-col gap-1">
-                      <div className="flex justify-between items-center mb-0.5">
-                        <label className="text-zinc-400 text-[10px] font-semibold capitalize">Yaş Grubu (Age Group)</label>
-                        {renderDefaultIndicator('age', ttsAge)}
-                      </div>
-                      <div className="custom-select-wrapper select-wrapper w-full">
-                        <select
-                          value={ttsAge}
-                          onChange={(e) => setTtsAge(e.target.value)}
-                          className="orion-native-select orion-native-select-sm"
-                        >
-                          <option value="Auto">Auto</option>
-                          <option value="child">child (Çocuk)</option>
-                          <option value="teenager">teenager (Genç)</option>
-                          <option value="young adult">young adult (Genç Yetişkin)</option>
-                          <option value="middle-aged">middle-aged (Orta Yaşlı)</option>
-                          <option value="elderly">elderly (Yaşlı)</option>
-                        </select>
-                      </div>
-                    </div>
+                <div className="flex gap-2 items-end">
+                  <Textarea
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        if (!isGenerating) {
+                          handleSendChat();
+                        }
+                      }
+                    }}
+                    placeholder={t('playground.chatPlaceholder')}
+                    className="flex-1 bg-black/40 border border-zinc-850 text-white rounded p-2.5 text-xs h-10 min-h-10 resize-none custom-scrollbar"
+                  />
+                  <Button
+                    onClick={() => setChatMessages([])}
+                    className="bg-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-700 font-medium px-4 h-10 text-xs rounded-lg"
+                    title={t('playground.clearChat')}
+                  >
+                    {t('common.clear')}
+                  </Button>
+                  {isGenerating ? (
+                    <Button
+                      onClick={() => abortControllerRef.current?.abort()}
+                      className="bg-red-600 text-white hover:bg-red-700 font-semibold px-5 h-10 text-xs rounded-lg min-w-[70px]"
+                    >
+                      {t('playground.stop')}
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={handleSendChat}
+                      className="bg-white text-black hover:bg-zinc-200 font-semibold px-5 h-10 text-xs rounded-lg min-w-[70px]"
+                    >
+                      {t('common.send')}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
-                    {/* Ton */}
-                    <div className="flex flex-col gap-1">
-                      <div className="flex justify-between items-center mb-0.5">
-                        <label className="text-zinc-400 text-[10px] font-semibold capitalize">Ton (Pitch)</label>
-                        {renderDefaultIndicator('pitch', ttsPitch)}
-                      </div>
-                      <div className="custom-select-wrapper select-wrapper w-full">
-                        <select
-                          value={ttsPitch}
-                          onChange={(e) => setTtsPitch(e.target.value)}
-                          className="orion-native-select orion-native-select-sm"
-                        >
-                          <option value="Auto">Auto</option>
-                          <option value="very high pitch">very high pitch (Çok Tiz)</option>
-                          <option value="high pitch">high pitch (Tiz)</option>
-                          <option value="moderate pitch">moderate pitch (Normal)</option>
-                          <option value="low pitch">low pitch (Pes/Bas)</option>
-                          <option value="very low pitch">very low pitch (Çok Pes/Bas)</option>
-                        </select>
-                      </div>
-                    </div>
+          {/* TTS TAB */}
+          {activeTab === 'tts' && (
+            <div className="playground-layout flex flex-col md:flex-row gap-4">
+              {/* Settings Sidebar */}
+              <div className="pg-sidebar md:w-[250px] p-4 glass-panel bg-[#18181b] border border-zinc-850 rounded-lg flex flex-col gap-3 shrink-0">
+                <h3 className="panel-title text-white font-heading font-semibold pb-1.5 border-b border-zinc-850 text-xs tracking-wide capitalize">{t('playground.audioSettings')}</h3>
 
-                    {/* Stil */}
-                    <div className="flex flex-col gap-1">
-                      <div className="flex justify-between items-center mb-0.5">
-                        <label className="text-zinc-400 text-[10px] font-semibold capitalize">Stil (Style)</label>
-                        {renderDefaultIndicator('style', ttsStyle)}
-                      </div>
-                      <div className="custom-select-wrapper select-wrapper w-full">
-                        <select
-                          value={ttsStyle}
-                          onChange={(e) => setTtsStyle(e.target.value)}
-                          className="orion-native-select orion-native-select-sm"
-                        >
-                          <option value="Auto">Auto</option>
-                          <option value="whisper">whisper (Fısıltı)</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Aksan */}
-                    <div className="flex flex-col gap-1">
-                      <div className="flex justify-between items-center mb-0.5">
-                        <label className="text-zinc-400 text-[10px] font-semibold capitalize">Aksan (Accent)</label>
-                        {renderDefaultIndicator('accent', ttsAccent)}
-                      </div>
-                      <div className="custom-select-wrapper select-wrapper w-full">
-                        <select
-                          value={ttsAccent}
-                          onChange={(e) => setTtsAccent(e.target.value)}
-                          className="orion-native-select orion-native-select-sm"
-                        >
-                          <option value="Auto">Auto</option>
-                          <option value="american accent">american accent</option>
-                          <option value="australian accent">australian accent</option>
-                          <option value="british accent">british accent</option>
-                          <option value="canadian accent">canadian accent</option>
-                          <option value="chinese accent">chinese accent</option>
-                          <option value="indian accent">indian accent</option>
-                          <option value="japanese accent">japanese accent</option>
-                          <option value="korean accent">korean accent</option>
-                          <option value="portuguese accent">portuguese accent</option>
-                          <option value="russian accent">russian accent</option>
-                        </select>
-                      </div>
+                {isLocalTts && (
+                  <div className="flex flex-col gap-1 border-b border-zinc-850 pb-2 mb-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider">Model Motoru</span>
+                      {localTtsInfo.active ? (
+                        <span className="text-[10px] text-zinc-300 flex items-center gap-1.5 font-medium">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                          {resolvedTtsEngine}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-red-400 font-semibold flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                          Çevrimdışı
+                        </span>
+                      )}
                     </div>
                   </div>
                 )}
-              </div>
-            )}
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.modelOrGroup')}</label>
+                  <div className="custom-select-wrapper select-wrapper w-full">
+                    <select
+                      value={ttsModel}
+                      onChange={(e) => setTtsModel(e.target.value)}
+                      className="orion-native-select orion-native-select-sm"
+                    >
+                      {getRouteOptions('tts').map((route) => (
+                        <option key={route.value} value={route.value}>
+                          {route.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <div className="flex justify-between items-center mb-0.5">
+                    <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.voicePersona')}</label>
+                    {renderDefaultIndicator('voice', ttsVoice)}
+                  </div>
+                  {!isLocalTts || (localTtsInfo.active && localTtsInfo.engine === resolvedTtsEngine && voices.length > 0) ? (
+                    <div className="custom-select-wrapper select-wrapper w-full">
+                      <select
+                        value={ttsVoice}
+                        onChange={(e) => setTtsVoice(e.target.value)}
+                        className="orion-native-select orion-native-select-sm"
+                      >
+                        {isLocalTts && <option value="">None</option>}
+                        {voices.map((v) => (
+                          <option key={v} value={v}>
+                            {v}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <Input
+                      value={ttsVoice}
+                      onChange={(e) => setTtsVoice(e.target.value)}
+                      placeholder="Ses adını elle yazın (Klon/Persona)..."
+                      className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs"
+                    />
+                  )}
+                </div>
+                <div className="flex flex-col gap-1">
+                  <div className="flex justify-between items-center mb-1 relative group">
+                    <label className="text-zinc-400 text-[10px] font-semibold capitalize">
+                      {isLocalTts ? t('playground.temperature') + ' (Yaratıcılık)' : t('playground.temperature')}
+                    </label>
+                    {selectedTtsGroup ? (
+                      <>
+                        <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all cursor-help ${hasTtsTempOverride
+                          ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
+                          : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
+                          }`}>
+                          {t('playground.defaultGroup')}
+                        </span>
+                        <div className="absolute top-full right-0 mt-1 hidden group-hover:block z-50 bg-[#242427]/98 border border-zinc-700/60 text-zinc-200 text-[10px] p-2.5 rounded shadow-xl whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar pointer-events-none min-w-[220px]">
+                          <div className="font-semibold text-[9px] text-purple-400 mb-1.5 uppercase tracking-wide">Group Temperature:</div>
+                          <div className="flex flex-col gap-1">
+                            {selectedTtsGroup.items?.map((item: any, idx: number) => {
+                              const mDetail = models.find((m) => m.name === item.name && m.capability === 'tts');
+                              const tVal = item.temperature !== undefined && item.temperature !== null
+                                ? item.temperature
+                                : (mDetail?.temperature ?? null);
+                              return (
+                                <div key={item.id} className="flex justify-between items-center gap-2 border-b border-zinc-800/50 pb-1 last:border-0 last:pb-0">
+                                  <span className="text-zinc-400 font-mono text-[8px] truncate whitespace-nowrap block max-w-[145px]" title={item.name}>{idx + 1}. {item.name}</span>
+                                  <span className="text-white font-mono text-[8px] shrink-0 whitespace-nowrap">
+                                    {tVal !== null ? tVal : '-'}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                            {(!selectedTtsGroup.items || selectedTtsGroup.items.length === 0) && (
+                              <span className="text-zinc-500 text-[9px]">No models in this group</span>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      renderDefaultIndicator('temperature', ttsTemp)
+                    )}
+                  </div>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="2"
+                    step="0.1"
+                    value={ttsTemp}
+                    onChange={(e) => setTtsTemp(e.target.value)}
+                    placeholder={t('playground.optional')}
+                    className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs placeholder:text-zinc-600"
+                  />
+                </div>
+                {isLocalTts && resolvedTtsEngine === 'voxcpm2' && (
+                  <div className={`flex flex-col gap-1 border-t border-zinc-850 pt-3 mt-1 ${!!ttsVoice ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <div className="flex justify-between items-center mb-0.5">
+                      <div className="flex items-center gap-2">
+                        <label className="text-zinc-400 text-[10px] font-semibold capitalize">Konuşma Tarzı Açıklaması</label>
+                        {!!ttsVoice && (
+                          <span className="text-[8px] text-zinc-600 font-medium bg-black/40 px-1 py-0.5 rounded border border-zinc-800 normal-case">Persona Aktif</span>
+                        )}
+                      </div>
+                      {renderDefaultIndicator('tts_instruct', ttsInstruct)}
+                    </div>
+                    <Textarea
+                      value={ttsInstruct}
+                      onChange={(e) => setTtsInstruct(e.target.value)}
+                      placeholder="Karakteri betimleyin. Örn: A young girl with a soft, sweet voice. Speaks slowly with a melancholic tone."
+                      className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs h-20 resize-none custom-scrollbar overflow-y-auto"
+                    />
+                  </div>
+                )}
+
+                {isLocalTts && resolvedTtsEngine === 'omnivoice' && (
+                  <div className="flex flex-col gap-3 pt-3 mt-1 border-t border-zinc-850">
+                    {/* Karakter Tasarımı - Collapsible */}
+                    <button
+                      type="button"
+                      onClick={() => setShowCharacterDesign(!showCharacterDesign)}
+                      className={`flex items-center justify-between text-left text-[10px] font-semibold uppercase tracking-wider py-1 cursor-pointer transition-colors w-full ${!!ttsVoice
+                          ? 'text-zinc-500 hover:text-zinc-400'
+                          : 'text-zinc-300 hover:text-white'
+                        }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        🎭 Karakter Tasarımı
+                        {!!ttsVoice && (
+                          <span className="text-[8px] text-zinc-600 font-medium bg-black/40 px-1 py-0.5 rounded border border-zinc-800 normal-case">Persona Aktif</span>
+                        )}
+                      </span>
+                      <span>{showCharacterDesign ? '▼' : '►'}</span>
+                    </button>
+
+                    {showCharacterDesign && (
+                      <div className={`flex flex-col gap-3 pl-1 border-l border-zinc-800 ${!!ttsVoice ? 'opacity-50 pointer-events-none' : ''}`}>
+                        {/* Cinsiyet */}
+                        <div className="flex flex-col gap-1">
+                          <div className="flex justify-between items-center mb-0.5">
+                            <label className="text-zinc-400 text-[10px] font-semibold capitalize">Cinsiyet (Gender)</label>
+                            {renderDefaultIndicator('gender', ttsGender)}
+                          </div>
+                          <div className="custom-select-wrapper select-wrapper w-full">
+                            <select
+                              value={ttsGender}
+                              onChange={(e) => setTtsGender(e.target.value)}
+                              className="orion-native-select orion-native-select-sm"
+                            >
+                              <option value="Auto">Auto</option>
+                              <option value="male">male (Erkek)</option>
+                              <option value="female">female (Kadın)</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Yaş Grubu */}
+                        <div className="flex flex-col gap-1">
+                          <div className="flex justify-between items-center mb-0.5">
+                            <label className="text-zinc-400 text-[10px] font-semibold capitalize">Yaş Grubu (Age Group)</label>
+                            {renderDefaultIndicator('age', ttsAge)}
+                          </div>
+                          <div className="custom-select-wrapper select-wrapper w-full">
+                            <select
+                              value={ttsAge}
+                              onChange={(e) => setTtsAge(e.target.value)}
+                              className="orion-native-select orion-native-select-sm"
+                            >
+                              <option value="Auto">Auto</option>
+                              <option value="child">child (Çocuk)</option>
+                              <option value="teenager">teenager (Genç)</option>
+                              <option value="young adult">young adult (Genç Yetişkin)</option>
+                              <option value="middle-aged">middle-aged (Orta Yaşlı)</option>
+                              <option value="elderly">elderly (Yaşlı)</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Ton */}
+                        <div className="flex flex-col gap-1">
+                          <div className="flex justify-between items-center mb-0.5">
+                            <label className="text-zinc-400 text-[10px] font-semibold capitalize">Ton (Pitch)</label>
+                            {renderDefaultIndicator('pitch', ttsPitch)}
+                          </div>
+                          <div className="custom-select-wrapper select-wrapper w-full">
+                            <select
+                              value={ttsPitch}
+                              onChange={(e) => setTtsPitch(e.target.value)}
+                              className="orion-native-select orion-native-select-sm"
+                            >
+                              <option value="Auto">Auto</option>
+                              <option value="very high pitch">very high pitch (Çok Tiz)</option>
+                              <option value="high pitch">high pitch (Tiz)</option>
+                              <option value="moderate pitch">moderate pitch (Normal)</option>
+                              <option value="low pitch">low pitch (Pes/Bas)</option>
+                              <option value="very low pitch">very low pitch (Çok Pes/Bas)</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Stil */}
+                        <div className="flex flex-col gap-1">
+                          <div className="flex justify-between items-center mb-0.5">
+                            <label className="text-zinc-400 text-[10px] font-semibold capitalize">Stil (Style)</label>
+                            {renderDefaultIndicator('style', ttsStyle)}
+                          </div>
+                          <div className="custom-select-wrapper select-wrapper w-full">
+                            <select
+                              value={ttsStyle}
+                              onChange={(e) => setTtsStyle(e.target.value)}
+                              className="orion-native-select orion-native-select-sm"
+                            >
+                              <option value="Auto">Auto</option>
+                              <option value="whisper">whisper (Fısıltı)</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Aksan ve Lehçe */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex justify-between items-center mb-0.5">
+                              <label className="text-zinc-400 text-[10px] font-semibold capitalize">Aksan (Accent)</label>
+                              {renderDefaultIndicator('accent', ttsAccent)}
+                            </div>
+                            <div className="custom-select-wrapper select-wrapper w-full">
+                              <select
+                                value={ttsAccent}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setTtsAccent(val);
+                                  if (val !== 'Auto') setTtsDialect('Auto');
+                                }}
+                                className="orion-native-select orion-native-select-sm"
+                              >
+                                <option value="Auto">Auto</option>
+                                <option value="american accent">american accent</option>
+                                <option value="australian accent">australian accent</option>
+                                <option value="british accent">british accent</option>
+                                <option value="canadian accent">canadian accent</option>
+                                <option value="chinese accent">chinese accent</option>
+                                <option value="indian accent">indian accent</option>
+                                <option value="japanese accent">japanese accent</option>
+                                <option value="korean accent">korean accent</option>
+                                <option value="portuguese accent">portuguese accent</option>
+                                <option value="russian accent">russian accent</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col gap-1">
+                            <div className="flex justify-between items-center mb-0.5">
+                              <label className="text-zinc-400 text-[10px] font-semibold capitalize">Çince Lehçe (Dialect)</label>
+                              {renderDefaultIndicator('dialect', ttsDialect)}
+                            </div>
+                            <div className="custom-select-wrapper select-wrapper w-full">
+                              <select
+                                value={ttsDialect}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setTtsDialect(val);
+                                  if (val !== 'Auto') setTtsAccent('Auto');
+                                }}
+                                className="orion-native-select orion-native-select-sm"
+                              >
+                                <option value="Auto">Auto</option>
+                                <option value="东北话">Dongbei (东北话)</option>
+                                <option value="云南话">Yunnan (云南话)</option>
+                                <option value="四川话">Sichuan (四川话)</option>
+                                <option value="宁夏话">Ningxia (宁夏话)</option>
+                                <option value="桂林话">Guilin (桂林话)</option>
+                                <option value="河南话">Henan (河南话)</option>
+                                <option value="济南话">Jinan (济南话)</option>
+                                <option value="甘肃话">Gansu (甘肃话)</option>
+                                <option value="石家庄话">Shijiazhuang (石家庄话)</option>
+                                <option value="贵州话">Guizhou (贵州话)</option>
+                                <option value="陕西话">Shaanxi (陕西话)</option>
+                                <option value="青岛话">Qingdao (青岛话)</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* 🌊 Streaming Ayarları */}
                 <button
@@ -1565,42 +1626,44 @@ export default function PlaygroundPage() {
 
                 {showAdvancedSettings && (
                   <div className="flex flex-col gap-3 pl-1 border-l border-zinc-800">
-                    <div className="flex flex-col gap-1">
-                      <div className="flex justify-between items-center mb-0.5">
-                        <label className="text-zinc-400 text-[10px] font-semibold capitalize">Dil (Language)</label>
-                        {renderDefaultIndicator('language', ttsLanguage)}
-                      </div>
-                      {!isLocalTts || resolvedTtsEngine === 'omnivoice' ? (
-                        <div className="custom-select-wrapper select-wrapper w-full">
-                          <select
+                    {!(isLocalTts && resolvedTtsEngine === 'voxcpm2') && (
+                      <div className="flex flex-col gap-1">
+                        <div className="flex justify-between items-center mb-0.5">
+                          <label className="text-zinc-400 text-[10px] font-semibold capitalize">Dil (Language)</label>
+                          {renderDefaultIndicator('language', ttsLanguage)}
+                        </div>
+                        {!isLocalTts || (resolvedTtsEngine === 'omnivoice' && localTtsInfo.active && localTtsInfo.engine === 'omnivoice' && languages.length > 0) ? (
+                          <div className="custom-select-wrapper select-wrapper w-full">
+                            <select
+                              value={ttsLanguage}
+                              onChange={(e) => setTtsLanguage(e.target.value)}
+                              className="orion-native-select orion-native-select-sm"
+                            >
+                              {languages.length > 0 ? (
+                                languages.map((lang) => (
+                                  <option key={lang} value={lang}>
+                                    {lang === 'Auto' ? 'Otomatik Algıla (Auto)' : lang}
+                                  </option>
+                                ))
+                              ) : (
+                                <>
+                                  <option value="Auto">Otomatik Algıla (Auto)</option>
+                                  <option value="Turkish">Turkish</option>
+                                  <option value="English">English</option>
+                                </>
+                              )}
+                            </select>
+                          </div>
+                        ) : (
+                          <Input
                             value={ttsLanguage}
                             onChange={(e) => setTtsLanguage(e.target.value)}
-                            className="orion-native-select orion-native-select-sm"
-                          >
-                            {languages.length > 0 ? (
-                              languages.map((lang) => (
-                                <option key={lang} value={lang}>
-                                  {lang === 'Auto' ? 'Otomatik Algıla (Auto)' : lang}
-                                </option>
-                              ))
-                            ) : (
-                              <>
-                                <option value="Auto">Otomatik Algıla (Auto)</option>
-                                <option value="Turkish">Turkish</option>
-                                <option value="English">English</option>
-                              </>
-                            )}
-                          </select>
-                        </div>
-                      ) : (
-                        <Input
-                          value={ttsLanguage}
-                          onChange={(e) => setTtsLanguage(e.target.value)}
-                          placeholder="Dil elle yazın. Örn: Turkish, English..."
-                          className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs"
-                        />
-                      )}
-                    </div>
+                            placeholder="Dil elle yazın. Örn: Turkish, English..."
+                            className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs"
+                          />
+                        )}
+                      </div>
+                    )}
 
                     <div className="flex flex-col gap-1">
                       <div className="flex justify-between items-center mb-0.5">
@@ -1651,135 +1714,137 @@ export default function PlaygroundPage() {
                     </div>
                   </div>
                 )}
-          </div>
-
-          {/* Main Area */}
-          <div className="pg-main-area flex-1 p-4 glass-panel bg-[#18181b] border border-zinc-850 rounded-lg flex flex-col gap-3">
-            <div className="flex flex-col gap-1 flex-1">
-              <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.textToSynthesize')}</label>
-              <Textarea
-                value={ttsInput}
-                onChange={(e) => setTtsInput(e.target.value)}
-                placeholder={t('playground.textToSynthesizePlaceholder')}
-                className="flex-1 bg-black/40 border border-zinc-850 text-white rounded p-3 text-xs min-h-[120px] max-h-[220px]"
-              />
-            </div>
-
-            <div className="flex justify-end">
-              {isGeneratingTTS ? (
-                <Button
-                  onClick={() => ttsAbortControllerRef.current?.abort()}
-                  className="bg-red-600 text-white hover:bg-red-700 font-semibold px-5 py-2 rounded-lg text-xs min-w-[70px]"
-                >
-                  {t('playground.stop')}
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleGenerateTTS}
-                  className="bg-white text-black hover:bg-zinc-200 font-semibold px-5 py-2 rounded-lg text-xs"
-                >
-                  {t('playground.generateAudio')}
-                </Button>
-              )}
-            </div>
-
-            {ttsError && (
-              <div className="text-red-500 bg-red-950/20 border border-red-500/30 rounded p-3 text-xs">
-                {ttsError}
               </div>
-            )}
 
-            {ttsUrl && (
-              <div className="p-3 bg-white/5 border border-zinc-800 rounded-lg flex items-center justify-between gap-3 mt-1">
-                <audio src={ttsUrl} controls className="flex-grow max-w-[400px] h-8" />
-                <a
-                  href={ttsUrl}
-                  download="speech.wav"
-                  className="bg-zinc-800 text-white border border-zinc-700 hover:bg-zinc-700 font-medium px-3 py-1.5 text-[10px] rounded transition-colors"
-                >
-                  {t('playground.download')}
-                </a>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* EMBEDDING TAB */}
-      {activeTab === 'embed' && (
-        <div className="playground-layout flex flex-col md:flex-row gap-4">
-          {/* Settings Sidebar */}
-          <div className="pg-sidebar md:w-[250px] p-4 glass-panel bg-[#18181b] border border-zinc-850 rounded-lg flex flex-col gap-3 shrink-0">
-            <h3 className="panel-title text-white font-heading font-semibold pb-1.5 border-b border-zinc-850 text-xs tracking-wide capitalize">{t('playground.embeddingSettings')}</h3>
-            <div className="flex flex-col gap-1">
-              <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.modelOrGroup')}</label>
-              <div className="custom-select-wrapper select-wrapper w-full">
-                <select
-                  value={embedModel}
-                  onChange={(e) => setEmbedModel(e.target.value)}
-                  className="orion-native-select orion-native-select-sm"
-                >
-                  {getRouteOptions('embed').map((route) => (
-                    <option key={route.value} value={route.value}>
-                      {route.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Main Area */}
-          <div className="pg-main-area flex-1 p-4 glass-panel bg-[#18181b] border border-zinc-850 rounded-lg flex flex-col gap-3">
-            <div className="flex flex-col gap-1 flex-1">
-              <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.textToEmbed')}</label>
-              <Textarea
-                value={embedInput}
-                onChange={(e) => setEmbedInput(e.target.value)}
-                placeholder={t('playground.textToEmbedPlaceholder')}
-                className="flex-1 bg-black/40 border border-zinc-850 text-white rounded p-3 text-xs min-h-[120px] max-h-[220px]"
-              />
-            </div>
-
-            <div className="flex justify-end">
-              {isGeneratingEmbed ? (
-                <Button
-                  onClick={() => embedAbortControllerRef.current?.abort()}
-                  className="bg-red-600 text-white hover:bg-red-700 font-semibold px-5 py-2 rounded-lg text-xs min-w-[70px]"
-                >
-                  {t('playground.stop')}
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleGenerateEmbedding}
-                  className="bg-white text-black hover:bg-zinc-200 font-semibold px-5 py-2 rounded-lg text-xs"
-                >
-                  {t('playground.generateVector')}
-                </Button>
-              )}
-            </div>
-
-            {embedError && (
-              <div className="text-red-500 bg-red-950/20 border border-red-500/30 rounded p-3 text-xs">
-                {embedError}
-              </div>
-            )}
-
-            {embedPreview && (
-              <div className="p-4 bg-black/30 border border-zinc-855 rounded-lg flex flex-col gap-2">
-                <div className="inline-flex max-w-max text-[9px] bg-zinc-800 text-zinc-300 font-semibold tracking-wide uppercase px-2 py-0.5 rounded">
-                  {embedDim}
+              {/* Main Area */}
+              <div className="pg-main-area flex-1 p-4 glass-panel bg-[#18181b] border border-zinc-850 rounded-lg flex flex-col gap-3">
+                <div className="flex flex-col gap-1 flex-1">
+                  <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.textToSynthesize')}</label>
+                  <Textarea
+                    value={ttsInput}
+                    onChange={(e) => setTtsInput(e.target.value)}
+                    placeholder={t('playground.textToSynthesizePlaceholder')}
+                    className="flex-1 bg-black/40 border border-zinc-850 text-white rounded p-3 text-xs min-h-[120px] max-h-[220px]"
+                  />
                 </div>
-                <div className="font-mono text-xs text-purple-400 break-all select-all">
-                  {embedPreview}
+
+                <div className="flex justify-end">
+                  {isGeneratingTTS ? (
+                    <Button
+                      onClick={() => ttsAbortControllerRef.current?.abort()}
+                      className="bg-red-600 text-white hover:bg-red-700 font-semibold px-5 py-2 rounded-lg text-xs min-w-[70px]"
+                    >
+                      {t('playground.stop')}
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={handleGenerateTTS}
+                      className="bg-white text-black hover:bg-zinc-200 font-semibold px-5 py-2 rounded-lg text-xs"
+                    >
+                      {t('playground.generateAudio')}
+                    </Button>
+                  )}
                 </div>
-                <pre className="custom-scrollbar bg-black/50 border border-zinc-850 p-3 rounded text-[11px] font-mono overflow-auto max-h-[180px] text-zinc-300 whitespace-pre">
-                  {embedJson}
-                </pre>
+
+                {ttsError && (
+                  <div className="text-red-500 bg-red-950/20 border border-red-500/30 rounded p-3 text-xs">
+                    {ttsError}
+                  </div>
+                )}
+
+                {ttsUrl && (
+                  <div className="p-3 bg-white/5 border border-zinc-800 rounded-lg flex items-center justify-between gap-3 mt-1">
+                    <audio src={ttsUrl} controls className="flex-grow max-w-[400px] h-8" />
+                    <a
+                      href={ttsUrl}
+                      download="speech.wav"
+                      className="bg-zinc-800 text-white border border-zinc-700 hover:bg-zinc-700 font-medium px-3 py-1.5 text-[10px] rounded transition-colors"
+                    >
+                      {t('playground.download')}
+                    </a>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </div>
+            </div>
+          )}
+
+          {/* EMBEDDING TAB */}
+          {activeTab === 'embed' && (
+            <div className="playground-layout flex flex-col md:flex-row gap-4">
+              {/* Settings Sidebar */}
+              <div className="pg-sidebar md:w-[250px] p-4 glass-panel bg-[#18181b] border border-zinc-850 rounded-lg flex flex-col gap-3 shrink-0">
+                <h3 className="panel-title text-white font-heading font-semibold pb-1.5 border-b border-zinc-850 text-xs tracking-wide capitalize">{t('playground.embeddingSettings')}</h3>
+                <div className="flex flex-col gap-1">
+                  <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.modelOrGroup')}</label>
+                  <div className="custom-select-wrapper select-wrapper w-full">
+                    <select
+                      value={embedModel}
+                      onChange={(e) => setEmbedModel(e.target.value)}
+                      className="orion-native-select orion-native-select-sm"
+                    >
+                      {getRouteOptions('embed').map((route) => (
+                        <option key={route.value} value={route.value}>
+                          {route.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Area */}
+              <div className="pg-main-area flex-1 p-4 glass-panel bg-[#18181b] border border-zinc-850 rounded-lg flex flex-col gap-3">
+                <div className="flex flex-col gap-1 flex-1">
+                  <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.textToEmbed')}</label>
+                  <Textarea
+                    value={embedInput}
+                    onChange={(e) => setEmbedInput(e.target.value)}
+                    placeholder={t('playground.textToEmbedPlaceholder')}
+                    className="flex-1 bg-black/40 border border-zinc-850 text-white rounded p-3 text-xs min-h-[120px] max-h-[220px]"
+                  />
+                </div>
+
+                <div className="flex justify-end">
+                  {isGeneratingEmbed ? (
+                    <Button
+                      onClick={() => embedAbortControllerRef.current?.abort()}
+                      className="bg-red-600 text-white hover:bg-red-700 font-semibold px-5 py-2 rounded-lg text-xs min-w-[70px]"
+                    >
+                      {t('playground.stop')}
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={handleGenerateEmbedding}
+                      className="bg-white text-black hover:bg-zinc-200 font-semibold px-5 py-2 rounded-lg text-xs"
+                    >
+                      {t('playground.generateVector')}
+                    </Button>
+                  )}
+                </div>
+
+                {embedError && (
+                  <div className="text-red-500 bg-red-950/20 border border-red-500/30 rounded p-3 text-xs">
+                    {embedError}
+                  </div>
+                )}
+
+                {embedPreview && (
+                  <div className="p-4 bg-black/30 border border-zinc-855 rounded-lg flex flex-col gap-2">
+                    <div className="inline-flex max-w-max text-[9px] bg-zinc-800 text-zinc-300 font-semibold tracking-wide uppercase px-2 py-0.5 rounded">
+                      {embedDim}
+                    </div>
+                    <div className="font-mono text-xs text-purple-400 break-all select-all">
+                      {embedPreview}
+                    </div>
+                    <pre className="custom-scrollbar bg-black/50 border border-zinc-850 p-3 rounded text-[11px] font-mono overflow-auto max-h-[180px] text-zinc-300 whitespace-pre">
+                      {embedJson}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </section>
   );
