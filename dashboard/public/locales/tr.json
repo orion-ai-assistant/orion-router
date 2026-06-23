@@ -341,5 +341,8 @@
   "tts.accent.japanese": "Japon Aksanı",
   "tts.accent.korean": "Kore Aksanı",
   "tts.accent.portuguese": "Portekiz Aksanı",
-  "tts.accent.russian": "Rus Aksanı"
+  "tts.accent.russian": "Rus Aksanı",
+  "settings.banner.title": "Genel Bakış Resmi",
+  "settings.banner.description": "Genel bakış sayfasındaki banner resmi için bir arka plan stili seçin.",
+  "settings.banner.toast.success": "Genel bakış resmi güncellendi!"
 }

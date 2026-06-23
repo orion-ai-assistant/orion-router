@@ -31,6 +31,66 @@ interface ConfirmDialogState {
   callback: (() => void) | null;
 }
 
+export interface BannerPreset {
+  id: string;
+  style: React.CSSProperties;
+}
+
+export const BANNER_PRESETS: BannerPreset[] = [
+  {
+    id: 'default',
+    style: {
+      backgroundImage: "url('/dashboard/static/images/dashboard_banner.png')",
+      backgroundSize: 'cover',
+      backgroundPosition: 'center 30%',
+      backgroundRepeat: 'no-repeat',
+    }
+  },
+  {
+    id: 'preset-neon',
+    style: {
+      backgroundColor: '#09090b',
+      backgroundImage: `
+        linear-gradient(to right, rgba(236, 72, 153, 0.12) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(236, 72, 153, 0.12) 1px, transparent 1px),
+        linear-gradient(135deg, #09090b 0%, #1e1b4b 30%, #4c1d95 70%, #09090b 100%)
+      `,
+      backgroundSize: '40px 40px, 40px 40px, 100% 100%',
+      backgroundPosition: 'center center',
+      backgroundRepeat: 'repeat, repeat, no-repeat',
+    }
+  },
+  {
+    id: 'preset-network',
+    style: {
+      backgroundColor: '#18181b',
+      backgroundImage: `
+        radial-gradient(circle at 20% 30%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
+        radial-gradient(circle at 80% 70%, rgba(14, 165, 233, 0.15) 0%, transparent 40%),
+        radial-gradient(1.5px 1.5px at 40px 60px, rgba(255, 255, 255, 0.25) 100%, transparent),
+        radial-gradient(1.5px 1.5px at 120px 150px, rgba(255, 255, 255, 0.2) 100%, transparent),
+        radial-gradient(1.5px 1.5px at 220px 80px, rgba(255, 255, 255, 0.25) 100%, transparent),
+        radial-gradient(1.5px 1.5px at 320px 120px, rgba(255, 255, 255, 0.2) 100%, transparent),
+        radial-gradient(1.5px 1.5px at 420px 40px, rgba(255, 255, 255, 0.25) 100%, transparent),
+        radial-gradient(1.5px 1.5px at 520px 140px, rgba(255, 255, 255, 0.2) 100%, transparent),
+        linear-gradient(135deg, #121214 0%, #18181b 100%)
+      `,
+      backgroundSize: '100% 100%, 100% 100%, 120px 180px, 200px 200px, 150px 150px, 250px 250px, 180px 180px, 300px 300px, 100% 100%',
+      backgroundPosition: 'center, center, 0 0, 40px 60px, 130px 10px, 70px 220px, 20px 80px, 110px 190px, center',
+      backgroundRepeat: 'no-repeat, no-repeat, repeat, repeat, repeat, repeat, repeat, repeat, no-repeat',
+    }
+  },
+  {
+    id: 'preset-forest',
+    style: {
+      backgroundImage: "url('/dashboard/static/images/forest_banner.png')",
+      backgroundSize: 'cover',
+      backgroundPosition: 'center 30%',
+      backgroundRepeat: 'no-repeat',
+    }
+  }
+];
+
 interface AppContextType {
   adminKey: string;
   isAuthenticated: boolean;
@@ -42,6 +102,9 @@ interface AppContextType {
   locale: string;
   setLocale: (lang: string) => void;
   t: TranslatorFunction;
+  bannerStyle: React.CSSProperties;
+  activeBannerId: string;
+  updateActiveBannerId: (id: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -54,6 +117,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [showLogin, setShowLogin] = useState<boolean>(false);
   const [adminKeyInput, setAdminKeyInput] = useState<string>('');
   const [loginError, setLoginError] = useState<string>('');
+
+  // Banner State
+  const [activeBannerId, setActiveBannerId] = useState<string>('default');
+  const [bannerStyle, setBannerStyle] = useState<React.CSSProperties>(BANNER_PRESETS[0].style);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedBannerId = localStorage.getItem('orion-active-banner-id') || 'default';
+      setActiveBannerId(savedBannerId);
+      const preset = BANNER_PRESETS.find(p => p.id === savedBannerId) || BANNER_PRESETS[0];
+      setBannerStyle(preset.style);
+    }
+  }, []);
+
+  const updateActiveBannerId = (id: string) => {
+    setActiveBannerId(id);
+    const preset = BANNER_PRESETS.find(p => p.id === id) || BANNER_PRESETS[0];
+    setBannerStyle(preset.style);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('orion-active-banner-id', id);
+    }
+  };
 
   // Toasts State
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -245,7 +330,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AppContext.Provider value={{ adminKey, isAuthenticated, isDefaultPassword, showToast, confirmAction, logout, updateAdminKey, locale, setLocale, t }}>
+    <AppContext.Provider value={{
+      adminKey,
+      isAuthenticated,
+      isDefaultPassword,
+      showToast,
+      confirmAction,
+      logout,
+      updateAdminKey,
+      locale,
+      setLocale,
+      t,
+      bannerStyle,
+      activeBannerId,
+      updateActiveBannerId
+    }}>
       {children}
 
       {/* Admin Login Dialog */}

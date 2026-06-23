@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { adminFetch } from '@/lib/api';
-import { useApp } from '@/components/AppContext';
+import { useApp, BANNER_PRESETS } from '@/components/AppContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -10,7 +10,7 @@ import { ChevronDown, Check } from 'lucide-react';
 import { SUPPORTED_LOCALES, LOCALE_NAMES, Locale } from '@/lib/i18n';
 
 export default function SettingsPage() {
-  const { showToast, updateAdminKey, t, locale, setLocale } = useApp();
+  const { showToast, updateAdminKey, t, locale, setLocale, activeBannerId, updateActiveBannerId } = useApp();
   
   // Change Admin Secret states
   const [showChangeKeyModal, setShowChangeKeyModal] = useState<boolean>(false);
@@ -274,80 +274,142 @@ export default function SettingsPage() {
         </div>
       </header>
 
-      <div className="glass-panel p-8 bg-[#18181b] border border-zinc-800 rounded-md shadow-xl max-w-2xl mb-8">
-        <h2 className="font-heading text-lg font-semibold text-white mb-2">{t('settings.language.title')}</h2>
-        <p className="text-zinc-400 text-sm mb-6">{t('settings.language.description')}</p>
-        
-        <div className="flex relative" ref={dropdownRef}>
-          <button
-            onClick={() => setLangDropdownOpen(!langDropdownOpen)}
-            className="flex items-center justify-between bg-black/40 border border-zinc-800 text-white rounded px-4 py-2.5 min-w-[200px] outline-none hover:border-zinc-600 transition-colors"
-          >
-            <span>{LOCALE_NAMES[locale] || locale}</span>
-            <ChevronDown className="w-4 h-4 ml-2 text-zinc-400 shrink-0" />
-          </button>
-          
-          {langDropdownOpen && (
-            <div
-              ref={listRef}
-              className="absolute top-[calc(100%+4px)] left-0 w-[240px] bg-zinc-900 border border-zinc-700 rounded-md shadow-2xl z-50 max-h-64 overflow-y-auto custom-scrollbar py-1"
-            >
-              {SUPPORTED_LOCALES.map((l) => (
-                <button
-                  key={l}
-                  data-locale={l}
-                  onMouseEnter={() => setHighlightedLocale(l)}
-                  onClick={() => {
-                    setLocale(l);
-                    setLangDropdownOpen(false);
-                  }}
-                  className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between transition-colors ${
-                    highlightedLocale === l
-                      ? 'bg-zinc-800 text-white font-medium'
-                      : locale === l
-                      ? 'bg-zinc-800/40 text-white/95 font-medium'
-                      : 'text-zinc-300'
-                  }`}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start max-w-6xl">
+        {/* Left Column: Language & Admin Auth */}
+        <div className="flex flex-col gap-8">
+          {/* Language Settings Card */}
+          <div className="glass-panel p-8 bg-[#18181b] border border-zinc-800 rounded-md shadow-xl">
+            <h2 className="font-heading text-lg font-semibold text-white mb-2">{t('settings.language.title')}</h2>
+            <p className="text-zinc-400 text-sm mb-6">{t('settings.language.description')}</p>
+            
+            <div className="flex relative" ref={dropdownRef}>
+              <button
+                onClick={() => setLangDropdownOpen(!langDropdownOpen)}
+                className="flex items-center justify-between bg-black/40 border border-zinc-800 text-white rounded px-4 py-2.5 min-w-[200px] outline-none hover:border-zinc-600 transition-colors"
+              >
+                <span>{LOCALE_NAMES[locale] || locale}</span>
+                <ChevronDown className="w-4 h-4 ml-2 text-zinc-400 shrink-0" />
+              </button>
+              
+              {langDropdownOpen && (
+                <div
+                  ref={listRef}
+                  className="absolute top-[calc(100%+4px)] left-0 w-[240px] bg-zinc-900 border border-zinc-700 rounded-md shadow-2xl z-50 max-h-64 overflow-y-auto custom-scrollbar py-1"
                 >
-                  <span dir="auto">{LOCALE_NAMES[l] || l}</span>
-                  {locale === l && <Check className="w-4 h-4 text-emerald-500 shrink-0" />}
-                </button>
-              ))}
+                  {SUPPORTED_LOCALES.map((l) => (
+                    <button
+                      key={l}
+                      data-locale={l}
+                      onMouseEnter={() => setHighlightedLocale(l)}
+                      onClick={() => {
+                        setLocale(l);
+                        setLangDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between transition-colors ${
+                        highlightedLocale === l
+                          ? 'bg-zinc-800 text-white font-medium'
+                          : locale === l
+                          ? 'bg-zinc-800/40 text-white/95 font-medium'
+                          : 'text-zinc-300'
+                      }`}
+                    >
+                      <span dir="auto">{LOCALE_NAMES[l] || l}</span>
+                      {locale === l && <Check className="w-4 h-4 text-emerald-500 shrink-0" />}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      </div>
+          </div>
 
-      <div className="glass-panel p-8 bg-[#18181b] border border-zinc-800 rounded-md shadow-xl max-w-2xl">
-        <h2 className="font-heading text-lg font-semibold text-white mb-2">{t('settings.auth.title')}</h2>
-        <p className="text-zinc-400 text-sm mb-6">{t('settings.auth.description')}</p>
-        
-        <div className="flex">
-          <Button
-            type="button"
-            onClick={() => setShowChangeKeyModal(true)}
-            className="bg-white text-black hover:bg-zinc-200 font-semibold px-6 py-2.5 rounded transition-all duration-200 shadow-md"
-          >
-            {t('settings.auth.updateBtn')}
-          </Button>
+          {/* Admin Authentication Card */}
+          <div className="glass-panel p-8 bg-[#18181b] border border-zinc-800 rounded-md shadow-xl">
+            <h2 className="font-heading text-lg font-semibold text-white mb-2">{t('settings.auth.title')}</h2>
+            <p className="text-zinc-400 text-sm mb-6">{t('settings.auth.description')}</p>
+            
+            <div className="flex">
+              <Button
+                type="button"
+                onClick={() => setShowChangeKeyModal(true)}
+                className="bg-white text-black hover:bg-zinc-200 font-semibold px-6 py-2.5 rounded transition-all duration-200 shadow-md"
+              >
+                {t('settings.auth.updateBtn')}
+              </Button>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Danger Zone */}
-      <div className="glass-panel p-8 bg-[#18181b] border border-red-950/20 rounded-md shadow-xl max-w-2xl mt-8">
-        <h2 className="font-heading text-lg font-semibold text-red-500 mb-2">{t('settings.danger.title')}</h2>
-        <p className="text-zinc-400 text-sm mb-6">
-          {t('settings.danger.description')}
-        </p>
-        
-        <div className="flex">
-          <Button
-            type="button"
-            onClick={() => setShowClearLogsModal(true)}
-            className="bg-red-950/20 hover:bg-red-900/30 text-red-400 border border-red-500/25 font-semibold px-6 py-2.5 rounded transition-all duration-200 shadow-md"
-          >
-            {t('settings.danger.resetBtn')}
-          </Button>
+        {/* Right Column: Banner Selector & Danger Zone */}
+        <div className="flex flex-col gap-8">
+          {/* Banner Selector Card */}
+          <div className="glass-panel p-8 bg-[#18181b] border border-zinc-800 rounded-md shadow-xl">
+            <h2 className="font-heading text-lg font-semibold text-white mb-2">{t('settings.banner.title')}</h2>
+            <p className="text-zinc-400 text-sm mb-6">{t('settings.banner.description')}</p>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {BANNER_PRESETS.map((preset) => {
+                const isActive = activeBannerId === preset.id;
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => {
+                      updateActiveBannerId(preset.id);
+                      showToast(t('settings.banner.toast.success'));
+                    }}
+                    className={`relative group rounded-lg overflow-hidden border p-0.5 text-left transition-all duration-200 focus:outline-none flex flex-col hover:scale-[1.02] active:scale-[0.98] ${
+                      isActive 
+                        ? 'border-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.35)] bg-zinc-900/60' 
+                        : 'border-zinc-850 hover:border-zinc-700 bg-zinc-950/40'
+                    }`}
+                  >
+                    <div className="w-full h-8 rounded-md overflow-hidden relative">
+                      <div 
+                        className="dashboard-banner !mb-0 !border-0 !shadow-none !rounded-none"
+                        style={{
+                          ...preset.style,
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '500%',
+                          height: '160px',
+                          transformOrigin: 'top left',
+                          transform: 'scale(0.2)',
+                        }}
+                      />
+                      {/* Subtle Dark Overlay */}
+                      <div className="absolute inset-0 bg-black/15 group-hover:bg-transparent transition-colors duration-150 pointer-events-none"></div>
+                      
+                      {/* Active Check Overlay */}
+                      {isActive && (
+                        <div className="absolute top-1.5 right-1.5 z-10 bg-blue-500 text-white p-0.5 rounded-full flex items-center justify-center shadow-lg border border-white/20">
+                          <Check className="w-2.5 h-2.5 stroke-[2.8]" />
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Danger Zone Card */}
+          <div className="glass-panel p-8 bg-[#18181b] border border-red-950/20 rounded-md shadow-xl">
+            <h2 className="font-heading text-lg font-semibold text-red-500 mb-2">{t('settings.danger.title')}</h2>
+            <p className="text-zinc-400 text-sm mb-6">
+              {t('settings.danger.description')}
+            </p>
+            
+            <div className="flex">
+              <Button
+                type="button"
+                onClick={() => setShowClearLogsModal(true)}
+                className="bg-red-950/20 hover:bg-red-900/30 text-red-400 border border-red-500/25 font-semibold px-6 py-2.5 rounded transition-all duration-200 shadow-md"
+              >
+                {t('settings.danger.resetBtn')}
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
 

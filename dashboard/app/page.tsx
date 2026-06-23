@@ -19,7 +19,7 @@ interface Stats {
 }
 
 export default function OverviewPage() {
-  const { t } = useApp();
+  const { t, bannerStyle } = useApp();
   const [stats, setStats] = useState<Stats>({
     total_cost: 0,
     prompt_cost: 0,
@@ -70,7 +70,7 @@ export default function OverviewPage() {
 
   return (
     <section id="dashboard" className="tab-content active block pt-8">
-      <div className="dashboard-banner"></div>
+      <div className="dashboard-banner" style={bannerStyle}></div>
 
       <header className="flex justify-between items-end mb-8 pb-6 border-b border-border">
         <div className="header-titles">
