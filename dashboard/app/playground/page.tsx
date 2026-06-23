@@ -20,7 +20,7 @@ interface Message {
 }
 
 export default function PlaygroundPage() {
-  const { showToast, t } = useApp();
+  const { showToast, locale, t } = useApp();
   const getSavedState = (key: string, defaultVal: string) => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem(key) || defaultVal;
@@ -692,6 +692,7 @@ export default function PlaygroundPage() {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${adminKey}`,
+          'Accept-Language': locale,
         },
         body: JSON.stringify(payload),
         signal: abortControllerRef.current.signal,
@@ -699,13 +700,18 @@ export default function PlaygroundPage() {
 
       if (!res.ok) {
         const errText = await res.text();
+        let displayError = errText;
+        try {
+          const parsed = JSON.parse(errText);
+          displayError = parsed.error?.message || parsed.detail || errText;
+        } catch (_) {}
         setChatMessages((prev) => [
           ...prev,
           {
             id: 'err-' + Date.now(),
             role: 'assistant',
             type: 'content',
-            html: `Error: ${res.status} - ${errText}`,
+            html: `Error: ${res.status} - ${displayError}`,
           },
         ]);
         return;
@@ -905,6 +911,7 @@ export default function PlaygroundPage() {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${adminKey}`,
+          'Accept-Language': locale,
         },
         body: JSON.stringify(payload),
         signal: ttsAbortControllerRef.current.signal,
@@ -912,7 +919,7 @@ export default function PlaygroundPage() {
 
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.detail || res.statusText);
+        throw new Error(err.error?.message || err.detail || res.statusText);
       }
 
       const blob = await res.blob();
@@ -952,6 +959,7 @@ export default function PlaygroundPage() {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${adminKey}`,
+          'Accept-Language': locale,
         },
         body: JSON.stringify({ model: embedModel, input: text }),
         signal: embedAbortControllerRef.current.signal,
@@ -959,7 +967,7 @@ export default function PlaygroundPage() {
 
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.detail || res.statusText);
+        throw new Error(err.error?.message || err.detail || res.statusText);
       }
 
       const data = await res.json();
