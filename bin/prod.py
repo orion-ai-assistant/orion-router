@@ -25,7 +25,7 @@ if str(ROOT) not in sys.path:
 
 # Import shared helpers and definitions from common.py
 from bin.common import (
-    ROOT, DASHBOARD, PG_BIN, DEFAULT_TIMEOUT,
+    ROOT, DASHBOARD, DEFAULT_TIMEOUT,
     RESET, BOLD, CYAN, GREEN, YELLOW, RED, GRAY,
     ok, info, warn, err, dim,
     acquire_lock, release_lock, run, run_silent, psql, read_env,
@@ -59,7 +59,7 @@ def build_dashboard(router_port: str) -> None:
     
     if npm_needs_install(DASHBOARD):
         dim(t("npm_installing_deps"))
-        result_npm = run(["npm", "install"], cwd=DASHBOARD, shell=True)
+        result_npm = run("npm install", cwd=DASHBOARD, shell=True)
         if result_npm.returncode != 0:
             err(t("npm_install_failed"))
             sys.exit(1)
@@ -67,7 +67,7 @@ def build_dashboard(router_port: str) -> None:
 
     env = {**os.environ, "NEXT_PUBLIC_ROUTER_PORT": router_port}
     result = run(
-        ["npm", "run", "build"],
+        "npm run build",
         cwd=DASHBOARD,
         shell=True,
         env=env,
@@ -94,7 +94,11 @@ def shutdown(procs: list) -> None:
     print(f"\n{RED}✘  {t('shutdown_received')}{RESET}", flush=True)
     for name, proc in procs:
         try:
-            run_silent(["taskkill", "/f", "/t", "/pid", str(proc.pid)])
+            proc.terminate()
+            try:
+                proc.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                proc.kill()
             dim(t("service_closed", name=name, pid=proc.pid))
         except Exception:
             pass

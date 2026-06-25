@@ -66,9 +66,6 @@ class ColouredFormatter(logging.Formatter):
             asctime = self.formatTime(record, self.datefmt)
             return f"{self.GREY}{asctime}{self.RESET} [{levelname}] {name}: {message}"
 
-if sys.platform == "win32":
-    os.system("")  # Enable ANSI support on Windows
-
 handler = logging.StreamHandler(sys.stdout)
 handler.setFormatter(ColouredFormatter())
 logging.basicConfig(

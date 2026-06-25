@@ -21,7 +21,7 @@ if str(ROOT) not in sys.path:
 
 # Import shared helpers and definitions from common.py
 from bin.common import (
-    ROOT, DASHBOARD, PG_BIN, DEFAULT_TIMEOUT,
+    ROOT, DASHBOARD, DEFAULT_TIMEOUT,
     RESET, BOLD, CYAN, GREEN, YELLOW, RED, GRAY,
     ok, info, warn, err, dim,
     acquire_lock, release_lock, run, run_silent, psql, read_env,
@@ -80,14 +80,14 @@ def launch(router_port: str) -> list[tuple[str, subprocess.Popen]]:
     # Next.js frontend
     if npm_needs_install(DASHBOARD):
         dim(t("npm_installing_deps"))
-        result_npm = run(["npm", "install"], cwd=DASHBOARD, shell=True)
+        result_npm = run("npm install", cwd=DASHBOARD, shell=True)
         if result_npm.returncode != 0:
             err(t("npm_install_failed"))
             sys.exit(1)
         record_npm_install(DASHBOARD)
 
     frontend = subprocess.Popen(
-        ["npm", "run", "dev", "--", "-p", str(UI_PORT), "-H", "0.0.0.0"],
+        f"npm run dev -- -p {UI_PORT} -H 0.0.0.0",
         cwd=DASHBOARD,
         shell=True,
     )
@@ -101,7 +101,11 @@ def shutdown(procs: list) -> None:
 
     for name, proc in procs:
         try:
-            run_silent(["taskkill", "/f", "/t", "/pid", str(proc.pid)])
+            proc.terminate()
+            try:
+                proc.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                proc.kill()
             dim(t("service_closed", name=name, pid=proc.pid))
         except Exception:
             pass

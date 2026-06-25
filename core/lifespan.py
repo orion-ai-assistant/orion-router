@@ -43,6 +43,7 @@ def print_active_services_banner(
     BLUE   = "\033[94m"
     GREEN  = "\033[92m"
     CYAN   = "\033[96m"
+    UNDERLINE = "\033[4m"
     YELLOW = "\033[93m"
     BOLD   = "\033[1m"
     GRAY   = "\033[90m"
@@ -73,8 +74,8 @@ def print_active_services_banner(
 
     border_line = f"{GRAY}────────────────────────────────────────────────{RESET}"
     title_colored = f"{BLUE}{BOLD}ORION ROUTER{RESET}"
-    dash_colored  = f"{BLUE}➜{RESET}  {BOLD}Dashboard:{RESET}   {CYAN}{dashboard_url}{RESET}"
-    ip_colored    = f"{BLUE}➜{RESET}  {BOLD}{local_net_label}:{RESET}    {CYAN}{local_url}{RESET}"
+    dash_colored  = f"{BLUE}➜{RESET}  {BOLD}Dashboard:{RESET}   {CYAN}{UNDERLINE}{dashboard_url}{RESET}"
+    ip_colored    = f"{BLUE}➜{RESET}  {BOLD}{local_net_label}:{RESET}    {CYAN}{UNDERLINE}{local_url}{RESET}"
 
     # Print the banner block with clean newlines to separate from surrounding logs
     print()
@@ -90,15 +91,16 @@ def print_active_services_banner(
 
 def _restart_postgres() -> None:
     """Restarts the portable PostgreSQL instance if it is in use and pg_ctl exists."""
-    if sys.platform != "win32":
-        return
+    try:
+        from bin.common import PG_CTL
+        pg_ctl = PG_CTL
+    except Exception:
+        import shutil
+        pg_ctl_path = shutil.which("pg_ctl")
+        pg_ctl = Path(pg_ctl_path) if pg_ctl_path else None
 
-    root = Path(__file__).parent.parent.resolve()
-    pg_bin = root / "tools" / "pgsql" / "bin"
-    pg_ctl = pg_bin / "pg_ctl.exe"
-
-    if not pg_ctl.exists():
-        logger.warning("Portable pg_ctl.exe not found. Cannot restart database automatically.")
+    if not pg_ctl or not pg_ctl.exists():
+        logger.warning("PostgreSQL pg_ctl not found. Cannot restart database automatically.")
         return
 
     postgres_port = os.getenv("POSTGRES_PORT")
