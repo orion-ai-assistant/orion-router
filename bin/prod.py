@@ -122,47 +122,48 @@ def main() -> None:
         err(t("err_lock_fail"))
         sys.exit(1)
 
-    banner()
-
-    run_silent([sys.executable, "-c", "import core.config"], cwd=ROOT)
-    router_port = read_env("ROUTER_PORT", "20128")
-
-    free_ports([int(router_port), PG_PORT], PG_DATA, "prod")
-    print()
-
-    download_postgres()
-    init_database(PG_DATA, PG_USER)
-    start_postgres(PG_DATA, PG_PORT, PG_LOG, "prod")
-    wait_for_postgres(PG_DATA, PG_PORT, PG_LOG, PG_USER, "prod")
-    setup_db_and_user(PG_USER, PG_PASS, PG_PORT, PG_DB)
-    print()
-
-    build_dashboard(router_port)
-    print()
-
-    set_env(router_port, PG_PORT, PG_DB, PG_USER, PG_PASS, "0")
-    procs = launch(router_port)
-
-    # ── Print Banner when server is ready ───────
-    def wait_for_server_and_print_banner(port: str) -> None:
-        url = f"http://127.0.0.1:{port}/health"
-        start_time = time.time()
-        while time.time() - start_time < 30:
-            try:
-                with urllib.request.urlopen(url, timeout=1.0) as resp:
-                    if resp.status == 200:
-                        time.sleep(2.0)
-                        print_active_services_banner(port)
-                        return
-            except Exception:
-                pass
-            time.sleep(0.5)
-
-    banner_thread = threading.Thread(target=wait_for_server_and_print_banner, args=[router_port])
-    banner_thread.daemon = True
-    banner_thread.start()
-
+    procs = []
     try:
+        banner()
+
+        run_silent([sys.executable, "-c", "import core.config"], cwd=ROOT)
+        router_port = read_env("ROUTER_PORT", "20128")
+
+        free_ports([int(router_port), PG_PORT], PG_DATA, "prod")
+        print()
+
+        download_postgres()
+        init_database(PG_DATA, PG_USER)
+        start_postgres(PG_DATA, PG_PORT, PG_LOG, "prod")
+        wait_for_postgres(PG_DATA, PG_PORT, PG_LOG, PG_USER, "prod")
+        setup_db_and_user(PG_USER, PG_PASS, PG_PORT, PG_DB)
+        print()
+
+        build_dashboard(router_port)
+        print()
+
+        set_env(router_port, PG_PORT, PG_DB, PG_USER, PG_PASS, "0")
+        procs.extend(launch(router_port))
+
+        # ── Print Banner when server is ready ───────
+        def wait_for_server_and_print_banner(port: str) -> None:
+            url = f"http://127.0.0.1:{port}/health"
+            start_time = time.time()
+            while time.time() - start_time < 30:
+                try:
+                    with urllib.request.urlopen(url, timeout=1.0) as resp:
+                        if resp.status == 200:
+                            time.sleep(2.0)
+                            print_active_services_banner(port)
+                            return
+                except Exception:
+                    pass
+                time.sleep(0.5)
+
+        banner_thread = threading.Thread(target=wait_for_server_and_print_banner, args=[router_port])
+        banner_thread.daemon = True
+        banner_thread.start()
+
         while True:
             alive = [p for _, p in procs if p.poll() is None]
             if not alive:
@@ -174,7 +175,6 @@ def main() -> None:
     finally:
         shutdown(procs)
         release_lock(".orion.prod.lock")
-
 
 if __name__ == "__main__":
     main()

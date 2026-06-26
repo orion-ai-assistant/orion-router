@@ -130,57 +130,58 @@ def main() -> None:
         err(t("err_lock_fail"))
         sys.exit(1)
 
-    banner()
-
-    run_silent([sys.executable, "-c", "import core.config"], cwd=ROOT)
-    router_port = read_env("ROUTER_DEV_PORT", "20129")
-
-    free_ports([UI_PORT, int(router_port), PG_PORT], PG_DATA, "dev")
-    print()
-
-    download_postgres()
-    init_database(PG_DATA, PG_USER)
-    start_postgres(PG_DATA, PG_PORT, PG_LOG, "dev")
-    wait_for_postgres(PG_DATA, PG_PORT, PG_LOG, PG_USER, "dev")
-    setup_db_and_user(PG_USER, PG_PASS, PG_PORT, PG_DB)
-    print()
-
-    set_env(router_port, PG_PORT, PG_DB, PG_USER, PG_PASS, "1")
-    procs = launch(router_port)
-
-    def wait_for_server_and_print_banner(port: str) -> None:
-        backend_url = f"http://127.0.0.1:{port}/health"
-        backend_ready = False
-        frontend_ready = False
-        start_time = time.time()
-        while time.time() - start_time < 30:
-            if not backend_ready:
-                try:
-                    with urllib.request.urlopen(backend_url, timeout=1.0) as resp:
-                        if resp.status == 200:
-                            backend_ready = True
-                except Exception:
-                    pass
-
-            if not frontend_ready:
-                try:
-                    import socket
-                    with socket.create_connection(("127.0.0.1", UI_PORT), timeout=1.0):
-                        frontend_ready = True
-                except Exception:
-                    pass
-
-            if backend_ready and frontend_ready:
-                time.sleep(2.5)
-                print_active_services_banner(port, dashboard_port=str(UI_PORT))
-                return
-            time.sleep(0.5)
-
-    banner_thread = threading.Thread(target=wait_for_server_and_print_banner, args=[router_port])
-    banner_thread.daemon = True
-    banner_thread.start()
-
+    procs = []
     try:
+        banner()
+
+        run_silent([sys.executable, "-c", "import core.config"], cwd=ROOT)
+        router_port = read_env("ROUTER_DEV_PORT", "20129")
+
+        free_ports([UI_PORT, int(router_port), PG_PORT], PG_DATA, "dev")
+        print()
+
+        download_postgres()
+        init_database(PG_DATA, PG_USER)
+        start_postgres(PG_DATA, PG_PORT, PG_LOG, "dev")
+        wait_for_postgres(PG_DATA, PG_PORT, PG_LOG, PG_USER, "dev")
+        setup_db_and_user(PG_USER, PG_PASS, PG_PORT, PG_DB)
+        print()
+
+        set_env(router_port, PG_PORT, PG_DB, PG_USER, PG_PASS, "1")
+        procs.extend(launch(router_port))
+
+        def wait_for_server_and_print_banner(port: str) -> None:
+            backend_url = f"http://127.0.0.1:{port}/health"
+            backend_ready = False
+            frontend_ready = False
+            start_time = time.time()
+            while time.time() - start_time < 30:
+                if not backend_ready:
+                    try:
+                        with urllib.request.urlopen(backend_url, timeout=1.0) as resp:
+                            if resp.status == 200:
+                                backend_ready = True
+                    except Exception:
+                        pass
+
+                if not frontend_ready:
+                    try:
+                        import socket
+                        with socket.create_connection(("127.0.0.1", UI_PORT), timeout=1.0):
+                            frontend_ready = True
+                    except Exception:
+                        pass
+
+                if backend_ready and frontend_ready:
+                    time.sleep(2.5)
+                    print_active_services_banner(port, dashboard_port=str(UI_PORT))
+                    return
+                time.sleep(0.5)
+
+        banner_thread = threading.Thread(target=wait_for_server_and_print_banner, args=[router_port])
+        banner_thread.daemon = True
+        banner_thread.start()
+
         while True:
             alive = [p for _, p in procs if p.poll() is None]
             if len(alive) < len(procs):

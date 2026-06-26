@@ -359,6 +359,7 @@ def download_postgres() -> None:
             sys.exit(1)
 
     import shutil
+    kill_all_postgres()
     shutil.rmtree(TOOLS_DIR / "pgsql", ignore_errors=True)
     (TOOLS_DIR / "pgsql.manifest").unlink(missing_ok=True)
 
