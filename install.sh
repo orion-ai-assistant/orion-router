@@ -233,8 +233,22 @@ elif [ "$ACTION" = "start" ]; then
         fi
     fi
     URL="http://127.0.0.1:$PORT"
-    echo -e "\n\033[92m✔ Orion Router started successfully in the background!\033[0m"
-    echo -e "\033[96m➜\033[0m \033[1mDashboard:\033[0m  \033[96m\033[4m${URL}\033[0m\n"
+    
+    if command -v ipconfig >/dev/null 2>&1; then
+        LOCAL_IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || echo "127.0.0.1")
+    elif command -v hostname >/dev/null 2>&1; then
+        LOCAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "127.0.0.1")
+    else
+        LOCAL_IP="127.0.0.1"
+    fi
+    LOCAL_URL="http://${LOCAL_IP}:${PORT}"
+
+    echo -e "\n\033[90m────────────────────────────────────────────────\033[0m"
+    echo -e "\033[94m\033[1mORION ROUTER\033[0m\n"
+    echo -e "\033[94m➜\033[0m  \033[1mDashboard:\033[0m   \033[96m\033[4m${URL}\033[0m"
+    echo -e "\033[94m➜\033[0m  \033[1mYerel Ağ:\033[0m    \033[96m\033[4m${LOCAL_URL}\033[0m"
+    echo -e "\033[90m────────────────────────────────────────────────\033[0m"
+    echo -e "\033[90mKomutlar: orionrouter start | stop | logs | help\033[0m\n"
 
     echo "Streaming live logs... (Press Ctrl+C to exit)"
     tail -f "$LOG_FILE"
@@ -253,7 +267,22 @@ elif [ "$ACTION" = "logs" ]; then
         fi
     fi
     URL="http://127.0.0.1:$PORT"
-    echo -e "\033[96m➜\033[0m \033[1mDashboard:\033[0m  \033[96m\033[4m${URL}\033[0m\n"
+
+    if command -v ipconfig >/dev/null 2>&1; then
+        LOCAL_IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || echo "127.0.0.1")
+    elif command -v hostname >/dev/null 2>&1; then
+        LOCAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "127.0.0.1")
+    else
+        LOCAL_IP="127.0.0.1"
+    fi
+    LOCAL_URL="http://${LOCAL_IP}:${PORT}"
+
+    echo -e "\n\033[90m────────────────────────────────────────────────\033[0m"
+    echo -e "\033[94m\033[1mORION ROUTER\033[0m\n"
+    echo -e "\033[94m➜\033[0m  \033[1mDashboard:\033[0m   \033[96m\033[4m${URL}\033[0m"
+    echo -e "\033[94m➜\033[0m  \033[1mYerel Ağ:\033[0m    \033[96m\033[4m${LOCAL_URL}\033[0m"
+    echo -e "\033[90m────────────────────────────────────────────────\033[0m"
+    echo -e "\033[90mKomutlar: orionrouter start | stop | logs | help\033[0m\n"
 
     if [ -f "$ERROR_LOG_FILE" ]; then
         echo -e "\n[!] RECENT ERRORS (orion_error.log):"
@@ -336,8 +365,22 @@ elif [ "$ACTION" = "start" ]; then
         fi
     fi
     URL="http://127.0.0.1:$PORT"
-    echo -e "\n\033[92m✔ Orion Router started successfully on Docker!\033[0m"
-    echo -e "\033[96m➜\033[0m \033[1mDashboard:\033[0m  \033[96m\033[4m${URL}\033[0m\n"
+    
+    if command -v ipconfig >/dev/null 2>&1; then
+        LOCAL_IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || echo "127.0.0.1")
+    elif command -v hostname >/dev/null 2>&1; then
+        LOCAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "127.0.0.1")
+    else
+        LOCAL_IP="127.0.0.1"
+    fi
+    LOCAL_URL="http://${LOCAL_IP}:${PORT}"
+
+    echo -e "\n\033[90m────────────────────────────────────────────────\033[0m"
+    echo -e "\033[94m\033[1mORION ROUTER\033[0m\n"
+    echo -e "\033[94m➜\033[0m  \033[1mDashboard:\033[0m   \033[96m\033[4m${URL}\033[0m"
+    echo -e "\033[94m➜\033[0m  \033[1mYerel Ağ:\033[0m    \033[96m\033[4m${LOCAL_URL}\033[0m"
+    echo -e "\033[90m────────────────────────────────────────────────\033[0m"
+    echo -e "\033[90mKomutlar: orionrouter start | stop | logs | help\033[0m\n"
 
     echo "Streaming live logs... (Press Ctrl+C to exit)"
     docker compose -f "$COMPOSE_FILE" -p orion-router logs -f
@@ -355,7 +398,22 @@ elif [ "$ACTION" = "logs" ]; then
         fi
     fi
     URL="http://127.0.0.1:$PORT"
-    echo -e "\033[96m➜\033[0m \033[1mDashboard:\033[0m  \033[96m\033[4m${URL}\033[0m\n"
+
+    if command -v ipconfig >/dev/null 2>&1; then
+        LOCAL_IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || echo "127.0.0.1")
+    elif command -v hostname >/dev/null 2>&1; then
+        LOCAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "127.0.0.1")
+    else
+        LOCAL_IP="127.0.0.1"
+    fi
+    LOCAL_URL="http://${LOCAL_IP}:${PORT}"
+
+    echo -e "\n\033[90m────────────────────────────────────────────────\033[0m"
+    echo -e "\033[94m\033[1mORION ROUTER\033[0m\n"
+    echo -e "\033[94m➜\033[0m  \033[1mDashboard:\033[0m   \033[96m\033[4m${URL}\033[0m"
+    echo -e "\033[94m➜\033[0m  \033[1mYerel Ağ:\033[0m    \033[96m\033[4m${LOCAL_URL}\033[0m"
+    echo -e "\033[90m────────────────────────────────────────────────\033[0m"
+    echo -e "\033[90mKomutlar: orionrouter start | stop | logs | help\033[0m\n"
 
     cd "$PROJECT_DIR"
     docker compose -f "$COMPOSE_FILE" -p orion-router logs -f

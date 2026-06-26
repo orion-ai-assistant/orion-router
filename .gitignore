@@ -35,9 +35,7 @@ Thumbs.db
 # Native PostgreSQL Data & Tools
 .pgdata-dev/
 .pgdata-prod/
-tools/pgsql/
-tools/pgsql.manifest
-tools/postgresql.zip
+tools/
 
 # Orion lock & pid files
 .orion.dev.lock
