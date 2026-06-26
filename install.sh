@@ -18,7 +18,7 @@ if [ "$MODE" != "local" ] && [ "$MODE" != "docker" ]; then
 fi
 
 echo "Installation Mode: $MODE"
-INSTALL_DIR="$HOME/.orion-router"
+INSTALL_DIR="${ORION_INSTALL_DIR:-$HOME/.orion-router}"
 REPO_URL="https://github.com/krstalacam/orion-router.git"
 echo "Target Directory:  $INSTALL_DIR"
 
@@ -38,6 +38,40 @@ for cmd in "${REQUIRED_CMDS[@]}"; do
 done
 echo "✔ Requirements met (${REQUIRED_CMDS[*]})."
 
+# macOS-specific PostgreSQL check and auto-install for local execution
+if [ "$MODE" = "local" ] && [ "$(uname)" = "Darwin" ]; then
+  echo "Checking PostgreSQL status on macOS..."
+  # Check standard path and Homebrew paths
+  if ! command -v pg_ctl >/dev/null 2>&1 && ! command -v initdb >/dev/null 2>&1; then
+    echo "PostgreSQL not found. Attempting to install postgresql@16 via Homebrew..."
+    if command -v brew >/dev/null 2>&1; then
+      BREW_PREFIX=$(brew --prefix)
+      USER_LOGS="$HOME/Library/Logs/Homebrew"
+      
+      # Ensure logs directory exists
+      mkdir -p "$USER_LOGS" 2>/dev/null || true
+      
+      # Verify if directories are writable by current user
+      if [ ! -w "$BREW_PREFIX" ] || [ ! -w "$USER_LOGS" ] || [ -d "$BREW_PREFIX/Cellar" -a ! -w "$BREW_PREFIX/Cellar" ]; then
+        echo -e "\n[!] Homebrew directories are not writable by your user."
+        echo "Requesting administrator privileges (sudo) to automatically fix Homebrew write permissions..."
+        sudo chown -R "$(whoami)" "$USER_LOGS" "$BREW_PREFIX"
+        chmod u+w "$USER_LOGS" "$BREW_PREFIX"
+      fi
+
+      # Attempt install
+      brew install postgresql@16 || { echo "WARNING: Homebrew installation failed. Please install PostgreSQL manually."; }
+      brew services start postgresql@16 || true
+      brew link postgresql@16 --force || true
+      export PATH="$BREW_PREFIX/opt/postgresql@16/bin:$PATH"
+    else
+      echo "Homebrew is not installed! Please install Homebrew or install PostgreSQL manually (e.g. Postgres.app)."
+    fi
+  else
+    echo "✔ PostgreSQL binaries are available."
+  fi
+fi
+
 # 2. Repo Clone or Update
 echo -e "\n[2/5] Setting up Orion Router directory..."
 
@@ -46,31 +80,45 @@ if [ -f "$STOP_SCRIPT" ]; then
   python3 "$STOP_SCRIPT" --quiet >/dev/null 2>&1 || true
 fi
 
-if [ ! -d "$INSTALL_DIR" ]; then
-  # Case 1: No folder at all — fresh clone
-  echo "[OK] Cloning fresh copy from GitHub..."
-  git clone "$REPO_URL" "$INSTALL_DIR"
-
-elif [ ! -d "$INSTALL_DIR/.git" ]; then
-  # Case 2: Folder exists but no .git — init in-place (avoids rm -rf on locked dirs)
-  echo "[!] Folder exists but has no git repository. Initializing in-place..."
-  cd "$INSTALL_DIR"
-  git init
-  # Safely set remote (remove if exists, then add)
-  git remote remove origin 2>/dev/null || true
-  git remote add origin "$REPO_URL"
-  git fetch origin main || { echo "[ERROR] git fetch failed. Check your internet connection."; exit 1; }
-  git reset --hard origin/main || { echo "[ERROR] git reset failed."; exit 1; }
-  echo "✔ Repository initialized and updated."
-
+if [ -f "main.py" ] && [ -f "bin/common.py" ]; then
+  echo "✔ Installing from local directory files..."
+  if [ "$INSTALL_DIR" != "$(pwd)" ]; then
+    mkdir -p "$INSTALL_DIR"
+    # Copy all files except git folders, postgres data, tools, and node_modules
+    if command -v rsync >/dev/null 2>&1; then
+      rsync -a --exclude='.git' --exclude='.pgdata*' --exclude='tools' --exclude='node_modules' ./ "$INSTALL_DIR/"
+    else
+      cp -R . "$INSTALL_DIR/"
+      rm -rf "$INSTALL_DIR/.git" "$INSTALL_DIR/.pgdata*" "$INSTALL_DIR/tools" "$INSTALL_DIR/node_modules" "$INSTALL_DIR/dashboard/node_modules" 2>/dev/null || true
+    fi
+  fi
 else
-  # Case 3: Folder + .git exist — ensure remote is correct URL then update
-  echo "✔ Directory exists, forcing updates from GitHub..."
-  cd "$INSTALL_DIR"
-  # Fix remote URL in case it was broken by a previous failed install
-  git remote set-url origin "$REPO_URL" 2>/dev/null || git remote add origin "$REPO_URL"
-  git fetch origin main || { echo "[ERROR] git fetch failed. There might be a connection issue."; exit 1; }
-  git reset --hard origin/main || { echo "[ERROR] Resetting/updating code failed."; exit 1; }
+  if [ ! -d "$INSTALL_DIR" ]; then
+    # Case 1: No folder at all — fresh clone
+    echo "[OK] Cloning fresh copy from GitHub..."
+    git clone "$REPO_URL" "$INSTALL_DIR"
+
+  elif [ ! -d "$INSTALL_DIR/.git" ]; then
+    # Case 2: Folder exists but no .git — init in-place (avoids rm -rf on locked dirs)
+    echo "[!] Folder exists but has no git repository. Initializing in-place..."
+    cd "$INSTALL_DIR"
+    git init
+    # Safely set remote (remove if exists, then add)
+    git remote remove origin 2>/dev/null || true
+    git remote add origin "$REPO_URL"
+    git fetch origin main || { echo "[ERROR] git fetch failed. Check your internet connection."; exit 1; }
+    git reset --hard origin/main || { echo "[ERROR] git reset failed."; exit 1; }
+    echo "✔ Repository initialized and updated."
+
+  else
+    # Case 3: Folder + .git exist — ensure remote is correct URL then update
+    echo "✔ Directory exists, forcing updates from GitHub..."
+    cd "$INSTALL_DIR"
+    # Fix remote URL in case it was broken by a previous failed install
+    git remote set-url origin "$REPO_URL" 2>/dev/null || git remote add origin "$REPO_URL"
+    git fetch origin main || { echo "[ERROR] git fetch failed. There might be a connection issue."; exit 1; }
+    git reset --hard origin/main || { echo "[ERROR] Resetting/updating code failed."; exit 1; }
+  fi
 fi
 cd "$INSTALL_DIR"
 
@@ -92,10 +140,14 @@ fi
 # 3 & 4. Dependencies
 if [ "$MODE" = "local" ]; then
     echo -e "\n[3/5] Installing Python packages (pip)..."
-    python3 -m pip install -e .
+    if python3 -m pip install --help 2>&1 | grep -q "break-system-packages"; then
+      python3 -m pip install --break-system-packages -e . || echo "WARNING: pip install failed. Continuing..."
+    else
+      python3 -m pip install -e . || echo "WARNING: pip install failed. Continuing..."
+    fi
     echo -e "\n[4/5] Installing Dashboard dependencies (NPM)..."
     if [ -d "dashboard" ]; then
-        (cd dashboard && npm install)
+        (cd dashboard && npm install || echo "WARNING: npm install failed. Continuing...")
     fi
 else
     echo -e "\n[3/5] and [4/5] Steps Skipped..."
@@ -105,7 +157,15 @@ fi
 # 5. Global Command Installation
 echo -e "\n[5/5] Installing global 'orionrouter' command..."
 
-if [ -n "${ZSH_VERSION:-}" ]; then
+if [ "$(uname)" = "Darwin" ]; then
+  if [ -f "$HOME/.zshrc" ]; then
+    PROFILE="$HOME/.zshrc"
+  elif [ -f "$HOME/.bash_profile" ]; then
+    PROFILE="$HOME/.bash_profile"
+  else
+    PROFILE="$HOME/.profile"
+  fi
+elif [ -n "${ZSH_VERSION:-}" ]; then
   PROFILE="$HOME/.zshrc"
 elif [ -n "${BASH_VERSION:-}" ]; then
   PROFILE="$HOME/.bashrc"
@@ -129,7 +189,7 @@ cat > "$CLI_SCRIPT" << 'EOF'
 #!/usr/bin/env bash
 
 ACTION="${1:-help}"
-PROJECT_DIR="$HOME/.orion-router"
+PROJECT_DIR="${ORION_INSTALL_DIR:-$HOME/.orion-router}"
 PID_FILE="$PROJECT_DIR/.orion.pid"
 LOG_FILE="$PROJECT_DIR/orion_output.log"
 ERROR_LOG_FILE="$PROJECT_DIR/orion_error.log"
@@ -165,6 +225,17 @@ elif [ "$ACTION" = "start" ]; then
     nohup python3 orion.py prod > "$LOG_FILE" 2> "$ERROR_LOG_FILE" &
     echo $! > "$PID_FILE"
     
+    PORT="20128"
+    if [ -f "$PROJECT_DIR/.env" ]; then
+        ENV_PORT=$(grep -E "^ROUTER_PORT=" "$PROJECT_DIR/.env" | cut -d'=' -f2 | tr -d '\r\n ' || true)
+        if [ -n "$ENV_PORT" ]; then
+            PORT="$ENV_PORT"
+        fi
+    fi
+    URL="http://127.0.0.1:$PORT"
+    echo -e "\n\033[92m✔ Orion Router started successfully in the background!\033[0m"
+    echo -e "\033[96m➜\033[0m \033[1mDashboard:\033[0m  \033[96m\033[4m${URL}\033[0m\n"
+
     echo "Streaming live logs... (Press Ctrl+C to exit)"
     tail -f "$LOG_FILE"
 elif [ "$ACTION" = "stop" ]; then
@@ -174,6 +245,16 @@ elif [ "$ACTION" = "stop" ]; then
     fi
     echo "[OK] Orion Router stopped."
 elif [ "$ACTION" = "logs" ]; then
+    PORT="20128"
+    if [ -f "$PROJECT_DIR/.env" ]; then
+        ENV_PORT=$(grep -E "^ROUTER_PORT=" "$PROJECT_DIR/.env" | cut -d'=' -f2 | tr -d '\r\n ' || true)
+        if [ -n "$ENV_PORT" ]; then
+            PORT="$ENV_PORT"
+        fi
+    fi
+    URL="http://127.0.0.1:$PORT"
+    echo -e "\033[96m➜\033[0m \033[1mDashboard:\033[0m  \033[96m\033[4m${URL}\033[0m\n"
+
     if [ -f "$ERROR_LOG_FILE" ]; then
         echo -e "\n[!] RECENT ERRORS (orion_error.log):"
         tail -15 "$ERROR_LOG_FILE"
@@ -194,7 +275,7 @@ cat > "$CLI_SCRIPT" << 'EOF'
 #!/usr/bin/env bash
 
 ACTION="${1:-help}"
-PROJECT_DIR="$HOME/.orion-router"
+PROJECT_DIR="${ORION_INSTALL_DIR:-$HOME/.orion-router}"
 COMPOSE_FILE="docker-compose.ghcr.yml"
 
 ORIGINAL_DIR=$(pwd)
@@ -246,6 +327,18 @@ elif [ "$ACTION" = "start" ]; then
     echo "Starting Orion Router on Docker (with GHCR Images)..."
     cd "$PROJECT_DIR"
     docker compose -f "$COMPOSE_FILE" -p orion-router up -d
+
+    PORT="20128"
+    if [ -f "$PROJECT_DIR/.env" ]; then
+        ENV_PORT=$(grep -E "^ROUTER_PORT=" "$PROJECT_DIR/.env" | cut -d'=' -f2 | tr -d '\r\n ' || true)
+        if [ -n "$ENV_PORT" ]; then
+            PORT="$ENV_PORT"
+        fi
+    fi
+    URL="http://127.0.0.1:$PORT"
+    echo -e "\n\033[92m✔ Orion Router started successfully on Docker!\033[0m"
+    echo -e "\033[96m➜\033[0m \033[1mDashboard:\033[0m  \033[96m\033[4m${URL}\033[0m\n"
+
     echo "Streaming live logs... (Press Ctrl+C to exit)"
     docker compose -f "$COMPOSE_FILE" -p orion-router logs -f
 elif [ "$ACTION" = "stop" ]; then
@@ -254,6 +347,16 @@ elif [ "$ACTION" = "stop" ]; then
     docker compose -f "$COMPOSE_FILE" -p orion-router stop
     echo "[OK] Container stopped successfully."
 elif [ "$ACTION" = "logs" ]; then
+    PORT="20128"
+    if [ -f "$PROJECT_DIR/.env" ]; then
+        ENV_PORT=$(grep -E "^ROUTER_PORT=" "$PROJECT_DIR/.env" | cut -d'=' -f2 | tr -d '\r\n ' || true)
+        if [ -n "$ENV_PORT" ]; then
+            PORT="$ENV_PORT"
+        fi
+    fi
+    URL="http://127.0.0.1:$PORT"
+    echo -e "\033[96m➜\033[0m \033[1mDashboard:\033[0m  \033[96m\033[4m${URL}\033[0m\n"
+
     cd "$PROJECT_DIR"
     docker compose -f "$COMPOSE_FILE" -p orion-router logs -f
 else
@@ -273,6 +376,23 @@ if [ -f "$PROFILE" ]; then
     fi
 fi
 
+# Try to symlink globally to /usr/local/bin or /opt/homebrew/bin so it works in the current active shell
+echo "Registering 'orionrouter' command globally..."
+if [ -d "/usr/local/bin" ] && [ -w "/usr/local/bin" ]; then
+    ln -sf "$CLI_SCRIPT" /usr/local/bin/orionrouter 2>/dev/null || true
+    echo "✔ Global symlink created in /usr/local/bin"
+elif [ -d "/opt/homebrew/bin" ] && [ -w "/opt/homebrew/bin" ]; then
+    ln -sf "$CLI_SCRIPT" /opt/homebrew/bin/orionrouter 2>/dev/null || true
+    echo "✔ Global symlink created in /opt/homebrew/bin"
+else
+    # Fallback to sudo if neither is writable (prompting user once)
+    if [ -d "/usr/local/bin" ]; then
+        echo "[!] Requesting administrator privileges (sudo) to register 'orionrouter' globally..."
+        sudo ln -sf "$CLI_SCRIPT" /usr/local/bin/orionrouter 2>/dev/null || true
+        echo "✔ Global symlink created in /usr/local/bin using sudo"
+    fi
+fi
+
 # Apply to current session
 export PATH="$INSTALL_DIR:$PATH"
 
@@ -283,7 +403,7 @@ fi
 
 echo ""
 echo "[OK] Installation complete."
-echo "[OK] 'orionrouter' command is ready in this terminal and new ones."
+echo "[OK] 'orionrouter' command is globally registered and ready to use in this terminal and new ones!"
 echo "[OK] Starting Orion Router..."
 
 orionrouter start

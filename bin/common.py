@@ -2,19 +2,7 @@ import os
 import sys
 import time
 import subprocess
-import urllib.request
-import zipfile
 from pathlib import Path
-
-# Initialize Terminal Encoding/ANSI Support
-if sys.platform == "win32":
-    os.system("chcp 65001 >nul")
-    os.environ["PYTHONUTF8"] = "1"
-    try:
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
-        sys.stderr.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
-    except Exception:
-        pass
 
 # Terminal Colors
 RESET  = "\033[0m"
@@ -39,22 +27,56 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from bin.i18n import t
-from bin.pg_integrity import generate_manifest, verify_manifest
 
 DEFAULT_TIMEOUT = 10.0
 TOOLS_DIR = ROOT / "tools"
-PG_BIN    = TOOLS_DIR / "pgsql" / "bin"
 DASHBOARD = ROOT / "dashboard"
 
-INITDB  = PG_BIN / "initdb.exe"
-PG_CTL  = PG_BIN / "pg_ctl.exe"
-PSQL    = PG_BIN / "psql.exe"
+def find_postgres_binaries():
+    import shutil
+    # 1. Check if they are in the PATH
+    initdb_path = shutil.which("initdb")
+    pg_ctl_path = shutil.which("pg_ctl")
+    psql_path = shutil.which("psql")
+    
+    if initdb_path and pg_ctl_path and psql_path:
+        return Path(initdb_path), Path(pg_ctl_path), Path(psql_path)
+        
+    # 2. Check standard Homebrew locations on Apple Silicon / Intel Mac
+    brew_candidates = [
+        Path("/opt/homebrew/opt/postgresql@16/bin"),
+        Path("/opt/homebrew/opt/postgresql@15/bin"),
+        Path("/opt/homebrew/opt/postgresql@14/bin"),
+        Path("/opt/homebrew/bin"),
+        Path("/usr/local/opt/postgresql@16/bin"),
+        Path("/usr/local/bin"),
+    ]
+    for base in brew_candidates:
+        i = base / "initdb"
+        c = base / "pg_ctl"
+        p = base / "psql"
+        if i.is_file() and c.is_file() and p.is_file():
+            return i, c, p
+            
+    # 3. Check PostgresApp locations
+    app_versions = ["16", "15", "14", "13"]
+    for v in app_versions:
+        base = Path(f"/Applications/Postgres.app/Contents/Versions/{v}/bin")
+        i = base / "initdb"
+        c = base / "pg_ctl"
+        p = base / "psql"
+        if i.is_file() and c.is_file() and p.is_file():
+            return i, c, p
+            
+    return None
 
-PG_DOWNLOAD_URL = (
-    "https://get.enterprisedb.com/postgresql/"
-    "postgresql-16.3-1-windows-x64-binaries.zip"
-)
-PG_ZIP = TOOLS_DIR / "postgresql.zip"
+pg_bins = find_postgres_binaries()
+if pg_bins:
+    INITDB, PG_CTL, PSQL = pg_bins
+else:
+    INITDB  = Path("initdb")
+    PG_CTL  = Path("pg_ctl")
+    PSQL    = Path("psql")
 
 LOCK_FILE_HANDLE = None
 
@@ -64,13 +86,8 @@ def acquire_lock(lock_name: str) -> bool:
     
     try:
         LOCK_FILE_HANDLE = open(lock_path, "w")
-        if sys.platform == "win32":
-            import msvcrt
-            msvcrt.locking(LOCK_FILE_HANDLE.fileno(), msvcrt.LK_NBLCK, 1)
-        else:
-            import fcntl
-            fcntl.flock(LOCK_FILE_HANDLE.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-            
+        import fcntl
+        fcntl.flock(LOCK_FILE_HANDLE.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         LOCK_FILE_HANDLE.write(str(os.getpid()))
         LOCK_FILE_HANDLE.flush()
         return True
@@ -145,15 +162,12 @@ def kill_port(port: int) -> bool:
             pass
 
     try:
-        result = run(
-            ["netstat", "-aon"],
-            capture_output=True, text=True, timeout=DEFAULT_TIMEOUT
-        )
-        for line in result.stdout.splitlines():
-            if f":{port} " in line and "LISTENING" in line:
-                pid = line.split()[-1]
-                if pid.isdigit() and pid != "0":
-                    run_silent(["taskkill", "/f", "/t", "/pid", pid])
+        res = run(["lsof", "-t", f"-i:{port}"], capture_output=True, text=True, timeout=5)
+        if res.returncode == 0:
+            pids = [line.strip() for line in res.stdout.splitlines() if line.strip()]
+            for pid in pids:
+                if pid.isdigit():
+                    run_silent(["kill", "-9", pid])
                     dim(t("port_killed", port=port, pid=pid))
                     killed_any = True
     except Exception:
@@ -175,11 +189,13 @@ def kill_portable_postgres(data_dir: Path, label: str) -> bool:
             lines = pid_file.read_text().splitlines()
             if lines and lines[0].isdigit():
                 pid = lines[0]
-                check = run_silent(["tasklist", "/fi", f"PID eq {pid}", "/fo", "csv", "/nh"])
-                if check.returncode == 0:
-                    run_silent(["taskkill", "/f", "/t", "/pid", pid])
+                try:
+                    os.kill(int(pid), 0)
+                    run_silent(["kill", "-9", pid])
                     dim(t("old_pg_killed", pid=pid, name=label))
                     killed_any = True
+                except OSError:
+                    pass
         except Exception:
             pass
 
@@ -196,34 +212,17 @@ def kill_portable_postgres(data_dir: Path, label: str) -> bool:
     return killed_any
 
 def kill_all_postgres() -> bool:
-    import sys
     import time
     killed_any = False
-    if sys.platform == "win32":
-        try:
-            result = run(
-                ["tasklist", "/fi", "imagename eq postgres.exe"],
-                capture_output=True,
-                text=True,
-                timeout=DEFAULT_TIMEOUT
-            )
-            if "postgres.exe" in result.stdout.lower():
-                run_silent(["taskkill", "/f", "/t", "/im", "postgres.exe"])
-                dim(t("all_pg_killed"))
-                killed_any = True
-                time.sleep(2.0)
-        except Exception:
-            pass
-    else:
-        try:
-            res = run(["pgrep", "-f", "postgres"], capture_output=True, text=True)
-            if res.stdout.strip():
-                run_silent(["pkill", "-f", "postgres"])
-                dim(t("all_pg_killed"))
-                killed_any = True
-                time.sleep(2.0)
-        except Exception:
-            pass
+    try:
+        res = run(["pgrep", "-f", "postgres"], capture_output=True, text=True)
+        if res.stdout.strip():
+            run_silent(["pkill", "-f", "postgres"])
+            dim(t("all_pg_killed"))
+            killed_any = True
+            time.sleep(2.0)
+    except Exception:
+        pass
     return killed_any
 
 def kill_orion_pid() -> bool:
@@ -235,22 +234,15 @@ def kill_orion_pid() -> bool:
             lines = pid_file.read_text().splitlines()
             if lines and lines[0].isdigit():
                 pid = lines[0]
-                if sys.platform == "win32":
-                    check = run_silent(["tasklist", "/fi", f"PID eq {pid}", "/fo", "csv", "/nh"])
-                    if check.returncode == 0:
-                        run_silent(["taskkill", "/f", "/t", "/pid", pid])
-                        dim(t("old_pg_killed", pid=pid, name="orion router"))
-                        killed_any = True
-                else:
-                    try:
-                        res = run(["pgrep", "-P", pid], capture_output=True, text=True, timeout=5)
-                    except Exception:
-                        res = subprocess.CompletedProcess(["pgrep"], 1, stdout="", stderr="")
-                    if res.returncode == 0:
-                        run_silent(["pkill", "-P", pid])
-                    run_silent(["kill", "-9", pid])
-                    dim(t("old_pg_killed", pid=pid, name="orion router"))
-                    killed_any = True
+                try:
+                    res = run(["pgrep", "-P", pid], capture_output=True, text=True, timeout=5)
+                except Exception:
+                    res = subprocess.CompletedProcess(["pgrep"], 1, stdout="", stderr="")
+                if res.returncode == 0:
+                    run_silent(["pkill", "-P", pid])
+                run_silent(["kill", "-9", pid])
+                dim(t("old_pg_killed", pid=pid, name="orion router"))
+                killed_any = True
         except Exception:
             pass
         finally:
@@ -273,56 +265,15 @@ def download_postgres() -> None:
     if (TOOLS_DIR / "pgsql.ready").is_file():
         return
 
-    import shutil
-    shutil.rmtree(TOOLS_DIR / "pgsql", ignore_errors=True)
-    (TOOLS_DIR / "pgsql.manifest").unlink(missing_ok=True)
-
-    print()
-    info(t("pg_not_found_downloading"))
-    TOOLS_DIR.mkdir(parents=True, exist_ok=True)
-    
-    def _download_progress(block_num: int, block_size: int, total: int) -> None:
-        if not hasattr(_download_progress, "last_pct"):
-            _download_progress.last_pct = -1
-
-        done = min(block_num * block_size, total)
-        if total <= 0: return
-        pct  = int(done * 100 / total)
-        mb   = done / 1_048_576
-        bar  = "█" * (pct // 5) + "░" * (20 - pct // 5)
-
-        if sys.stdout.isatty():
-            print(f"\r    [{bar}] {pct:3d}%  {mb:5.1f} MB", end="", flush=True)
-        else:
-            if pct % 10 == 0 and pct != _download_progress.last_pct:
-                _download_progress.last_pct = pct
-                print(f"    [{bar}] {pct:3d}%  {mb:5.1f} MB", flush=True)
-
-    urllib.request.urlretrieve(PG_DOWNLOAD_URL, PG_ZIP, _download_progress)
-    print()
-    ok(t("download_complete"))
-
-    info(t("extracting_archive"))
-    with zipfile.ZipFile(PG_ZIP, "r") as zf:
-        namelist = zf.namelist()
-        total_files = len(namelist)
-        last_pct = -1
-        for i, member in enumerate(namelist, 1):
-            zf.extract(member, TOOLS_DIR)
-            pct = int(i * 100 / total_files)
-            if pct != last_pct:
-                last_pct = pct
-                bar = "█" * (pct // 5) + "░" * (20 - pct // 5)
-                if sys.stdout.isatty():
-                    print(f"\r    [{bar}] {pct:3d}%  ({i}/{total_files} files)", end="", flush=True)
-                else:
-                    if pct % 10 == 0:
-                        print(f"    [{bar}] {pct:3d}%  ({i}/{total_files} files)", flush=True)
-        if sys.stdout.isatty():
-            print()
-    PG_ZIP.unlink(missing_ok=True)
-    generate_manifest(TOOLS_DIR, "postgresql-16.3-1-windows-x64-binaries")
-    ok(t("pg_ready"))
+    pg_bins = find_postgres_binaries()
+    if pg_bins:
+        TOOLS_DIR.mkdir(parents=True, exist_ok=True)
+        (TOOLS_DIR / "pgsql.ready").touch()
+        ok(t("pg_ready") + " (System PostgreSQL)")
+    else:
+        err("PostgreSQL binaries (initdb, pg_ctl, psql) not found!")
+        err("Please install PostgreSQL (e.g. using: brew install postgresql@16) and make sure it is in your PATH.")
+        sys.exit(1)
 
 def init_database(pg_data: Path, pg_user: str, _repair_attempted: bool = False) -> None:
     if pg_data.exists():
@@ -342,19 +293,7 @@ def init_database(pg_data: Path, pg_user: str, _repair_attempted: bool = False) 
         err(t("initdb_failed"))
         print(result.stdout[-2000:])
         print(result.stderr[-2000:])
-        
-        if not _repair_attempted:
-            warn(t("pg_checking_integrity"))
-            if not verify_manifest(TOOLS_DIR):
-                err(t("pg_corrupted_rebuilding"))
-                import shutil
-                shutil.rmtree(TOOLS_DIR / "pgsql", ignore_errors=True)
-                (TOOLS_DIR / "pgsql.manifest").unlink(missing_ok=True)
-                (TOOLS_DIR / "pgsql.ready").unlink(missing_ok=True)
-                download_postgres()
-                init_database(pg_data, pg_user, _repair_attempted=True)
-                return
-
+        err("System PostgreSQL initdb failed. Please check the logs.")
         sys.exit(1)
 
     ok(t("db_dir_ready"))
@@ -445,20 +384,7 @@ def wait_for_postgres(pg_data: Path, pg_port: int, pg_log: Path, pg_user: str, l
         time.sleep(0.5)
     err(t("pg_timeout_warning"))
     print_pg_log_errors(pg_log)
-    
-    warn(t("pg_failed_checking_integrity"))
-    if not verify_manifest(TOOLS_DIR):
-        err(t("pg_corrupted_rebuilding"))
-        import shutil
-        stop_postgres(pg_data)
-        shutil.rmtree(TOOLS_DIR / "pgsql", ignore_errors=True)
-        (TOOLS_DIR / "pgsql.manifest").unlink(missing_ok=True)
-        (TOOLS_DIR / "pgsql.ready").unlink(missing_ok=True)
-        download_postgres()
-        start_postgres(pg_data, pg_port, pg_log, label)
-        _wait_for_postgres_once(pg_port, pg_user, pg_log, timeout)
-        return
-        
+    err("PostgreSQL startup timed out. Please check log files or ensure local postgres config matches.")
     sys.exit(1)
 
 def _wait_for_postgres_once(pg_port: int, pg_user: str, pg_log: Path, timeout: float) -> None:
@@ -493,8 +419,8 @@ def setup_db_and_user(pg_user: str, pg_pass: str, pg_port: int, pg_db: str) -> N
     select_proc = subprocess.Popen(
         [str(PSQL), "-U", pg_user, "-p", str(pg_port), "-d", "postgres",
          "-t", "--no-psqlrc", "-c", check_sql],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
+         stdout=subprocess.PIPE,
+         stderr=subprocess.DEVNULL,
     )
     exec_proc = subprocess.Popen(
         [str(PSQL), "-U", pg_user, "-p", str(pg_port), "-d", "postgres"],
