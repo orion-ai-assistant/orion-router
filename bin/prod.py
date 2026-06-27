@@ -149,7 +149,7 @@ def main() -> None:
         def wait_for_server_and_print_banner(port: str) -> None:
             url = f"http://127.0.0.1:{port}/health"
             start_time = time.time()
-            while time.time() - start_time < 30:
+            while time.time() - start_time < DEFAULT_TIMEOUT:
                 try:
                     with urllib.request.urlopen(url, timeout=1.0) as resp:
                         if resp.status == 200:
