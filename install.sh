@@ -19,7 +19,7 @@ fi
 
 echo "Installation Mode: $MODE"
 INSTALL_DIR="${ORION_INSTALL_DIR:-$HOME/.orion-router}"
-REPO_URL="https://github.com/krstalacam/orion-router.git"
+REPO_URL="https://github.com/orion-ai-assistant/orion-router.git"
 echo "Target Directory:  $INSTALL_DIR"
 
 # 1. Requirement Checks

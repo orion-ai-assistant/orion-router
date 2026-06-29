@@ -6,7 +6,7 @@ Orion project's **AI Gateway (Router)** layer. It centrally collects, authorizes
 
 To install and start using Orion Router on your system, please visit our website. *(Note: Our website offers documentation in multiple languages!)*
 
-👉 **[Website (Documentation & Installation)](https://krstalacam.github.io/orion-router/)** 👈
+👉 **[Website (Documentation & Installation)](https://orion-ai-assistant.github.io/orion-router/)** 👈
 
 ---
 

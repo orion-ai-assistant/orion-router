@@ -21,7 +21,7 @@ if ($Mode -notin @("local", "docker")) {
 
 Write-Host "Installation Mode: $Mode" -ForegroundColor Yellow
 $TargetFolder = Join-Path $env:LOCALAPPDATA "OrionRouter"
-$RepoUrl = "https://github.com/krstalacam/orion-router.git"
+$RepoUrl = "https://github.com/orion-ai-assistant/orion-router.git"
 Write-Host "Target Directory:  $TargetFolder`n" -ForegroundColor DarkGray
 
 # 1. Requirement Checks

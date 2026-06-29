@@ -6,7 +6,7 @@ Orion projesinin **AI Gateway (Router)** katmanı. İstemcilerden ve worker'lard
 
 Orion Router'ı sisteminize kurmak ve kullanmaya başlamak için web sitemizi ziyaret edebilirsiniz. *(Not: Web sitemizde çok daha fazla dil seçeneği bulunmaktadır!)*
 
-👉 **[Web Sitesi (Kurulum ve Kullanım Rehberi)](https://krstalacam.github.io/orion-router/)** 👈
+👉 **[Web Sitesi (Kurulum ve Kullanım Rehberi)](https://orion-ai-assistant.github.io/orion-router/)** 👈
 
 ---
 

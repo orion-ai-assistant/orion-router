@@ -57,10 +57,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Kopyala (Copy to Clipboard) Mantığı ---
     const commandDictionary = {
-        'win-docker': 'powershell -c "iex(irm raw.github.com/krstalacam/orion-router/main/install.ps1)"',
-        'mac-docker': 'curl -sL raw.github.com/krstalacam/orion-router/main/install.sh | bash',
-        'win-local': 'powershell -c "&([scriptblock]::Create((irm raw.github.com/krstalacam/orion-router/main/install.ps1))) local"',
-        'mac-local': 'curl -sL raw.github.com/krstalacam/orion-router/main/install.sh | bash -s local'
+        'win-docker': 'powershell -c "iex(irm raw.github.com/orion-ai-assistant/orion-router/main/install.ps1)"',
+        'mac-docker': 'curl -sL raw.github.com/orion-ai-assistant/orion-router/main/install.sh | bash',
+        'win-local': 'powershell -c "&([scriptblock]::Create((irm raw.github.com/orion-ai-assistant/orion-router/main/install.ps1))) local"',
+        'mac-local': 'curl -sL raw.github.com/orion-ai-assistant/orion-router/main/install.sh | bash -s local'
     };
 
     const copyBtn = document.getElementById('orion-cli-copy-action-button');

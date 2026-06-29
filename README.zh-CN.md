@@ -6,7 +6,7 @@ Orion 项目的 **AI 网关 (Router)** 层。它将来自客户端和 worker 的
 
 要安装并开始在您的系统上使用 Orion Router，请访问我们的网站。 *(注意：我们的网站提供更多语言的文档！)*
 
-👉 **[官方网站 (安装和使用指南)](https://krstalacam.github.io/orion-router/)** 👈
+👉 **[官方网站 (安装和使用指南)](https://orion-ai-assistant.github.io/orion-router/)** 👈
 
 ---
 
