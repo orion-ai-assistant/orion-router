@@ -1,14 +1,21 @@
+import os
 import sys
 import json
 from openai import OpenAI
 from colorama import init, Fore, Style
+from dotenv import load_dotenv
+
+load_dotenv()
 
 init(autoreset=True)
 
 # Orion Router'ın adresi ve Senin Sanal Anahtarın
+# .env dosyasından okunur, yoksa varsayılan test anahtarı kullanılır.
+api_key = os.environ.get("ROUTER_API_KEY")
+
 client = OpenAI(
     base_url="http://localhost:20128/v1",
-    api_key="sk-orion-T4wlYzqt11Af2omYK9IjKoj-qpUlwppFcyTpCRWfzOg"
+    api_key=api_key
 )
 
 def get_weather(location: str):

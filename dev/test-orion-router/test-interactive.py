@@ -1,14 +1,20 @@
 """
 test-interactive.py - Orion Router 
 """
+import os
 import time
 import openai
+from dotenv import load_dotenv
+
+load_dotenv()
 
 print("Sistem başlatılıyor, lütfen bekleyin...")
 
+api_key = os.environ.get("ROUTER_API_KEY")
+
 client = openai.OpenAI(
     base_url='http://localhost:20128/v1', 
-    api_key='sk-orion-T4wlYzqt11Af2omYK9IjKoj-qpUlwppFcyTpCRWfzOg'
+    api_key=api_key
 )
 
 # Bağlantıyı önden ısıtma (Warm-up) bu hiçbir işe yaramıyor olabilir?

@@ -147,6 +147,7 @@ MODEL_PRICING_PATH = _DATA_DIR / "model_pricing.json"
 # --- App Identification Headers ---
 APP_REFERER = os.getenv("APP_REFERER")
 APP_TITLE = os.getenv("APP_TITLE")
+APP_CATEGORIES = os.getenv("APP_CATEGORIES")
 
 # --- Dashboard UI ---
 # Next.js static build directory (out)

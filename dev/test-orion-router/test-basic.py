@@ -1,8 +1,14 @@
+import os
 import openai
+from dotenv import load_dotenv
+
+load_dotenv()
+
+api_key = os.environ.get("ROUTER_API_KEY")
 
 client = openai.OpenAI(
     base_url="http://127.0.0.1:20128/v1",
-    api_key='sk-orion-nJmxDMjwV1HNck1VsSUsVD9-EU2EyQ3xmLm-lJOsY7Y'
+    api_key=api_key
 )
 
 messages = []
