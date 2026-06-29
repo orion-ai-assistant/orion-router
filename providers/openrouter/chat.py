@@ -35,11 +35,11 @@ class OpenRouterChatProvider(BaseChat):
         if not resolved_key:
             raise ValueError("OpenRouter Error: No API key provided.")
 
-        from core.config import OPENROUTER_REFERER, OPENROUTER_TITLE
+        from core.config import APP_REFERER, APP_TITLE
         headers = {
             "Content-Type": "application/json",
-            "HTTP-Referer": OPENROUTER_REFERER,
-            "X-Title": OPENROUTER_TITLE,
+            "HTTP-Referer": APP_REFERER,
+            "X-Title": APP_TITLE,
             "Authorization": f"Bearer {resolved_key}",
         }
 

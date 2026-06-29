@@ -144,9 +144,9 @@ _DATA_DIR = _ROOT / "data"
 
 MODEL_PRICING_PATH = _DATA_DIR / "model_pricing.json"
 
-# --- OpenRouter App Identification Headers ---
-OPENROUTER_REFERER = "https://github.com/krstalacam/orion-router"
-OPENROUTER_TITLE = "Orion Router"
+# --- App Identification Headers ---
+APP_REFERER = os.getenv("APP_REFERER")
+APP_TITLE = os.getenv("APP_TITLE")
 
 # --- Dashboard UI ---
 # Next.js static build directory (out)
