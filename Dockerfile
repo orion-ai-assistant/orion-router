@@ -13,6 +13,8 @@ RUN npm run build
 # --- Stage 2: Final FastAPI/Python Production Image ---
 FROM python:3.11-slim
 
+LABEL org.opencontainers.image.source="https://github.com/orion-ai-assistant/orion-router"
+
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
