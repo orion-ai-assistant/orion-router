@@ -18,13 +18,19 @@ _PERSISTENT_DIR = _ROOT / "persistent"
 _KEY_FILE = _PERSISTENT_DIR / "encryption.key"
 
 
+def _is_docker() -> bool:
+    return pathlib.Path("/.dockerenv").exists()
+
 def _ensure_env_file() -> bool:
     """
     .env dosyasını yönetir:
     - Yoksa .env.example'dan oluşturur.
     - Varsa .env.example'daki eksik anahtarları otomatik ekler.
-    Bu sayede yeni sürümlerde eklenen değişkenler mevcut kurulumları bozmadan eklenir.
+    Docker içindeyken (RAM'den okunduğu için) bu fiziksel dosyayı oluşturmaz.
     """
+    if _is_docker():
+        return False
+
     if not _ENV_EXAMPLE_PATH.exists():
         return False
 
