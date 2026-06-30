@@ -14,9 +14,18 @@ services:
       - POSTGRES_DB=orion_router
       - POSTGRES_USER=router_user
       - POSTGRES_PASSWORD=router_pass
-      - LLM_HOST=llama-cpp
-      - EMBED_HOST=llama-cpp-embed
-      - TTS_HOST=tts
+      - LLM_HOST=${LLM_HOST}
+      - LLM_PORT=${LLM_PORT}
+      - EMBED_HOST=${EMBED_HOST}
+      - EMBED_PORT=${EMBED_PORT}
+      - TTS_HOST=${TTS_HOST}
+      - TTS_PORT=${TTS_PORT}
+      - ADMIN_SECRET=${ADMIN_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - CLI_LANG=${CLI_LANG}
+      - APP_REFERER=${APP_REFERER}
+      - APP_TITLE=${APP_TITLE}
+      - APP_CATEGORIES=${APP_CATEGORIES}
     env_file:
       - path: .env
         required: false

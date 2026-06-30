@@ -21,9 +21,12 @@ services:
       - TTS_HOST=${TTS_HOST}
       - TTS_PORT=${TTS_PORT}
       # Yeni eklenen kritik güvenlik ve yönetim değişkenleri
-      - ADMIN_SECRET=${ADMIN_SECRET:-orion}
+      - ADMIN_SECRET=${ADMIN_SECRET}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY} # Restart'larda API key'lerin bozulmaması için şart
-      - CLI_LANG=${CLI_LANG:-en}
+      - CLI_LANG=${CLI_LANG}
+      - APP_REFERER=${APP_REFERER}
+      - APP_TITLE=${APP_TITLE}
+      - APP_CATEGORIES=${APP_CATEGORIES}
 
     networks:
       - orion-network
