@@ -161,59 +161,8 @@ _ensure_encryption_key()
 
 
 
-def _load_env_file() -> None:
-    if not _ENV_PATH.exists():
-        return
-    try:
-        with open(_ENV_PATH, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("#"):
-                    continue
-                if "=" in line:
-                    key, val = line.split("=", 1)
-                    key = key.strip()
-                    val = val.strip()
-                    if (val.startswith('"') and val.endswith('"')) or (
-                        val.startswith("'") and val.endswith("'")
-                    ):
-                        val = val[1:-1]
-                    # Sistem ortam değişkenleri önceliklidir, ezilmezler
-                    if key and key not in os.environ:
-                        os.environ[key] = val
-    except OSError:
-        pass
 
 
-_ensure_env_file()
-_load_env_file()
-
-
-def _ensure_encryption_key() -> None:
-    if "ENCRYPTION_KEY" in os.environ:
-        return
-    try:
-        from cryptography.fernet import Fernet
-        new_key = Fernet.generate_key().decode("utf-8")
-        os.environ["ENCRYPTION_KEY"] = new_key
-        if _ENV_PATH.exists():
-            with open(_ENV_PATH, "a", encoding="utf-8") as f:
-                f.write(f'\nENCRYPTION_KEY="{new_key}"\n')
-        try:
-            from bin.i18n import t
-            msg = t("config_key_created")
-        except Exception:
-            msg = "[orion-router] New ENCRYPTION_KEY generated and added to .env file."
-        print(msg, file=sys.stderr)
-    except Exception as e:
-        try:
-            from bin.i18n import t
-            msg = t("config_key_failed", e=e)
-        except Exception:
-            msg = f"[orion-router] ENCRYPTION_KEY could not be generated: {e}"
-        print(msg, file=sys.stderr)
-
-_ensure_encryption_key()
 
 
 # --- Router (bu servis) ---
