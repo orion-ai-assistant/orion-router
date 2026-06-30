@@ -44,3 +44,6 @@ tools/
 
 # Dashboard generated
 dashboard/.npm_lockfile_hash
+
+# Docker persistent volume mount
+persistent/

@@ -125,17 +125,63 @@ cd "$INSTALL_DIR"
 
 # --- Smart .env Check ---
 echo -e "\n[*] Checking .env file..."
-if [ ! -f ".env" ]; then
-    if [ -f ".env.example" ]; then
-        cp .env.example .env
-        echo "✔ .env file not found. Created a new .env file from .env.example to prevent Docker warnings."
-    else
-        echo "[!] .env.example not found, creating an empty .env file..."
-        touch .env
-    fi
-else
-    echo "✔ Existing .env file detected. Kept intact to preserve your configurations."
+SYS_LANG="en"
+if command -v locale >/dev/null 2>&1; then
+    LOCALE_VAL=$(locale | grep LANG= | cut -d= -f2 | tr -d '"' | cut -d_ -f1)
+    if [ -n "$LOCALE_VAL" ]; then SYS_LANG="$LOCALE_VAL"; fi
+elif [ -n "${LANG:-}" ]; then
+    SYS_LANG=$(echo "$LANG" | cut -d_ -f1)
 fi
+
+# .env.example'daki aktif (yorum olmayan) anahtarları mevcut .env'ye ekleyen yardımcı fonksiyon
+merge_env_from_example() {
+    local env_path="$1"
+    local example_path="$2"
+    local appended=0
+    while IFS= read -r line || [ -n "$line" ]; do
+        line=$(echo "$line" | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
+        [ -z "$line" ] && continue
+        echo "$line" | grep -q "^#" && continue
+        KEY=$(echo "$line" | cut -d= -f1)
+        VAL=$(echo "$line" | cut -d= -f2-)
+        if ! grep -q "^${KEY}=" "$env_path"; then
+            echo "${KEY}=${VAL}" >> "$env_path"
+            echo "    + '${KEY}' .env'de bulunamadi, otomatik eklendi."
+            appended=$((appended + 1))
+        fi
+    done < "$example_path"
+    echo "$appended"
+}
+
+if [ ! -f ".env" ]; then
+    # --- Yeni kurulum: example'dan kopyala, ardından CLI_LANG ekle ---
+    if [ -f ".env.example" ]; then
+        cp ".env.example" ".env"
+    else
+        touch ".env"
+    fi
+    echo "" >> ".env"
+    echo "CLI_LANG=$SYS_LANG" >> ".env"
+    echo "✔ .env created (Language: $SYS_LANG)."
+else
+    # --- Mevcut kurulum: eksik anahtarları ekle, CLI_LANG yoksa ekle ---
+    echo "✔ Existing .env file detected. Checking for missing keys..."
+    added=0
+    if [ -f ".env.example" ]; then
+        added=$(merge_env_from_example ".env" ".env.example")
+    fi
+    if ! grep -q "^CLI_LANG=" ".env"; then
+        echo "CLI_LANG=$SYS_LANG" >> ".env"
+        echo "    + 'CLI_LANG' .env'de bulunamadi, otomatik eklendi ($SYS_LANG)."
+        added=$((added + 1))
+    fi
+    if [ "$added" -gt 0 ]; then
+        echo "✔ $added eksik ayar .env dosyaniza eklendi."
+    else
+        echo "✔ .env dosyasi guncel, eksik ayar yok."
+    fi
+fi
+
 
 # 3 & 4. Dependencies
 if [ "$MODE" = "local" ]; then

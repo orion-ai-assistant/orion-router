@@ -100,16 +100,58 @@ Write-Host ""
 
 # --- Smart .env Check ---
 Write-Host "[*] Checking .env file..."
+$SysLang = (Get-Culture).TwoLetterISOLanguageName
+if (-not $SysLang) { $SysLang = "en" }
+
+# .env.example'daki aktif (yorum olmayan) anahtarları mevcut .env'ye ekleyen yardımcı fonksiyon
+function Merge-EnvFromExample {
+    param([string]$EnvPath, [string]$ExamplePath)
+    $envContent = Get-Content $EnvPath -Raw
+    $appended = 0
+    foreach ($line in Get-Content $ExamplePath) {
+        $line = $line.Trim()
+        if (-not $line -or $line.StartsWith("#")) { continue }
+        if ($line -match "^([A-Za-z_][A-Za-z0-9_]*)=(.*)$") {
+            $key = $Matches[1]
+            $val = $Matches[2]
+            if ($envContent -notmatch "(?m)^$key=") {
+                Add-Content -Path $EnvPath -Value "$key=$val" -Encoding UTF8
+                Write-Host "    + '$key' .env'de bulunamadi, otomatik eklendi." -ForegroundColor Cyan
+                $appended++
+            }
+        }
+    }
+    return $appended
+}
+
 if (-not (Test-Path ".env")) {
+    # --- Yeni kurulum: example'dan kopyala, ardından CLI_LANG ekle ---
+    Write-Host "[*] .env not found. Creating..." -ForegroundColor Yellow
     if (Test-Path ".env.example") {
         Copy-Item ".env.example" ".env"
-        Write-Host "[OK] .env file not found. Created from .env.example." -ForegroundColor Green
     } else {
-        Write-Host "[!] .env.example not found, creating empty .env..." -ForegroundColor Yellow
         New-Item -Path ".env" -ItemType File | Out-Null
     }
+    Add-Content -Path ".env" -Value "`nCLI_LANG=$SysLang" -Encoding UTF8
+    Write-Host "[OK] .env created (Language: $SysLang)." -ForegroundColor Green
 } else {
-    Write-Host "[OK] Existing .env file detected. Kept intact." -ForegroundColor Green
+    # --- Mevcut kurulum: eksik anahtarları ekle, CLI_LANG yoksa ekle ---
+    Write-Host "[OK] Existing .env file detected. Checking for missing keys..." -ForegroundColor Green
+    $added = 0
+    if (Test-Path ".env.example") {
+        $added = Merge-EnvFromExample -EnvPath ".env" -ExamplePath ".env.example"
+    }
+    $envContent = Get-Content ".env" -Raw
+    if ($envContent -notmatch "(?m)^CLI_LANG=") {
+        Add-Content -Path ".env" -Value "CLI_LANG=$SysLang" -Encoding UTF8
+        Write-Host "    + 'CLI_LANG' .env'de bulunamadi, otomatik eklendi ($SysLang)." -ForegroundColor Cyan
+        $added++
+    }
+    if ($added -gt 0) {
+        Write-Host "[OK] $added eksik ayar .env dosyaniza eklendi." -ForegroundColor Green
+    } else {
+        Write-Host "[OK] .env dosyasi guncel, eksik ayar yok." -ForegroundColor Green
+    }
 }
 Write-Host ""
 

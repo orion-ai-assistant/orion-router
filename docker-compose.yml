@@ -21,7 +21,6 @@ services:
       - TTS_HOST=${TTS_HOST}
       - TTS_PORT=${TTS_PORT}
       - ADMIN_SECRET=${ADMIN_SECRET}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - CLI_LANG=${CLI_LANG}
       - APP_REFERER=${APP_REFERER}
       - APP_TITLE=${APP_TITLE}
@@ -29,6 +28,8 @@ services:
     env_file:
       - path: .env
         required: false
+    volumes:
+      - orion_router_app_data:/app/persistent
     networks:
       - orion-network
     depends_on:
@@ -58,6 +59,8 @@ services:
 volumes:
   orion_router_postgres_data:
     name: orion_router_postgres_data
+  orion_router_app_data:
+    name: orion_router_app_data
 
 networks:
   orion-network:

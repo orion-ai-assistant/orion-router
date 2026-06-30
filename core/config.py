@@ -13,46 +13,151 @@ _ROOT = pathlib.Path(__file__).parent.parent
 _ENV_PATH = _ROOT / ".env"
 _ENV_EXAMPLE_PATH = _ROOT / ".env.example"
 
+# Sadece ENCRYPTION_KEY için kalıcı volume dizini
+_PERSISTENT_DIR = _ROOT / "persistent"
+_KEY_FILE = _PERSISTENT_DIR / "encryption.key"
+
 
 def _ensure_env_file() -> bool:
-    """Yoksa .env.example dosyasından .env oluşturur (Docker / ilk kurulum)."""
-    if _ENV_PATH.exists():
-        return False
+    """
+    .env dosyasını yönetir:
+    - Yoksa .env.example'dan oluşturur.
+    - Varsa .env.example'daki eksik anahtarları otomatik ekler.
+    Bu sayede yeni sürümlerde eklenen değişkenler mevcut kurulumları bozmadan eklenir.
+    """
     if not _ENV_EXAMPLE_PATH.exists():
         return False
-    try:
-        shutil.copy(_ENV_EXAMPLE_PATH, _ENV_PATH)
-        
-        # Cihazın varsayılan dilini tespit edip yeni oluşturulan .env dosyasına ekliyoruz
+
+    if not _ENV_PATH.exists():
+        # --- İlk kurulum: .env.example'ı kopyala ---
         try:
-            import locale
-            sys_lang, _ = locale.getdefaultlocale()
-            if sys_lang:
-                # Dairesel importları önlemek için lokal import
-                try:
-                    from bin.i18n import normalize_locale
-                    detected_lang = normalize_locale(sys_lang)
-                except Exception:
-                    detected_lang = sys_lang.split("_")[0].lower() if "_" in sys_lang else sys_lang.lower()
-                
-                if detected_lang:
-                    with open(_ENV_PATH, "a", encoding="utf-8") as f:
-                        f.write(f'\n# Cihaz dili otomatik algılandı\nCLI_LANG="{detected_lang}"\n')
-        except Exception:
+            shutil.copy(_ENV_EXAMPLE_PATH, _ENV_PATH)
+            try:
+                from bin.i18n import t
+                msg = t("config_env_copied")
+            except Exception:
+                msg = "[orion-router] .env not found; .env.example copied to .env."
+            print(msg, file=sys.stderr)
+            return True
+        except OSError:
+            return False
+
+    # --- Mevcut .env: eksik anahtarları .env.example'dan otomatik ekle ---
+    try:
+        with open(_ENV_PATH, "r", encoding="utf-8") as f:
+            env_content = f.read()
+
+        existing_keys: set[str] = set()
+        for line in env_content.splitlines():
+            stripped = line.strip()
+            if stripped and not stripped.startswith("#") and "=" in stripped:
+                existing_keys.add(stripped.split("=", 1)[0].strip())
+
+        missing_lines: list[str] = []
+        with open(_ENV_EXAMPLE_PATH, "r", encoding="utf-8") as f:
+            for line in f:
+                stripped = line.strip()
+                if not stripped or stripped.startswith("#"):
+                    continue
+                if "=" in stripped:
+                    key = stripped.split("=", 1)[0].strip()
+                    if key not in existing_keys:
+                        missing_lines.append(stripped)
+
+        if missing_lines:
+            with open(_ENV_PATH, "a", encoding="utf-8") as f:
+                f.write("\n# --- Auto-merged from .env.example ---\n")
+                for ml in missing_lines:
+                    f.write(ml + "\n")
+            count = len(missing_lines)
+            try:
+                from bin.i18n import t
+                msg = t("config_env_merged", count=count)
+            except Exception:
+                msg = f"[orion-router] {count} missing key(s) added to .env from .env.example."
+            print(msg, file=sys.stderr)
+    except OSError:
+        pass
+
+    return False
+
+
+_ensure_env_file()
+
+
+def _load_env_file() -> None:
+    if not _ENV_PATH.exists():
+        return
+    try:
+        with open(_ENV_PATH, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" in line:
+                    key, val = line.split("=", 1)
+                    key = key.strip()
+                    val = val.strip()
+                    if (val.startswith('"') and val.endswith('"')) or (
+                        val.startswith("'") and val.endswith("'")
+                    ):
+                        val = val[1:-1]
+                    # Sistem ortam değişkenleri önceliklidir, ezilmezler
+                    if key and key not in os.environ:
+                        os.environ[key] = val
+    except OSError:
+        pass
+
+
+_load_env_file()
+
+
+def _ensure_encryption_key() -> None:
+    """
+    ENCRYPTION_KEY'i yönetir.
+    Öncelik sırası:
+      1. Sistem ortam değişkeni (Docker env'den gelebilir)
+      2. /app/persistent/encryption.key dosyası (Docker volume - kalıcı)
+      3. Yoksa üret ve volume dosyasına yaz
+    """
+    # 1. Zaten ortam değişkeninden geliyorsa kullan
+    if "ENCRYPTION_KEY" in os.environ:
+        return
+
+    # 2. Volume dosyasında varsa oku
+    if _KEY_FILE.exists():
+        try:
+            key = _KEY_FILE.read_text(encoding="utf-8").strip()
+            if key:
+                os.environ["ENCRYPTION_KEY"] = key
+                return
+        except OSError:
             pass
 
+    # 3. Üret ve volume dosyasına yaz (kalıcı)
+    try:
+        from cryptography.fernet import Fernet
+        new_key = Fernet.generate_key().decode("utf-8")
+        os.environ["ENCRYPTION_KEY"] = new_key
+        # Volume dizini yoksa oluştur (yerel geliştirme için de çalışsın)
+        _PERSISTENT_DIR.mkdir(parents=True, exist_ok=True)
+        _KEY_FILE.write_text(new_key, encoding="utf-8")
         try:
             from bin.i18n import t
-            msg = t("config_env_copied")
+            msg = t("config_key_created")
         except Exception:
-            msg = "[orion-router] .env not found; .env.example copied to .env."
-        print(
-            msg,
-            file=sys.stderr,
-        )
-        return True
-    except OSError:
-        return False
+            msg = "[orion-router] New ENCRYPTION_KEY generated and saved to persistent volume."
+        print(msg, file=sys.stderr)
+    except Exception as e:
+        try:
+            from bin.i18n import t
+            msg = t("config_key_failed", e=e)
+        except Exception:
+            msg = f"[orion-router] ENCRYPTION_KEY could not be generated: {e}"
+        print(msg, file=sys.stderr)
+
+_ensure_encryption_key()
+
 
 
 
