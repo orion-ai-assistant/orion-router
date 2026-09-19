@@ -67,7 +67,7 @@ async def is_default_password():
 
 @router.put("/api/settings/admin-secret", dependencies=[Depends(verify_admin)])
 async def update_admin_secret(request: Request):
-    from core.security import verify_secret, hash_secret
+    from core.security import check_admin_secret, hash_secret
     import json
     try:
         body = await request.json()
@@ -80,14 +80,8 @@ async def update_admin_secret(request: Request):
             raise HTTPException(status_code=400, detail="New admin secret cannot be empty")
             
         # Verify old secret
-        hashed_db = await db_manager.get_config("admin_secret_hash")
-        if hashed_db:
-            if not verify_secret(old_secret, hashed_db):
-                raise HTTPException(status_code=400, detail="Incorrect current admin secret")
-        else:
-            from core import config
-            if old_secret != config.ADMIN_SECRET:
-                raise HTTPException(status_code=400, detail="Incorrect current admin secret")
+        if not await check_admin_secret(old_secret):
+            raise HTTPException(status_code=400, detail="Incorrect current admin secret")
         
         # Hash and store new secret
         hashed = hash_secret(new_secret)

@@ -42,7 +42,9 @@ async def chat_completions(
     model = (raw_model or "").strip()
     if not model:
         raise HTTPException(status_code=400, detail="'model' field is required. Please specify a model name explicitly.")
-    thinking_level = body.get("thinking_level")
+    thinking_keys = ("thinking_level", "reasoning_effort", "thinking_budget")
+    thinking_level = next((body[k] for k in thinking_keys if body.get(k) is not None), None)
+
     system_prompt = body.get("system_prompt")
     tools = body.get("tools")
     tool_choice = body.get("tool_choice")
@@ -50,7 +52,11 @@ async def chat_completions(
     # Pass remaining keys to dynamic router
     kwargs = {
         k: v for k, v in body.items()
-        if k not in ("stream", "messages", "model", "thinking_level", "system_prompt", "tools", "tool_choice")
+        if k not in (
+            "stream", "messages", "model", "thinking_level",
+            "reasoning_effort", "thinking_budget",
+            "system_prompt", "tools", "tool_choice"
+        )
     }
 
     dynamic_router: DynamicLLMRouter = request.app.state.dynamic_router

@@ -17,6 +17,8 @@ import json
 from abc import ABC, abstractmethod
 from typing import AsyncGenerator, Any
 
+from core.thinking import ThinkingConfig
+
 
 class _ProviderMixin:
     """Tüm provider yetenek sınıfları için ortak yardımcı metotlar."""
@@ -57,6 +59,22 @@ class _ProviderMixin:
 
 class BaseChat(_ProviderMixin, ABC):
     """Streaming chat/completion yetenekleri için temel sınıf."""
+
+    @staticmethod
+    def extract_thinking_config(kwargs: dict[str, Any]) -> ThinkingConfig:
+        """kwargs içinden thinking_level / reasoning_effort / thinking_budget okur ve normalize ThinkingConfig döner."""
+        val = kwargs.get("thinking_level")
+        if val is None:
+            val = kwargs.get("reasoning_effort")
+        if val is None:
+            val = kwargs.get("thinking_budget")
+        return ThinkingConfig.from_value(val)
+
+    def apply_thinking(self, target: dict[str, Any], thinking: ThinkingConfig) -> None:
+        """Provider'a özgü payload veya config sözlüğüne düşünme parametrelerini uygular.
+        Alt sınıflar bu metodu ezerek kendi API formatlarını tanımlar (Open-Closed).
+        """
+        pass
 
     @abstractmethod
     async def stream_chat(

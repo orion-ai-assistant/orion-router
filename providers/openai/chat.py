@@ -10,11 +10,21 @@ from typing import AsyncGenerator, Any
 
 from providers.base import BaseChat
 
+from core.thinking import ThinkingConfig
+
 _BASE_URL = "https://api.openai.com"
 
 
 class OpenAIChatProvider(BaseChat):
 
+    def apply_thinking(self, payload: dict[str, Any], thinking: ThinkingConfig) -> None:
+        """OpenAI API için reasoning_effort parametresini uygular."""
+        if thinking.is_unspecified or thinking.is_disabled:
+            # Devre dışı veya belirtilmemiş ise reasoning_effort eklenmez
+            return
+
+        if thinking.level is not None:
+            payload["reasoning_effort"] = thinking.level
 
     async def stream_chat(
         self,
@@ -49,9 +59,8 @@ class OpenAIChatProvider(BaseChat):
         if kwargs.get("temperature") is not None:
             payload["temperature"] = float(kwargs["temperature"])
 
-        thinking_level = kwargs.get("thinking_level")
-        if thinking_level is not None:
-            payload["reasoning_effort"] = thinking_level
+        thinking = self.extract_thinking_config(kwargs)
+        self.apply_thinking(payload, thinking)
 
         tools = kwargs.get("tools")
         if tools:

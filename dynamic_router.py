@@ -154,6 +154,19 @@ def _sanitize_tool_ids_for_non_gemini(messages: list[dict]) -> list[dict]:
     return out
 
 
+def _inject_system_prompt(messages: list[dict[str, Any]], system_prompt: str | None) -> list[dict[str, Any]]:
+    """Prepends or merges a system prompt with existing system messages."""
+    route_messages = list(messages)
+    if not system_prompt:
+        return route_messages
+
+    existing_sys = [m.get("content", "") for m in route_messages if m.get("role") == "system"]
+    combined_sys = system_prompt + ("\n" + "\n".join(existing_sys) if existing_sys else "")
+    return [{"role": "system", "content": combined_sys}] + [
+        m for m in route_messages if m.get("role") != "system"
+    ]
+
+
 # ---------------------------------------------------------------------------
 #  DynamicLLMRouter
 # ---------------------------------------------------------------------------
@@ -474,37 +487,29 @@ class DynamicLLMRouter:
                 p_system_prompt = route.get("system_prompt")
                 
                 route_kwargs = {**kwargs}
-                
-                if p_temp is not None:
-                    incoming_temp = route_kwargs.get("temperature")
-                    if incoming_temp is None:
-                        try:
-                            route_kwargs["temperature"] = float(p_temp)
-                        except Exception:
-                            pass
-                        
-                if p_think is not None:
-                    incoming_think = route_kwargs.get("thinking_level")
-                    if incoming_think in (None, ""):
-                        route_kwargs["thinking_level"] = p_think
 
-                if p_system_prompt is not None:
-                    incoming_system = route_kwargs.get("system_prompt")
-                    if incoming_system in (None, ""):
-                        route_kwargs["system_prompt"] = p_system_prompt
-                
+                if route_kwargs.get("temperature") is None and p_temp is not None:
+                    try:
+                        route_kwargs["temperature"] = float(p_temp)
+                    except (ValueError, TypeError):
+                        pass
+
+                incoming_think = next(
+                    (route_kwargs[k] for k in ("thinking_level", "reasoning_effort", "thinking_budget")
+                     if route_kwargs.get(k) not in (None, "")),
+                    None,
+                )
+                route_kwargs["thinking_level"] = incoming_think if incoming_think not in (None, "") else p_think
+
+                if not route_kwargs.get("system_prompt") and p_system_prompt:
+                    route_kwargs["system_prompt"] = p_system_prompt
+
                 plugin = self.chat_providers.get(p_provider)
                 if not plugin:
                     logger.warning(f"Provider plugin {p_provider} not loaded, skipping route.")
                     continue
-                
-                route_messages = list(messages)
-                final_system_prompt = route_kwargs.get("system_prompt")
-                if final_system_prompt:
-                    existing_sys = [m.get("content", "") for m in route_messages if m.get("role") == "system"]
-                    combined_sys = final_system_prompt + ("\n" + "\n".join(existing_sys) if existing_sys else "")
-                    route_messages = [{"role": "system", "content": combined_sys}] + [m for m in route_messages if m.get("role") != "system"]
-                route_kwargs.pop("system_prompt", None)
+
+                route_messages = _inject_system_prompt(messages, route_kwargs.pop("system_prompt", None))
                 
                 keys_to_try = await self._get_keys_for_provider(p_provider, api_key or auth_header)
                 
@@ -570,13 +575,7 @@ class DynamicLLMRouter:
 
         db_key = self._get_db_key(provider)
         
-        route_messages = list(messages)
-        final_system_prompt = kwargs.get("system_prompt")
-        if final_system_prompt:
-            existing_sys = [m.get("content", "") for m in route_messages if m.get("role") == "system"]
-            combined_sys = final_system_prompt + ("\n" + "\n".join(existing_sys) if existing_sys else "")
-            route_messages = [{"role": "system", "content": combined_sys}] + [m for m in route_messages if m.get("role") != "system"]
-        kwargs.pop("system_prompt", None)
+        route_messages = _inject_system_prompt(messages, kwargs.pop("system_prompt", None))
 
         async for chunk in self._stream(
             self.chat_providers[provider], key_id, provider, model,

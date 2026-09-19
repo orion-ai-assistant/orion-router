@@ -10,11 +10,33 @@ from typing import AsyncGenerator, Any
 
 from providers.base import BaseChat
 
+from core.thinking import ThinkingConfig
+
 _BASE_URL = "https://openrouter.ai"
 
 
 class OpenRouterChatProvider(BaseChat):
 
+    def apply_thinking(self, payload: dict[str, Any], thinking: ThinkingConfig) -> None:
+        """OpenRouter API için reasoning yapılandırmasını uygular."""
+        if thinking.is_unspecified:
+            return
+
+        active = not thinking.is_disabled
+
+        payload["include_reasoning"] = active
+        template_kwargs = payload.get("chat_template_kwargs") or {}
+        template_kwargs["enable_thinking"] = active
+        payload["chat_template_kwargs"] = template_kwargs
+
+        if thinking.is_disabled:
+            payload["reasoning"] = {"max_tokens": 0}
+        elif thinking.level is not None:
+            payload["reasoning_effort"] = thinking.level
+            payload["reasoning"] = {"effort": thinking.level}
+        elif thinking.budget is not None:
+            payload["thinking_budget_tokens"] = thinking.budget
+            payload["reasoning"] = {"max_tokens": thinking.budget}
 
     async def stream_chat(
         self,
@@ -53,10 +75,11 @@ class OpenRouterChatProvider(BaseChat):
         if kwargs.get("temperature") is not None:
             payload["temperature"] = float(kwargs["temperature"])
 
-        thinking_level = kwargs.get("thinking_level")
-        if thinking_level is not None:
-            payload["reasoning_effort"] = thinking_level
-            payload["include_reasoning"] = True  # only request reasoning when thinking is active
+        if kwargs.get("chat_template_kwargs") and isinstance(kwargs["chat_template_kwargs"], dict):
+            payload["chat_template_kwargs"] = dict(kwargs["chat_template_kwargs"])
+
+        thinking = self.extract_thinking_config(kwargs)
+        self.apply_thinking(payload, thinking)
 
         tools = kwargs.get("tools")
         if tools:

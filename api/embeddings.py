@@ -10,27 +10,12 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from core.dependencies import authenticate_request
+from core.utils import run_with_disconnect_check
 from dynamic_router import DynamicLLMRouter
 
 logger = logging.getLogger("service-router.embeddings")
 
 router = APIRouter(tags=["Embeddings"])
-
-async def run_with_disconnect_check(request: Request, coro):
-    task = asyncio.create_task(coro)
-    
-    async def check_disconnect():
-        while True:
-            if await request.is_disconnected():
-                task.cancel()
-                return
-            await asyncio.sleep(0.1)
-            
-    checker = asyncio.create_task(check_disconnect())
-    try:
-        return await task
-    finally:
-        checker.cancel()
 
 @router.post("/v1/embeddings")
 async def embeddings(

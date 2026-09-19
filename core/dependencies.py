@@ -122,14 +122,9 @@ async def authenticate_request(request: Request) -> dict:
         return {"source": "virtual_key", "key_id": row["id"], "name": row["name"]}
 
     # --- 2. Admin Secret kontrolü ---
-    hashed_db = await db_manager.get_config("admin_secret_hash")
-    if hashed_db:
-        from core.security import verify_secret
-        if verify_secret(token, hashed_db):
-            return {"source": "system", "key_id": None}
-    else:
-        if token == config.ADMIN_SECRET:
-            return {"source": "system", "key_id": None}
+    from core.security import check_admin_secret
+    if await check_admin_secret(token):
+        return {"source": "system", "key_id": None}
 
     # --- 3. Tanınmayan token ---
     raise HTTPException(status_code=401, detail="Invalid API key")
@@ -144,12 +139,7 @@ async def verify_admin(x_admin_key: str = Header(default=None)):
     
     x_admin_key = urllib.parse.unquote(x_admin_key)
     
-    hashed_db = await db_manager.get_config("admin_secret_hash")
-    if hashed_db:
-        from core.security import verify_secret
-        if not verify_secret(x_admin_key, hashed_db):
-            raise HTTPException(status_code=401, detail="Unauthorized admin access")
-    else:
-        if x_admin_key != config.ADMIN_SECRET:
-            raise HTTPException(status_code=401, detail="Unauthorized admin access")
+    from core.security import check_admin_secret
+    if not await check_admin_secret(x_admin_key):
+        raise HTTPException(status_code=401, detail="Unauthorized admin access")
     return True

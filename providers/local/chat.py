@@ -9,11 +9,30 @@ import httpx
 from typing import AsyncGenerator, Any
 
 from providers.base import BaseChat
+from core.thinking import ThinkingConfig
 from core.config import LLM_HOST, LLM_PORT
 
 
 class LocalChatProvider(BaseChat):
 
+    def apply_thinking(self, payload: dict[str, Any], thinking: ThinkingConfig) -> None:
+        """llama.cpp / vLLM / Qwen / Jinja chat şablonları için düşünme ayarlarını uygular."""
+        if thinking.is_unspecified:
+            return
+
+        active = not thinking.is_disabled
+
+        template_kwargs = payload.get("chat_template_kwargs") or {}
+        template_kwargs["enable_thinking"] = active
+        payload["chat_template_kwargs"] = template_kwargs
+
+        if thinking.is_disabled:
+            payload["thinking_budget_tokens"] = 0
+            payload["reasoning_effort"] = "none"
+        elif thinking.level is not None:
+            payload["reasoning_effort"] = thinking.level
+        elif thinking.budget is not None:
+            payload["thinking_budget_tokens"] = thinking.budget
 
     async def stream_chat(
         self,
@@ -36,15 +55,11 @@ class LocalChatProvider(BaseChat):
         if kwargs.get("temperature") is not None:
             payload["temperature"] = float(kwargs["temperature"])
 
-        thinking_level = kwargs.get("thinking_level")
-        if thinking_level is not None:
-            val = str(thinking_level).strip()
-            if val.isdigit():
-                payload["thinking_budget_tokens"] = int(val)
-            elif val.lower() == "false":
-                payload["chat_template_kwargs"] = {"enable_thinking": False}
-            elif val.lower() == "true":
-                payload["chat_template_kwargs"] = {"enable_thinking": True}
+        if kwargs.get("chat_template_kwargs") and isinstance(kwargs["chat_template_kwargs"], dict):
+            payload["chat_template_kwargs"] = dict(kwargs["chat_template_kwargs"])
+
+        thinking = self.extract_thinking_config(kwargs)
+        self.apply_thinking(payload, thinking)
 
         tools = kwargs.get("tools")
         if tools:

@@ -18,11 +18,29 @@ from google import genai
 from google.genai import types
 
 from providers.base import BaseChat
+from core.thinking import ThinkingConfig
 
 logger = logging.getLogger("service-router.gemini")
 
 
 class GeminiChatProvider(BaseChat):
+
+    def apply_thinking(self, config_kwargs: dict[str, Any], thinking: ThinkingConfig) -> None:
+        """Google GenAI SDK için ThinkingConfig yapılandırmasını uygular."""
+        if thinking.is_unspecified:
+            return
+
+        active = not thinking.is_disabled
+        tc_kwargs = {"include_thoughts": active}
+
+        if thinking.is_disabled:
+            tc_kwargs["thinking_budget"] = 0
+        elif thinking.level is not None:
+            tc_kwargs["thinking_level"] = thinking.level
+        elif thinking.budget is not None:
+            tc_kwargs["thinking_budget"] = thinking.budget
+
+        config_kwargs["thinking_config"] = types.ThinkingConfig(**tc_kwargs)
 
 
     async def stream_chat(
@@ -144,17 +162,8 @@ class GeminiChatProvider(BaseChat):
         if kwargs.get("temperature") is not None:
             config_kwargs["temperature"] = float(kwargs["temperature"])
 
-        thinking_level = kwargs.get("thinking_level")
-        if thinking_level is not None:
-            val = str(thinking_level).strip()
-            if val.isdigit():
-                config_kwargs["thinking_config"] = types.ThinkingConfig(
-                    include_thoughts=True, thinking_budget=int(val)
-                )
-            else:
-                config_kwargs["thinking_config"] = types.ThinkingConfig(
-                    include_thoughts=True, thinking_level=val
-                )
+        thinking = self.extract_thinking_config(kwargs)
+        self.apply_thinking(config_kwargs, thinking)
 
         tools = kwargs.get("tools")
         if tools:

@@ -250,7 +250,7 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
     }
 
     const trimmedThinking = chatThinking.trim();
-    if (trimmedThinking && trimmedThinking.toLowerCase() !== 'none') {
+    if (trimmedThinking) {
       payload.thinking_level = trimmedThinking;
     }
 

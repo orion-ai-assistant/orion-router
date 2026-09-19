@@ -16,6 +16,17 @@ def verify_secret(secret: str, hashed_secret: str, salt: bytes = b"orion-router-
     """Verifies a secret against a stored hash."""
     return hash_secret(secret, salt) == hashed_secret
 
+async def check_admin_secret(secret: str | None) -> bool:
+    """Verifies an admin secret against the stored DB hash or fallback config."""
+    if not secret:
+        return False
+    from database import db_manager
+    from core import config
+    hashed_db = await db_manager.get_config("admin_secret_hash")
+    if hashed_db:
+        return verify_secret(secret, hashed_db)
+    return secret == config.ADMIN_SECRET
+
 def _get_cipher() -> Fernet:
     from core.config import ENCRYPTION_KEY
     if not ENCRYPTION_KEY:
