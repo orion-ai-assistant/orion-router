@@ -77,9 +77,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger("service-router")
 
-# Uvicorn loglarını --log-level warning ile başlattığımızda erişim logları (access) da kapanır.
-# Erişim loglarını tekrar açmak için manuel olarak INFO seviyesine çekiyoruz.
 logging.getLogger("uvicorn.access").setLevel(logging.INFO)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 class UvicornAccessFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:

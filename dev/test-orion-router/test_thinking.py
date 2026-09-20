@@ -195,21 +195,18 @@ def test_openai_and_openrouter_providers():
 
 
 def test_live_local_llama_cpp():
-    print("\n--- 5. Testing Live Local Model Endpoint (port 8085 / 8080) ---")
-    local_ports = [8085, 8080]
+    print(f"\n--- 5. Testing Live Local Model Endpoint (port {LLM_PORT}) ---")
     active_port = None
-    for p in local_ports:
-        try:
-            req = urllib.request.Request(f"http://127.0.0.1:{p}/v1/models")
-            with urllib.request.urlopen(req, timeout=2) as resp:
-                if resp.status == 200:
-                    active_port = p
-                    break
-        except Exception:
-            pass
+    try:
+        req = urllib.request.Request(f"http://{LLM_HOST}:{LLM_PORT}/v1/models")
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            if resp.status == 200:
+                active_port = LLM_PORT
+    except Exception:
+        pass
 
     if not active_port:
-        print("  [SKIP] No local llama-cpp runner active on 8085/8080.")
+        print(f"  [SKIP] No local llama-cpp runner active on {LLM_PORT}.")
         return
 
     print(f"  [INFO] Found active local llama-cpp server on port {active_port}")

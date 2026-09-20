@@ -441,9 +441,12 @@ async def get_admin_stt_languages(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+_cached_local_languages = None
+
 @router.get("/api/local-tts-info", dependencies=[Depends(verify_admin)])
 async def get_local_tts_info():
     """Yerel TTS servisinin aktif model/motor bilgisini döner."""
+    global _cached_local_languages
     from core.config import TTS_HOST, TTS_PORT
     import httpx
     try:
@@ -452,30 +455,32 @@ async def get_local_tts_info():
             if res_info.status_code == 200:
                 data = res_info.json()
                 voices = []
-                languages = []
                 try:
                     res_voices = await client.get(f"http://{TTS_HOST}:{TTS_PORT}/v1/voices")
                     if res_voices.status_code == 200:
                         voices = [v for v in res_voices.json().get("voices", []) if str(v).lower() != "none"]
                 except Exception:
                     pass
-                try:
-                    res_langs = await client.get(f"http://{TTS_HOST}:{TTS_PORT}/v1/languages")
-                    if res_langs.status_code == 200:
-                        languages = res_langs.json().get("languages", [])
-                except Exception:
-                    pass
+
+                if not _cached_local_languages:
+                    try:
+                        res_langs = await client.get(f"http://{TTS_HOST}:{TTS_PORT}/v1/languages")
+                        if res_langs.status_code == 200:
+                            _cached_local_languages = res_langs.json().get("languages", [])
+                    except Exception:
+                        pass
+
                 return {
                     "active": True,
                     "engine": data.get("engine", "omnivoice"),
                     "voices": voices,
-                    "languages": languages,
+                    "languages": _cached_local_languages or [],
                     "low_vram": data.get("low_vram", False),
                     "idle_cleanup_mins": data.get("idle_cleanup_mins", None)
                 }
     except Exception as e:
         logger.debug(f"Could not fetch model info from local TTS: {e}")
-    return {"active": False, "engine": None, "voices": [], "languages": []}
+    return {"active": False, "engine": None, "voices": [], "languages": _cached_local_languages or []}
 
 # ---------------------------------------------------------------------------
 #  Provider Key Pool

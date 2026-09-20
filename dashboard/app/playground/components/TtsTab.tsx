@@ -139,7 +139,7 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
     };
     initTtsData();
 
-    // 2-second timeout & polling interval
+    // 10-second polling interval for engine status
     const interval = setInterval(async () => {
       try {
         const res = await adminFetch('/dashboard/api/local-tts-info');
@@ -154,7 +154,7 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
           previousActive = data.active;
         }
       } catch (e) {}
-    }, 2000);
+    }, 10000);
 
     return () => {
       clearInterval(interval);

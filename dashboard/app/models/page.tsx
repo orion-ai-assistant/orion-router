@@ -303,21 +303,39 @@ export default function ModelsPage() {
   };
 
   useEffect(() => {
-    const initData = () => {
+    let previousActive = false;
+
+    const initData = async () => {
       loadProviders();
       loadVoices();
       loadLanguages();
-      loadLocalTtsInfo();
       loadModels();
+      try {
+        const res = await adminFetch('/dashboard/api/local-tts-info');
+        if (res.ok) {
+          const data = await res.json();
+          setLocalTtsInfo(data);
+          previousActive = !!data.active;
+        }
+      } catch (e) {}
     };
     initData();
 
-    // Sürekli olarak arka planda TTS verilerini kontrol et
-    const interval = setInterval(() => {
-      loadLocalTtsInfo();
-      loadVoices();
-      loadLanguages();
-    }, 5000);
+    // Sadece TTS servisi sonradan açıldıysa (offline -> online) ses ve dilleri 1 kez tazele
+    const interval = setInterval(async () => {
+      try {
+        const res = await adminFetch('/dashboard/api/local-tts-info');
+        if (res.ok) {
+          const data = await res.json();
+          setLocalTtsInfo(data);
+          if (data.active && !previousActive) {
+            loadVoices();
+            loadLanguages();
+          }
+          previousActive = !!data.active;
+        }
+      } catch (e) {}
+    }, 15000);
 
     const handleAuth = () => {
       initData();

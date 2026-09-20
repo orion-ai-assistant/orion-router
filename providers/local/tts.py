@@ -22,14 +22,21 @@ class LocalTTSProvider(BaseTTS):
 
         return [v for v in cloned_voices if v.lower() != "none"]
 
+    _cached_languages = None
+
     def get_languages(self) -> list[str]:
-        """Yerel TTS motorundan desteklenen dilleri döner."""
+        """Yerel TTS motorundan desteklenen dilleri döner (statik liste önbelleklenir)."""
+        if self._cached_languages:
+            return self._cached_languages
         try:
             import httpx
-            res = httpx.get(f"http://{TTS_HOST}:{TTS_PORT}/v1/languages", timeout=1.0)
+            res = httpx.get(f"http://{TTS_HOST}:{TTS_PORT}/v1/languages", timeout=1.5)
             if res.status_code == 200:
                 data = res.json()
-                return data.get("languages", [])
+                langs = data.get("languages", [])
+                if langs:
+                    self._cached_languages = langs
+                return langs
         except Exception as e:
             logger.debug(f"Could not fetch languages from local TTS: {e}")
         return []
