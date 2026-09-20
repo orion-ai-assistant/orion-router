@@ -30,14 +30,14 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
   // TTS State
   const [ttsModel, setTtsModel] = useState(getSavedState('pg_ttsModel', ''));
   const savedTtsModel = getSavedState('pg_ttsModel', '');
-  const initialTtsModelRef = useRef<string | null>(savedTtsModel);
+  const initialTtsModelRef = useRef<string | null>('__pending__');
   const lastTtsModelRef = useRef<string | null>(savedTtsModel);
-  const [ttsVoice, setTtsVoice] = useState(getSavedState('pg_ttsVoice', 'alloy'));
-  const [ttsTemp, setTtsTemp] = useState(getSavedState('pg_ttsTemp', ''));
-  const [ttsSpeed, setTtsSpeed] = useState(getSavedState('pg_ttsSpeed', '1.0'));
-  const [ttsLanguage, setTtsLanguage] = useState(getSavedState('pg_ttsLanguage', 'Auto'));
-  const [ttsSteps, setTtsSteps] = useState(getSavedState('pg_ttsSteps', '15'));
-  const [ttsSeed, setTtsSeed] = useState(getSavedState('pg_ttsSeed', '-1'));
+  const [ttsVoice, setTtsVoice] = useState('');
+  const [ttsTemp, setTtsTemp] = useState('');
+  const [ttsSpeed, setTtsSpeed] = useState('');
+  const [ttsLanguage, setTtsLanguage] = useState('Auto');
+  const [ttsSteps, setTtsSteps] = useState('');
+  const [ttsSeed, setTtsSeed] = useState('');
   const [ttsGender, setTtsGender] = useState(getSavedState('pg_ttsGender', 'Auto'));
   const [ttsAge, setTtsAge] = useState(getSavedState('pg_ttsAge', 'Auto'));
   const [ttsPitch, setTtsPitch] = useState(getSavedState('pg_ttsPitch', 'Auto'));
@@ -246,13 +246,13 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
     }
     setLanguages(nextLangs);
 
-    const isInitialLoadForSavedModel = initialTtsModelRef.current === ttsModel;
+    const isInitialLoad = initialTtsModelRef.current !== null && models.length > 0;
     const isModelChanged = lastTtsModelRef.current !== ttsModel;
 
-    if (isInitialLoadForSavedModel) {
-      initialTtsModelRef.current = null;
-      lastTtsModelRef.current = ttsModel;
-    } else if (isModelChanged) {
+    if (isInitialLoad || isModelChanged) {
+      if (isInitialLoad) {
+        initialTtsModelRef.current = null;
+      }
       lastTtsModelRef.current = ttsModel;
       
       const findModelConfig = (mName: string) => {
@@ -281,7 +281,7 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
       };
 
       const defVoice = getVal('voice', '');
-      if (defVoice && defVoice.toLowerCase() !== 'none') {
+      if (defVoice && defVoice.toLowerCase() !== 'none' && (!isLocal || defVoice.toLowerCase() !== 'alloy')) {
         setTtsVoice(defVoice);
       } else {
         if (isLocal) {
@@ -324,27 +324,27 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
       const defInstruct = getVal('tts_instruct', '');
       setTtsInstruct(defInstruct);
     }
-  }, [ttsModel, groups, models, voicesByProvider, languagesByProvider, localTtsInfo]);
 
-  // Save states to localStorage
+    if (isLocal && ttsVoice && (ttsVoice.toLowerCase() === 'alloy' || ttsVoice.toLowerCase() === 'none')) {
+      setTtsVoice('');
+    }
+  }, [ttsModel, groups, models, voicesByProvider, languagesByProvider, localTtsInfo, isLocalTts]);
+
+  // Save model to localStorage and cleanup legacy override keys
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('pg_ttsModel', ttsModel);
-      localStorage.setItem('pg_ttsVoice', ttsVoice);
-      localStorage.setItem('pg_ttsTemp', ttsTemp);
-      localStorage.setItem('pg_ttsSpeed', ttsSpeed);
-      localStorage.setItem('pg_ttsLanguage', ttsLanguage);
-      localStorage.setItem('pg_ttsSteps', ttsSteps);
-      localStorage.setItem('pg_ttsSeed', ttsSeed);
-      localStorage.setItem('pg_ttsGender', ttsGender);
-      localStorage.setItem('pg_ttsAge', ttsAge);
-      localStorage.setItem('pg_ttsPitch', ttsPitch);
-      localStorage.setItem('pg_ttsStyle', ttsStyle);
-      localStorage.setItem('pg_ttsAccent', ttsAccent);
-      localStorage.setItem('pg_ttsDialect', ttsDialect);
-      localStorage.setItem('pg_ttsInstruct', ttsInstruct);
+      if (ttsModel) {
+        localStorage.setItem('pg_ttsModel', ttsModel);
+      }
+      // Clean up legacy keys so they do not pollute model defaults
+      localStorage.removeItem('pg_ttsSpeed');
+      localStorage.removeItem('pg_ttsSeed');
+      localStorage.removeItem('pg_ttsSteps');
+      if (localStorage.getItem('pg_ttsVoice') === 'alloy') {
+        localStorage.removeItem('pg_ttsVoice');
+      }
     }
-  }, [ttsModel, ttsVoice, ttsTemp, ttsSpeed, ttsLanguage, ttsSteps, ttsSeed, ttsGender, ttsAge, ttsPitch, ttsStyle, ttsAccent, ttsDialect, ttsInstruct]);
+  }, [ttsModel]);
 
   const resolvedTtsDefaults = (() => {
     if (!ttsModel) return { temperature: null };
@@ -490,21 +490,73 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
     const startTime = performance.now();
     const adminKey = getAdminKey();
     const apiBaseUrl = getApiBaseUrl();
-    const payload: any = { model: ttsModel, input: text, voice: ttsVoice };
 
-    const parsedTemp = parseFloat(ttsTemp);
-    if (!isNaN(parsedTemp)) {
-      payload.temperature = parsedTemp;
+    // Voice calculation
+    let effectiveVoice = ttsVoice;
+    if (isLocalTts) {
+      if (effectiveVoice && (effectiveVoice.toLowerCase() === 'none' || effectiveVoice.toLowerCase() === 'alloy')) {
+        effectiveVoice = '';
+      }
+    } else {
+      if (!effectiveVoice || effectiveVoice.toLowerCase() === 'none') {
+        effectiveVoice = getTtsFieldDefault('voice') || 'alloy';
+      }
+    }
+
+    const payload: any = { model: ttsModel, input: text, voice: effectiveVoice };
+
+    if (ttsTemp.trim() !== '') {
+      const parsedTemp = parseFloat(ttsTemp);
+      if (!isNaN(parsedTemp)) {
+        payload.temperature = parsedTemp;
+      }
+    } else {
+      const defTemp = getTtsFieldDefault('temperature');
+      if (defTemp !== '') {
+        const parsedDefTemp = parseFloat(defTemp);
+        if (!isNaN(parsedDefTemp)) {
+          payload.temperature = parsedDefTemp;
+        }
+      }
     }
 
     if (isLocalTts) {
-      payload.speed = parseFloat(ttsSpeed) || 1.0;
-      payload.language = ttsLanguage || 'Auto';
-      payload.steps = parseInt(ttsSteps, 10) || 15;
-      payload.seed = parseInt(ttsSeed, 10) || -1;
+      // Speed: use input if typed, otherwise fall back to model override default
+      if (ttsSpeed.trim() !== '') {
+        const parsedSpeed = parseFloat(ttsSpeed);
+        if (!isNaN(parsedSpeed)) payload.speed = parsedSpeed;
+      } else {
+        const defSpeed = parseFloat(getTtsFieldDefault('speed'));
+        payload.speed = !isNaN(defSpeed) ? defSpeed : 1.0;
+      }
+
+      // Language: use input if selected, otherwise fall back to model override default
+      if (ttsLanguage.trim() !== '') {
+        payload.language = ttsLanguage;
+      } else {
+        payload.language = getTtsFieldDefault('language') || 'Auto';
+      }
+
+      // Steps: use input if typed, otherwise fall back to model override default
+      if (ttsSteps.trim() !== '') {
+        const parsedSteps = parseInt(ttsSteps, 10);
+        if (!isNaN(parsedSteps)) payload.steps = parsedSteps;
+      } else {
+        const defSteps = parseInt(getTtsFieldDefault('steps'), 10);
+        payload.steps = !isNaN(defSteps) ? defSteps : 15;
+      }
+
+      // Seed: use input if typed, otherwise fall back to model override default
+      if (ttsSeed.trim() !== '') {
+        const parsedSeed = parseInt(ttsSeed, 10);
+        if (!isNaN(parsedSeed)) payload.seed = parsedSeed;
+      } else {
+        const defSeed = parseInt(getTtsFieldDefault('seed'), 10);
+        payload.seed = !isNaN(defSeed) ? defSeed : -1;
+      }
 
       // Construct character design instructs (only when no persona is selected)
-      const hasPersona = !!ttsVoice && ttsVoice.toLowerCase() !== 'none';
+      const hasPersona = !!effectiveVoice && effectiveVoice.toLowerCase() !== 'none';
       if (!hasPersona) {
         if (resolvedTtsEngine === 'voxcpm2') {
           payload.tts_instruct = ttsInstruct || '';
@@ -520,6 +572,12 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
         }
       } else {
         payload.tts_instruct = '';
+      }
+    } else {
+      // Non-local models (e.g. OpenAI)
+      const effSpeed = ttsSpeed.trim() !== '' ? parseFloat(ttsSpeed) : parseFloat(getTtsFieldDefault('speed'));
+      if (!isNaN(effSpeed) && effSpeed !== 1.0) {
+        payload.speed = effSpeed;
       }
     }
 
@@ -624,7 +682,7 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
                 className="orion-native-select orion-native-select-sm"
               >
                 {isLocalTts && <option value="">{t('common.none')}</option>}
-                {ttsVoice && !voices.includes(ttsVoice) && ttsVoice.toLowerCase() !== 'none' && (
+                {ttsVoice && !voices.includes(ttsVoice) && ttsVoice.toLowerCase() !== 'none' && (!isLocalTts || ttsVoice.toLowerCase() !== 'alloy') && (
                   <option value={ttsVoice}>{ttsVoice} ⚠️</option>
                 )}
                 {voices.map((v) => (

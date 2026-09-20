@@ -747,13 +747,33 @@ class DynamicLLMRouter:
                 p_provider = route["provider"]
                 p_model = route["name"]
                 p_temp = route.get("temperature")
-                
-                route_kwargs = {**kwargs}
+                p_def_config = route.get("default_config")
+                if isinstance(p_def_config, str):
+                    try:
+                        import json as _json
+                        p_def_config = _json.loads(p_def_config)
+                    except Exception:
+                        p_def_config = {}
+                elif not isinstance(p_def_config, dict):
+                    p_def_config = {}
+
+                route_kwargs = {}
+                for k, v in p_def_config.items():
+                    if v is not None and v != "":
+                        route_kwargs[k] = v
+                for k, v in kwargs.items():
+                    if v is not None and v != "":
+                        route_kwargs[k] = v
+
                 if p_temp is not None and route_kwargs.get("temperature") is None:
                     try:
                         route_kwargs["temperature"] = float(p_temp)
                     except Exception:
                         pass
+
+                target_voice = voice
+                if (not target_voice or str(target_voice).lower() == "none") and p_def_config.get("voice"):
+                    target_voice = p_def_config.get("voice")
                 
                 plugin = self.tts_providers.get(p_provider)
                 if not plugin:
@@ -763,12 +783,12 @@ class DynamicLLMRouter:
                 keys_to_try = await self._get_keys_for_provider(p_provider, api_key or auth_header)
                 
                 for key_val, key_pool_id in keys_to_try:
-                    logger.info(f"Routing TTS to {p_provider} (model={p_model}, voice={voice}) using key {key_pool_id or 'default'}, kwargs={route_kwargs}")
+                    logger.info(f"Routing TTS to {p_provider} (model={p_model}, voice={target_voice}) using key {key_pool_id or 'default'}, kwargs={route_kwargs}")
                     try:
                         audio_bytes, content_type, usage_meta = await plugin.generate_speech(
                             model=p_model,
                             input_text=input_text,
-                            voice=voice,
+                            voice=target_voice,
                             api_key=key_val,
                             auth_header=auth_header if not key_val else None,
                             **route_kwargs
