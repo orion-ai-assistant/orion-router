@@ -15,6 +15,7 @@ from google import genai
 from google.genai import types
 
 from providers.base import BaseSTT
+from providers.gemini.client import get_gemini_client
 
 logger = logging.getLogger("service-router.gemini.stt")
 
@@ -224,7 +225,7 @@ class GeminiSTTProvider(BaseSTT):
         if not model:
             raise ValueError("Gemini STT Error: Model name is required.")
 
-        client = genai.Client(api_key=resolved_key)
+        client = get_gemini_client(resolved_key)
 
         # Content type belirleme
         content_type = "audio/wav"

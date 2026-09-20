@@ -18,6 +18,7 @@ from google import genai
 from google.genai import types
 
 from providers.base import BaseChat
+from providers.gemini.client import get_gemini_client
 from core.thinking import ThinkingConfig
 
 logger = logging.getLogger("service-router.gemini")
@@ -63,7 +64,7 @@ class GeminiChatProvider(BaseChat):
             return
 
         try:
-            client = genai.Client(api_key=resolved_key)
+            client = get_gemini_client(resolved_key)
         except Exception as e:
             err_msg = f"Gemini client init failed: {e}"
             yield f'data: {json.dumps({"error": {"message": err_msg, "type": "api_error"}}, ensure_ascii=False)}\n\n'

@@ -11,6 +11,7 @@ import httpx
 
 from providers.base import BaseEmbed
 from core.config import EMBED_HOST, EMBED_PORT
+from core.http_client import get_http_client
 
 logger = logging.getLogger("service-router.local.embed")
 
@@ -38,7 +39,7 @@ class LocalEmbedProvider(BaseEmbed):
 
         logger.info(f"Routing embeddings to local: {url}")
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.post(url, json=payload)
-            resp.raise_for_status()
-            return resp.json()
+        client = get_http_client(timeout=60.0)
+        resp = await client.post(url, json=payload)
+        resp.raise_for_status()
+        return resp.json()

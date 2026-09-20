@@ -11,6 +11,7 @@ from typing import AsyncGenerator, Any
 from providers.base import BaseChat
 
 from core.thinking import ThinkingConfig
+from core.http_client import get_http_client
 
 _BASE_URL = "https://api.openai.com"
 
@@ -69,13 +70,13 @@ class OpenAIChatProvider(BaseChat):
             if tool_choice:
                 payload["tool_choice"] = tool_choice
 
-        async with httpx.AsyncClient(timeout=None) as client:
-            async with client.stream("POST", url, json=payload, headers=headers) as response:
-                if response.status_code != 200:
-                    err = await response.aread()
-                    raise RuntimeError(f"OpenAI HTTP Error {response.status_code}: {err.decode(errors='ignore')}")
+        client = get_http_client()
+        async with client.stream("POST", url, json=payload, headers=headers, timeout=None) as response:
+            if response.status_code != 200:
+                err = await response.aread()
+                raise RuntimeError(f"OpenAI HTTP Error {response.status_code}: {err.decode(errors='ignore')}")
 
-                async for data in self._iter_sse_lines(response):
+            async for data in self._iter_sse_lines(response):
                     if data.get("usage"):
                         usage = data["usage"]
                         details = usage.get("completion_tokens_details") or {}

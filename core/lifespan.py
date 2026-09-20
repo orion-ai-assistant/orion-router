@@ -19,6 +19,8 @@ from fastapi import FastAPI
 from database import db_manager
 from dynamic_router import DynamicLLMRouter
 from core.config import MODEL_PRICING_PATH, ROUTER_PORT
+from core.http_client import close_http_clients
+from providers.gemini.client import close_gemini_clients
 
 logger = logging.getLogger("service-router")
 
@@ -233,4 +235,6 @@ async def lifespan(app: FastAPI):
     #  SHUTDOWN                                                            #
     # ------------------------------------------------------------------ #
     logger.info("Shutting down Orion Custom Service Router")
+    await close_gemini_clients()
+    await close_http_clients()
     await db_manager.close_db()

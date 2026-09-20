@@ -11,6 +11,7 @@ from typing import AsyncGenerator, Any
 from providers.base import BaseChat
 from core.thinking import ThinkingConfig
 from core.config import LLM_HOST, LLM_PORT
+from core.http_client import get_http_client
 
 
 class LocalChatProvider(BaseChat):
@@ -71,15 +72,15 @@ class LocalChatProvider(BaseChat):
         # Kaç karakter reasoning (think) geldi — API breakdown vermezse tahmin için
         thought_chars = 0
 
-        async with httpx.AsyncClient(timeout=None) as client:
-            async with client.stream(
-                "POST", url, json=payload, headers={"Content-Type": "application/json"}
-            ) as response:
-                if response.status_code != 200:
-                    err = await response.aread()
-                    raise RuntimeError(f"Local HTTP Error {response.status_code}: {err.decode(errors='ignore')}")
+        client = get_http_client()
+        async with client.stream(
+            "POST", url, json=payload, headers={"Content-Type": "application/json"}, timeout=None
+        ) as response:
+            if response.status_code != 200:
+                err = await response.aread()
+                raise RuntimeError(f"Local HTTP Error {response.status_code}: {err.decode(errors='ignore')}")
 
-                async for data in self._iter_sse_lines(response):
+            async for data in self._iter_sse_lines(response):
                     # ── Usage chunk ────────────────────────────────────────────────────
                     if data.get("usage"):
                         usage = data["usage"]

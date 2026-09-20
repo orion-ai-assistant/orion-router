@@ -9,6 +9,7 @@ import logging
 from google import genai
 
 from providers.base import BaseEmbed
+from providers.gemini.client import get_gemini_client
 
 
 logger = logging.getLogger("service-router.gemini.embed")
@@ -36,7 +37,7 @@ class GeminiEmbedProvider(BaseEmbed):
         if not model:
             raise ValueError("Gemini Embed Error: Model name is required.")
 
-        client = genai.Client(api_key=resolved_key)
+        client = get_gemini_client(resolved_key)
         embed_model = model
 
         logger.info(f"Generating Gemini embeddings with model: {embed_model}")

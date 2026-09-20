@@ -20,6 +20,7 @@ from google import genai
 from google.genai import types
 
 from providers.base import BaseTTS
+from providers.gemini.client import get_gemini_client
 
 
 logger = logging.getLogger("service-router.gemini.tts")
@@ -122,7 +123,7 @@ class GeminiTTSProvider(BaseTTS):
         if not model:
             raise ValueError("Gemini TTS Error: Model name is required.")
 
-        client = genai.Client(api_key=resolved_key)
+        client = get_gemini_client(resolved_key)
         voice_name = voice or self.get_voices()[0]
 
         # Temperature: güvenli parse — geçersiz değer gelirse loglanıp atlanır

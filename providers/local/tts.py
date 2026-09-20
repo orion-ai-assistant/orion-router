@@ -2,6 +2,7 @@ import httpx
 import logging
 from providers.base import BaseTTS
 from core.config import TTS_HOST, TTS_PORT
+from core.http_client import get_http_client
 
 logger = logging.getLogger("service-router.local.tts")
 
@@ -98,19 +99,19 @@ class LocalTTSProvider(BaseTTS):
 
         logger.info(f"Generating Local TTS: model={model}, voice={voice}, url={url}")
 
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            try:
-                response = await client.post(url, json=payload)
-            except httpx.RequestError as e:
-                logger.error(f"Failed to connect to local TTS server: {e}")
-                raise RuntimeError(f"Local TTS Service Unreachable: {e}")
+        client = get_http_client(timeout=120.0)
+        try:
+            response = await client.post(url, json=payload)
+        except httpx.RequestError as e:
+            logger.error(f"Failed to connect to local TTS server: {e}")
+            raise RuntimeError(f"Local TTS Service Unreachable: {e}")
 
-            if response.status_code != 200:
-                logger.error(f"Local TTS API Error: {response.text}")
-                raise RuntimeError(f"Local TTS API Error: {response.status_code} - {response.text}")
-            
-            audio_bytes = response.content
-            content_type = response.headers.get("content-type", "audio/wav")
+        if response.status_code != 200:
+            logger.error(f"Local TTS API Error: {response.text}")
+            raise RuntimeError(f"Local TTS API Error: {response.status_code} - {response.text}")
+        
+        audio_bytes = response.content
+        content_type = response.headers.get("content-type", "audio/wav")
             
         # Basit kullanım istatistiği dönüyoruz
         usage_dict = {

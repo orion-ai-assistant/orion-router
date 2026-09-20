@@ -10,6 +10,7 @@ from typing import Any
 
 from providers.base import BaseSTT
 from core.config import STT_HOST, STT_PORT
+from core.http_client import get_http_client
 
 logger = logging.getLogger("service-router.local.stt")
 
@@ -194,21 +195,21 @@ class LocalSTTProvider(BaseSTT):
             f"language={data.get('language', 'auto')}, url={url}"
         )
 
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            try:
-                response = await client.post(url, data=data, files=files)
-            except httpx.RequestError as e:
-                logger.error(f"Failed to connect to local STT server at {url}: {e}")
-                raise RuntimeError(f"Local STT Service Unreachable ({url}): {e}")
+        client = get_http_client(timeout=120.0)
+        try:
+            response = await client.post(url, data=data, files=files)
+        except httpx.RequestError as e:
+            logger.error(f"Failed to connect to local STT server at {url}: {e}")
+            raise RuntimeError(f"Local STT Service Unreachable ({url}): {e}")
 
-            if response.status_code != 200:
-                logger.error(f"Local STT API Error [{response.status_code}]: {response.text}")
-                raise RuntimeError(f"Local STT API Error: {response.status_code} - {response.text}")
+        if response.status_code != 200:
+            logger.error(f"Local STT API Error [{response.status_code}]: {response.text}")
+            raise RuntimeError(f"Local STT API Error: {response.status_code} - {response.text}")
 
-            try:
-                result = response.json()
-            except Exception:
-                result = {"text": response.text.strip()}
+        try:
+            result = response.json()
+        except Exception:
+            result = {"text": response.text.strip()}
 
         logger.info(f"Local STT completed successfully: text_len={len(result.get('text', ''))}")
         return result

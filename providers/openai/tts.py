@@ -7,6 +7,7 @@ import httpx
 import logging
 
 from providers.base import BaseTTS
+from core.http_client import get_http_client
 
 _BASE_URL = "https://api.openai.com"
 
@@ -61,11 +62,11 @@ class OpenAITTSProvider(BaseTTS):
 
         logger.info(f"Generating OpenAI TTS: model={model}, voice={voice_name}")
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(url, json=payload, headers=headers)
-            if response.status_code != 200:
-                err_detail = response.read().decode(errors="ignore")
-                raise RuntimeError(f"OpenAI TTS API Error {response.status_code}: {err_detail}")
+        client = get_http_client(timeout=60.0)
+        response = await client.post(url, json=payload, headers=headers)
+        if response.status_code != 200:
+            err_detail = response.read().decode(errors="ignore")
+            raise RuntimeError(f"OpenAI TTS API Error {response.status_code}: {err_detail}")
 
             content_type = response.headers.get("content-type", "audio/mpeg")
             audio_bytes = response.content
