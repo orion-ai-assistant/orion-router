@@ -398,13 +398,12 @@ class DynamicLLMRouter:
         except Exception as e:
             has_error = True
             status_val = False
-            error_details = str(e)
-            if isinstance(e, RuntimeError):
-                logger.error(f"[{provider}] Stream Exception: {e}")
+            if isinstance(e, RuntimeError) or "connect" in str(e).lower():
+                logger.warning(f"[{provider}] Stream Connection Failed: {e}")
             else:
                 logger.error(f"[{provider}] Stream Exception: {e}", exc_info=True)
                 
-            err_msg = f"Provider Exception ({provider}): {str(e)}"
+            err_msg = str(e)
             yield f'data: {json.dumps({"error": {"message": err_msg, "type": "api_error"}}, ensure_ascii=False)}\n\n'
         finally:
             # API'den usage sadece stream sonunda gelir.

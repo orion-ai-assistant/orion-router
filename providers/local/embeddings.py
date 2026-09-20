@@ -40,6 +40,11 @@ class LocalEmbedProvider(BaseEmbed):
         logger.info(f"Routing embeddings to local: {url}")
 
         client = get_http_client(timeout=60.0)
-        resp = await client.post(url, json=payload)
-        resp.raise_for_status()
-        return resp.json()
+        try:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.ConnectError:
+            raise RuntimeError(f"Yerel Embeddings servisine ({EMBED_HOST}:{EMBED_PORT}) bağlanılamadı. Servisin açık olduğundan emin olun.")
+        except httpx.RequestError as e:
+            raise RuntimeError(f"Yerel Embeddings servisine bağlanırken ağ hatası oluştu: {e}")

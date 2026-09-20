@@ -73,14 +73,15 @@ class LocalChatProvider(BaseChat):
         thought_chars = 0
 
         client = get_http_client()
-        async with client.stream(
-            "POST", url, json=payload, headers={"Content-Type": "application/json"}, timeout=None
-        ) as response:
-            if response.status_code != 200:
-                err = await response.aread()
-                raise RuntimeError(f"Local HTTP Error {response.status_code}: {err.decode(errors='ignore')}")
+        try:
+            async with client.stream(
+                "POST", url, json=payload, headers={"Content-Type": "application/json"}, timeout=None
+            ) as response:
+                if response.status_code != 200:
+                    err = await response.aread()
+                    raise RuntimeError(f"Local HTTP Error {response.status_code}: {err.decode(errors='ignore')}")
 
-            async for data in self._iter_sse_lines(response):
+                async for data in self._iter_sse_lines(response):
                     # ── Usage chunk ────────────────────────────────────────────────────
                     if data.get("usage"):
                         usage = data["usage"]
@@ -125,3 +126,12 @@ class LocalChatProvider(BaseChat):
 
                     if delta.get("tool_calls"):
                         yield f'data: {{"choices":[{{"delta":{{"tool_calls":{json.dumps(delta["tool_calls"], ensure_ascii=False)}}}}}]}}\n\n'
+        except httpx.ConnectError:
+            raise RuntimeError(
+                f"Yerel LLM servisine ({LLM_HOST}:{LLM_PORT}) bağlanılamadı. "
+                f"Lütfen yerel model sunucusunun (llama.cpp vb.) açık olduğundan emin olun."
+            )
+        except httpx.TimeoutException:
+            raise RuntimeError(f"Yerel LLM servisi ({LLM_HOST}:{LLM_PORT}) zaman aşımına uğradı.")
+        except httpx.RequestError as e:
+            raise RuntimeError(f"Yerel LLM servisine bağlanırken ağ hatası oluştu: {e}")

@@ -102,6 +102,8 @@ class LocalTTSProvider(BaseTTS):
         client = get_http_client(timeout=120.0)
         try:
             response = await client.post(url, json=payload)
+        except httpx.ConnectError:
+            raise RuntimeError(f"Yerel TTS servisine ({TTS_HOST}:{TTS_PORT}) bağlanılamadı. Lütfen OmniVoice/TTS servisinin açık olduğundan emin olun.")
         except httpx.RequestError as e:
             logger.error(f"Failed to connect to local TTS server: {e}")
             raise RuntimeError(f"Local TTS Service Unreachable: {e}")
