@@ -573,13 +573,17 @@ export default function ModelsPage() {
 
     const isLocal = formState.provider === 'local';
     const selectedEngine = isLocal ? (formState.default_config?.engine || 'omnivoice') : 'omnivoice';
+    const isOmni = selectedEngine.toLowerCase().includes('omnivoice') || (localTtsInfo.active && String(localTtsInfo.engine).toLowerCase().includes('omnivoice'));
 
     // Determine voice selection mode
     let voices: string[] = [];
     let showVoiceSelect = false;
     if (isLocal) {
-      if (localTtsInfo.active && localTtsInfo.engine === selectedEngine) {
-        voices = localTtsInfo.voices;
+      const localVoices = (localTtsInfo.voices && localTtsInfo.voices.length > 0)
+        ? localTtsInfo.voices
+        : (voicesByProvider['local'] || []);
+      if (localTtsInfo.active) {
+        voices = localVoices;
         showVoiceSelect = voices.length > 0;
       } else {
         showVoiceSelect = false;
@@ -593,9 +597,12 @@ export default function ModelsPage() {
     let languages: string[] = [];
     let showLangSelect = false;
     if (isLocal) {
-      if (selectedEngine === 'omnivoice') {
-        if (localTtsInfo.active && localTtsInfo.engine === 'omnivoice' && localTtsInfo.languages && localTtsInfo.languages.length > 0) {
-          languages = localTtsInfo.languages;
+      if (isOmni) {
+        const localLangs = (localTtsInfo.languages && localTtsInfo.languages.length > 0)
+          ? localTtsInfo.languages
+          : (languagesByProvider['local'] || []);
+        if (localLangs && localLangs.length > 0) {
+          languages = localLangs;
           showLangSelect = true;
         } else {
           showLangSelect = false;
@@ -687,7 +694,7 @@ export default function ModelsPage() {
               </div>
             )}
 
-            {isLocal && selectedEngine === 'omnivoice' && (
+            {isLocal && isOmni && (
               <>
                 <div className={`flex flex-col gap-3 ${hasPersona ? 'opacity-50 pointer-events-none' : ''}`}>
                   <div className="flex items-center justify-between mt-1">

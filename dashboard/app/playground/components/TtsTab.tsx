@@ -61,6 +61,8 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
   const [localTtsInfo, setLocalTtsInfo] = useState<{
     active: boolean;
     engine: string | null;
+    voices?: string[];
+    languages?: string[];
   }>({ active: false, engine: null });
 
   const [voicesByProvider, setVoicesByProvider] = useState<Record<string, string[]>>({});
@@ -194,11 +196,14 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
 
     const isLocal = provider === 'local';
     const resolvedEngine = isLocal ? (localTtsInfo.active && localTtsInfo.engine ? localTtsInfo.engine : 'omnivoice') : 'omnivoice';
+    const isOmni = resolvedEngine.toLowerCase().includes('omnivoice') || (localTtsInfo.active && String(localTtsInfo.engine).toLowerCase().includes('omnivoice'));
 
     let nextVoices: string[] = [];
-    const localVoices = voicesByProvider['local'] || [];
+    const localVoices = (localTtsInfo.voices && localTtsInfo.voices.length > 0)
+      ? localTtsInfo.voices
+      : (voicesByProvider['local'] || []);
     if (isLocal) {
-      if (localTtsInfo.active && localTtsInfo.engine === resolvedEngine) {
+      if (localTtsInfo.active) {
         nextVoices = Array.isArray(localVoices) ? localVoices : [];
       } else {
         nextVoices = []; // Will show manual text input instead
@@ -219,10 +224,12 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
 
     // Languages list:
     let nextLangs: string[] = [];
-    const localLangs = languagesByProvider['local'] || [];
+    const localLangs = (localTtsInfo.languages && localTtsInfo.languages.length > 0)
+      ? localTtsInfo.languages
+      : (languagesByProvider['local'] || []);
     if (isLocal) {
-      if (resolvedEngine === 'omnivoice') {
-        if (localTtsInfo.active && localTtsInfo.engine === 'omnivoice' && Array.isArray(localLangs) && localLangs.length > 0) {
+      if (isOmni) {
+        if (localTtsInfo.active && Array.isArray(localLangs) && localLangs.length > 0) {
           nextLangs = localLangs;
         } else {
           nextLangs = []; // Show manual text input when offline or empty
@@ -366,6 +373,7 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
     if (!isLocalTts) return 'omnivoice';
     return localTtsInfo.active && localTtsInfo.engine ? localTtsInfo.engine : 'omnivoice';
   })();
+  const isOmniVoice = resolvedTtsEngine.toLowerCase().includes('omnivoice');
 
   const getTtsFieldDefault = (field: string) => {
     const defaults = resolvedTtsDefaults || {};
@@ -687,35 +695,176 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
           />
         </div>
 
-
-        {/* 🌊 Streaming Ayarları (Gizlendi - Desteklenmiyor) */}
-        {false && (
-          <>
+        {/* Karakter Tasarımı (OmniVoice) */}
+        {isLocalTts && isOmniVoice && (
+          <div className="flex flex-col gap-2">
             <button
               type="button"
-              onClick={() => setShowStreamingSettings(!showStreamingSettings)}
-              className="flex items-center justify-between text-left text-zinc-400 text-[10px] font-semibold uppercase tracking-wider mt-4 py-2 px-2 bg-zinc-900/30 hover:bg-zinc-800/40 rounded cursor-pointer transition-colors w-full"
+              onClick={() => setShowCharacterDesign(!showCharacterDesign)}
+              className={`flex items-center justify-between text-left text-[10px] font-semibold uppercase tracking-wider py-2 px-2 bg-zinc-900/30 hover:bg-zinc-800/40 rounded cursor-pointer transition-colors w-full ${
+                ttsHasPersona ? 'text-zinc-500 hover:text-zinc-400' : 'text-zinc-400 hover:text-white'
+              }`}
             >
-              <span>{t('tts.streaming.settings')}</span>
-              <span>{showStreamingSettings ? '▼' : '►'}</span>
+              <span className="flex items-center gap-2">
+                {t('tts.character.design')}
+                {ttsHasPersona && (
+                  <span className="text-[8px] text-zinc-600 font-medium bg-black/40 px-1 py-0.5 rounded border border-zinc-800 normal-case">
+                    {t('tts.persona.active')}
+                  </span>
+                )}
+              </span>
+              <span>{showCharacterDesign ? '▼' : '►'}</span>
             </button>
 
-            {showStreamingSettings && (
-              <div className="flex flex-col gap-2 pl-2 mt-2 border-l-2 border-zinc-800/50">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    disabled
-                    checked={false}
-                    className="rounded border-zinc-800 bg-black/40 text-purple-600 focus:ring-purple-600 focus:ring-offset-black"
-                  />
-                  <label className="text-zinc-500 text-[10px] select-none">
-                    {t('tts.streaming.stream')}
-                  </label>
+            {showCharacterDesign && (
+              <div className={`flex flex-col gap-2.5 pl-2 mt-1 border-l-2 border-zinc-800/50 ${ttsHasPersona ? 'opacity-50 pointer-events-none' : ''}`}>
+                {/* Cinsiyet */}
+                <div className="flex flex-col gap-1">
+                  <div className="flex justify-between items-center mb-0.5">
+                    <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('tts.gender')}</label>
+                    {renderDefaultIndicator('gender', ttsGender)}
+                  </div>
+                  <div className="custom-select-wrapper select-wrapper w-full">
+                    <select
+                      value={ttsGender}
+                      onChange={(e) => setTtsGender(e.target.value)}
+                      className="orion-native-select orion-native-select-sm"
+                    >
+                      <option value="Auto">{t('tts.gender.auto')}</option>
+                      <option value="male">{t('tts.gender.male')}</option>
+                      <option value="female">{t('tts.gender.female')}</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Yaş Grubu */}
+                <div className="flex flex-col gap-1">
+                  <div className="flex justify-between items-center mb-0.5">
+                    <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('tts.age')}</label>
+                    {renderDefaultIndicator('age', ttsAge)}
+                  </div>
+                  <div className="custom-select-wrapper select-wrapper w-full">
+                    <select
+                      value={ttsAge}
+                      onChange={(e) => setTtsAge(e.target.value)}
+                      className="orion-native-select orion-native-select-sm"
+                    >
+                      <option value="Auto">{t('tts.age.auto')}</option>
+                      <option value="child">{t('tts.age.child')}</option>
+                      <option value="teenager">{t('tts.age.teenager')}</option>
+                      <option value="young adult">{t('tts.age.young_adult')}</option>
+                      <option value="middle-aged">{t('tts.age.middle_aged')}</option>
+                      <option value="elderly">{t('tts.age.elderly')}</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Ton */}
+                <div className="flex flex-col gap-1">
+                  <div className="flex justify-between items-center mb-0.5">
+                    <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('tts.pitch')}</label>
+                    {renderDefaultIndicator('pitch', ttsPitch)}
+                  </div>
+                  <div className="custom-select-wrapper select-wrapper w-full">
+                    <select
+                      value={ttsPitch}
+                      onChange={(e) => setTtsPitch(e.target.value)}
+                      className="orion-native-select orion-native-select-sm"
+                    >
+                      <option value="Auto">{t('tts.pitch.auto')}</option>
+                      <option value="very high pitch">{t('tts.pitch.very_high')}</option>
+                      <option value="high pitch">{t('tts.pitch.high')}</option>
+                      <option value="moderate pitch">{t('tts.pitch.moderate')}</option>
+                      <option value="low pitch">{t('tts.pitch.low')}</option>
+                      <option value="very low pitch">{t('tts.pitch.very_low')}</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Stil */}
+                <div className="flex flex-col gap-1">
+                  <div className="flex justify-between items-center mb-0.5">
+                    <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('tts.style')}</label>
+                    {renderDefaultIndicator('style', ttsStyle)}
+                  </div>
+                  <div className="custom-select-wrapper select-wrapper w-full">
+                    <select
+                      value={ttsStyle}
+                      onChange={(e) => setTtsStyle(e.target.value)}
+                      className="orion-native-select orion-native-select-sm"
+                    >
+                      <option value="Auto">{t('tts.style.auto')}</option>
+                      <option value="whisper">{t('tts.style.whisper')}</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Aksan ve Lehçe */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex flex-col gap-1">
+                    <div className="flex justify-between items-center mb-0.5">
+                      <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('tts.accent')}</label>
+                      {renderDefaultIndicator('accent', ttsAccent)}
+                    </div>
+                    <div className="custom-select-wrapper select-wrapper w-full">
+                      <select
+                        value={ttsAccent}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setTtsAccent(val);
+                          if (val !== 'Auto') setTtsDialect('Auto');
+                        }}
+                        className="orion-native-select orion-native-select-sm"
+                      >
+                        <option value="Auto">{t('tts.accent.auto')}</option>
+                        <option value="american accent">{t('tts.accent.american')}</option>
+                        <option value="australian accent">{t('tts.accent.australian')}</option>
+                        <option value="british accent">{t('tts.accent.british')}</option>
+                        <option value="canadian accent">{t('tts.accent.canadian')}</option>
+                        <option value="chinese accent">{t('tts.accent.chinese')}</option>
+                        <option value="indian accent">{t('tts.accent.indian')}</option>
+                        <option value="japanese accent">{t('tts.accent.japanese')}</option>
+                        <option value="korean accent">{t('tts.accent.korean')}</option>
+                        <option value="portuguese accent">{t('tts.accent.portuguese')}</option>
+                        <option value="russian accent">{t('tts.accent.russian')}</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <div className="flex justify-between items-center mb-0.5">
+                      <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('tts.dialect')}</label>
+                      {renderDefaultIndicator('dialect', ttsDialect)}
+                    </div>
+                    <div className="custom-select-wrapper select-wrapper w-full">
+                      <select
+                        value={ttsDialect}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setTtsDialect(val);
+                          if (val !== 'Auto') setTtsAccent('Auto');
+                        }}
+                        className="orion-native-select orion-native-select-sm"
+                      >
+                        <option value="Auto">{t('tts.dialect.auto')}</option>
+                        <option value="东北话">Dongbei (东北话)</option>
+                        <option value="云南话">Yunnan (云南话)</option>
+                        <option value="四川话">Sichuan (四川话)</option>
+                        <option value="宁夏话">Ningxia (宁夏话)</option>
+                        <option value="山东话">Shandong (山东话)</option>
+                        <option value="山西话">Shanxi (山西话)</option>
+                        <option value="广东话">Guangdong (广东话)</option>
+                        <option value="江苏话">Jiangsu (江苏话)</option>
+                        <option value="河南话">Henan (河南话)</option>
+                        <option value="河北话">Hebei (河北话)</option>
+                        <option value="陕西话">Shaanxi (陕西话)</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
-          </>
+          </div>
         )}
 
         {/* ⚙️ Gelişmiş Ayarlar */}
@@ -732,13 +881,13 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
 
             {showAdvancedSettings && (
               <div className="flex flex-col gap-3 pl-2 mt-2 border-l-2 border-zinc-800/50">
-            {isLocalTts && resolvedTtsEngine === 'omnivoice' && (
+            {isLocalTts && isOmniVoice && (
               <div className="flex flex-col gap-1">
                 <div className="flex justify-between items-center mb-0.5">
                   <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('tts.language')}</label>
                   {renderDefaultIndicator('language', ttsLanguage)}
                 </div>
-                {!isLocalTts || (resolvedTtsEngine === 'omnivoice' && localTtsInfo.active && languages.length > 0) ? (
+                {!isLocalTts || (isOmniVoice && languages.length > 0) ? (
                   <div className="custom-select-wrapper select-wrapper w-full">
                     <select
                       value={ttsLanguage}

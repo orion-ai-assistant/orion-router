@@ -451,13 +451,31 @@ async def get_local_tts_info():
             res_info = await client.get(f"http://{TTS_HOST}:{TTS_PORT}/v1/model_info")
             if res_info.status_code == 200:
                 data = res_info.json()
+                voices = []
+                languages = []
+                try:
+                    res_voices = await client.get(f"http://{TTS_HOST}:{TTS_PORT}/v1/voices")
+                    if res_voices.status_code == 200:
+                        voices = [v for v in res_voices.json().get("voices", []) if str(v).lower() != "none"]
+                except Exception:
+                    pass
+                try:
+                    res_langs = await client.get(f"http://{TTS_HOST}:{TTS_PORT}/v1/languages")
+                    if res_langs.status_code == 200:
+                        languages = res_langs.json().get("languages", [])
+                except Exception:
+                    pass
                 return {
                     "active": True,
-                    "engine": data.get("engine", "omnivoice")
+                    "engine": data.get("engine", "omnivoice"),
+                    "voices": voices,
+                    "languages": languages,
+                    "low_vram": data.get("low_vram", False),
+                    "idle_cleanup_mins": data.get("idle_cleanup_mins", None)
                 }
     except Exception as e:
         logger.debug(f"Could not fetch model info from local TTS: {e}")
-    return {"active": False, "engine": None}
+    return {"active": False, "engine": None, "voices": [], "languages": []}
 
 # ---------------------------------------------------------------------------
 #  Provider Key Pool
