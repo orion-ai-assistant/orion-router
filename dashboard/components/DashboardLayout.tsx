@@ -94,7 +94,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <button
             type="button"
             onClick={logout}
-            className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl text-xs font-medium text-red-400 hover:text-red-400 hover:bg-red-950/40 transition-all duration-200 cursor-pointer"
+            className="flex items-center gap-2.5 pl-3.5 pr-8 py-2 rounded-xl text-xs font-medium text-red-400 hover:text-red-400 hover:bg-red-950/50 border border-transparent hover:border-red-900/30 transition-all duration-200 cursor-pointer"
           >
             <LogOut className="w-4 h-4 text-red-400 shrink-0" />
             <span>{t('nav.signOut')}</span>
@@ -112,9 +112,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <span>v{versionInfo.latest_version}</span>
             </button>
           ) : (
-            <span className="flex items-center gap-1 text-[11px] font-mono text-zinc-400 px-1 py-1 select-none shrink-0">
-              <ChevronUp className="w-3.5 h-3.5 text-emerald-400" />
-              <span>v{versionInfo?.current_version || '0.1.1'}</span>
+            <span className="text-[11px] font-mono text-zinc-500 px-2 py-1 select-none shrink-0">
+              v{versionInfo?.current_version || '0.1.1'}
             </span>
           )}
         </div>
