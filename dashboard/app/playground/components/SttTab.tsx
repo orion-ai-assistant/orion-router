@@ -177,6 +177,8 @@ export default function SttTab({ models, groups }: SttTabProps) {
   const processorNodeRef = useRef<ScriptProcessorNode | null>(null);
   const streamingTimerRef = useRef<any>(null);
   const isStreamingRef = useRef<boolean>(false);
+  const lastCommittedPromptRef = useRef<string>(getSavedState('pg_sttPrompt', ''));
+  const promptDebounceTimerRef = useRef<any>(null);
 
   // Fetch STT languages dynamically from Orion Router API
   useEffect(() => {
@@ -286,6 +288,9 @@ export default function SttTab({ models, groups }: SttTabProps) {
       }
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
+      }
+      if (promptDebounceTimerRef.current) {
+        clearTimeout(promptDebounceTimerRef.current);
       }
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
         mediaRecorderRef.current.stop();
@@ -550,10 +555,37 @@ export default function SttTab({ models, groups }: SttTabProps) {
     }
   };
 
-  const handlePromptBlur = () => {
-    if (isStreamingRef.current) {
-      connectWs(language, promptHint);
+  const applyPromptUpdate = (newPrompt: string) => {
+    if (promptDebounceTimerRef.current) {
+      clearTimeout(promptDebounceTimerRef.current);
+      promptDebounceTimerRef.current = null;
     }
+    const trimmed = newPrompt.trim();
+    if (trimmed === lastCommittedPromptRef.current.trim()) {
+      return;
+    }
+    lastCommittedPromptRef.current = newPrompt;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('pg_sttPrompt', newPrompt);
+    }
+    if (isStreamingRef.current) {
+      connectWs(language, newPrompt);
+    }
+    showToast(t('playground.promptUpdated') || 'İpucu / bağlam metni güncellendi.');
+  };
+
+  const handlePromptChange = (val: string) => {
+    setPromptHint(val);
+    if (promptDebounceTimerRef.current) {
+      clearTimeout(promptDebounceTimerRef.current);
+    }
+    promptDebounceTimerRef.current = setTimeout(() => {
+      applyPromptUpdate(val);
+    }, 2000);
+  };
+
+  const handlePromptBlur = () => {
+    applyPromptUpdate(promptHint);
   };
 
   // Handle file upload
@@ -815,7 +847,7 @@ export default function SttTab({ models, groups }: SttTabProps) {
             </div>
             <Textarea
               value={promptHint}
-              onChange={(e) => setPromptHint(e.target.value)}
+              onChange={(e) => handlePromptChange(e.target.value)}
               onBlur={handlePromptBlur}
               placeholder="Örn: Orion, CTranslate2, WebRTC (modelin doğru telaffuz etmesini istediğiniz terimler)..."
               className="bg-black/40 border border-zinc-850 text-white rounded p-2.5 text-xs h-20 resize-none custom-scrollbar"
