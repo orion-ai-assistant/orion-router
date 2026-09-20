@@ -772,8 +772,18 @@ class DynamicLLMRouter:
                         pass
 
                 target_voice = voice
-                if (not target_voice or str(target_voice).lower() == "none") and p_def_config.get("voice"):
+                if (not target_voice or str(target_voice).lower() in ("none", "null", "default", "alloy")) and p_def_config.get("voice"):
                     target_voice = p_def_config.get("voice")
+
+                # If tts_instruct is not explicitly provided, construct from character design configs
+                if not route_kwargs.get("tts_instruct") and not route_kwargs.get("instructions"):
+                    instructs = []
+                    for field in ("gender", "age", "pitch", "style", "accent", "dialect"):
+                        val = route_kwargs.get(field)
+                        if val and str(val).strip() and str(val).strip().lower() != "auto":
+                            instructs.append(str(val).strip())
+                    if instructs:
+                        route_kwargs["tts_instruct"] = ", ".join(instructs)
                 
                 plugin = self.tts_providers.get(p_provider)
                 if not plugin:

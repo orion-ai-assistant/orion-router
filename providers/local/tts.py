@@ -69,18 +69,25 @@ class LocalTTSProvider(BaseTTS):
             except (ValueError, TypeError):
                 return default
 
-        tts_instruct = kwargs.get("tts_instruct")
-        
-        if tts_instruct is not None:
-            # Dashboard / direct API with tts_instruct
+        tts_instruct = kwargs.get("tts_instruct") or kwargs.get("instructions")
+        if not tts_instruct:
+            instructs = []
+            for field in ("gender", "age", "pitch", "style", "accent", "dialect"):
+                val = kwargs.get(field)
+                if val and str(val).strip() and str(val).strip().lower() != "auto":
+                    instructs.append(str(val).strip())
+            if instructs:
+                tts_instruct = ", ".join(instructs)
+
+        has_persona = bool(voice and str(voice).strip() and str(voice).lower() not in ("none", "null", "default", "alloy"))
+        payload_voice = voice if has_persona else ""
+
+        if tts_instruct and not has_persona:
             payload_model = tts_instruct
-            payload_voice = voice if voice and voice != "None" else ""
+        elif model not in ("local", "test", "local-model", "default", "none"):
+            payload_model = model
         else:
-            if model not in ("local", "test"):
-                payload_model = model
-            else:
-                payload_model = ""
-            payload_voice = voice if voice and voice != "None" else ""
+            payload_model = ""
 
         speed_val = safe_float(kwargs.get("speed"), 1.0)
         guidance_val = safe_float(
@@ -103,6 +110,8 @@ class LocalTTSProvider(BaseTTS):
             "steps": steps_val,
             "stream": False
         }
+        if tts_instruct and not has_persona:
+            payload["instructions"] = tts_instruct
 
         logger.info(f"Generating Local TTS: model={model}, voice={voice}, url={url}")
 
