@@ -61,8 +61,7 @@ def _is_git_repository() -> bool:
 
 def check_for_updates(force: bool = False) -> Dict[str, Any]:
     """
-    Uzak repodan yeni sürüm olup olmadığını denetler.
-    GitHub Releases API, raw pyproject.toml ve git commit kıyaslaması yapar.
+    Uzak GitHub reposundaki pyproject.toml dosyasından yeni sürüm olup olmadığını denetler.
     """
     global _CACHE
     now = time.time()
@@ -72,102 +71,37 @@ def check_for_updates(force: bool = False) -> Dict[str, Any]:
     current_ver = APP_VERSION
     latest_ver = current_ver
     release_notes = ""
-    release_url = f"https://github.com/{GITHUB_REPO}/releases"
+    release_url = f"https://github.com/{GITHUB_REPO}"
     has_update = False
-    behind_commits = 0
-    is_git = _is_git_repository()
 
-    # 1. GitHub Releases API'den en son sürümü çekmeyi dene
+    # Doğrudan GitHub main dalındaki pyproject.toml dosyasından version kontrolü
     headers = {"User-Agent": "OrionRouter-Updater"}
-    api_url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+    raw_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/pyproject.toml"
     try:
-        req = urllib.request.Request(api_url, headers=headers)
+        req = urllib.request.Request(raw_url, headers=headers)
         with urllib.request.urlopen(req, timeout=5) as resp:
             if resp.status == 200:
-                data = json.loads(resp.read().decode("utf-8"))
-                tag = data.get("tag_name", "").strip()
-                if tag:
-                    latest_ver = tag.lstrip("vV")
-                    release_notes = data.get("body", "")
-                    release_url = data.get("html_url", release_url)
-                    if _parse_semver(latest_ver) > _parse_semver(current_ver):
-                        has_update = True
-    except Exception as e:
-        logger.debug(f"GitHub Releases API check failed: {e}")
-
-    # 2. Eğer release yoksa veya aynıysa, raw pyproject.toml'den bak
-    if not has_update:
-        raw_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/pyproject.toml"
-        try:
-            req = urllib.request.Request(raw_url, headers=headers)
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                if resp.status == 200:
-                    content = resp.read().decode("utf-8")
-                    for line in content.splitlines():
-                        if line.strip().startswith("version"):
-                            parts = line.split("=", 1)
-                            if len(parts) == 2:
-                                parsed = parts[1].strip().strip('"').strip("'")
-                                if _parse_semver(parsed) > _parse_semver(current_ver):
-                                    latest_ver = parsed
-                                    has_update = True
-                                    break
-        except Exception as e:
-            logger.debug(f"GitHub pyproject.toml check failed: {e}")
-
-    # 3. Git repo kontrolü (eğer git varsa arkada kalan commit sayısını tespit et)
-    if is_git:
-        try:
-            # git ls-remote origin refs/heads/main
-            res = subprocess.run(
-                ["git", "ls-remote", "origin", "refs/heads/main"],
-                cwd=ROOT,
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            if res.returncode == 0 and res.stdout.strip():
-                remote_commit = res.stdout.strip().split()[0]
-                local_res = subprocess.run(
-                    ["git", "rev-parse", "HEAD"],
-                    cwd=ROOT,
-                    capture_output=True,
-                    text=True,
-                    timeout=3
-                )
-                if local_res.returncode == 0 and local_res.stdout.strip():
-                    local_commit = local_res.stdout.strip()
-                    if remote_commit != local_commit:
-                        # Fetch yapıp geride kaç commit var bakalım
-                        subprocess.run(["git", "fetch", "origin", "main"], cwd=ROOT, capture_output=True, timeout=10)
-                        rev_count = subprocess.run(
-                            ["git", "rev-list", "--count", "HEAD..origin/main"],
-                            cwd=ROOT,
-                            capture_output=True,
-                            text=True,
-                            timeout=3
-                        )
-                        if rev_count.returncode == 0:
-                            count = int(rev_count.stdout.strip() or "0")
-                            behind_commits = count
-                            if count > 0:
+                content = resp.read().decode("utf-8")
+                for line in content.splitlines():
+                    if line.strip().startswith("version"):
+                        parts = line.split("=", 1)
+                        if len(parts) == 2:
+                            parsed = parts[1].strip().strip('"').strip("'")
+                            latest_ver = parsed
+                            if _parse_semver(parsed) > _parse_semver(current_ver):
                                 has_update = True
-                                if latest_ver == current_ver:
-                                    # Increment patch semver instead of showing +count
-                                    sem = list(_parse_semver(current_ver))
-                                    sem[2] += count
-                                    latest_ver = f"{sem[0]}.{sem[1]}.{sem[2]}"
-        except Exception as e:
-            logger.debug(f"Git check failed: {e}")
+                            break
+    except Exception as e:
+        logger.debug(f"GitHub pyproject.toml check failed: {e}")
 
     result = {
         "current_version": current_ver,
         "latest_version": latest_ver,
         "update_available": has_update,
-        "behind_commits": behind_commits,
+        "behind_commits": 0,
         "release_notes": release_notes,
         "release_url": release_url,
-        "is_git_repo": is_git,
+        "is_git_repo": _is_git_repository(),
         "last_checked": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now))
     }
 

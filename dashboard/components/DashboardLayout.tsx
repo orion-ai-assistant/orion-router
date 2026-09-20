@@ -89,14 +89,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </ul>
 
         {/* Sidebar Alt Kısım: Çıkış Yap ve Güncelleme / Versiyon Butonu */}
-        <div className="mt-auto pt-3 pb-1 border-t border-zinc-800/80 flex items-center justify-between gap-2">
+        <div className="mt-auto pt-3 pb-1 border-t border-zinc-800/80 flex items-center justify-between gap-1">
           {/* Çıkış Yap Butonu */}
           <button
             type="button"
             onClick={logout}
-            className="flex items-center gap-2 text-xs font-medium text-red-400/80 hover:text-red-300 hover:bg-red-500/10 p-1.5 rounded-lg transition-colors cursor-pointer"
+            className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl text-xs font-medium text-red-400 hover:text-red-400 hover:bg-red-950/40 transition-all duration-200 cursor-pointer"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-4 h-4 text-red-400 shrink-0" />
             <span>{t('nav.signOut')}</span>
           </button>
 
@@ -112,8 +112,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <span>v{versionInfo.latest_version}</span>
             </button>
           ) : (
-            <span className="text-[11px] font-mono text-zinc-500 px-2 py-1 select-none shrink-0">
-              v{versionInfo?.current_version || '0.1.1'}
+            <span className="flex items-center gap-1 text-[11px] font-mono text-zinc-400 px-1 py-1 select-none shrink-0">
+              <ChevronUp className="w-3.5 h-3.5 text-emerald-400" />
+              <span>v{versionInfo?.current_version || '0.1.1'}</span>
             </span>
           )}
         </div>
