@@ -207,7 +207,8 @@ async def get_admin_logs():
             SELECT l.id, k.name as key_name, l.provider, l.requested_model,
                    l.tokens_used, l.prompt_tokens, l.completion_tokens, l.thoughts_tokens,
                    l.cost, l.success, l.created_at,
-                   COALESCE(l.capability, 'chat') as capability
+                   COALESCE(l.capability, 'chat') as capability,
+                   COALESCE(l.status, CASE WHEN l.success = true THEN 'success' WHEN l.success = false THEN 'failed' ELSE 'interrupted' END) as status
             FROM router_request_logs l
             LEFT JOIN router_virtual_keys k ON l.key_id = k.id
             ORDER BY l.created_at DESC

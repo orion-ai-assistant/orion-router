@@ -23,6 +23,7 @@ interface LogItem {
   thoughts_tokens: number;
   cost: number | null;
   success: boolean | null;
+  status?: string;
   capability: string;
   created_at: string;
 }
@@ -58,10 +59,28 @@ export default function LogsPage() {
         const incoming: LogItem[] = data.logs || [];
         if (mode === 'poll') {
           setLogs((prev) => {
-            const ids = new Set(prev.map((l) => l.id));
-            const fresh = incoming.filter((l) => !ids.has(l.id));
-            if (fresh.length === 0) return prev;
-            return [...fresh, ...prev];
+            const incomingMap = new Map(incoming.map((l) => [l.id, l]));
+            let changed = false;
+            const updated = prev.map((old) => {
+              const fresh = incomingMap.get(old.id);
+              if (
+                fresh &&
+                (fresh.status !== old.status ||
+                  fresh.success !== old.success ||
+                  fresh.cost !== old.cost ||
+                  fresh.tokens_used !== old.tokens_used)
+              ) {
+                changed = true;
+                return fresh;
+              }
+              return old;
+            });
+            const prevIds = new Set(prev.map((l) => l.id));
+            const newItems = incoming.filter((l) => !prevIds.has(l.id));
+            if (newItems.length > 0 || changed) {
+              return [...newItems, ...updated];
+            }
+            return prev;
           });
         } else {
           setLogs(incoming);
@@ -243,7 +262,7 @@ export default function LogsPage() {
                         </div>
                       )}
 
-                      {log.capability !== 'tts' && log.capability !== 'embed' && (
+                      {log.capability !== 'tts' && log.capability !== 'embed' && log.capability !== 'stt' && (
                         <div className="pricing-item relative flex flex-col items-center py-1">
                           <span className="pricing-label text-[8px] font-semibold text-zinc-500 uppercase tracking-wider scale-90 mb-0.5">think</span>
                           <span className="pricing-value text-xs font-mono">{log.thoughts_tokens ?? '-'}</span>
@@ -259,21 +278,28 @@ export default function LogsPage() {
                         : money(log.cost, 6)}
                   </TableCell>
                   <TableCell className="py-4 text-center">
-                    <Badge
-                      className={`text-[10px] font-semibold tracking-wide px-2 py-0.5 rounded-full ${
-                        log.success === true
-                          ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
-                          : log.success === false
-                          ? 'bg-red-500/10 text-red-500 border border-red-500/20'
-                          : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                    {log.status === 'streaming' || log.status === 'processing' ? (
+                      <Badge className="bg-blue-500/15 text-blue-400 border border-blue-500/30 text-[10px] font-semibold tracking-wide px-2.5 py-0.5 rounded-full animate-pulse flex items-center justify-center gap-1.5 w-fit mx-auto">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-ping" />
+                        {t('logs.status.streaming') || 'İşleniyor'}
+                      </Badge>
+                    ) : (
+                      <Badge
+                        className={`text-[10px] font-semibold tracking-wide px-2 py-0.5 rounded-full ${
+                          log.success === true
+                            ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+                            : log.success === false
+                            ? 'bg-red-500/10 text-red-500 border border-red-500/20'
+                            : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
                         }`}
-                    >
-                      {log.success === true
-                        ? t('logs.status.success')
-                        : log.success === false
-                        ? t('logs.status.failed')
-                        : t('logs.status.interrupted')}
-                    </Badge>
+                      >
+                        {log.success === true
+                          ? t('logs.status.success')
+                          : log.success === false
+                          ? t('logs.status.failed')
+                          : t('logs.status.interrupted')}
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell className="py-4 text-center font-mono text-xs text-zinc-400">
                     {dateTime(log.created_at)}

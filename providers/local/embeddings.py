@@ -34,7 +34,7 @@ class LocalEmbedProvider(BaseEmbed):
         # llama-cpp-embed OpenAI uyumlu {"input": text, "model": model} formatı bekler
         payload = {
             "input": input_text,
-            "model": model or "local-model"
+            "model": model or "local-embed"
         }
 
         logger.info(f"Routing embeddings to local: {url}")

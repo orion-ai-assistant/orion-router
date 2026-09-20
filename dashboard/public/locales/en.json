@@ -195,6 +195,7 @@
   "logs.status.success": "Success",
   "logs.status.failed": "Failed",
   "logs.status.interrupted": "Interrupted",
+  "logs.status.streaming": "Processing",
   "logs.requestJson": "Request JSON",
   "logs.responseJson": "Response JSON",
   "logs.copyFull": "Copy Full",

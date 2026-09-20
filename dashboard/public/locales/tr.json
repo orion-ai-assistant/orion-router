@@ -195,6 +195,7 @@
   "logs.status.success": "Başarılı",
   "logs.status.failed": "Başarısız",
   "logs.status.interrupted": "Yarıda Kesildi",
+  "logs.status.streaming": "İşleniyor",
   "logs.requestJson": "İstek JSON",
   "logs.responseJson": "Yanıt JSON",
   "logs.copyFull": "Tamamını Kopyala",

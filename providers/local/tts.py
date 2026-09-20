@@ -84,7 +84,7 @@ class LocalTTSProvider(BaseTTS):
 
         if tts_instruct and not has_persona:
             payload_model = tts_instruct
-        elif model not in ("local", "test", "local-model", "default", "none"):
+        elif model not in ("local", "test", "local-model", "local-tts", "default", "none"):
             payload_model = model
         else:
             payload_model = ""

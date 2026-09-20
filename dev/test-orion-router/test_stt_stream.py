@@ -81,5 +81,58 @@ class TestSTTStreaming(unittest.TestCase):
         self.assertIn(pcm_payload, mock_backend.sent)
         print("  [PASS] WebSocket STT full-duplex proxy (live & final) verified!")
 
+    def test_websocket_stream_session_logging(self):
+        """Streaming STT oturumunun başında create_streaming_log, final segmentlerde ve bitişte update_streaming_log çağrılmalı."""
+        from fastapi import WebSocket
+        async def mock_auth(websocket: WebSocket):
+            return {"source": "virtual_key", "key_id": "key-test-123", "name": "Test Key"}
+        app.dependency_overrides[authenticate_websocket] = mock_auth
+
+        mock_backend = MockBackendWS()
+        mock_backend.queue.put_nowait(json.dumps({"type": "live", "text": "test"}))
+        mock_backend.queue.put_nowait(json.dumps({"type": "final", "text": "birinci cümle", "duration": 1.5, "language": "tr"}))
+
+        created_logs = []
+        updated_logs = []
+
+        async def mock_create(**kwargs):
+            created_logs.append(kwargs)
+            return 999
+
+        async def mock_update(**kwargs):
+            updated_logs.append(kwargs)
+
+        with patch("api.transcriptions.db_manager.create_streaming_log", side_effect=mock_create), \
+             patch("api.transcriptions.db_manager.update_streaming_log", side_effect=mock_update), \
+             patch("api.transcriptions.websockets.connect", side_effect=lambda url: MockConnectCM(mock_backend)):
+
+            client = TestClient(app)
+            with client.websocket_connect("/v1/audio/transcriptions/stream?token=test") as ws:
+                _ = ws.receive_json()  # live
+                ws.send_bytes(b"\x00" * 3200)
+                _ = ws.receive_json()  # final
+                mock_backend.queue.put_nowait(None)
+
+        # 1. create_streaming_log kontrolü
+        self.assertEqual(len(created_logs), 1)
+        self.assertEqual(created_logs[0]["key_id"], "key-test-123")
+        self.assertEqual(created_logs[0]["model"], "local-stt")
+        self.assertEqual(created_logs[0]["status"], "streaming")
+        self.assertEqual(created_logs[0]["capability"], "stt")
+
+        # 2. update_streaming_log kontrolü (final segment + finalize)
+        self.assertGreaterEqual(len(updated_logs), 1)
+        final_call = updated_logs[-1]
+        self.assertEqual(final_call["log_id"], 999)
+        self.assertEqual(final_call["status"], "success")
+        self.assertEqual(final_call["success"], True)
+
+        resp = json.loads(final_call["response_json"])
+        self.assertEqual(resp["text"], "birinci cümle")
+        self.assertEqual(resp["total_segments"], 1)
+        self.assertEqual(resp["segments"][0]["text"], "birinci cümle")
+        self.assertEqual(resp["segments"][0]["duration"], 1.5)
+        print("  [PASS] Streaming STT session logging with segments verified!")
+
 if __name__ == "__main__":
     unittest.main()

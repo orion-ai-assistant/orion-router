@@ -47,7 +47,7 @@ class LocalChatProvider(BaseChat):
         url = f"http://{LLM_HOST}:{LLM_PORT}/v1/chat/completions"
 
         payload = {
-            "model": "local-model",
+            "model": model or "local-chat",
             "messages": messages,
             "stream": True,
             "stream_options": {"include_usage": True},

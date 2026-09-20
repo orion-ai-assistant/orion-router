@@ -87,6 +87,7 @@ class DatabaseManager:
         await conn.execute("ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS response_json JSONB;")
         await conn.execute("ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS upstream_key_id TEXT;")
         await conn.execute("ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS capability TEXT DEFAULT 'chat';")
+        await conn.execute("ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'completed';")
         
         # Allow NULL for token columns (no estimation, only real API values) and success (None = Interrupted)
         await conn.execute("ALTER TABLE router_request_logs ALTER COLUMN tokens_used DROP DEFAULT;")
@@ -257,14 +258,21 @@ class DatabaseManager:
         await conn.execute(
             "DELETE FROM router_models WHERE name = 'gemini-3.1-flash-tts-preview' AND capability = 'tts'"
         )
+
+        # Migrate legacy local model names to unified local- naming
+        await conn.execute("UPDATE router_models SET name = 'local-chat' WHERE name = 'local-model' AND capability = 'chat'")
+        await conn.execute("UPDATE router_models SET name = 'local-stt' WHERE name = 'whisper-small-finetuned-tr' AND capability = 'stt'")
+        await conn.execute("DELETE FROM router_models WHERE name = 'local-model' AND capability = 'tts'")
+
         defaults = [
-            ("local-model", "local", "chat", None),
+            ("local-chat", "local", "chat", None),
+            ("local-embed", "local", "embed", None),
+            ("local-tts", "local", "tts", None),
+            ("local-stt", "local", "stt", None),
             ("gpt-4o-mini", "openai", "chat", 0.7),
             ("gemini-3.1-flash-lite", "gemini", "chat", 0.7),
             ("gemini-3.1-flash-tts-preview", "gemini", "tts", None),
             ("tts-1", "openai", "tts", None),
-            ("local-embed", "local", "embed", None),
-            ("whisper-small-finetuned-tr", "local", "stt", None),
             ("gemini-3.5-transcribe", "gemini", "stt", None),
         ]
         for name, provider, capability, temperature in defaults:
@@ -365,23 +373,88 @@ class DatabaseManager:
                 return json.loads(val)
             return None
 
-    async def log_request(self, key_id, provider, model, tokens_used, prompt_tokens, completion_tokens, thoughts_tokens, cost, request_json=None, response_json=None, upstream_key_id=None, success=True, capability='chat', prompt_cost=0.0, completion_cost=0.0, thoughts_cost=0.0):
+    async def log_request(self, key_id, provider, model, tokens_used, prompt_tokens, completion_tokens, thoughts_tokens, cost, request_json=None, response_json=None, upstream_key_id=None, success=True, capability='chat', prompt_cost=0.0, completion_cost=0.0, thoughts_cost=0.0, status=None):
         pool = await self.get_db_pool()
+        if status is None:
+            status = "success" if success is True else ("failed" if success is False else "interrupted")
         async with pool.acquire() as conn:
             async with conn.transaction():
                 await conn.execute(
                     """
                     INSERT INTO router_request_logs
                         (key_id, provider, requested_model, tokens_used,
-                         prompt_tokens, completion_tokens, thoughts_tokens, cost, success, request_json, response_json, upstream_key_id, capability, prompt_cost, completion_cost, thoughts_cost)
-                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13,$14,$15,$16)
+                         prompt_tokens, completion_tokens, thoughts_tokens, cost, success, request_json, response_json, upstream_key_id, capability, prompt_cost, completion_cost, thoughts_cost, status)
+                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13,$14,$15,$16,$17)
                     """,
-                    key_id, provider, model, tokens_used, prompt_tokens, completion_tokens, thoughts_tokens, cost, success, request_json, response_json, upstream_key_id, capability, prompt_cost, completion_cost, thoughts_cost
+                    key_id, provider, model, tokens_used, prompt_tokens, completion_tokens, thoughts_tokens, cost, success, request_json, response_json, upstream_key_id, capability, prompt_cost, completion_cost, thoughts_cost, status
                 )
                 if key_id and cost is not None and (success or cost > 0):
                     await conn.execute(
                         "UPDATE router_virtual_keys SET used_amount = used_amount + $1 WHERE id = $2",
                         cost, key_id
+                    )
+
+    async def create_streaming_log(
+        self,
+        key_id: str | None,
+        provider: str,
+        model: str,
+        request_json: str | None = None,
+        response_json: str | None = None,
+        capability: str = "stt",
+        status: str = "streaming",
+    ) -> int:
+        """Yeni bir canlı streaming oturumu için log kaydı başlatır ve log_id döner."""
+        pool = await self.get_db_pool()
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                log_id = await conn.fetchval(
+                    """
+                    INSERT INTO router_request_logs
+                        (key_id, provider, requested_model, tokens_used,
+                         prompt_tokens, completion_tokens, thoughts_tokens, cost, success,
+                         request_json, response_json, capability, status)
+                    VALUES ($1, $2, $3, NULL, NULL, NULL, NULL, 0.0, NULL, $4::jsonb, $5::jsonb, $6, $7)
+                    RETURNING id
+                    """,
+                    key_id, provider, model, request_json, response_json, capability, status,
+                )
+                return log_id
+
+    async def update_streaming_log(
+        self,
+        log_id: int,
+        response_json: str | None = None,
+        status: str = "success",
+        success: bool | None = True,
+        tokens_used: int | None = None,
+        prompt_tokens: int | None = None,
+        completion_tokens: int | None = None,
+        cost: float = 0.0,
+        key_id: str | None = None,
+    ) -> None:
+        """Canlı streaming oturumunun ara veya nihai sonucunu günceller."""
+        pool = await self.get_db_pool()
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                await conn.execute(
+                    """
+                    UPDATE router_request_logs
+                    SET response_json = COALESCE($2::jsonb, response_json),
+                        status = $3,
+                        success = $4,
+                        tokens_used = COALESCE($5, tokens_used),
+                        prompt_tokens = COALESCE($6, prompt_tokens),
+                        completion_tokens = COALESCE($7, completion_tokens),
+                        cost = COALESCE($8, cost)
+                    WHERE id = $1
+                    """,
+                    log_id, response_json, status, success, tokens_used, prompt_tokens, completion_tokens, cost,
+                )
+                if key_id and cost is not None and cost > 0:
+                    await conn.execute(
+                        "UPDATE router_virtual_keys SET used_amount = used_amount + $1 WHERE id = $2",
+                        cost, key_id,
                     )
 
     async def get_active_provider_keys(self, provider: str) -> list[dict]:
