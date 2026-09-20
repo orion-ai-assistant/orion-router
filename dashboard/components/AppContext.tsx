@@ -1,11 +1,11 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { getAdminKey, setAdminKey, UNAUTHORIZED_EVENT } from '@/lib/api';
+import { getAdminKey, setAdminKey, UNAUTHORIZED_EVENT, adminFetch } from '@/lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { AlertCircle, CheckCircle, AlertTriangle, X } from 'lucide-react';
+import { AlertCircle, CheckCircle, AlertTriangle, X, Sparkles, CheckCircle2 } from 'lucide-react';
 import { 
   detectLocale, 
   loadLocale, 
@@ -91,6 +91,17 @@ export const BANNER_PRESETS: BannerPreset[] = [
   }
 ];
 
+export interface VersionInfo {
+  current_version: string;
+  latest_version: string;
+  update_available: boolean;
+  behind_commits?: number;
+  release_notes?: string;
+  release_url?: string;
+  is_git_repo?: boolean;
+  last_checked?: string;
+}
+
 interface AppContextType {
   adminKey: string;
   isAuthenticated: boolean;
@@ -105,6 +116,18 @@ interface AppContextType {
   bannerStyle: React.CSSProperties;
   activeBannerId: string;
   updateActiveBannerId: (id: string) => void;
+  versionInfo: VersionInfo | null;
+  refreshVersionInfo: (force?: boolean) => Promise<VersionInfo | null>;
+  isUpdateModalOpen: boolean;
+  setIsUpdateModalOpen: (open: boolean) => void;
+  updateRunning: boolean;
+  updateStep: string;
+  updateProgress: number;
+  updateLogs: string[];
+  updateError: string | null;
+  updateSuccess: boolean;
+  startSystemUpdate: () => Promise<void>;
+  closeUpdateModal: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -157,6 +180,110 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [i18nReady, setI18nReady] = useState<boolean>(false);
 
   const t = createTranslator(translations, fallbackTranslations);
+
+  // System Version & Updates State
+  const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState<boolean>(false);
+  const [updateRunning, setUpdateRunning] = useState<boolean>(false);
+  const [updateStep, setUpdateStep] = useState<string>('idle');
+  const [updateProgress, setUpdateProgress] = useState<number>(0);
+  const [updateLogs, setUpdateLogs] = useState<string[]>([]);
+  const [updateError, setUpdateError] = useState<string | null>(null);
+  const [updateSuccess, setUpdateSuccess] = useState<boolean>(false);
+  const updateLogsEndRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (updateLogsEndRef.current) {
+      updateLogsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [updateLogs]);
+
+  const closeUpdateModal = () => {
+    if (!updateRunning) {
+      setIsUpdateModalOpen(false);
+    }
+  };
+
+  const startSystemUpdate = async () => {
+    setIsUpdateModalOpen(true);
+    setUpdateRunning(true);
+    setUpdateStep('started');
+    setUpdateProgress(10);
+    setUpdateLogs([]);
+    setUpdateError(null);
+    setUpdateSuccess(false);
+
+    try {
+      const res = await adminFetch('/dashboard/api/system/update', {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || 'Güncelleme başlatılamadı');
+      }
+
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusRes = await adminFetch('/dashboard/api/system/update-status');
+          if (statusRes.ok) {
+            const statusData = await statusRes.json();
+            setUpdateStep(statusData.step || 'started');
+            setUpdateProgress(statusData.progress || 10);
+            if (statusData.logs) {
+              setUpdateLogs(statusData.logs);
+            }
+            if (statusData.error) {
+              setUpdateError(statusData.error);
+              setUpdateRunning(false);
+              clearInterval(pollInterval);
+            } else if (statusData.success || statusData.step === 'completed') {
+              setUpdateSuccess(true);
+              setUpdateRunning(false);
+              clearInterval(pollInterval);
+
+              setTimeout(() => {
+                const reloadInterval = setInterval(async () => {
+                  try {
+                    const health = await fetch('/health');
+                    if (health.ok) {
+                      clearInterval(reloadInterval);
+                      window.location.reload();
+                    }
+                  } catch {}
+                }, 1000);
+              }, 2000);
+            }
+          }
+        } catch (pollErr) {
+          console.log('Update poll ping:', pollErr);
+        }
+      }, 1000);
+    } catch (err: any) {
+      setUpdateError(err.message || 'Güncelleme hatası');
+      setUpdateRunning(false);
+    }
+  };
+
+  const refreshVersionInfo = async (force: boolean = false): Promise<VersionInfo | null> => {
+    try {
+      const url = force ? '/dashboard/api/system/version?check_now=true' : '/dashboard/api/system/version';
+      const res = await fetch(url);
+      if (res.ok) {
+        const data: VersionInfo = await res.json();
+        setVersionInfo(data);
+        return data;
+      }
+    } catch (e) {
+      console.warn('Failed to fetch system version info', e);
+    }
+    return null;
+  };
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      refreshVersionInfo(false);
+    }
+  }, [isAuthenticated]);
 
   // Check default password status on load
   const checkPasswordStatus = async () => {
@@ -343,7 +470,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       t,
       bannerStyle,
       activeBannerId,
-      updateActiveBannerId
+      updateActiveBannerId,
+      versionInfo,
+      refreshVersionInfo,
+      isUpdateModalOpen,
+      setIsUpdateModalOpen,
+      updateRunning,
+      updateStep,
+      updateProgress,
+      updateLogs,
+      updateError,
+      updateSuccess,
+      startSystemUpdate,
+      closeUpdateModal
     }}>
       {children}
 
@@ -445,6 +584,103 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             >
               {t('common.yes')}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Global System Update Modal */}
+      <Dialog open={isUpdateModalOpen} onOpenChange={(open) => {
+        if (!updateRunning) setIsUpdateModalOpen(open);
+      }}>
+        <DialogContent className="max-w-[550px] border border-border bg-zinc-950 p-6 rounded-2xl glass-panel text-white shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-heading font-semibold text-white flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-emerald-400" />
+              <span>{t('settings.system.modalTitle')}</span>
+            </DialogTitle>
+            <DialogDescription className="text-zinc-400 text-xs mt-1">
+              {updateSuccess ? t('settings.system.completed') : t('settings.system.modalDesc')}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-4 my-4">
+            {/* Progress Bar */}
+            <div className="w-full bg-zinc-900 h-2 rounded-full overflow-hidden border border-zinc-800">
+              <div
+                className={`h-full transition-all duration-500 ${
+                  updateSuccess 
+                    ? 'bg-emerald-500' 
+                    : updateError 
+                    ? 'bg-red-500' 
+                    : 'bg-blue-500 animate-pulse'
+                }`}
+                style={{ width: `${updateProgress}%` }}
+              />
+            </div>
+
+            {/* Steps pills */}
+            <div className="grid grid-cols-4 gap-2 text-center text-[11px] font-medium">
+              <div className={`p-1.5 rounded border ${updateProgress >= 15 ? 'bg-blue-950/40 border-blue-500/40 text-blue-300' : 'bg-zinc-900 border-zinc-800 text-zinc-600'}`}>
+                1. {t('settings.system.stepGit')}
+              </div>
+              <div className={`p-1.5 rounded border ${updateProgress >= 40 ? 'bg-blue-950/40 border-blue-500/40 text-blue-300' : 'bg-zinc-900 border-zinc-800 text-zinc-600'}`}>
+                2. {t('settings.system.stepDeps')}
+              </div>
+              <div className={`p-1.5 rounded border ${updateProgress >= 70 ? 'bg-blue-950/40 border-blue-500/40 text-blue-300' : 'bg-zinc-900 border-zinc-800 text-zinc-600'}`}>
+                3. {t('settings.system.stepBuild')}
+              </div>
+              <div className={`p-1.5 rounded border ${updateProgress >= 95 ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300' : 'bg-zinc-900 border-zinc-800 text-zinc-600'}`}>
+                4. {t('settings.system.stepRestart')}
+              </div>
+            </div>
+
+            {/* Live Terminal Console Box */}
+            <div className="bg-black/90 border border-zinc-800 rounded-lg p-3 font-mono text-[11px] text-zinc-300 h-52 overflow-y-auto custom-scrollbar flex flex-col gap-1">
+              {updateLogs.length === 0 && (
+                <div className="text-zinc-600 italic">Hazırlanıyor...</div>
+              )}
+              {updateLogs.map((log, index) => (
+                <div key={index} className="leading-tight break-all">
+                  {log.includes('✔') ? (
+                    <span className="text-emerald-400">{log}</span>
+                  ) : log.includes('HATA') || log.includes('error') ? (
+                    <span className="text-red-400">{log}</span>
+                  ) : log.startsWith('$') ? (
+                    <span className="text-blue-400 font-semibold">{log}</span>
+                  ) : (
+                    <span>{log}</span>
+                  )}
+                </div>
+              ))}
+              <div ref={updateLogsEndRef} />
+            </div>
+
+            {/* Status alerts */}
+            {updateError && (
+              <div className="bg-red-950/30 border border-red-500/30 text-red-300 p-3 rounded-md text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+                <span>{updateError}</span>
+              </div>
+            )}
+
+            {updateSuccess && (
+              <div className="bg-emerald-950/30 border border-emerald-500/30 text-emerald-300 p-3 rounded-md text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                <span>{t('settings.system.completed')} {t('settings.system.reloading')}</span>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex justify-end gap-2">
+            {!updateRunning && (
+              <Button
+                type="button"
+                onClick={() => setIsUpdateModalOpen(false)}
+                className="border-zinc-800 bg-zinc-900 text-white hover:bg-zinc-800 text-xs px-4"
+              >
+                {t('common.cancel')}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

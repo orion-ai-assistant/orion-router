@@ -47,6 +47,7 @@ def print_usage():
     print(f"{BOLD}{t('valid_commands')}{RESET}")
     print(f"    {GREEN}{BOLD}dev{RESET}   : {t('cmd_dev_desc')}")
     print(f"    {GREEN}{BOLD}prod{RESET}  : {t('cmd_prod_desc')}")
+    print(f"    {CYAN}{BOLD}update{RESET}: Orion Router'ı en güncel sürüme günceller")
     print(f"    {RED}{BOLD}stop{RESET}  : {t('cmd_stop_desc')}\n")
     print(f"{GRAY}{t('cmd_example')}{RESET}\n")
 
@@ -59,6 +60,7 @@ def main():
     script_map = {
         "dev": BIN_DIR / "dev.py",
         "prod": BIN_DIR / "prod.py",
+        "update": BIN_DIR / "update.py",
         "stop": BIN_DIR / "stop.py"
     }
 

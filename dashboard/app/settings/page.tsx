@@ -6,11 +6,23 @@ import { useApp, BANNER_PRESETS } from '@/components/AppContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { ChevronDown, Check } from 'lucide-react';
+import { ChevronDown, Check, RefreshCw, Sparkles, CheckCircle2, AlertCircle, Terminal, ExternalLink } from 'lucide-react';
 import { SUPPORTED_LOCALES, LOCALE_NAMES, Locale } from '@/lib/i18n';
 
 export default function SettingsPage() {
-  const { showToast, updateAdminKey, t, locale, setLocale, activeBannerId, updateActiveBannerId } = useApp();
+  const { 
+    showToast, 
+    updateAdminKey, 
+    t, 
+    locale, 
+    setLocale, 
+    activeBannerId, 
+    updateActiveBannerId,
+    versionInfo,
+    refreshVersionInfo,
+    startSystemUpdate,
+    updateRunning
+  } = useApp();
   
   // Change Admin Secret states
   const [showChangeKeyModal, setShowChangeKeyModal] = useState<boolean>(false);
@@ -23,6 +35,25 @@ export default function SettingsPage() {
   const [showClearLogsModal, setShowClearLogsModal] = useState<boolean>(false);
   const [confirmAdminKey, setConfirmAdminKey] = useState<string>('');
   const [clearing, setClearing] = useState<boolean>(false);
+
+  // System Update states
+  const [checkingUpdate, setCheckingUpdate] = useState<boolean>(false);
+
+  const handleCheckUpdate = async () => {
+    setCheckingUpdate(true);
+    try {
+      const data = await refreshVersionInfo(true);
+      if (data?.update_available) {
+        showToast(`${t('settings.system.updateAvailable')}: v${data.latest_version}`, 'success');
+      } else {
+        showToast(`v${data?.current_version || '0.1.0'}`, 'success');
+      }
+    } catch (e) {
+      showToast(t('common.error'), 'error');
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
 
   // Locale dropdown states
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
@@ -337,6 +368,69 @@ export default function SettingsPage() {
               </Button>
             </div>
           </div>
+
+          {/* System & Updates Card */}
+          <div id="system-updates" className="glass-panel p-8 bg-[#18181b] border border-zinc-800 rounded-md shadow-xl transition-all">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="font-heading text-lg font-semibold text-white flex items-center gap-2">
+                <span>{t('settings.system.title')}</span>
+                {versionInfo?.update_available && (
+                  <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-950/60 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                    {t('settings.system.updateAvailable')}
+                  </span>
+                )}
+              </h2>
+            </div>
+            <p className="text-zinc-400 text-sm mb-6">{t('settings.system.description')}</p>
+
+            <div className="flex flex-col gap-4">
+              {/* Version details box */}
+              <div className="bg-black/40 border border-zinc-850 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex flex-col gap-1">
+                  <div className="text-xs text-zinc-500 font-medium">{t('settings.system.currentVersion')}</div>
+                  <div className="text-lg font-semibold text-white font-mono flex items-center gap-2">
+                    <span>v{versionInfo?.current_version || '0.1.0'}</span>
+                    {versionInfo?.update_available && (
+                      <span className="text-xs text-blue-400 font-sans font-medium flex items-center gap-1 bg-blue-950/40 px-2 py-0.5 rounded border border-blue-500/20">
+                        → v{versionInfo.latest_version}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={checkingUpdate || updateRunning}
+                    onClick={handleCheckUpdate}
+                    className="border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-800 px-4 py-2 text-xs font-medium flex items-center gap-2"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${checkingUpdate ? 'animate-spin' : ''}`} />
+                    <span>{checkingUpdate ? t('settings.system.checking') : t('settings.system.checkUpdates')}</span>
+                  </Button>
+
+                  {versionInfo?.update_available && (
+                    <Button
+                      type="button"
+                      disabled={updateRunning}
+                      onClick={startSystemUpdate}
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-2 text-xs rounded transition-all duration-200 shadow-lg shadow-emerald-900/30 flex items-center gap-2 cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>{t('settings.system.updateNow')}</span>
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {/* CLI Hint */}
+              <div className="flex items-center gap-2 text-xs text-zinc-500 pt-1">
+                <Terminal className="w-3.5 h-3.5 shrink-0 text-zinc-600" />
+                <span>{t('settings.system.cliHint')}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Right Column: Banner Selector & Danger Zone */}
@@ -534,6 +628,8 @@ export default function SettingsPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Confirm Clear Logs Dialog */}
     </section>
   );
 }

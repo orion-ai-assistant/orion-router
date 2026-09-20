@@ -168,6 +168,16 @@ def main() -> None:
         while True:
             alive = [p for _, p in procs if p.poll() is None]
             if not alive:
+                restart_flag = ROOT / ".restart_requested"
+                if restart_flag.exists():
+                    try:
+                        restart_flag.unlink()
+                    except Exception:
+                        pass
+                    info(f"{CYAN}{BOLD}✔  Güncelleme sonrası servis yeniden başlatılıyor...{RESET}")
+                    time.sleep(0.5)
+                    procs = launch(router_port)
+                    continue
                 warn(t("service_crashed_single"))
                 break
             time.sleep(1)

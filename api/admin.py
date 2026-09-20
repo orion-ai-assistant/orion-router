@@ -909,6 +909,38 @@ async def delete_model_group_item(group_id: str, item_id: str):
 
 
 # ---------------------------------------------------------------------------
+#  System & Updater Endpoints
+# ---------------------------------------------------------------------------
+
+@router.get("/api/system/version")
+async def get_system_version(check_now: bool = False):
+    """Mevcut sürüm bilgisini ve güncelleme durumunu döner."""
+    from core.updater import check_for_updates
+    return check_for_updates(force=check_now)
+
+
+@router.post("/api/system/check-update", dependencies=[Depends(verify_admin)])
+async def force_check_update():
+    """Önbelleği atlayarak GitHub ve Git remote üzerinden canlı sürüm kontrolü yapar."""
+    from core.updater import check_for_updates
+    return check_for_updates(force=True)
+
+
+@router.post("/api/system/update", dependencies=[Depends(verify_admin)])
+async def trigger_system_update():
+    """Sistem güncelleme sürecini arka planda başlatır."""
+    from core.updater import start_update
+    return start_update()
+
+
+@router.get("/api/system/update-status", dependencies=[Depends(verify_admin)])
+async def get_update_progress():
+    """Devam eden veya tamamlanan güncellemenin durumunu ve loglarını döner."""
+    from core.updater import get_update_status
+    return get_update_status()
+
+
+# ---------------------------------------------------------------------------
 #  UI (Fallback for SPA Routing)
 # ---------------------------------------------------------------------------
 

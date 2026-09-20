@@ -231,3 +231,7 @@ if _dash_val:
 else:
     DASHBOARD_OUT_DIR = "/dashboard_out" if os.path.exists("/dashboard_out") else str(_ROOT / "dashboard/out")
 
+# --- Sürüm ve Repo Bilgisi ---
+APP_VERSION = "0.1.0"
+GITHUB_REPO = "orion-ai-assistant/orion-router"
+
