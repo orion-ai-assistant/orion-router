@@ -8,7 +8,9 @@ Files API ve Interactions API kullanarak yüksek doğrulukla metne döker.
 import asyncio
 import base64
 import io
+import json
 import logging
+import re
 from typing import Any
 
 from google import genai
@@ -185,6 +187,74 @@ def resolve_gemini_bcp47(lang: str) -> str:
     return cleaned
 
 
+def detect_language_from_text(text: str) -> str:
+    """Metin iceriginden otomatik dil tespiti yapar (ISO 639-1 kodu doner)."""
+    if not text:
+        return "auto"
+    t = text.lower()
+
+    # Turkce'ye ozgu harfler
+    if any(c in t for c in "çğıöşü"):
+        return "tr"
+
+    # Alfabe kontrolleri
+    for char in text:
+        cp = ord(char)
+        if 0x0600 <= cp <= 0x06FF:
+            return "ar"
+        if 0x0400 <= cp <= 0x04FF:
+            return "ru"
+        if 0x4E00 <= cp <= 0x9FFF or 0x3400 <= cp <= 0x4DBF:
+            return "zh"
+        if 0x3040 <= cp <= 0x30FF:
+            return "ja"
+        if 0xAC00 <= cp <= 0xD7AF:
+            return "ko"
+        if 0x0370 <= cp <= 0x03FF:
+            return "el"
+        if 0x0590 <= cp <= 0x05FF:
+            return "he"
+
+    words = set(re.findall(r"\b\w+\b", t))
+
+    # Turkce yaygin kelimeler (ozel karakter icermeyenler)
+    tr_words = {
+        "ve", "bir", "bu", "da", "de", "icin", "cok", "ben", "sen", "biz", "siz", "onlar",
+        "merhaba", "nasilsin", "evet", "hayir", "var", "yok", "ama", "nasil", "ne", "zaman",
+        "tamam", "guzel", "iyi", "oldu", "olur", "yaparim", "selam"
+    }
+    if words & tr_words:
+        return "tr"
+
+    # Ingilizce yaygin kelimeler
+    en_words = {
+        "the", "be", "to", "of", "and", "a", "in", "that", "have", "i", "it", "for", "not",
+        "on", "with", "he", "as", "you", "do", "at", "this", "but", "his", "by", "from",
+        "they", "we", "say", "her", "she", "or", "an", "will", "my", "one", "all", "would",
+        "there", "their", "what", "so", "up", "out", "if", "about", "who", "get", "which",
+        "go", "me", "hello", "how", "are", "hi", "yes", "no", "okay", "good", "fine"
+    }
+    if words & en_words:
+        return "en"
+
+    # Almanca
+    de_words = {"der", "die", "das", "und", "in", "den", "von", "zu", "mit", "sich", "des", "auf", "für", "ist", "im", "dem", "nicht", "ein", "eine"}
+    if words & de_words:
+        return "de"
+
+    # Fransizca
+    fr_words = {"le", "la", "les", "et", "en", "un", "une", "du", "des", "est", "dans", "pour", "qui", "sur", "avec", "ce", "que"}
+    if words & fr_words:
+        return "fr"
+
+    # İspanyolca
+    es_words = {"el", "la", "de", "que", "y", "en", "un", "ser", "se", "no", "haber", "por", "con", "su", "para", "como", "estar", "tener", "le", "lo"}
+    if words & es_words:
+        return "es"
+
+    return "en" if len(words) > 0 else "auto"
+
+
 class GeminiSTTProvider(BaseSTT):
     provider_name: str = "gemini"
 
@@ -351,6 +421,9 @@ class GeminiSTTProvider(BaseSTT):
                 )
 
                 detected_lang = language or "auto"
+                if detected_lang in ("auto", "none", "") and text:
+                    detected_lang = detect_language_from_text(text)
+
                 return {
                     "text": text.strip(),
                     "language": detected_lang,
@@ -374,13 +447,20 @@ class GeminiSTTProvider(BaseSTT):
         # =====================================================================
         audio_part = types.Part.from_bytes(data=file_bytes, mime_type=content_type)
 
-        instruction_parts = ["Transcribe the audio exactly as spoken. Output ONLY the verbatim transcribed text without any extra commentary."]
-        if language and language.strip().lower() not in ("auto", "none", ""):
+        is_auto_lang = not language or language.strip().lower() in ("auto", "none", "")
+        if is_auto_lang:
+            user_prompt = (
+                "Transcribe the audio exactly as spoken and identify the spoken language.\n"
+                "You must output ONLY a valid JSON object with exactly two keys:\n"
+                "- \"language\": the 2-letter ISO 639-1 code of the detected spoken language (e.g. 'tr', 'en', 'de', 'fr', 'es', 'ru', 'ar', etc.)\n"
+                "- \"text\": the verbatim transcribed text without any extra commentary.\n"
+                "JSON format: {\"language\": \"...\", \"text\": \"...\"}"
+            )
+        else:
             bcp_code = resolve_gemini_bcp47(language)
             lang_name = GEMINI_STT_LANGUAGES.get(bcp_code, language.strip())
-            instruction_parts.append(f"The spoken language is {lang_name}.")
+            user_prompt = f"Transcribe the audio exactly as spoken. Output ONLY the verbatim transcribed text without any extra commentary. The spoken language is {lang_name}."
 
-        user_prompt = " ".join(instruction_parts)
         contents = [
             types.Content(
                 role="user",
@@ -435,6 +515,31 @@ class GeminiSTTProvider(BaseSTT):
         )
 
         detected_lang = language or "auto"
+        if is_auto_lang and text:
+            clean = text.strip()
+            if clean.startswith("```"):
+                clean = re.sub(r"^```(?:json)?\s*", "", clean)
+                clean = re.sub(r"\s*```$", "", clean)
+            try:
+                parsed = json.loads(clean)
+                if isinstance(parsed, dict) and "text" in parsed:
+                    text = str(parsed.get("text", "")).strip()
+                    if "language" in parsed and parsed["language"]:
+                        detected_lang = str(parsed["language"]).strip().lower()
+            except Exception:
+                lang_match = re.search(r'"language"\s*:\s*"([^"]+)"', clean)
+                text_match = re.search(r'"text"\s*:\s*"((?:[^"\\]|\\.)*)"', clean)
+                if text_match:
+                    try:
+                        text = text_match.group(1).encode().decode('unicode_escape', errors='ignore').strip()
+                    except Exception:
+                        text = text_match.group(1).strip()
+                    if lang_match:
+                        detected_lang = lang_match.group(1).strip().lower()
+
+        # Fallback if language is still "auto"
+        if detected_lang in ("auto", "none", "") and text:
+            detected_lang = detect_language_from_text(text)
         return {
             "text": text.strip(),
             "language": detected_lang,

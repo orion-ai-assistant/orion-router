@@ -37,8 +37,8 @@ class TestWhisperSTTIntegration(unittest.TestCase):
         self.assertIsInstance(gemini_p, BaseSTT)
         self.assertEqual(gemini_p.provider_name, "gemini")
         gemini_codes = [l["code"] for l in gemini_p.get_languages() if isinstance(l, dict)]
-        self.assertIn("tr", gemini_codes)
-        self.assertIn("en", gemini_codes)
+        self.assertTrue(any(c.startswith("tr") for c in gemini_codes))
+        self.assertTrue(any(c.startswith("en") for c in gemini_codes))
         print("  [PASS] BaseSTT, LocalSTTProvider, and GeminiSTTProvider inheritance verified.")
 
     def test_02_dynamic_router_discovery(self):

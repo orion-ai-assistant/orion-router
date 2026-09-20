@@ -22,10 +22,13 @@ async def check_admin_secret(secret: str | None) -> bool:
         return False
     from database import db_manager
     from core import config
-    hashed_db = await db_manager.get_config("admin_secret_hash")
-    if hashed_db:
-        return verify_secret(secret, hashed_db)
-    return secret == config.ADMIN_SECRET
+    try:
+        hashed_db = await db_manager.get_config("admin_secret_hash")
+        if hashed_db:
+            return verify_secret(secret, hashed_db)
+    except Exception:
+        pass
+    return bool(config.ADMIN_SECRET and secret == config.ADMIN_SECRET)
 
 def _get_cipher() -> Fernet:
     from core.config import ENCRYPTION_KEY

@@ -12,7 +12,7 @@ import hashlib
 import logging
 import time
 
-from fastapi import Request, HTTPException, Header
+from fastapi import Request, HTTPException, Header, WebSocket, WebSocketException, status
 from database import db_manager
 from core import config
 
@@ -53,36 +53,10 @@ async def prewarm_vkey_cache() -> None:
         logging.getLogger("service-router.auth").error(f"Failed to pre-warm virtual keys: {e}")
 
 
-async def authenticate_request(request: Request) -> dict:
-    """Tek merkezi auth gate. Her istek buradan geçer.
-
-    Authorization: Bearer <token> başlığından token'ı alır ve şu kontrolleri yapar:
-      1. Token == ADMIN_SECRET → {"source": "system", "key_id": None}
-      2. Token sk-orion-... ile başlıyorsa → DB'den virtual key doğrula (TTL cache'li)
-      3. Hiçbiri değilse → 401
-
-    Returns:
-        {"source": "system", "key_id": None}                          → Admin/System
-        {"source": "virtual_key", "key_id": <id>, "name": <name>}    → Virtual key user
-    Raises:
-        HTTPException 401: Key yok veya tanınmıyor
-        HTTPException 403: Key inactive
-        HTTPException 402: Bütçe aşıldıysa
-    """
-    # --- Token'ı çıkar ---
-    token = None
-
-    # Önce Authorization header'ına bak
-    auth_header = request.headers.get("authorization")
-    if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header.removeprefix("Bearer ").strip()
-
-    # Alternatif olarak x-orion-api-key header'ına bak
+async def verify_token_string(token: str) -> dict:
+    """Verilen ham API anahtarını veya admin secret'ını doğrular."""
     if not token:
-        token = request.headers.get("x-orion-api-key")
-
-    if not token:
-        raise HTTPException(status_code=401, detail="API key is required. Send via Authorization: Bearer <key>")
+        raise HTTPException(status_code=401, detail="API key is required.")
 
     # --- 1. Virtual Key kontrolü ---
     if token.startswith("sk-orion-"):
@@ -128,6 +102,75 @@ async def authenticate_request(request: Request) -> dict:
 
     # --- 3. Tanınmayan token ---
     raise HTTPException(status_code=401, detail="Invalid API key")
+
+
+async def authenticate_request(request: Request) -> dict:
+    """Tek merkezi auth gate. Her istek buradan geçer.
+
+    Authorization: Bearer <token> başlığından token'ı alır ve şu kontrolleri yapar:
+      1. Token == ADMIN_SECRET → {"source": "system", "key_id": None}
+      2. Token sk-orion-... ile başlıyorsa → DB'den virtual key doğrula (TTL cache'li)
+      3. Hiçbiri değilse → 401
+
+    Returns:
+        {"source": "system", "key_id": None}                          → Admin/System
+        {"source": "virtual_key", "key_id": <id>, "name": <name>}    → Virtual key user
+    Raises:
+        HTTPException 401: Key yok veya tanınmıyor
+        HTTPException 403: Key inactive
+        HTTPException 402: Bütçe aşıldıysa
+    """
+    token = None
+
+    # Önce Authorization header'ına bak
+    auth_header = request.headers.get("authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.removeprefix("Bearer ").strip()
+
+    # Alternatif olarak x-orion-api-key header'ına bak
+    if not token:
+        token = request.headers.get("x-orion-api-key")
+
+    if not token:
+        raise HTTPException(status_code=401, detail="API key is required. Send via Authorization: Bearer <key>")
+
+    return await verify_token_string(token)
+
+
+async def authenticate_websocket(websocket: WebSocket) -> dict:
+    """WebSocket bağlantıları için kimlik doğrulama.
+
+    URL sorgu parametrelerinden (?token=..., ?api_key=..., ?access_token=...)
+    veya WebSocket handshake HTTP başlıklarından token'ı arar.
+    """
+    token = (
+        websocket.query_params.get("token")
+        or websocket.query_params.get("api_key")
+        or websocket.query_params.get("access_token")
+    )
+
+    if not token:
+        auth_header = websocket.headers.get("authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.removeprefix("Bearer ").strip()
+
+    if not token:
+        token = websocket.headers.get("x-orion-api-key")
+
+    if not token:
+        raise WebSocketException(
+            code=status.WS_1008_POLICY_VIOLATION,
+            reason="API key is required. Provide via ?token=... query parameter or Authorization header.",
+        )
+
+    try:
+        return await verify_token_string(token)
+    except HTTPException as e:
+        raise WebSocketException(
+            code=status.WS_1008_POLICY_VIOLATION,
+            reason=e.detail if isinstance(e.detail, str) else "Authentication failed",
+        )
+
 
 
 import urllib.parse
