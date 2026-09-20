@@ -17,6 +17,8 @@ interface Message {
   role: 'user' | 'assistant';
   type: 'content' | 'thinking';
   html: string;
+  ttftMs?: number;
+  totalDurationMs?: number;
 }
 
 interface ChatTabProps {
@@ -261,6 +263,9 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
 
     const adminKey = getAdminKey();
     const apiBaseUrl = getApiBaseUrl();
+    const startTime = performance.now();
+    let ttftRecorded = false;
+    let firstTokenLatencyMs: number | undefined = undefined;
 
     try {
       setIsGenerating(true);
@@ -350,6 +355,11 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
         const delta = data.choices?.[0]?.delta || null;
         if (!delta) return;
 
+        if (!ttftRecorded && (delta.reasoning_content || delta.content)) {
+          ttftRecorded = true;
+          firstTokenLatencyMs = Math.round(performance.now() - startTime);
+        }
+
         if (delta.reasoning_content) {
           const escaped = escapeHtml(delta.reasoning_content).replace(/\n/g, '<br />');
           if (!hasThinking) {
@@ -411,6 +421,20 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
       if (buffer.trim()) {
         handleDataLine(buffer);
       }
+
+      const totalDurationMs = Math.round(performance.now() - startTime);
+      setChatMessages((prev) =>
+        prev.map((msg) => {
+          if (msg.id === contentMsgId || (!hasContent && msg.id === thinkingMsgId)) {
+            return {
+              ...msg,
+              ttftMs: firstTokenLatencyMs,
+              totalDurationMs: totalDurationMs,
+            };
+          }
+          return msg;
+        })
+      );
     } catch (e: any) {
       if (e.name !== 'AbortError') {
         setChatMessages((prev) => {
@@ -633,8 +657,23 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
                     ? 'bg-purple-950/20 border border-purple-500/10 text-purple-300 self-start rounded-bl-none font-mono text-xs'
                     : 'bg-black/30 border border-zinc-850 text-zinc-100 self-start rounded-bl-none'
                   }`}
-                dangerouslySetInnerHTML={{ __html: msg.html }}
-              />
+              >
+                <div dangerouslySetInnerHTML={{ __html: msg.html }} />
+                {msg.role === 'assistant' && (msg.ttftMs !== undefined || msg.totalDurationMs !== undefined) && (
+                  <div className="text-[10px] text-zinc-400 font-mono text-right mt-1.5 pt-1 border-t border-zinc-800/40 select-none flex items-center justify-end gap-2.5">
+                    {msg.ttftMs !== undefined && (
+                      <span title="İlk Token Süresi (Time to First Token)">
+                        ⚡ {msg.ttftMs} ms
+                      </span>
+                    )}
+                    {msg.totalDurationMs !== undefined && (
+                      <span title="Toplam Yanıt Süresi">
+                        ⏱ {msg.totalDurationMs} ms
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
             ))
           )}
           <div ref={chatMessagesEndRef} />

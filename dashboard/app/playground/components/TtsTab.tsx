@@ -53,6 +53,7 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
   const [ttsUrl, setTtsUrl] = useState('');
   const [ttsError, setTtsError] = useState('');
   const [isGeneratingTTS, setIsGeneratingTTS] = useState(false);
+  const [ttsLatencyMs, setTtsLatencyMs] = useState<number | null>(null);
   const ttsAbortControllerRef = useRef<AbortController | null>(null);
 
   // Custom tts_instruct and active engine info state for local TTS
@@ -476,7 +477,9 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
 
     setTtsError('');
     setTtsUrl('');
+    setTtsLatencyMs(null);
 
+    const startTime = performance.now();
     const adminKey = getAdminKey();
     const apiBaseUrl = getApiBaseUrl();
     const payload: any = { model: ttsModel, input: text, voice: ttsVoice };
@@ -533,6 +536,8 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
       }
 
       const blob = await res.blob();
+      const elapsed = Math.round(performance.now() - startTime);
+      setTtsLatencyMs(elapsed);
       setTtsUrl(URL.createObjectURL(blob));
       showToast(t('playground.toast.audioSuccess'));
     } catch (e: any) {
@@ -990,22 +995,31 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
           />
         </div>
 
-        <div className="flex justify-end">
-          {isGeneratingTTS ? (
-            <Button
-              onClick={() => ttsAbortControllerRef.current?.abort()}
-              className="bg-red-600 text-white hover:bg-red-700 font-semibold px-5 py-2 rounded-lg text-xs min-w-[70px]"
-            >
-              {t('playground.stop')}
-            </Button>
-          ) : (
-            <Button
-              onClick={handleGenerateTTS}
-              className="bg-white text-black hover:bg-zinc-200 font-semibold px-5 py-2 rounded-lg text-xs"
-            >
-              {t('playground.generateAudio')}
-            </Button>
-          )}
+        <div className="flex items-center justify-between">
+          <div>
+            {ttsLatencyMs !== null && (
+              <div className="text-[11px] text-zinc-400 font-mono">
+                ⏱ {ttsLatencyMs} ms
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {isGeneratingTTS ? (
+              <Button
+                onClick={() => ttsAbortControllerRef.current?.abort()}
+                className="bg-red-600 text-white hover:bg-red-700 font-semibold px-5 py-2 rounded-lg text-xs min-w-[70px]"
+              >
+                {t('playground.stop')}
+              </Button>
+            ) : (
+              <Button
+                onClick={handleGenerateTTS}
+                className="bg-white text-black hover:bg-zinc-200 font-semibold px-5 py-2 rounded-lg text-xs"
+              >
+                {t('playground.generateAudio')}
+              </Button>
+            )}
+          </div>
         </div>
 
         {ttsError && (
@@ -1015,15 +1029,22 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
         )}
 
         {ttsUrl && (
-          <div className="p-3 bg-white/5 border border-zinc-800 rounded-lg flex items-center justify-between gap-3 mt-1">
-            <audio src={ttsUrl} controls className="flex-grow max-w-[400px] h-8" />
-            <a
-              href={ttsUrl}
-              download="speech.wav"
-              className="bg-zinc-800 text-white border border-zinc-700 hover:bg-zinc-700 font-medium px-3 py-1.5 text-[10px] rounded transition-colors"
-            >
-              {t('playground.download')}
-            </a>
+          <div className="p-3 bg-white/5 border border-zinc-800 rounded-lg flex flex-col gap-2 mt-1">
+            <div className="flex items-center justify-between gap-3">
+              <audio src={ttsUrl} controls className="flex-grow max-w-[400px] h-8" />
+              <a
+                href={ttsUrl}
+                download="speech.wav"
+                className="bg-zinc-800 text-white border border-zinc-700 hover:bg-zinc-700 font-medium px-3 py-1.5 text-[10px] rounded transition-colors"
+              >
+                {t('playground.download')}
+              </a>
+            </div>
+            {ttsLatencyMs !== null && (
+              <div className="text-[10px] text-zinc-400 font-mono text-right select-none">
+                ⏱ {ttsLatencyMs} ms
+              </div>
+            )}
           </div>
         )}
       </div>

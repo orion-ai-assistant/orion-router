@@ -81,6 +81,14 @@ async def audio_transcriptions(
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.exception(f"Transcription error ({provider or target_model})")
-        raise HTTPException(status_code=500, detail=str(e))
+        err_str = str(e)
+        status_code = 500
+        if "429" in err_str or "rate limit" in err_str.lower() or "too many requests" in err_str.lower():
+            status_code = 429
+        elif "401" in err_str or "unauthorized" in err_str.lower() or "invalid api key" in err_str.lower():
+            status_code = 401
+        logger.error(f"Transcription error ({provider or target_model}): [{status_code}] {err_str}")
+        raise HTTPException(status_code=status_code, detail=err_str)
