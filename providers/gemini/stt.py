@@ -6,6 +6,7 @@ Gemini'nin ses işleme yeteneğini (özellikle gemini-3.5-transcribe modelini)
 Files API ve Interactions API kullanarak yüksek doğrulukla metne döker.
 """
 import asyncio
+import base64
 import io
 import logging
 from typing import Any
@@ -246,25 +247,39 @@ class GeminiSTTProvider(BaseSTT):
         # =====================================================================
         if is_transcribe_model:
             audio_file = None
+            use_inline = len(file_bytes) <= 20 * 1024 * 1024  # 20MB ve altı için doğrudan inline base64 (çok hızlı ~1-2s)
             try:
-                # 1. Ses dosyasını Files API ile yükle
-                audio_file = await client.aio.files.upload(
-                    file=io.BytesIO(file_bytes),
-                    config=types.UploadFileConfig(
-                        mime_type=content_type,
-                        display_name=filename or "audio.wav",
-                    ),
-                )
+                if use_inline:
+                    encoded_audio = base64.b64encode(file_bytes).decode("utf-8")
+                    audio_input = {
+                        "type": "audio",
+                        "data": encoded_audio,
+                        "mime_type": content_type,
+                    }
+                else:
+                    # 20MB üzeri büyük ses dosyaları için Files API ile yükle
+                    audio_file = await client.aio.files.upload(
+                        file=io.BytesIO(file_bytes),
+                        config=types.UploadFileConfig(
+                            mime_type=content_type,
+                            display_name=filename or "audio.wav",
+                        ),
+                    )
 
-                # Dosya işlenme durumunu doğrula (büyük dosyalarda kısa bekleme)
-                wait_count = 0
-                while getattr(audio_file, "state", None) == types.FileState.PROCESSING and wait_count < 30:
-                    await asyncio.sleep(0.5)
-                    audio_file = await client.aio.files.get(name=audio_file.name)
-                    wait_count += 1
+                    wait_count = 0
+                    while getattr(audio_file, "state", None) == types.FileState.PROCESSING and wait_count < 30:
+                        await asyncio.sleep(0.5)
+                        audio_file = await client.aio.files.get(name=audio_file.name)
+                        wait_count += 1
 
-                if getattr(audio_file, "state", None) == types.FileState.FAILED:
-                    raise ValueError("Gemini Audio upload processing failed.")
+                    if getattr(audio_file, "state", None) == types.FileState.FAILED:
+                        raise ValueError("Gemini Audio upload processing failed.")
+
+                    audio_input = {
+                        "type": "audio",
+                        "uri": audio_file.uri,
+                        "mime_type": audio_file.mime_type or content_type,
+                    }
 
                 # 2. Generation / Transcription konfigürasyonu
                 generation_config: dict[str, Any] = {}
@@ -279,20 +294,14 @@ class GeminiSTTProvider(BaseSTT):
 
                 call_kwargs: dict[str, Any] = {
                     "model": model,
-                    "input": [
-                        {
-                            "type": "audio",
-                            "uri": audio_file.uri,
-                            "mime_type": audio_file.mime_type or content_type,
-                        }
-                    ],
+                    "input": [audio_input],
                 }
                 if generation_config:
                     call_kwargs["generation_config"] = generation_config
 
                 logger.info(
                     f"Routing Gemini 3.5 Transcribe (Interactions API): model={model}, filename={filename} "
-                    f"({len(file_bytes)} bytes), uri={audio_file.uri}, lang={transcription_config.get('language_codes')}"
+                    f"({len(file_bytes)} bytes), inline={use_inline}, lang={transcription_config.get('language_codes')}"
                 )
 
                 interaction = await client.aio.interactions.create(**call_kwargs)
