@@ -781,6 +781,16 @@ export default function SttTab({ models, groups }: SttTabProps) {
     showToast('Metin panoya kopyalandı!');
   };
 
+  const handleClearResult = () => {
+    setTranscriptionText('');
+    setLiveText('');
+    setRawResponseJson('');
+    setSttError('');
+    setLatencyMs(null);
+    setStreamLatencyMs(null);
+    showToast('Transkripsiyon sonucu temizlendi.');
+  };
+
   const formatSeconds = (sec: number) => {
     const mins = Math.floor(sec / 60);
     const s = sec % 60;
@@ -982,51 +992,55 @@ export default function SttTab({ models, groups }: SttTabProps) {
           )}
         </div>
 
-        {/* Action Controls */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={handleTranscribe}
-              disabled={isTranscribing || !audioFile || isStreaming}
-              className="bg-purple-600 hover:bg-purple-500 text-white font-medium px-5 py-2 rounded-lg flex items-center gap-2 text-xs disabled:opacity-50"
-            >
-              {isTranscribing ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  {t('playground.transcribing') || 'Dönüştürülüyor...'}
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4" />
-                  {t('playground.transcribeAudio') || 'Sesi Metne Çevir'}
-                </>
+        {/* Action Controls - Only shown when audio file exists, transcribing, or latency metrics exist */}
+        {(audioFile || isTranscribing || streamLatencyMs !== null || latencyMs !== null) && (
+          <div className="flex items-center justify-between animate-in fade-in duration-150">
+            <div className="flex items-center gap-2">
+              {audioFile && (
+                <Button
+                  onClick={handleTranscribe}
+                  disabled={isTranscribing || isStreaming}
+                  className="bg-purple-600 hover:bg-purple-500 text-white font-medium px-5 py-2 rounded-lg flex items-center gap-2 text-xs disabled:opacity-50 shadow-md shadow-purple-950/40"
+                >
+                  {isTranscribing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      {t('playground.transcribing') || 'Dönüştürülüyor...'}
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      {t('playground.transcribeAudio') || 'Sesi Metne Çevir'}
+                    </>
+                  )}
+                </Button>
               )}
-            </Button>
 
-            {isTranscribing && (
-              <Button
-                variant="outline"
-                onClick={() => abortControllerRef.current?.abort()}
-                className="border-zinc-800 text-zinc-400 hover:text-white text-xs h-8"
-              >
-                {t('playground.stop')}
-              </Button>
-            )}
-          </div>
+              {isTranscribing && (
+                <Button
+                  variant="outline"
+                  onClick={() => abortControllerRef.current?.abort()}
+                  className="border-zinc-800 text-zinc-400 hover:text-white text-xs h-8"
+                >
+                  {t('playground.stop')}
+                </Button>
+              )}
+            </div>
 
-          <div className="flex items-center gap-3">
-            {streamLatencyMs !== null && isStreaming && (
-              <div className="text-[11px] text-amber-400 font-mono flex items-center gap-1">
-                ⚡ Canlı Gecikme: {streamLatencyMs} ms
-              </div>
-            )}
-            {latencyMs !== null && !isStreaming && (
-              <div className="text-[11px] text-zinc-400 font-mono">
-                ⏱ {latencyMs} ms
-              </div>
-            )}
+            <div className="flex items-center gap-3">
+              {streamLatencyMs !== null && isStreaming && (
+                <div className="text-[11px] text-amber-400 font-mono flex items-center gap-1">
+                  ⚡ Canlı Gecikme: {streamLatencyMs} ms
+                </div>
+              )}
+              {latencyMs !== null && !isStreaming && (
+                <div className="text-[11px] text-zinc-400 font-mono">
+                  ⏱ {latencyMs} ms
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Error Alert */}
         {sttError && (
@@ -1050,19 +1064,33 @@ export default function SttTab({ models, groups }: SttTabProps) {
               )}
             </div>
 
-            {transcriptionText && (
+            {(transcriptionText || liveText) && (
               <div className="flex items-center gap-2">
-                <span className="text-[11px] text-zinc-500 font-mono">
-                  {transcriptionText.length} karakter | {transcriptionText.split(/\s+/).filter(Boolean).length} kelime
-                </span>
+                {transcriptionText && (
+                  <span className="text-[11px] text-zinc-500 font-mono">
+                    {transcriptionText.length} karakter | {transcriptionText.split(/\s+/).filter(Boolean).length} kelime
+                  </span>
+                )}
+                {transcriptionText && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCopy}
+                    className="border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-800 text-xs h-7 px-2.5 flex items-center gap-1.5"
+                  >
+                    {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copied ? 'Kopyalandı' : 'Metni Kopyala'}
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleCopy}
-                  className="border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-800 text-xs h-7 px-2.5 flex items-center gap-1.5"
+                  onClick={handleClearResult}
+                  className="border-zinc-800 text-zinc-400 hover:text-red-400 hover:bg-zinc-800 text-xs h-7 px-2.5 flex items-center gap-1.5 transition-colors"
+                  title="Sonucu Temizle"
                 >
-                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  {copied ? 'Kopyalandı' : 'Metni Kopyala'}
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Temizle
                 </Button>
               </div>
             )}
