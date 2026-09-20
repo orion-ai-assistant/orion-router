@@ -55,9 +55,11 @@ def launch(router_port: str) -> list[tuple[str, subprocess.Popen]]:
     procs = []
 
     # FastAPI backend
+    dev_env = {**dict(sys.modules['os'].environ), "UVICORN_RELOAD": "1"}
     backend = subprocess.Popen(
         [sys.executable, "main.py"],
         cwd=ROOT,
+        env=dev_env,
         stdin=subprocess.DEVNULL
     )
     procs.append(("FastAPI", backend))

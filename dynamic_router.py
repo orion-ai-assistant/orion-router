@@ -22,7 +22,7 @@ from datetime import datetime, timedelta, timezone
 from typing import AsyncGenerator, Any
 
 import providers
-from providers.base import BaseChat, BaseEmbed, BaseTTS, BaseFileUpload
+from providers.base import BaseChat, BaseEmbed, BaseTTS, BaseSTT, BaseFileUpload
 from database import db_manager
 
 logger = logging.getLogger("service-router.dynamic")
@@ -32,7 +32,7 @@ QUOTA_COOLDOWN_SECONDS = 45
 
 # Provider klasöründe taranacak yetenek dosyaları.
 # Yeni bir yetenek eklemek için buraya adını yazıp providers/<name>/<yetenek>.py dosyasını oluşturun.
-ALLOWED_CAPABILITIES: list[str] = ["chat", "embeddings", "tts", "files", "image", "audio", "video"]
+ALLOWED_CAPABILITIES: list[str] = ["chat", "embeddings", "tts", "stt", "files", "image", "audio", "video"]
 
 
 def _pool_key_on_quota_cooldown(pool_key: dict) -> bool:
@@ -177,6 +177,7 @@ class DynamicLLMRouter:
         self.chat_providers: dict[str, BaseChat] = {}
         self.embed_providers: dict[str, BaseEmbed] = {}
         self.tts_providers: dict[str, BaseTTS] = {}
+        self.stt_providers: dict[str, BaseSTT] = {}
         self.file_providers: dict[str, BaseFileUpload] = {}
         self._load_providers()
 
@@ -185,13 +186,13 @@ class DynamicLLMRouter:
 
         Keşif Mantığı:
           - providers/<name>/ klasörü bulunur.
-          - Yalnızca belirli yetenekleri ifade eden dosyalar (chat.py, embeddings.py, tts.py, files.py vb.) taranır.
+          - Yalnızca belirli yetenekleri ifade eden dosyalar (chat.py, embeddings.py, tts.py, stt.py, files.py vb.) taranır.
           - Bu sayede test_ veya _ ile başlayan dosyaları kontrol etmeye gerek kalmaz; 
             sadece izin verilen yetenek dosyaları modül olarak yüklenir.
-          - BaseChat, BaseEmbed, BaseTTS, BaseFileUpload sınıflarından türetilen sınıflar otomatik kaydedilir.
+          - BaseChat, BaseEmbed, BaseTTS, BaseSTT, BaseFileUpload sınıflarından türetilen sınıflar otomatik kaydedilir.
           - Geliştiricinin __init__.py içine açıkça export eklemesi gerekmez.
         """
-        BASE_CLASSES = (BaseChat, BaseEmbed, BaseTTS, BaseFileUpload)
+        BASE_CLASSES = (BaseChat, BaseEmbed, BaseTTS, BaseSTT, BaseFileUpload)
 
         def _register(obj, default_name: str):
             """Bir sınıfı ilgili provider sözlüğüne kaydeder."""
@@ -215,6 +216,11 @@ class DynamicLLMRouter:
                 if pname not in self.tts_providers:
                     self.tts_providers[pname] = obj()
                     logger.info(f"Loaded TTS provider: {pname} ({obj.__name__})")
+
+            if issubclass(obj, BaseSTT) and obj is not BaseSTT:
+                if pname not in self.stt_providers:
+                    self.stt_providers[pname] = obj()
+                    logger.info(f"Loaded STT provider: {pname} ({obj.__name__})")
 
             if issubclass(obj, BaseFileUpload) and obj is not BaseFileUpload:
                 if pname not in self.file_providers:
@@ -837,6 +843,141 @@ class DynamicLLMRouter:
         raise last_err or ValueError(f"Could not resolve TTS route for model: {model}")
 
     # -----------------------------------------------------------------------
+    #  STT (Speech-to-Text / Transcription)
+    # -----------------------------------------------------------------------
+
+    async def run_transcription(
+        self,
+        provider: str | None,
+        model: str,
+        file_bytes: bytes,
+        filename: str = "audio.wav",
+        language: str | None = None,
+        prompt: str | None = None,
+        response_format: str = "json",
+        temperature: float | None = None,
+        api_key: str | None = None,
+        auth_header: str | None = None,
+        key_id: str | None = None,
+        **kwargs,
+    ) -> dict:
+        """Belirtilen model üzerinden ses transkripsiyonu üretir (otomatik route ve key fallbacks ile)."""
+        routes = []
+        try:
+            routes = await db_manager.resolve_model_route("stt", model)
+        except Exception as e:
+            logger.warning(f"STT route resolution failed for '{model}': {e}")
+
+        if not routes:
+            routes = [{"provider": provider, "name": model}]
+
+        req_data = {
+            "model": model,
+            "filename": filename,
+            "language": language,
+            "bytes_len": len(file_bytes),
+            **kwargs,
+        }
+
+        p_provider = provider
+        p_model = model
+        last_err = None
+        try:
+            for route in routes:
+                p_provider = route["provider"]
+                p_model = route["name"]
+
+                plugin = self.stt_providers.get(p_provider)
+                if not plugin:
+                    last_err = ValueError(f"STT provider not available: {p_provider}")
+                    continue
+
+                keys_to_try = await self._get_keys_for_provider(p_provider, api_key or auth_header)
+
+                for key_val, key_pool_id in keys_to_try:
+                    logger.info(
+                        f"Routing STT to {p_provider} (model={p_model}, filename={filename}) "
+                        f"using key {key_pool_id or 'default'}"
+                    )
+                    try:
+                        result = await plugin.generate_transcription(
+                            model=p_model,
+                            file_bytes=file_bytes,
+                            filename=filename,
+                            language=language,
+                            prompt=prompt,
+                            response_format=response_format,
+                            temperature=temperature,
+                            api_key=key_val,
+                            auth_header=auth_header if not key_val else None,
+                            **kwargs,
+                        )
+
+                        # Log usage
+                        duration = result.get("duration", 0) or 0
+                        text_res = result.get("text", "")
+                        prompt_tokens = int(float(duration) * 25) if duration else max(1, len(file_bytes) // 3200)
+                        completion_tokens = len(text_res.split())
+                        usage = {
+                            "prompt_tokens": prompt_tokens,
+                            "completion_tokens": completion_tokens,
+                            "thoughts_tokens": 0,
+                        }
+
+                        asyncio.create_task(
+                            _log_usage(
+                                self.app_state,
+                                key_id,
+                                p_provider,
+                                p_model,
+                                usage,
+                                request_json=json.dumps(req_data, ensure_ascii=False),
+                                response_json=json.dumps(result, ensure_ascii=False),
+                                success=True,
+                                capability="stt",
+                            )
+                        )
+                        return result
+                    except Exception as e:
+                        logger.error(f"STT route {p_provider}/{p_model} failed: {e}")
+                        if key_pool_id:
+                            await db_manager.mark_provider_key_error(key_pool_id, str(e))
+                        last_err = e
+
+                        res_err = {"error": str(e)}
+                        asyncio.create_task(
+                            _log_usage(
+                                self.app_state,
+                                key_id,
+                                p_provider,
+                                p_model,
+                                None,
+                                request_json=json.dumps(req_data, ensure_ascii=False),
+                                response_json=json.dumps(res_err, ensure_ascii=False),
+                                success=False,
+                                capability="stt",
+                            )
+                        )
+        except asyncio.CancelledError:
+            res_err = {"error": "Client disconnected / Request Cancelled"}
+            asyncio.create_task(
+                _log_usage(
+                    self.app_state,
+                    key_id,
+                    p_provider,
+                    p_model,
+                    None,
+                    request_json=json.dumps(req_data, ensure_ascii=False),
+                    response_json=json.dumps(res_err, ensure_ascii=False),
+                    success=None,
+                    capability="stt",
+                )
+            )
+            raise
+
+        raise last_err or ValueError(f"Could not resolve STT route for model: {model}")
+
+    # -----------------------------------------------------------------------
     #  File Upload
     # -----------------------------------------------------------------------
 
@@ -868,13 +1009,16 @@ class DynamicLLMRouter:
 
     def get_capabilities(self) -> dict:
         """Her provider için desteklenen yetenekleri döner (admin/debug için)."""
-        all_providers = set(self.chat_providers) | set(self.embed_providers) \
-                        | set(self.tts_providers) | set(self.file_providers)
+        all_providers = (
+            set(self.chat_providers) | set(self.embed_providers)
+            | set(self.tts_providers) | set(self.stt_providers) | set(self.file_providers)
+        )
         return {
             p: {
                 "chat": p in self.chat_providers,
                 "embed": p in self.embed_providers,
                 "tts": p in self.tts_providers,
+                "stt": p in self.stt_providers,
                 "file_upload": p in self.file_providers,
             }
             for p in sorted(all_providers)

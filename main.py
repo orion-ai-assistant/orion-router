@@ -19,7 +19,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from core.lifespan import lifespan
-from api import admin, chat, embeddings, files, speech
+from api import admin, chat, embeddings, files, speech, transcriptions
 
 # ---------------------------------------------------------------------------
 #  Logging
@@ -183,6 +183,7 @@ app.include_router(chat.router)
 app.include_router(admin.router)
 app.include_router(embeddings.router)
 app.include_router(speech.router)
+app.include_router(transcriptions.router)
 app.include_router(files.router)
 
 # ---------------------------------------------------------------------------
@@ -212,6 +213,6 @@ if __name__ == "__main__":
         port=int(ROUTER_PORT),
         log_level=os.getenv("UVICORN_LOG_LEVEL", "info"),
         reload=reload,
-        reload_dirs=["data"] if reload else None,
+        reload_dirs=["providers", "api", "core", "database"] if reload else None,
         use_colors=True,
     )

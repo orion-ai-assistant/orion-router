@@ -28,7 +28,7 @@ interface ModelGroup {
   id: string;
   name: string;
   description: string;
-  capability: 'chat' | 'tts' | 'embed';
+  capability: 'chat' | 'tts' | 'embed' | 'stt';
   is_active: boolean;
   items: GroupItem[];
 }
@@ -37,7 +37,7 @@ interface ModelItem {
   id: string;
   name: string;
   provider: string;
-  capability: 'chat' | 'tts' | 'embed';
+  capability: 'chat' | 'tts' | 'embed' | 'stt';
   is_active: boolean;
 }
 
@@ -108,7 +108,7 @@ export default function GroupsPage() {
   const [showEditGroupItemModal, setShowEditGroupItemModal] = useState<boolean>(false);
 
   // Form states
-  const [groupForm, setGroupForm] = useState({ name: '', capability: 'chat' as 'chat' | 'tts' | 'embed' });
+  const [groupForm, setGroupForm] = useState({ name: '', capability: 'chat' as 'chat' | 'tts' | 'embed' | 'stt' });
   const [editingGroup, setEditingGroup] = useState<ModelGroup>({
     id: '',
     name: '',
@@ -776,6 +776,7 @@ export default function GroupsPage() {
                   <option value="chat">chat</option>
                   <option value="tts">tts</option>
                   <option value="embed">embed</option>
+                  <option value="stt">stt</option>
                 </select>
               </div>
             </div>
@@ -829,6 +830,7 @@ export default function GroupsPage() {
                   <option value="chat">chat</option>
                   <option value="tts">tts</option>
                   <option value="embed">embed</option>
+                  <option value="stt">stt</option>
                 </select>
               </div>
             </div>

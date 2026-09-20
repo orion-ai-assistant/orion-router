@@ -7,6 +7,7 @@ Yetenek sınıfları:
   - BaseChat        → stream_chat()
   - BaseEmbed       → generate_embeddings()
   - BaseTTS         → generate_speech()
+  - BaseSTT         → generate_transcription()
   - BaseFileUpload  → upload_file()
 
 Her provider alt paketi (__init__.py), desteklediği yetenek sınıflarından miras alan
@@ -124,6 +125,33 @@ class BaseTTS(_ProviderMixin, ABC):
     def get_voices(self) -> list[str]:
         """Desteklenen seslerin listesini döner."""
         return []
+
+    def get_languages(self) -> list[str]:
+        """Desteklenen dillerin listesini döner."""
+        return []
+
+
+class BaseSTT(_ProviderMixin, ABC):
+    """Konuşma-metin (STT / transcription) yetenekleri için temel sınıf."""
+
+    @abstractmethod
+    async def generate_transcription(
+        self,
+        model: str,
+        file_bytes: bytes,
+        filename: str = "audio.wav",
+        language: str | None = None,
+        prompt: str | None = None,
+        response_format: str = "json",
+        temperature: float | None = None,
+        api_key: str | None = None,
+        auth_header: str | None = None,
+        **kwargs,
+    ) -> dict:
+        """OpenAI uyumlu transcription yanıt dict'i döner.
+        Ör: {"text": "...", "language": "tr", "duration": 0.32}
+        """
+        raise NotImplementedError
 
     def get_languages(self) -> list[str]:
         """Desteklenen dillerin listesini döner."""

@@ -185,6 +185,9 @@ EMBED_PORT = os.getenv("EMBED_PORT")
 TTS_HOST = os.getenv("TTS_HOST")
 TTS_PORT = os.getenv("TTS_PORT")
 
+STT_HOST = os.getenv("STT_HOST", "127.0.0.1")
+STT_PORT = os.getenv("STT_PORT", "9009")
+
 # --- Admin Paneli ---
 # Admin paneline giriş için gereken şifre (sadece ilk seed işlemi için okunur, DB'ye aktarılır).
 ADMIN_SECRET = os.getenv("ADMIN_SECRET")

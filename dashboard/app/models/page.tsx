@@ -17,7 +17,7 @@ interface ModelItem {
   id: string;
   name: string;
   provider: string;
-  capability: 'chat' | 'tts' | 'embed';
+  capability: 'chat' | 'tts' | 'embed' | 'stt';
   temperature: number | null;
   is_active: boolean;
   input_price: number | string;
@@ -29,7 +29,7 @@ interface ModelItem {
   _original?: {
     name: string;
     provider: string;
-    capability: 'chat' | 'tts' | 'embed';
+    capability: 'chat' | 'tts' | 'embed' | 'stt';
     temperature: number | null;
     is_active: boolean;
     input_price: number;
@@ -167,7 +167,7 @@ export default function ModelsPage() {
   const [addForm, setAddForm] = useState({
     name: '',
     provider: '',
-    capability: 'chat' as 'chat' | 'tts' | 'embed',
+    capability: 'chat' as 'chat' | 'tts' | 'embed' | 'stt',
     temperature: '' as string | number,
     input_price: '0' as string | number,
     output_price: '0' as string | number,
@@ -965,13 +965,13 @@ export default function ModelsPage() {
                     </div>
                     
                     <div className="pricing-container flex items-center gap-4">
-                      {(model.capability === 'chat' || model.capability === 'tts' || model.capability === 'embed') && (
+                      {(model.capability === 'chat' || model.capability === 'tts' || model.capability === 'embed' || model.capability === 'stt') && (
                         <div className="flex flex-col items-center justify-center gap-0.5">
                           <span className="text-[9px] font-semibold text-zinc-500 capitalize tracking-wider">{t('models.in')}</span>
                           <span className="text-xs font-mono text-zinc-300">{money(model.input_price)}</span>
                         </div>
                       )}
-                      {(model.capability === 'chat' || model.capability === 'tts') && (
+                      {(model.capability === 'chat' || model.capability === 'tts' || model.capability === 'stt') && (
                         <div className="flex flex-col items-center justify-center gap-0.5">
                           <span className="text-[9px] font-semibold text-zinc-500 capitalize tracking-wider">{t('models.out')}</span>
                           <span className="text-xs font-mono text-zinc-300">{money(model.output_price)}</span>
@@ -1057,6 +1057,7 @@ export default function ModelsPage() {
                   <option value="chat">chat</option>
                   <option value="tts">tts</option>
                   <option value="embed">embed</option>
+                  <option value="stt">stt</option>
                 </select>
               </div>
             </div>
@@ -1108,7 +1109,7 @@ export default function ModelsPage() {
             <div className="flex flex-col gap-2">
               <label className="text-zinc-400 text-sm font-medium">{t('models.pricing')}</label>
               <div className="flex gap-3">
-                {(addForm.capability === 'chat' || addForm.capability === 'tts' || addForm.capability === 'embed') && (
+                {(addForm.capability === 'chat' || addForm.capability === 'tts' || addForm.capability === 'embed' || addForm.capability === 'stt') && (
                   <div className="flex-1 flex flex-col gap-1">
                     <span className="text-[11px] text-zinc-500 font-semibold">Input</span>
                     <Input
@@ -1123,7 +1124,7 @@ export default function ModelsPage() {
                   </div>
                 )}
 
-                {(addForm.capability === 'chat' || addForm.capability === 'tts') && (
+                {(addForm.capability === 'chat' || addForm.capability === 'tts' || addForm.capability === 'stt') && (
                   <div className="flex-1 flex flex-col gap-1">
                     <span className="text-[11px] text-zinc-500 font-semibold">Output</span>
                     <Input
@@ -1231,6 +1232,7 @@ export default function ModelsPage() {
                   <option value="chat">chat</option>
                   <option value="tts">tts</option>
                   <option value="embed">embed</option>
+                  <option value="stt">stt</option>
                 </select>
               </div>
             </div>
@@ -1282,7 +1284,7 @@ export default function ModelsPage() {
             <div className="flex flex-col gap-2">
               <label className="text-zinc-400 text-sm font-medium">{t('models.pricing')}</label>
               <div className="flex gap-3">
-                {(editingModel.capability === 'chat' || editingModel.capability === 'tts' || editingModel.capability === 'embed') && (
+                {(editingModel.capability === 'chat' || editingModel.capability === 'tts' || editingModel.capability === 'embed' || editingModel.capability === 'stt') && (
                   <div className="flex-1 flex flex-col gap-1">
                     <span className="text-[11px] text-zinc-500 font-semibold">Input</span>
                     <Input
@@ -1297,7 +1299,7 @@ export default function ModelsPage() {
                   </div>
                 )}
 
-                {(editingModel.capability === 'chat' || editingModel.capability === 'tts') && (
+                {(editingModel.capability === 'chat' || editingModel.capability === 'tts' || editingModel.capability === 'stt') && (
                   <div className="flex-1 flex flex-col gap-1">
                     <span className="text-[11px] text-zinc-500 font-semibold">Output</span>
                     <Input

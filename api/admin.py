@@ -424,6 +424,23 @@ async def get_admin_tts_languages(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/api/stt-languages", dependencies=[Depends(verify_admin)])
+async def get_admin_stt_languages(request: Request):
+    """Her STT sağlayıcısı için desteklenen dilleri döner."""
+    try:
+        router_instance = request.app.state.dynamic_router
+        languages_by_provider = {}
+        from fastapi.concurrency import run_in_threadpool
+        for provider_name, provider_inst in router_instance.stt_providers.items():
+            if hasattr(provider_inst, "get_languages"):
+                languages_by_provider[provider_name] = await run_in_threadpool(provider_inst.get_languages)
+            else:
+                languages_by_provider[provider_name] = []
+        return {"languages": languages_by_provider}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/api/local-tts-info", dependencies=[Depends(verify_admin)])
 async def get_local_tts_info():
     """Yerel TTS servisinin aktif model/motor bilgisini döner."""

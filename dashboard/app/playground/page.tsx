@@ -5,6 +5,7 @@ import { adminFetch } from '@/lib/api';
 import { useApp } from '@/components/AppContext';
 import ChatTab from './components/ChatTab';
 import TtsTab from './components/TtsTab';
+import SttTab from './components/SttTab';
 import EmbedTab from './components/EmbedTab';
 
 export default function PlaygroundPage() {
@@ -17,8 +18,8 @@ export default function PlaygroundPage() {
     return defaultVal;
   };
 
-  const [activeTab, setActiveTab] = useState<'chat' | 'tts' | 'embed'>(
-    getSavedState('pg_activeTab', 'chat') as 'chat' | 'tts' | 'embed'
+  const [activeTab, setActiveTab] = useState<'chat' | 'tts' | 'stt' | 'embed'>(
+    getSavedState('pg_activeTab', 'chat') as 'chat' | 'tts' | 'stt' | 'embed'
   );
   
   const [models, setModels] = useState<any[]>([]);
@@ -76,7 +77,7 @@ export default function PlaygroundPage() {
       </header>
 
       <div className="pg-segmented-control flex gap-1 bg-[#18181b] border border-zinc-800 p-0.5 rounded-md mb-4 max-w-max">
-        {(['chat', 'tts', 'embed'] as const).map((tab) => (
+        {(['chat', 'tts', 'stt', 'embed'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -85,7 +86,13 @@ export default function PlaygroundPage() {
               : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-white'
               }`}
           >
-            {tab === 'chat' ? t('playground.chat') : tab === 'tts' ? t('playground.tts') : t('playground.embed')}
+            {tab === 'chat'
+              ? t('playground.chat')
+              : tab === 'tts'
+              ? t('playground.tts')
+              : tab === 'stt'
+              ? (t('playground.stt') || 'Speech-to-Text')
+              : t('playground.embed')}
           </button>
         ))}
       </div>
@@ -96,6 +103,7 @@ export default function PlaygroundPage() {
         <>
           {activeTab === 'chat' && <ChatTab models={models} groups={groups} />}
           {activeTab === 'tts' && <TtsTab models={models} groups={groups} />}
+          {activeTab === 'stt' && <SttTab models={models} groups={groups} />}
           {activeTab === 'embed' && <EmbedTab models={models} groups={groups} />}
         </>
       )}

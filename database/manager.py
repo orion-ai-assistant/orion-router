@@ -264,6 +264,8 @@ class DatabaseManager:
             ("gemini-3.1-flash-tts-preview", "gemini", "tts", None),
             ("tts-1", "openai", "tts", None),
             ("local-embed", "local", "embed", None),
+            ("whisper-small-finetuned-tr", "local", "stt", None),
+            ("gemini-3.5-transcribe", "gemini", "stt", None),
         ]
         for name, provider, capability, temperature in defaults:
             await conn.execute(
