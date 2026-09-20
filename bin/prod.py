@@ -55,11 +55,6 @@ PG_DB     = "orion_router"
 # ─────────────────────────────────────────────────────────────────────────────
 
 def build_dashboard(router_port: str) -> None:
-    out_dir = DASHBOARD / "out"
-    if out_dir.exists():
-        info(t("db_build_dashboard") + " (Skipped, already built)")
-        return
-
     info(t("db_build_dashboard"))
     
     if npm_needs_install(DASHBOARD):

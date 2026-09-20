@@ -176,14 +176,14 @@ ROUTER_HOST = os.getenv("ROUTER_HOST")
 ROUTER_PORT = os.getenv("ROUTER_PORT")
 
 # --- Yerel Servis Adresleri ---
-LLM_HOST = os.getenv("LLM_HOST")
-LLM_PORT = os.getenv("LLM_PORT")
+LLM_HOST = os.getenv("LLM_HOST", "127.0.0.1")
+LLM_PORT = os.getenv("LLM_PORT", "8085")
 
-EMBED_HOST = os.getenv("EMBED_HOST")
-EMBED_PORT = os.getenv("EMBED_PORT")
+EMBED_HOST = os.getenv("EMBED_HOST", "127.0.0.1")
+EMBED_PORT = os.getenv("EMBED_PORT", "8086")
 
-TTS_HOST = os.getenv("TTS_HOST")
-TTS_PORT = os.getenv("TTS_PORT")
+TTS_HOST = os.getenv("TTS_HOST", "127.0.0.1")
+TTS_PORT = os.getenv("TTS_PORT", "8810")
 
 STT_HOST = os.getenv("STT_HOST", "127.0.0.1")
 STT_PORT = os.getenv("STT_PORT", "9009")
