@@ -15,7 +15,7 @@ import {
   Info,
   Settings,
   LogOut,
-  ArrowUpRight
+  ChevronUp
 } from 'lucide-react';
 
 interface SidebarTab {
@@ -88,36 +88,34 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           })}
         </ul>
 
-        {/* Version & Update area */}
-        <div className="mt-auto pt-3 pb-2.5 border-t border-zinc-800/80 flex flex-col gap-1.5 px-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-zinc-500 font-mono text-[12px] tracking-tight">
-              v{versionInfo?.current_version || '0.1.0'}
-            </span>
-            {versionInfo?.update_available && (
-              <button
-                type="button"
-                onClick={startSystemUpdate}
-                className="flex items-center gap-1 text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 bg-emerald-950/50 hover:bg-emerald-900/60 border border-emerald-500/30 px-2 py-0.5 rounded-full transition-all duration-200 group cursor-pointer"
-                title={`${t('settings.system.updateAvailable')}: v${versionInfo.latest_version}`}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span>v{versionInfo.latest_version} Güncelle</span>
-                <ArrowUpRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Logout button at bottom of sidebar */}
-        <div className="pt-1">
+        {/* Sidebar Alt Kısım: Çıkış Yap ve Güncelleme / Versiyon Butonu */}
+        <div className="mt-auto pt-3 pb-1 border-t border-zinc-800/80 flex items-center justify-between gap-2">
+          {/* Çıkış Yap Butonu */}
           <button
+            type="button"
             onClick={logout}
-            className="flex w-full items-center gap-3.5 px-5 py-3 rounded-md cursor-pointer transition-all duration-200 font-medium text-[14px] text-red-400/80 hover:bg-red-950/20 hover:text-red-400"
+            className="flex items-center gap-2 text-xs font-medium text-red-400/80 hover:text-red-300 hover:bg-red-500/10 p-1.5 rounded-lg transition-colors cursor-pointer"
           >
-            <LogOut className="w-[18px] h-[18px]" />
+            <LogOut className="w-4 h-4" />
             <span>{t('nav.signOut')}</span>
           </button>
+
+          {/* Sağ Taraf: Güncelleme Varsa Tıklanabilir Buton / Yoksa Düz Metin */}
+          {versionInfo?.update_available ? (
+            <button
+              type="button"
+              onClick={startSystemUpdate}
+              title={`${t('settings.system.updateAvailable')}: v${versionInfo.latest_version}`}
+              className="group flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-mono text-zinc-400 hover:text-emerald-400 hover:bg-emerald-500/10 border border-transparent hover:border-emerald-500/20 transition-all duration-200 cursor-pointer shrink-0"
+            >
+              <ChevronUp className="w-3.5 h-3.5 text-emerald-400 transition-transform group-hover:-translate-y-0.5" />
+              <span>v{versionInfo.latest_version}</span>
+            </button>
+          ) : (
+            <span className="text-[11px] font-mono text-zinc-500 px-2 py-1 select-none shrink-0">
+              v{versionInfo?.current_version || '0.1.1'}
+            </span>
+          )}
         </div>
       </aside>
 

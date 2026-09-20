@@ -423,12 +423,6 @@ export default function SettingsPage() {
                   )}
                 </div>
               </div>
-
-              {/* CLI Hint */}
-              <div className="flex items-center gap-2 text-xs text-zinc-500 pt-1">
-                <Terminal className="w-3.5 h-3.5 shrink-0 text-zinc-600" />
-                <span>{t('settings.system.cliHint')}</span>
-              </div>
             </div>
           </div>
         </div>

@@ -153,7 +153,10 @@ def check_for_updates(force: bool = False) -> Dict[str, Any]:
                             if count > 0:
                                 has_update = True
                                 if latest_ver == current_ver:
-                                    latest_ver = f"{current_ver}+{count}"
+                                    # Increment patch semver instead of showing +count
+                                    sem = list(_parse_semver(current_ver))
+                                    sem[2] += count
+                                    latest_ver = f"{sem[0]}.{sem[1]}.{sem[2]}"
         except Exception as e:
             logger.debug(f"Git check failed: {e}")
 
