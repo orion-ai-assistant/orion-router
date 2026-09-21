@@ -52,7 +52,7 @@ def _pool_key_on_quota_cooldown(pool_key: dict) -> bool:
 #  İç Yardımcılar
 # ---------------------------------------------------------------------------
 
-async def _log_usage(app_state, key_id: str | None, provider: str, model: str, usage: dict | None, request_json: str | None = None, response_json: str | None = None, success: bool | None = True, capability: str = 'chat', is_estimated: bool = False, ttft_ms: float | None = None, duration_ms: float | None = None):
+async def _log_usage(app_state, key_id: str | None, provider: str, model: str, usage: dict | None, request_json: str | None = None, response_json: str | None = None, success: bool | None = True, capability: str = 'chat', is_estimated: bool = False, ttft_ms: float | None = None, duration_ms: float | None = None, log_id: int | None = None):
     """Arka plan görevi: token kullanımını, gecikme metriklerini ve request/response JSON verilerini DB'ye kaydeder."""
     try:
         if usage is None:
@@ -87,28 +87,60 @@ async def _log_usage(app_state, key_id: str | None, provider: str, model: str, u
             p, c, t = None, None, None
             tokens_used = None
 
-        await db_manager.log_request(
-            key_id=key_id,
-            provider=provider,
-            model=model,
-            tokens_used=tokens_used,
-            prompt_tokens=p,
-            completion_tokens=c,
-            thoughts_tokens=t,
-            cost=cost,
-            request_json=request_json,
-            response_json=response_json,
-            success=success,
-            capability=capability,
-            prompt_cost=p_cost,
-            completion_cost=c_cost,
-            thoughts_cost=t_cost,
-            ttft_ms=ttft_ms,
-            duration_ms=duration_ms
-        )
+        if log_id is None:
+            await db_manager.log_request(
+                key_id=key_id,
+                provider=provider,
+                model=model,
+                tokens_used=tokens_used,
+                prompt_tokens=p,
+                completion_tokens=c,
+                thoughts_tokens=t,
+                cost=cost,
+                request_json=request_json,
+                response_json=response_json,
+                success=success,
+                capability=capability,
+                prompt_cost=p_cost,
+                completion_cost=c_cost,
+                thoughts_cost=t_cost,
+                ttft_ms=ttft_ms,
+                duration_ms=duration_ms
+            )
+        else:
+            await db_manager.update_streaming_log(
+                log_id=log_id,
+                response_json=response_json,
+                status="success" if success is True else ("failed" if success is False else "interrupted"),
+                success=success,
+                tokens_used=tokens_used,
+                prompt_tokens=p,
+                completion_tokens=c,
+                cost=cost,
+                key_id=key_id,
+                duration_ms=duration_ms,
+                ttft_ms=ttft_ms,
+            )
         logger.info(f"Logged usage for {provider}/{model} [{capability}]: (In:{p} Out:{c} Think:{t}) | TTFT:{ttft_ms}ms Dur:{duration_ms}ms | Costs: (In:{p_cost:.4f} Out:{c_cost:.4f} Think:{t_cost:.4f}) | Success: {success}")
     except Exception as e:
         logger.error(f"Failed to log usage: {e}")
+
+async def _create_processing_log(key_id: str | None, provider: str | None, model: str, capability: str, request_data: dict) -> int | None:
+    """Create the visible in-progress row before a provider request starts."""
+    try:
+        log_provider = provider or ("local" if model.startswith("local-") else "unknown")
+        return await db_manager.create_streaming_log(
+            key_id=key_id,
+            provider=log_provider,
+            model=model,
+            request_json=json.dumps(request_data, ensure_ascii=False),
+            response_json=json.dumps({"status": "processing"}, ensure_ascii=False),
+            capability=capability,
+            status="processing",
+        )
+    except Exception as e:
+        logger.warning(f"Failed to create processing log: {e}")
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -329,7 +361,7 @@ class DynamicLLMRouter:
     # -----------------------------------------------------------------------
 
     async def _stream(
-        self, plugin: BaseChat, key_id, provider, model, messages, api_key, auth_header, **kwargs
+        self, plugin: BaseChat, key_id, provider, model, messages, api_key, auth_header, log_id=None, **kwargs
     ):
         """Pluginden SSE chunk'larını yield eder; internal_usage'ı DB'ye kaydeder. Hataları merkezi loglar."""
         accumulated_content = ""
@@ -525,7 +557,8 @@ class DynamicLLMRouter:
                     success=status_val,
                     is_estimated=is_estimated,
                     ttft_ms=ttft_ms,
-                    duration_ms=total_duration_ms
+                    duration_ms=total_duration_ms,
+                    log_id=log_id,
                 )
             )
 
@@ -540,10 +573,19 @@ class DynamicLLMRouter:
         **kwargs,
     ) -> AsyncGenerator[str, None]:
         """Model registry tablosunu sorgulayıp, fallback'leri ve key havuzunu döndürerek sohbet akışını yönetir."""
+        req_data = {"model": model, "messages": messages, **kwargs}
+        log_id = await _create_processing_log(key_id, provider, model, "chat", req_data)
         routes = []
         try:
             routes = await db_manager.resolve_model_route("chat", model)
         except ValueError as e:
+            if log_id:
+                await db_manager.update_streaming_log(
+                    log_id=log_id,
+                    response_json=json.dumps({"error": str(e)}, ensure_ascii=False),
+                    status="failed",
+                    success=False,
+                )
             yield f'data: {json.dumps({"error": {"message": str(e), "type": "api_error"}}, ensure_ascii=False)}\n\n'
             return
         except Exception as e:
@@ -600,6 +642,7 @@ class DynamicLLMRouter:
                             messages=route_messages,
                             api_key=key_val,
                             auth_header=auth_header if not key_val else None,
+                            log_id=log_id,
                             **route_kwargs
                         ):
                             if isinstance(chunk, str) and '"error"' in chunk:
@@ -633,6 +676,13 @@ class DynamicLLMRouter:
                     break
             
             if not success and not yielded_any:
+                if log_id:
+                    await db_manager.update_streaming_log(
+                        log_id=log_id,
+                        response_json=json.dumps({"error": "All routes and fallbacks failed."}, ensure_ascii=False),
+                        status="failed",
+                        success=False,
+                    )
                 if last_error_chunk:
                     yield last_error_chunk
                 else:
@@ -643,6 +693,13 @@ class DynamicLLMRouter:
         logger.info(f"No routes found in database for model '{model}'. Falling back to direct provider routing.")
         if provider not in self.chat_providers:
             err_msg = f"Unknown chat provider: {provider}"
+            if log_id:
+                await db_manager.update_streaming_log(
+                    log_id=log_id,
+                    response_json=json.dumps({"error": err_msg}, ensure_ascii=False),
+                    status="failed",
+                    success=False,
+                )
             yield f'data: {json.dumps({"error": {"message": err_msg, "type": "api_error"}}, ensure_ascii=False)}\n\n'
             return
 
@@ -652,7 +709,7 @@ class DynamicLLMRouter:
 
         async for chunk in self._stream(
             self.chat_providers[provider], key_id, provider, model,
-            route_messages, db_key or api_key, auth_header, **kwargs
+            route_messages, db_key or api_key, auth_header, log_id=log_id, **kwargs
         ):
             yield chunk
 
@@ -683,6 +740,8 @@ class DynamicLLMRouter:
             "model": model,
             "input": input_text,
         }
+        log_provider = provider or routes[0].get("provider")
+        log_id = await _create_processing_log(key_id, log_provider, model, "embed", req_data)
 
         p_provider = provider
         p_model = model
@@ -736,7 +795,8 @@ class DynamicLLMRouter:
                                 response_json=json.dumps(result, ensure_ascii=False),
                                 success=True,
                                 capability='embed',
-                                duration_ms=duration_ms
+                                duration_ms=duration_ms,
+                                log_id=log_id,
                             )
                         )
                         return result
@@ -758,7 +818,8 @@ class DynamicLLMRouter:
                                 request_json=json.dumps(req_data, ensure_ascii=False),
                                 response_json=json.dumps(res_err, ensure_ascii=False),
                                 success=False,
-                                capability='embed'
+                                capability='embed',
+                                log_id=log_id,
                             )
                         )
         except asyncio.CancelledError:
@@ -773,12 +834,21 @@ class DynamicLLMRouter:
                     request_json=json.dumps(req_data, ensure_ascii=False),
                     response_json=json.dumps(res_err, ensure_ascii=False),
                     success=None,
-                    capability='embed'
+                    capability='embed',
+                    log_id=log_id,
                 )
             )
             raise
                     
-        raise last_err or ValueError(f"Could not resolve embed route for model: {model}")
+        final_error = last_err or ValueError(f"Could not resolve embed route for model: {model}")
+        if log_id:
+            await db_manager.update_streaming_log(
+                log_id=log_id,
+                response_json=json.dumps({"error": str(final_error)}, ensure_ascii=False),
+                status="failed",
+                success=False,
+            )
+        raise final_error
 
     # -----------------------------------------------------------------------
     #  TTS
@@ -811,6 +881,8 @@ class DynamicLLMRouter:
             "voice": voice,
             **kwargs
         }
+        log_provider = provider or routes[0].get("provider")
+        log_id = await _create_processing_log(key_id, log_provider, model, "tts", req_data)
 
         p_provider = provider
         p_model = model
@@ -906,7 +978,8 @@ class DynamicLLMRouter:
                                 response_json=json.dumps(res_success, ensure_ascii=False),
                                 success=True,
                                 capability='tts',
-                                duration_ms=duration_ms
+                                duration_ms=duration_ms,
+                                log_id=log_id,
                             )
                         )
                         response_metadata = {
@@ -931,7 +1004,8 @@ class DynamicLLMRouter:
                                 request_json=json.dumps(req_data, ensure_ascii=False),
                                 response_json=json.dumps(res_err, ensure_ascii=False),
                                 success=False,
-                                capability='tts'
+                                capability='tts',
+                                log_id=log_id,
                             )
                         )
         except asyncio.CancelledError:
@@ -946,12 +1020,21 @@ class DynamicLLMRouter:
                     request_json=json.dumps(req_data, ensure_ascii=False),
                     response_json=json.dumps(res_err, ensure_ascii=False),
                     success=None,
-                    capability='tts'
+                    capability='tts',
+                    log_id=log_id,
                 )
             )
             raise
                     
-        raise last_err or ValueError(f"Could not resolve TTS route for model: {model}")
+        final_error = last_err or ValueError(f"Could not resolve TTS route for model: {model}")
+        if log_id:
+            await db_manager.update_streaming_log(
+                log_id=log_id,
+                response_json=json.dumps({"error": str(final_error)}, ensure_ascii=False),
+                status="failed",
+                success=False,
+            )
+        raise final_error
 
     # -----------------------------------------------------------------------
     #  STT (Speech-to-Text / Transcription)
@@ -989,6 +1072,8 @@ class DynamicLLMRouter:
             "bytes_len": len(file_bytes),
             **kwargs,
         }
+        log_provider = provider or routes[0].get("provider")
+        log_id = await _create_processing_log(key_id, log_provider, model, "stt", req_data)
 
         p_provider = provider
         p_model = model
@@ -1050,7 +1135,8 @@ class DynamicLLMRouter:
                                 response_json=json.dumps(result, ensure_ascii=False),
                                 success=True,
                                 capability="stt",
-                                duration_ms=duration_ms
+                                duration_ms=duration_ms,
+                                log_id=log_id,
                             )
                         )
                         return result
@@ -1060,20 +1146,6 @@ class DynamicLLMRouter:
                             await db_manager.mark_provider_key_error(key_pool_id, str(e))
                         last_err = e
 
-                        res_err = {"error": str(e)}
-                        asyncio.create_task(
-                            _log_usage(
-                                self.app_state,
-                                key_id,
-                                p_provider,
-                                p_model,
-                                None,
-                                request_json=json.dumps(req_data, ensure_ascii=False),
-                                response_json=json.dumps(res_err, ensure_ascii=False),
-                                success=False,
-                                capability="stt",
-                            )
-                        )
         except asyncio.CancelledError:
             res_err = {"error": "Client disconnected / Request Cancelled"}
             asyncio.create_task(
@@ -1087,11 +1159,20 @@ class DynamicLLMRouter:
                     response_json=json.dumps(res_err, ensure_ascii=False),
                     success=None,
                     capability="stt",
+                    log_id=log_id,
                 )
             )
             raise
 
-        raise last_err or ValueError(f"Could not resolve STT route for model: {model}")
+        final_error = last_err or ValueError(f"Could not resolve STT route for model: {model}")
+        if log_id:
+            await db_manager.update_streaming_log(
+                log_id=log_id,
+                response_json=json.dumps({"error": str(final_error)}, ensure_ascii=False),
+                status="failed",
+                success=False,
+            )
+        raise final_error
 
     # -----------------------------------------------------------------------
     #  File Upload

@@ -435,6 +435,7 @@ class DatabaseManager:
         cost: float = 0.0,
         key_id: str | None = None,
         duration_ms: float | None = None,
+        ttft_ms: float | None = None,
     ) -> None:
         """Canlı streaming oturumunun ara veya nihai sonucunu günceller."""
         pool = await self.get_db_pool()
@@ -450,10 +451,11 @@ class DatabaseManager:
                         prompt_tokens = COALESCE($6, prompt_tokens),
                         completion_tokens = COALESCE($7, completion_tokens),
                         cost = COALESCE($8, cost),
-                        duration_ms = COALESCE($9, duration_ms)
+                        duration_ms = COALESCE($9, duration_ms),
+                        ttft_ms = COALESCE($10, ttft_ms)
                     WHERE id = $1
                     """,
-                    log_id, response_json, status, success, tokens_used, prompt_tokens, completion_tokens, cost, duration_ms
+                    log_id, response_json, status, success, tokens_used, prompt_tokens, completion_tokens, cost, duration_ms, ttft_ms
                 )
                 if key_id and cost is not None and cost > 0:
                     await conn.execute(
