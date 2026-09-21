@@ -268,6 +268,8 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
     let firstTokenAt: number | undefined;
     const thinkingMsgId = 'think-' + Date.now() + '-' + Math.random();
     const contentMsgId = 'content-' + Date.now() + '-' + Math.random();
+    let errorMessageId: string | null = null;
+    let receivedError = false;
     let hasThinking = false;
     let hasContent = false;
 
@@ -326,9 +328,11 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
         }
 
         if (data.error) {
+          receivedError = true;
           const errMsg = typeof data.error === 'string'
             ? data.error
             : data.error.message || JSON.stringify(data.error);
+          errorMessageId = 'err-' + Date.now() + '-' + Math.random();
 
           setChatMessages((prev) => {
             const updated = [...prev];
@@ -339,7 +343,7 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
             return [
               ...updated,
               {
-                id: 'err-' + Date.now() + '-' + Math.random(),
+                id: errorMessageId!,
                 role: 'assistant',
                 type: 'content',
                 html: `<span class="text-red-500 font-semibold">Error:</span> <pre class="whitespace-pre-wrap text-[10px] mt-1 bg-red-950/20 border border-red-500/30 p-2 rounded">${escapeHtml(errMsg)}</pre>`,
@@ -439,6 +443,20 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
         const interruptedTtftMs = firstTokenAt === undefined
           ? interruptedDurationMs
           : Math.round(firstTokenAt - startedAt);
+        if (receivedError && errorMessageId) {
+          setChatMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === errorMessageId
+                ? {
+                    ...msg,
+                    ttftMs: routerMetrics.ttft_ms ?? interruptedTtftMs,
+                    totalDurationMs: routerMetrics.total_duration_ms ?? interruptedDurationMs,
+                  }
+                : msg
+            )
+          );
+          return;
+        }
         setChatMessages((prev) => {
           let attached = false;
           const updated = prev.map((msg) => {

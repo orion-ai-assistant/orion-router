@@ -54,6 +54,26 @@ def inject_system_prompt(
     ]
 
 
+def extract_error_message(error_chunk: str | None) -> str | None:
+    if not error_chunk:
+        return None
+
+    data = error_chunk.strip()
+    if data.startswith("data:"):
+        data = data[5:].strip()
+    try:
+        payload = json.loads(data)
+    except json.JSONDecodeError:
+        return data or None
+
+    error = payload.get("error") if isinstance(payload, dict) else None
+    if isinstance(error, dict) and error.get("message"):
+        return str(error["message"])
+    if error:
+        return str(error)
+    return None
+
+
 class ChatRunner:
     def __init__(self, registry, route_resolver, key_pool, telemetry) -> None:
         self.registry = registry
@@ -113,6 +133,12 @@ class ChatRunner:
                                 data_str = data_str[5:].strip()
                             if data_str and data_str != "[DONE]":
                                 chunk_data = json.loads(data_str)
+                                if "error" in chunk_data:
+                                    error = chunk_data["error"]
+                                    if isinstance(error, dict) and error.get("message"):
+                                        error_details = str(error["message"])
+                                    elif error:
+                                        error_details = str(error)
                                 choices = chunk_data.get("choices", [])
                                 if choices:
                                     delta = choices[0].get("delta", {})
@@ -195,6 +221,7 @@ class ChatRunner:
                 logger.error("[%s] Stream Exception: %s", provider, exc, exc_info=True)
 
             err_msg = str(exc)
+            error_details = err_msg
             yield f"data: {json.dumps({'error': {'message': err_msg, 'type': 'api_error'}}, ensure_ascii=False)}\n\n"
         finally:
             total_duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
@@ -423,9 +450,11 @@ class ChatRunner:
                     break
 
             if not success and not yielded_any:
+                error_message = extract_error_message(last_error_chunk)
+                final_error = error_message or "All routes and fallbacks failed."
                 await self.telemetry.finish_processing_log(
                     log_id,
-                    {"error": "All routes and fallbacks failed."},
+                    {"error": final_error},
                     "failed",
                     False,
                 )
@@ -437,7 +466,7 @@ class ChatRunner:
                         + json.dumps(
                             {
                                 "error": {
-                                    "message": "All routes and fallbacks failed.",
+                                    "message": final_error,
                                     "type": "api_error",
                                 }
                             },

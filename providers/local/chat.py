@@ -14,6 +14,22 @@ from core.config import LLM_HOST, LLM_PORT
 from core.http_client import get_http_client
 
 
+def _response_error_message(body: bytes) -> str:
+    raw_body = body.decode(errors="ignore").strip() or "<empty>"
+    try:
+        payload = json.loads(raw_body)
+    except json.JSONDecodeError:
+        return raw_body
+
+    if isinstance(payload, dict):
+        error = payload.get("error")
+        if isinstance(error, dict) and error.get("message"):
+            return str(error["message"])
+        if payload.get("detail"):
+            return str(payload["detail"])
+    return raw_body
+
+
 class LocalChatProvider(BaseChat):
 
     def apply_thinking(self, payload: dict[str, Any], thinking: ThinkingConfig) -> None:
@@ -78,8 +94,9 @@ class LocalChatProvider(BaseChat):
                 "POST", url, json=payload, headers={"Content-Type": "application/json"}, timeout=None
             ) as response:
                 if response.status_code != 200:
-                    err = await response.aread()
-                    raise RuntimeError(f"Local HTTP Error {response.status_code}: {err.decode(errors='ignore')}")
+                    body = await response.aread()
+                    message = _response_error_message(body)
+                    raise RuntimeError(message)
 
                 async for data in self._iter_sse_lines(response):
                     # ── Usage chunk ────────────────────────────────────────────────────
