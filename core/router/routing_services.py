@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timedelta, timezone
 
-from core.route_types import ResolvedRoute, RoutePlan
+from core.router.route_types import ResolvedRoute, RoutePlan
 from database import db_manager
 
 logger = logging.getLogger("service-router.dynamic")

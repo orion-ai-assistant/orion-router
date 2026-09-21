@@ -10,22 +10,22 @@ flows live under core/. This module keeps the application-facing API stable.
 import logging
 from typing import Any, AsyncGenerator
 
-from core.provider_registry import ALLOWED_CAPABILITIES, ProviderRegistry
-from core.route_types import ResolvedRoute, RoutePlan
-from core.routing_services import (
+from core.router.provider_registry import ALLOWED_CAPABILITIES, ProviderRegistry
+from core.router.route_types import ResolvedRoute, RoutePlan
+from core.router.routing_services import (
     ProviderKeyPool,
     RouteResolver,
     pool_key_on_quota_cooldown,
 )
-from core.runners.chat import (
+from core.router.runners.chat import (
     ChatRunner,
     inject_system_prompt,
     sanitize_tool_ids_for_non_gemini,
 )
-from core.runners.embeddings import EmbeddingsRunner
-from core.runners.stt import STTRunner
-from core.runners.tts import TTSRunner
-from core.telemetry import TelemetryService
+from core.router.runners.embeddings import EmbeddingsRunner
+from core.router.runners.stt import STTRunner
+from core.router.runners.tts import TTSRunner
+from core.router.telemetry import TelemetryService
 
 logger = logging.getLogger("service-router.dynamic")
 

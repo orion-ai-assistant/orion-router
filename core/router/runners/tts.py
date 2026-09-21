@@ -4,7 +4,7 @@ import json
 import logging
 import time
 
-from core.route_types import RoutePlan
+from core.router.route_types import RoutePlan
 
 logger = logging.getLogger("service-router.dynamic")
 

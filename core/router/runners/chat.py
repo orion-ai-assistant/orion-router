@@ -307,7 +307,7 @@ class ChatRunner:
             logger.warning("Model route resolution failed for '%s': %s", model, exc)
 
         if route_plan is None:
-            from core.route_types import RoutePlan
+            from core.router.route_types import RoutePlan
 
             route_plan = RoutePlan.direct(model, provider)
 
