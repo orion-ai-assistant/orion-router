@@ -34,7 +34,9 @@ export default function EmbedTab({ models, groups }: EmbedTabProps) {
   const [embedDim, setEmbedDim] = useState('');
   const [embedJson, setEmbedJson] = useState('');
   const [isGeneratingEmbed, setIsGeneratingEmbed] = useState(false);
+  const [embedLatencyMs, setEmbedLatencyMs] = useState<number | null>(null);
   const embedAbortControllerRef = useRef<AbortController | null>(null);
+  const embedStartedAtRef = useRef<number | null>(null);
 
   // Update dropdown targets on models/groups load
   useEffect(() => {
@@ -90,12 +92,14 @@ export default function EmbedTab({ models, groups }: EmbedTabProps) {
     setEmbedPreview('');
     setEmbedDim('');
     setEmbedJson('');
+    setEmbedLatencyMs(null);
 
     const adminKey = getAdminKey();
     const apiBaseUrl = getApiBaseUrl();
 
     try {
       setIsGeneratingEmbed(true);
+      embedStartedAtRef.current = performance.now();
       embedAbortControllerRef.current = new AbortController();
 
       const res = await fetch(`${apiBaseUrl}/v1/embeddings`, {
@@ -115,10 +119,12 @@ export default function EmbedTab({ models, groups }: EmbedTabProps) {
       }
 
       const data = await res.json();
+      const serverDurationMs = data.metrics?.total_duration_ms;
+      setEmbedLatencyMs(typeof serverDurationMs === 'number' ? serverDurationMs : null);
       const vector = data.data?.[0]?.embedding || [];
       const dim = vector.length;
 
-      setEmbedDim(`📐 Dimensions: ${dim} | Model: ${data.model}`);
+      setEmbedDim(`📐 Dimensions: ${dim}`);
 
       const previewVec = vector.slice(0, 8).map((v: number) => v.toFixed(6)).join(', ');
       setEmbedPreview(`[${previewVec}${dim > 8 ? ', ...' : ''}]`);
@@ -135,12 +141,17 @@ export default function EmbedTab({ models, groups }: EmbedTabProps) {
       setEmbedJson(JSON.stringify(truncated, null, 2));
       showToast(t('playground.toast.embeddingSuccess'));
     } catch (e: any) {
-      if (e.name !== 'AbortError') {
+      if (e.name === 'AbortError') {
+        if (embedStartedAtRef.current !== null) {
+          setEmbedLatencyMs(Math.round(performance.now() - embedStartedAtRef.current));
+        }
+      } else {
         setEmbedError('❌ Error: ' + e.message);
       }
     } finally {
       setIsGeneratingEmbed(false);
       embedAbortControllerRef.current = null;
+      embedStartedAtRef.current = null;
     }
   };
 
@@ -174,12 +185,25 @@ export default function EmbedTab({ models, groups }: EmbedTabProps) {
           <Textarea
             value={embedInput}
             onChange={(e) => setEmbedInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (!isGeneratingEmbed) {
+                  handleGenerateEmbedding();
+                }
+              }
+            }}
             placeholder={t('playground.textToEmbedPlaceholder')}
             className="flex-1 bg-black/40 border border-zinc-850 text-white rounded p-3 text-xs min-h-[120px] max-h-[220px]"
           />
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex items-center justify-between">
+          {embedLatencyMs !== null ? (
+            <div className="text-[11px] text-zinc-400 font-mono">
+              ⏱ {embedLatencyMs} ms
+            </div>
+          ) : <span />}
           {isGeneratingEmbed ? (
             <Button
               onClick={() => embedAbortControllerRef.current?.abort()}

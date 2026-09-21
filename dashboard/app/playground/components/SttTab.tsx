@@ -353,7 +353,9 @@ export default function SttTab({ models, groups }: SttTabProps) {
     return result;
   };
 
-  const stopStreaming = () => {
+  const stopStreaming = (waitForFinalMetrics = false) => {
+    const socket = wsRef.current;
+    const shouldWaitForFinalMetrics = waitForFinalMetrics && socket?.readyState === WebSocket.OPEN && isStreamingRef.current;
     isStreamingRef.current = false;
     setIsStreaming(false);
     setStreamingStatus('idle');
@@ -384,6 +386,13 @@ export default function SttTab({ models, groups }: SttTabProps) {
         mediaStreamRef.current.getTracks().forEach((track) => track.stop());
       } catch {}
       mediaStreamRef.current = null;
+    }
+
+    if (shouldWaitForFinalMetrics) {
+      try {
+        socket.send(JSON.stringify({ type: 'stop' }));
+      } catch {}
+      return;
     }
 
     if (wsRef.current) {
@@ -448,6 +457,18 @@ export default function SttTab({ models, groups }: SttTabProps) {
           } else if (data.type === 'error') {
             setSttError(data.message || 'STT Servisi Hata Bildirdi');
             stopStreaming();
+          } else if (data.type === 'metrics') {
+            const totalDurationMs = data.metrics?.total_duration_ms;
+            if (typeof totalDurationMs === 'number') {
+              setStreamLatencyMs(totalDurationMs);
+            }
+            setRawResponseJson(JSON.stringify(data, null, 2));
+            if (data.text) {
+              setTranscriptionText((prev) => prev || data.text);
+            }
+            try {
+              ws.close();
+            } catch {}
           }
         } catch (err) {
           console.warn('Failed to parse WS message:', err);
@@ -490,9 +511,9 @@ export default function SttTab({ models, groups }: SttTabProps) {
         audio: {
           channelCount: 1,
           sampleRate: 16000,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
         },
       });
       mediaStreamRef.current = stream;
@@ -515,7 +536,10 @@ export default function SttTab({ models, groups }: SttTabProps) {
         const pcm16 = downsampleTo16kPCM(inputData, inputSampleRate, 16000);
         if (pcm16.length > 0) {
           try {
-            wsRef.current.send(pcm16.buffer);
+            const pcmBuffer = pcm16.buffer;
+            if (pcmBuffer instanceof ArrayBuffer) {
+              wsRef.current.send(pcmBuffer);
+            }
           } catch {}
         }
       };
@@ -606,6 +630,7 @@ export default function SttTab({ models, groups }: SttTabProps) {
     setAudioFileName(name);
     setAudioUrl(newUrl);
     setSttError('');
+    setStreamLatencyMs(null);
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
@@ -714,9 +739,9 @@ export default function SttTab({ models, groups }: SttTabProps) {
     setTranscriptionText('');
     setRawResponseJson('');
     setLatencyMs(null);
+    setStreamLatencyMs(null);
     setIsTranscribing(true);
 
-    const startTime = performance.now();
     const adminKey = getAdminKey();
     const apiBaseUrl = getApiBaseUrl();
 
@@ -745,9 +770,6 @@ export default function SttTab({ models, groups }: SttTabProps) {
         signal: abortControllerRef.current.signal,
       });
 
-      const elapsed = Math.round(performance.now() - startTime);
-      setLatencyMs(elapsed);
-
       if (!res.ok) {
         let errorDetail = res.statusText;
         try {
@@ -758,6 +780,8 @@ export default function SttTab({ models, groups }: SttTabProps) {
       }
 
       const jsonResult = await res.json();
+      const totalDurationMs = jsonResult.metrics?.total_duration_ms;
+      setLatencyMs(typeof totalDurationMs === 'number' ? totalDurationMs : null);
       setRawResponseJson(JSON.stringify(jsonResult, null, 2));
       setTranscriptionText(jsonResult.text || '');
 
@@ -791,10 +815,15 @@ export default function SttTab({ models, groups }: SttTabProps) {
     showToast('Transkripsiyon sonucu temizlendi.');
   };
 
-  const formatSeconds = (sec: number) => {
-    const mins = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${mins}:${s < 10 ? '0' : ''}${s}`;
+  const formatSeconds = (totalSec: number) => {
+    const s = Math.floor(totalSec % 60);
+    const m = Math.floor((totalSec / 60) % 60);
+    const h = Math.floor((totalSec / 3600) % 24);
+    const d = Math.floor(totalSec / 86400);
+    const pad = (n: number) => (n < 10 ? '0' : '') + n;
+    if (d > 0) return `${d}g ${pad(h)}:${pad(m)}:${pad(s)}`;
+    if (h > 0) return `${pad(h)}:${pad(m)}:${pad(s)}`;
+    return `${pad(m)}:${pad(s)}`;
   };
 
   return (
@@ -961,7 +990,7 @@ export default function SttTab({ models, groups }: SttTabProps) {
                     {isStreaming ? (
                       <Button
                         type="button"
-                        onClick={stopStreaming}
+                        onClick={() => stopStreaming(true)}
                         className="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white rounded-lg flex items-center gap-2 px-4 py-2 text-xs font-semibold shadow-md shadow-red-950/50 animate-pulse"
                       >
                         <Square className="w-4 h-4" />
@@ -1028,9 +1057,9 @@ export default function SttTab({ models, groups }: SttTabProps) {
             </div>
 
             <div className="flex items-center gap-3">
-              {streamLatencyMs !== null && isStreaming && (
+              {streamLatencyMs !== null && (
                 <div className="text-[11px] text-amber-400 font-mono flex items-center gap-1">
-                  ⚡ Canlı Gecikme: {streamLatencyMs} ms
+                  ⚡ {isStreaming ? 'Canlı Gecikme' : 'Toplam Süre'}: {streamLatencyMs} ms
                 </div>
               )}
               {latencyMs !== null && !isStreaming && (

@@ -26,6 +26,8 @@ interface LogItem {
   status?: string;
   capability: string;
   created_at: string;
+  ttft_ms?: number | null;
+  duration_ms?: number | null;
 }
 
 interface LogDetails {
@@ -302,7 +304,7 @@ export default function LogsPage() {
                     )}
                   </TableCell>
                   <TableCell className="py-4 text-center font-mono text-xs text-zinc-400">
-                    {dateTime(log.created_at)}
+                    <div>{dateTime(log.created_at)}</div>
                   </TableCell>
                   <TableCell className="py-4 text-right pr-6">
                     <Button

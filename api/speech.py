@@ -4,6 +4,7 @@ api/speech.py
 OpenAI-compatible text-to-speech endpoint.
 """
 import asyncio
+import json
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -43,7 +44,7 @@ async def audio_speech(
     extra_kwargs = {k: v for k, v in body.items() if k not in ("input", "model", "voice")}
 
     try:
-        audio_bytes, content_type = await run_with_disconnect_check(
+        audio_bytes, content_type, metrics = await run_with_disconnect_check(
             request,
             dynamic_router.run_speech(
                 provider=provider,
@@ -59,7 +60,10 @@ async def audio_speech(
         return Response(
             content=audio_bytes,
             media_type=content_type,
-            headers={"Content-Disposition": "inline; filename=\"speech.wav\""},
+            headers={
+                "Content-Disposition": "inline; filename=\"speech.wav\"",
+                "X-Orion-Metrics": json.dumps(metrics),
+            },
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

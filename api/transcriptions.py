@@ -179,6 +179,13 @@ async def audio_transcriptions_stream(
                             chunks_count += 1
                             await backend_ws.send(msg["bytes"])
                         elif "text" in msg and msg["text"]:
+                            try:
+                                control = json.loads(msg["text"])
+                            except (TypeError, json.JSONDecodeError):
+                                control = None
+                            if isinstance(control, dict) and control.get("type") == "stop":
+                                await backend_ws.close()
+                                break
                             await backend_ws.send(msg["text"])
                 except WebSocketDisconnect:
                     pass
@@ -257,12 +264,6 @@ async def audio_transcriptions_stream(
         err_message = str(e)
         logger.error(f"Unexpected error during STT stream: {e}")
     finally:
-        if websocket.client_state == WebSocketState.CONNECTED:
-            try:
-                await websocket.close()
-            except Exception:
-                pass
-
         # Oturum bittiğinde nihai log kaydını güncelle
         if log_id:
             try:
@@ -294,6 +295,9 @@ async def audio_transcriptions_stream(
                     "bytes_received": bytes_received,
                     "chunks_count": chunks_count,
                     "segments": segments,
+                    "metrics": {
+                        "total_duration_ms": round(session_duration * 1000, 2)
+                    }
                 }
                 if err_message:
                     final_resp["error"] = err_message
@@ -308,6 +312,7 @@ async def audio_transcriptions_stream(
                     completion_tokens=completion_tokens,
                     cost=cost,
                     key_id=auth.get("key_id"),
+                    duration_ms=round(session_duration * 1000, 2)
                 )
                 logger.info(
                     f"WebSocket STT session #{log_id} finalized: status={final_status}, "
@@ -315,6 +320,25 @@ async def audio_transcriptions_stream(
                 )
             except Exception as upd_err:
                 logger.error(f"Failed to finalize streaming log #{log_id}: {upd_err}")
+
+        # Stop sonrasında istemci bağlantıyı kapatmadan önce son süre JSON'unu alabilsin.
+        if websocket.client_state == WebSocketState.CONNECTED:
+            try:
+                final_duration = round(time.time() - session_start_time, 2)
+                await websocket.send_json({
+                    "type": "metrics",
+                    "text": " ".join(s["text"] for s in segments),
+                    "status": "interrupted" if err_message else "success",
+                    "metrics": {"total_duration_ms": round(final_duration * 1000, 2)},
+                })
+            except Exception as metrics_err:
+                logger.debug(f"Could not send final STT metrics to client: {metrics_err}")
+
+        if websocket.client_state == WebSocketState.CONNECTED:
+            try:
+                await websocket.close()
+            except Exception:
+                pass
 
         logger.info("WebSocket STT streaming closed cleanly.")
 

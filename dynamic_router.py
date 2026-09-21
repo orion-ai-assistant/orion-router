@@ -13,6 +13,7 @@ Combo route (alias → primary/fallback) desteği chat için korunmuştur.
 """
 import asyncio
 import json
+import time
 import importlib
 import inspect
 import logging
@@ -51,8 +52,8 @@ def _pool_key_on_quota_cooldown(pool_key: dict) -> bool:
 #  İç Yardımcılar
 # ---------------------------------------------------------------------------
 
-async def _log_usage(app_state, key_id: str | None, provider: str, model: str, usage: dict | None, request_json: str | None = None, response_json: str | None = None, success: bool | None = True, capability: str = 'chat', is_estimated: bool = False):
-    """Arka plan görevi: token kullanımını ve request/response JSON verilerini DB'ye kaydeder."""
+async def _log_usage(app_state, key_id: str | None, provider: str, model: str, usage: dict | None, request_json: str | None = None, response_json: str | None = None, success: bool | None = True, capability: str = 'chat', is_estimated: bool = False, ttft_ms: float | None = None, duration_ms: float | None = None):
+    """Arka plan görevi: token kullanımını, gecikme metriklerini ve request/response JSON verilerini DB'ye kaydeder."""
     try:
         if usage is None:
             p, c, t = None, None, None
@@ -101,9 +102,11 @@ async def _log_usage(app_state, key_id: str | None, provider: str, model: str, u
             capability=capability,
             prompt_cost=p_cost,
             completion_cost=c_cost,
-            thoughts_cost=t_cost
+            thoughts_cost=t_cost,
+            ttft_ms=ttft_ms,
+            duration_ms=duration_ms
         )
-        logger.info(f"Logged usage for {provider}/{model} [{capability}]: (In:{p} Out:{c} Think:{t}) | Costs: (In:{p_cost:.4f} Out:{c_cost:.4f} Think:{t_cost:.4f}) | Success: {success}")
+        logger.info(f"Logged usage for {provider}/{model} [{capability}]: (In:{p} Out:{c} Think:{t}) | TTFT:{ttft_ms}ms Dur:{duration_ms}ms | Costs: (In:{p_cost:.4f} Out:{c_cost:.4f} Think:{t_cost:.4f}) | Success: {success}")
     except Exception as e:
         logger.error(f"Failed to log usage: {e}")
 
@@ -338,6 +341,9 @@ class DynamicLLMRouter:
         error_details = None
         is_estimated = False
         
+        start_time = time.perf_counter()
+        ttft_ms: float | None = None
+        
         logger.info(f"Starting chat stream: provider={provider}, model={model}, kwargs={kwargs}")
         
         # Gemini-dışı provider'lara giden mesajlardaki uzun tool_call_id'leri kısalt
@@ -368,11 +374,15 @@ class DynamicLLMRouter:
                                 choices = chunk_data.get("choices", [])
                                 if choices:
                                     delta = choices[0].get("delta", {})
+                                    has_token = False
                                     if "reasoning_content" in delta and delta["reasoning_content"]:
                                         accumulated_reasoning += delta["reasoning_content"]
+                                        has_token = True
                                     if "content" in delta and delta["content"]:
                                         accumulated_content += delta["content"]
+                                        has_token = True
                                     if "tool_calls" in delta:
+                                        has_token = True
                                         for tc_delta in delta["tool_calls"]:
                                             idx = tc_delta.get("index", 0)
                                             # Yeni tool_call mı, yoksa mevcut olana ekleme mi?
@@ -386,9 +396,38 @@ class DynamicLLMRouter:
                                                 entry["function"]["name"] = fn["name"]
                                             if fn.get("arguments"):
                                                 entry["function"]["arguments"] += fn["arguments"]
+                                    if has_token and ttft_ms is None:
+                                        ttft_ms = round((time.perf_counter() - start_time) * 1000, 2)
                         except Exception:
                             pass
                     yield chunk
+
+            if not has_error and status_val is True:
+                total_duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+                if ttft_ms is None:
+                    ttft_ms = total_duration_ms
+
+                comp_tokens = (usage.get("completion_tokens") if usage else None) or (len(accumulated_content) // 4 if is_estimated else 0)
+                metrics_payload = {
+                    "ttft_ms": ttft_ms,
+                    "total_duration_ms": total_duration_ms,
+                }
+                if comp_tokens and total_duration_ms > 0:
+                    metrics_payload["tokens_per_second"] = round(comp_tokens / (total_duration_ms / 1000.0), 2)
+
+                final_chunk = {
+                    "id": f"chatcmpl-{int(time.time())}",
+                    "object": "chat.completion.chunk",
+                    "created": int(time.time()),
+                    "model": model,
+                    "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+                    "metrics": metrics_payload,
+                }
+                if usage:
+                    final_chunk["usage"] = usage
+
+                yield f'data: {json.dumps(final_chunk, ensure_ascii=False)}\n\n'
+                yield 'data: [DONE]\n\n'
         except asyncio.CancelledError:
             has_error = True
             status_val = None
@@ -406,6 +445,12 @@ class DynamicLLMRouter:
             err_msg = str(e)
             yield f'data: {json.dumps({"error": {"message": err_msg, "type": "api_error"}}, ensure_ascii=False)}\n\n'
         finally:
+            total_duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+            if ttft_ms is None and (accumulated_content or accumulated_reasoning or accumulated_tool_calls):
+                ttft_ms = total_duration_ms
+            if ttft_ms is None and status_val is None:
+                ttft_ms = total_duration_ms
+
             # API'den usage sadece stream sonunda gelir.
             # Eğer API stream_options: include_usage desteklemiyorsa veya kullanıcı erkenden keserse usage boş kalır.
             # Bu durumda tahmini token kullanımını hesapla ki harcanan miktar bilinsin.
@@ -432,7 +477,14 @@ class DynamicLLMRouter:
                     req_data[k] = v
 
             if status_val is False:
-                res_data = {"error": error_details}
+                res_data = {
+                    "error": error_details,
+                    "metrics": {
+                        "total_duration_ms": total_duration_ms,
+                    }
+                }
+                if ttft_ms is not None:
+                    res_data["metrics"]["ttft_ms"] = ttft_ms
             else:
                 msg_data: dict[str, Any] = {
                     "role": "assistant",
@@ -445,7 +497,21 @@ class DynamicLLMRouter:
                 
                 if accumulated_tool_calls:
                     msg_data["tool_calls"] = accumulated_tool_calls
-                res_data = {"choices": [{"message": msg_data}]}
+
+                metrics_dict = {
+                    "ttft_ms": ttft_ms,
+                    "total_duration_ms": total_duration_ms,
+                }
+                comp_tokens = (usage.get("completion_tokens") if usage else None) or (len(accumulated_content) // 4 if is_estimated else 0)
+                if comp_tokens and total_duration_ms > 0:
+                    metrics_dict["tokens_per_second"] = round(comp_tokens / (total_duration_ms / 1000.0), 2)
+
+                res_data = {
+                    "choices": [{"message": msg_data}],
+                    "metrics": metrics_dict,
+                }
+                if usage:
+                    res_data["usage"] = usage
             
             asyncio.create_task(
                 _log_usage(
@@ -457,7 +523,9 @@ class DynamicLLMRouter:
                     request_json=json.dumps(req_data, ensure_ascii=False) if req_data else None,
                     response_json=json.dumps(res_data, ensure_ascii=False) if res_data else None,
                     success=status_val,
-                    is_estimated=is_estimated
+                    is_estimated=is_estimated,
+                    ttft_ms=ttft_ms,
+                    duration_ms=total_duration_ms
                 )
             )
 
@@ -619,6 +687,7 @@ class DynamicLLMRouter:
         p_provider = provider
         p_model = model
         last_err = None
+        start_time = time.perf_counter()
         try:
             for route in routes:
                 p_provider = route["provider"]
@@ -641,6 +710,7 @@ class DynamicLLMRouter:
                             auth_header=auth_header if not key_val else None,
                         )
                         
+                        duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
                         # Log success — store vector dimension in completion_tokens
                         p_tokens = 0
                         vector_dim = 0
@@ -651,6 +721,8 @@ class DynamicLLMRouter:
                                 vector_dim = len(result["data"][0]["embedding"])
                             except Exception:
                                 pass
+                            if "metrics" not in result:
+                                result["metrics"] = {"total_duration_ms": duration_ms}
                         
                         usage = {"prompt_tokens": p_tokens, "completion_tokens": vector_dim, "thoughts_tokens": 0}
                         asyncio.create_task(
@@ -663,7 +735,8 @@ class DynamicLLMRouter:
                                 request_json=json.dumps(req_data, ensure_ascii=False),
                                 response_json=json.dumps(result, ensure_ascii=False),
                                 success=True,
-                                capability='embed'
+                                capability='embed',
+                                duration_ms=duration_ms
                             )
                         )
                         return result
@@ -721,7 +794,7 @@ class DynamicLLMRouter:
         auth_header: str | None = None,
         key_id: str | None = None,
         **kwargs,
-    ) -> tuple[bytes, str]:
+    ) -> tuple[bytes, str, dict[str, float]]:
         """Belirtilen model üzerinden ses üretir (otomatik route ve key fallbacks ile)."""
         routes = []
         try:
@@ -742,6 +815,7 @@ class DynamicLLMRouter:
         p_provider = provider
         p_model = model
         last_err = None
+        start_time = time.perf_counter()
         try:
             for route in routes:
                 p_provider = route["provider"]
@@ -804,6 +878,7 @@ class DynamicLLMRouter:
                             **route_kwargs
                         )
                         
+                        duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
                         # Log success — store audio tokens
                         import base64
                         audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
@@ -815,7 +890,10 @@ class DynamicLLMRouter:
                             "content_type": content_type,
                             "size_bytes": len(audio_bytes),
                             "estimated_duration_seconds": completion_tokens / 25.0,
-                            "audio_base64": audio_b64
+                            "audio_base64": audio_b64,
+                            "metrics": {
+                                "total_duration_ms": duration_ms
+                            }
                         }
                         asyncio.create_task(
                             _log_usage(
@@ -827,10 +905,14 @@ class DynamicLLMRouter:
                                 request_json=json.dumps(req_data, ensure_ascii=False),
                                 response_json=json.dumps(res_success, ensure_ascii=False),
                                 success=True,
-                                capability='tts'
+                                capability='tts',
+                                duration_ms=duration_ms
                             )
                         )
-                        return audio_bytes, content_type
+                        response_metadata = {
+                            key: value for key, value in res_success.items() if key != "audio_base64"
+                        }
+                        return audio_bytes, content_type, response_metadata
                     except Exception as e:
                         logger.error(f"TTS route {p_provider}/{p_model} failed: {e}")
                         if key_pool_id:
@@ -911,6 +993,7 @@ class DynamicLLMRouter:
         p_provider = provider
         p_model = model
         last_err = None
+        start_time = time.perf_counter()
         try:
             for route in routes:
                 p_provider = route["provider"]
@@ -942,6 +1025,7 @@ class DynamicLLMRouter:
                             **kwargs,
                         )
 
+                        duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
                         # Log usage
                         duration = result.get("duration", 0) or 0
                         text_res = result.get("text", "")
@@ -952,6 +1036,8 @@ class DynamicLLMRouter:
                             "completion_tokens": completion_tokens,
                             "thoughts_tokens": 0,
                         }
+                        if isinstance(result, dict) and "metrics" not in result:
+                            result["metrics"] = {"total_duration_ms": duration_ms}
 
                         asyncio.create_task(
                             _log_usage(
@@ -964,6 +1050,7 @@ class DynamicLLMRouter:
                                 response_json=json.dumps(result, ensure_ascii=False),
                                 success=True,
                                 capability="stt",
+                                duration_ms=duration_ms
                             )
                         )
                         return result

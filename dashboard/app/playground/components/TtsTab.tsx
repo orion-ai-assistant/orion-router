@@ -51,10 +51,12 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
   const [isLocalTts, setIsLocalTts] = useState(false);
   const [ttsInput, setTtsInput] = useState('');
   const [ttsUrl, setTtsUrl] = useState('');
+  const [ttsResponseJson, setTtsResponseJson] = useState('');
   const [ttsError, setTtsError] = useState('');
   const [isGeneratingTTS, setIsGeneratingTTS] = useState(false);
   const [ttsLatencyMs, setTtsLatencyMs] = useState<number | null>(null);
   const ttsAbortControllerRef = useRef<AbortController | null>(null);
+  const ttsStartedAtRef = useRef<number | null>(null);
 
   // Custom tts_instruct and active engine info state for local TTS
   const [ttsInstruct, setTtsInstruct] = useState(getSavedState('pg_ttsInstruct', ''));
@@ -485,9 +487,9 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
 
     setTtsError('');
     setTtsUrl('');
+    setTtsResponseJson('');
     setTtsLatencyMs(null);
 
-    const startTime = performance.now();
     const adminKey = getAdminKey();
     const apiBaseUrl = getApiBaseUrl();
 
@@ -583,6 +585,7 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
 
     try {
       setIsGeneratingTTS(true);
+      ttsStartedAtRef.current = performance.now();
       ttsAbortControllerRef.current = new AbortController();
 
       const res = await fetch(`${apiBaseUrl}/v1/audio/speech`, {
@@ -602,17 +605,35 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
       }
 
       const blob = await res.blob();
-      const elapsed = Math.round(performance.now() - startTime);
-      setTtsLatencyMs(elapsed);
+      const metricsHeader = res.headers.get('x-orion-metrics');
+      let totalDurationMs: number | null = null;
+      if (metricsHeader) {
+        try {
+          const responseMetadata = JSON.parse(metricsHeader);
+          const metrics = responseMetadata.metrics || responseMetadata;
+          if (typeof metrics.total_duration_ms === 'number') {
+            totalDurationMs = metrics.total_duration_ms;
+          }
+          setTtsResponseJson(JSON.stringify(responseMetadata, null, 2));
+        } catch {
+          // Ignore malformed optional metrics headers.
+        }
+      }
+      setTtsLatencyMs(totalDurationMs);
       setTtsUrl(URL.createObjectURL(blob));
       showToast(t('playground.toast.audioSuccess'));
     } catch (e: any) {
-      if (e.name !== 'AbortError') {
+      if (e.name === 'AbortError') {
+        if (ttsStartedAtRef.current !== null) {
+          setTtsLatencyMs(Math.round(performance.now() - ttsStartedAtRef.current));
+        }
+      } else {
         setTtsError('❌ Error: ' + e.message);
       }
     } finally {
       setIsGeneratingTTS(false);
       ttsAbortControllerRef.current = null;
+      ttsStartedAtRef.current = null;
     }
   };
 
@@ -1197,19 +1218,25 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
           <Textarea
             value={ttsInput}
             onChange={(e) => setTtsInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (!isGeneratingTTS) {
+                  handleGenerateTTS();
+                }
+              }
+            }}
             placeholder={t('playground.textToSynthesizePlaceholder')}
             className="flex-1 bg-black/40 border border-zinc-855 text-white rounded p-3 text-xs min-h-[120px] max-h-[220px] resize-none"
           />
         </div>
 
         <div className="flex items-center justify-between">
-          <div>
-            {ttsLatencyMs !== null && (
-              <div className="text-[11px] text-zinc-400 font-mono">
-                ⏱ {ttsLatencyMs} ms
-              </div>
-            )}
-          </div>
+          {ttsLatencyMs !== null ? (
+            <div className="text-[11px] text-zinc-400 font-mono">
+              ⏱ {ttsLatencyMs} ms
+            </div>
+          ) : <span />}
           <div className="flex items-center gap-2">
             {isGeneratingTTS ? (
               <Button
@@ -1236,21 +1263,29 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
         )}
 
         {ttsUrl && (
-          <div className="p-3 bg-white/5 border border-zinc-800 rounded-lg flex flex-col gap-2 mt-1">
-            <div className="flex items-center justify-between gap-3">
-              <audio src={ttsUrl} controls className="flex-grow max-w-[400px] h-8" />
+          <div className="p-4 bg-white/5 border border-zinc-800 rounded-lg flex flex-col gap-3 mt-1">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <audio src={ttsUrl} controls className="w-full sm:flex-1 sm:max-w-[520px] h-10" />
               <a
                 href={ttsUrl}
                 download="speech.wav"
-                className="bg-zinc-800 text-white border border-zinc-700 hover:bg-zinc-700 font-medium px-3 py-1.5 text-[10px] rounded transition-colors"
+                className="bg-zinc-800 text-white border border-zinc-700 hover:bg-zinc-700 font-medium px-3 py-2 text-[10px] rounded transition-colors text-center"
               >
                 {t('playground.download')}
               </a>
             </div>
-            {ttsLatencyMs !== null && (
-              <div className="text-[10px] text-zinc-400 font-mono text-right select-none">
-                ⏱ {ttsLatencyMs} ms
-              </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-zinc-400 font-mono select-none">
+              {ttsResponseJson && <span className="text-zinc-500">Audio response ready</span>}
+            </div>
+            {ttsResponseJson && (
+              <details className="text-xs group w-full max-w-full overflow-hidden">
+                <summary className="cursor-pointer text-zinc-500 hover:text-zinc-300 transition-colors font-mono py-1 select-none">
+                  ▶ Audio Response JSON
+                </summary>
+                <pre className="mt-2 p-3 bg-black/60 border border-zinc-850 rounded-lg font-mono text-[11px] text-zinc-300 overflow-x-auto max-h-48 whitespace-pre-wrap break-words custom-scrollbar w-full">
+                  {ttsResponseJson}
+                </pre>
+              </details>
             )}
           </div>
         )}

@@ -88,6 +88,8 @@ async def chat_completions(
         accumulated_content = ""
         accumulated_reasoning = ""
         accumulated_tool_calls = []
+        accumulated_metrics = None
+        accumulated_usage = None
         error_response = None
         
         async for chunk in combo_generator:
@@ -103,6 +105,11 @@ async def chat_completions(
                         error_response = chunk_data
                         break
                     
+                    if "metrics" in chunk_data:
+                        accumulated_metrics = chunk_data["metrics"]
+                    if "usage" in chunk_data:
+                        accumulated_usage = chunk_data["usage"]
+
                     choices = chunk_data.get("choices", [])
                     if choices:
                         delta = choices[0].get("delta", {})
@@ -140,7 +147,7 @@ async def chat_completions(
         if accumulated_tool_calls:
             msg_data["tool_calls"] = accumulated_tool_calls
 
-        return {
+        resp = {
             "id": f"chatcmpl-{int(time.time())}",
             "object": "chat.completion",
             "created": int(time.time()),
@@ -152,5 +159,10 @@ async def chat_completions(
                 "finish_reason": "stop"
             }]
         }
+        if accumulated_usage:
+            resp["usage"] = accumulated_usage
+        if accumulated_metrics:
+            resp["metrics"] = accumulated_metrics
+        return resp
 
 

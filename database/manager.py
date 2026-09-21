@@ -88,6 +88,8 @@ class DatabaseManager:
         await conn.execute("ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS upstream_key_id TEXT;")
         await conn.execute("ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS capability TEXT DEFAULT 'chat';")
         await conn.execute("ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'completed';")
+        await conn.execute("ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS ttft_ms NUMERIC(10, 2);")
+        await conn.execute("ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS duration_ms NUMERIC(10, 2);")
         
         # Allow NULL for token columns (no estimation, only real API values) and success (None = Interrupted)
         await conn.execute("ALTER TABLE router_request_logs ALTER COLUMN tokens_used DROP DEFAULT;")
@@ -373,7 +375,7 @@ class DatabaseManager:
                 return json.loads(val)
             return None
 
-    async def log_request(self, key_id, provider, model, tokens_used, prompt_tokens, completion_tokens, thoughts_tokens, cost, request_json=None, response_json=None, upstream_key_id=None, success=True, capability='chat', prompt_cost=0.0, completion_cost=0.0, thoughts_cost=0.0, status=None):
+    async def log_request(self, key_id, provider, model, tokens_used, prompt_tokens, completion_tokens, thoughts_tokens, cost, request_json=None, response_json=None, upstream_key_id=None, success=True, capability='chat', prompt_cost=0.0, completion_cost=0.0, thoughts_cost=0.0, status=None, ttft_ms=None, duration_ms=None):
         pool = await self.get_db_pool()
         if status is None:
             status = "success" if success is True else ("failed" if success is False else "interrupted")
@@ -383,10 +385,10 @@ class DatabaseManager:
                     """
                     INSERT INTO router_request_logs
                         (key_id, provider, requested_model, tokens_used,
-                         prompt_tokens, completion_tokens, thoughts_tokens, cost, success, request_json, response_json, upstream_key_id, capability, prompt_cost, completion_cost, thoughts_cost, status)
-                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13,$14,$15,$16,$17)
+                         prompt_tokens, completion_tokens, thoughts_tokens, cost, success, request_json, response_json, upstream_key_id, capability, prompt_cost, completion_cost, thoughts_cost, status, ttft_ms, duration_ms)
+                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13,$14,$15,$16,$17,$18,$19)
                     """,
-                    key_id, provider, model, tokens_used, prompt_tokens, completion_tokens, thoughts_tokens, cost, success, request_json, response_json, upstream_key_id, capability, prompt_cost, completion_cost, thoughts_cost, status
+                    key_id, provider, model, tokens_used, prompt_tokens, completion_tokens, thoughts_tokens, cost, success, request_json, response_json, upstream_key_id, capability, prompt_cost, completion_cost, thoughts_cost, status, ttft_ms, duration_ms
                 )
                 if key_id and cost is not None and (success or cost > 0):
                     await conn.execute(
@@ -432,6 +434,7 @@ class DatabaseManager:
         completion_tokens: int | None = None,
         cost: float = 0.0,
         key_id: str | None = None,
+        duration_ms: float | None = None,
     ) -> None:
         """Canlı streaming oturumunun ara veya nihai sonucunu günceller."""
         pool = await self.get_db_pool()
@@ -446,10 +449,11 @@ class DatabaseManager:
                         tokens_used = COALESCE($5, tokens_used),
                         prompt_tokens = COALESCE($6, prompt_tokens),
                         completion_tokens = COALESCE($7, completion_tokens),
-                        cost = COALESCE($8, cost)
+                        cost = COALESCE($8, cost),
+                        duration_ms = COALESCE($9, duration_ms)
                     WHERE id = $1
                     """,
-                    log_id, response_json, status, success, tokens_used, prompt_tokens, completion_tokens, cost,
+                    log_id, response_json, status, success, tokens_used, prompt_tokens, completion_tokens, cost, duration_ms
                 )
                 if key_id and cost is not None and cost > 0:
                     await conn.execute(

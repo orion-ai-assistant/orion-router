@@ -206,7 +206,7 @@ async def get_admin_logs():
             """
             SELECT l.id, k.name as key_name, l.provider, l.requested_model,
                    l.tokens_used, l.prompt_tokens, l.completion_tokens, l.thoughts_tokens,
-                   l.cost, l.success, l.created_at,
+                   l.cost, l.success, l.created_at, l.ttft_ms, l.duration_ms,
                    COALESCE(l.capability, 'chat') as capability,
                    COALESCE(l.status, CASE WHEN l.success = true THEN 'success' WHEN l.success = false THEN 'failed' ELSE 'interrupted' END) as status
             FROM router_request_logs l

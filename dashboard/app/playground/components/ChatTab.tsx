@@ -263,9 +263,13 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
 
     const adminKey = getAdminKey();
     const apiBaseUrl = getApiBaseUrl();
-    const startTime = performance.now();
-    let ttftRecorded = false;
-    let firstTokenLatencyMs: number | undefined = undefined;
+    let routerMetrics: { ttft_ms?: number; total_duration_ms?: number } = {};
+    const startedAt = performance.now();
+    let firstTokenAt: number | undefined;
+    const thinkingMsgId = 'think-' + Date.now() + '-' + Math.random();
+    const contentMsgId = 'content-' + Date.now() + '-' + Math.random();
+    let hasThinking = false;
+    let hasContent = false;
 
     try {
       setIsGenerating(true);
@@ -307,12 +311,6 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
       const decoder = new TextDecoder('utf-8');
       let buffer = '';
 
-      const thinkingMsgId = 'think-' + Date.now() + '-' + Math.random();
-      const contentMsgId = 'content-' + Date.now() + '-' + Math.random();
-
-      let hasThinking = false;
-      let hasContent = false;
-
       const handleDataLine = (line: string) => {
         const trimmed = line.trim();
         if (!trimmed.startsWith('data:')) return;
@@ -352,15 +350,15 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
           return;
         }
 
+        if (data.metrics) {
+          routerMetrics = data.metrics;
+        }
+
         const delta = data.choices?.[0]?.delta || null;
         if (!delta) return;
 
-        if (!ttftRecorded && (delta.reasoning_content || delta.content)) {
-          ttftRecorded = true;
-          firstTokenLatencyMs = Math.round(performance.now() - startTime);
-        }
-
         if (delta.reasoning_content) {
+          if (firstTokenAt === undefined) firstTokenAt = performance.now();
           const escaped = escapeHtml(delta.reasoning_content).replace(/\n/g, '<br />');
           if (!hasThinking) {
             hasThinking = true;
@@ -383,6 +381,7 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
         }
 
         if (delta.content) {
+          if (firstTokenAt === undefined) firstTokenAt = performance.now();
           const escaped = escapeHtml(delta.content).replace(/\n/g, '<br />');
           if (!hasContent) {
             hasContent = true;
@@ -422,21 +421,50 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
         handleDataLine(buffer);
       }
 
-      const totalDurationMs = Math.round(performance.now() - startTime);
       setChatMessages((prev) =>
         prev.map((msg) => {
           if (msg.id === contentMsgId || (!hasContent && msg.id === thinkingMsgId)) {
             return {
               ...msg,
-              ttftMs: firstTokenLatencyMs,
-              totalDurationMs: totalDurationMs,
+              ttftMs: routerMetrics.ttft_ms,
+              totalDurationMs: routerMetrics.total_duration_ms,
             };
           }
           return msg;
         })
       );
     } catch (e: any) {
-      if (e.name !== 'AbortError') {
+      if (e.name === 'AbortError') {
+        const interruptedDurationMs = Math.round(performance.now() - startedAt);
+        const interruptedTtftMs = firstTokenAt === undefined
+          ? interruptedDurationMs
+          : Math.round(firstTokenAt - startedAt);
+        setChatMessages((prev) => {
+          let attached = false;
+          const updated = prev.map((msg) => {
+            if (msg.id === contentMsgId || (!hasContent && msg.id === thinkingMsgId)) {
+              attached = true;
+              return {
+                ...msg,
+                ttftMs: routerMetrics.ttft_ms ?? interruptedTtftMs,
+                totalDurationMs: routerMetrics.total_duration_ms ?? interruptedDurationMs,
+              };
+            }
+            return msg;
+          });
+          if (!attached) {
+            updated.push({
+              id: contentMsgId,
+              role: 'assistant',
+              type: 'content',
+              html: '<span class="text-zinc-500">İstek durduruldu.</span>',
+              ttftMs: routerMetrics.ttft_ms ?? interruptedTtftMs,
+              totalDurationMs: routerMetrics.total_duration_ms ?? interruptedDurationMs,
+            });
+          }
+          return updated;
+        });
+      } else {
         setChatMessages((prev) => {
           const updated = [...prev];
           const lastUserIdx = updated.map(m => m.id).lastIndexOf(userMsg.id);
