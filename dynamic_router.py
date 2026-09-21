@@ -19,6 +19,7 @@ import inspect
 import logging
 import pkgutil
 import pathlib
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import AsyncGenerator, Any
 
@@ -34,6 +35,50 @@ QUOTA_COOLDOWN_SECONDS = 45
 # Provider klasöründe taranacak yetenek dosyaları.
 # Yeni bir yetenek eklemek için buraya adını yazıp providers/<name>/<yetenek>.py dosyasını oluşturun.
 ALLOWED_CAPABILITIES: list[str] = ["chat", "embeddings", "tts", "stt", "files", "image", "audio", "video"]
+
+
+@dataclass(frozen=True)
+class ResolvedRoute:
+    """A concrete provider/model route returned by the model registry."""
+
+    provider: str
+    model: str
+    temperature: float | None = None
+    thinking_level: str | int | None = None
+    system_prompt: str | None = None
+    default_config: dict[str, Any] | None = None
+
+    @classmethod
+    def from_record(cls, record: dict[str, Any]) -> "ResolvedRoute":
+        provider = record.get("provider")
+        model = record.get("name")
+        if not provider or not model:
+            raise ValueError("Model route must include both provider and model name.")
+        return cls(
+            provider=provider,
+            model=model,
+            temperature=record.get("temperature"),
+            thinking_level=record.get("thinking_level"),
+            system_prompt=record.get("system_prompt"),
+            default_config=record.get("default_config"),
+        )
+
+
+@dataclass(frozen=True)
+class RoutePlan:
+    """Resolved fallback routes plus the provider selected for initial logging."""
+
+    routes: tuple[ResolvedRoute, ...]
+    requested_provider: str | None = None
+
+    @classmethod
+    def direct(cls, model: str, provider: str | None) -> "RoutePlan":
+        routes = (ResolvedRoute(provider=provider, model=model),) if provider else ()
+        return cls(routes=routes, requested_provider=provider)
+
+    @property
+    def primary_provider(self) -> str | None:
+        return self.routes[0].provider if self.routes else self.requested_provider
 
 
 def _pool_key_on_quota_cooldown(pool_key: dict) -> bool:
@@ -143,6 +188,23 @@ async def _create_processing_log(key_id: str | None, provider: str | None, model
     except Exception as e:
         logger.warning(f"Failed to create processing log: {e}")
         return None
+
+
+async def _finish_processing_log(
+    log_id: int | None,
+    response: dict,
+    status: str,
+    success: bool | None,
+) -> None:
+    """Finalize a processing row when no usage payload is available."""
+    if log_id is None:
+        return
+    await db_manager.update_streaming_log(
+        log_id=log_id,
+        response_json=json.dumps(response, ensure_ascii=False),
+        status=status,
+        success=success,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -357,6 +419,26 @@ class DynamicLLMRouter:
                 else:
                     keys.append((None, None))
         return keys
+
+    async def _resolve_route_plan(
+        self,
+        capability: str,
+        model: str,
+        provider: str | None,
+    ) -> RoutePlan:
+        """Resolve registry routes once and normalize direct-provider fallback."""
+        records = await db_manager.resolve_model_route(capability, model)
+        if records:
+            return RoutePlan(
+                routes=tuple(ResolvedRoute.from_record(record) for record in records),
+                requested_provider=provider,
+            )
+        if provider:
+            return RoutePlan(
+                routes=(ResolvedRoute(provider=provider, model=model),),
+                requested_provider=provider,
+            )
+        return RoutePlan(routes=(), requested_provider=None)
 
     # -----------------------------------------------------------------------
     #  Chat
@@ -577,34 +659,26 @@ class DynamicLLMRouter:
         """Model registry tablosunu sorgulayıp, fallback'leri ve key havuzunu döndürerek sohbet akışını yönetir."""
         req_data = {"model": model, "messages": messages, **kwargs}
         log_id = None
-        routes = []
+        route_plan = RoutePlan.direct(model, provider)
         try:
-            routes = await db_manager.resolve_model_route("chat", model)
+            route_plan = await self._resolve_route_plan("chat", model, provider)
         except ValueError as e:
-            if log_id:
-                await db_manager.update_streaming_log(
-                    log_id=log_id,
-                    response_json=json.dumps({"error": str(e)}, ensure_ascii=False),
-                    status="failed",
-                    success=False,
-                )
             yield f'data: {json.dumps({"error": {"message": str(e), "type": "api_error"}}, ensure_ascii=False)}\n\n'
             return
         except Exception as e:
             logger.warning(f"Model route resolution failed for '{model}': {e}")
 
-        resolved_provider = routes[0].get("provider") if routes else provider
-        log_id = await _create_processing_log(key_id, resolved_provider, model, "chat", req_data)
+        log_id = await _create_processing_log(key_id, route_plan.primary_provider, model, "chat", req_data)
 
-        if routes:
+        if route_plan.routes:
             success = False
             last_error_chunk = None
-            for route in routes:
-                p_provider = route["provider"]
-                p_model = route["name"]
-                p_temp = route.get("temperature")
-                p_think = route.get("thinking_level")
-                p_system_prompt = route.get("system_prompt")
+            for route in route_plan.routes:
+                p_provider = route.provider
+                p_model = route.model
+                p_temp = route.temperature
+                p_think = route.thinking_level
+                p_system_prompt = route.system_prompt
                 
                 route_kwargs = {**kwargs}
 
@@ -681,13 +755,12 @@ class DynamicLLMRouter:
                     break
             
             if not success and not yielded_any:
-                if log_id:
-                    await db_manager.update_streaming_log(
-                        log_id=log_id,
-                        response_json=json.dumps({"error": "All routes and fallbacks failed."}, ensure_ascii=False),
-                        status="failed",
-                        success=False,
-                    )
+                await _finish_processing_log(
+                    log_id,
+                    {"error": "All routes and fallbacks failed."},
+                    "failed",
+                    False,
+                )
                 if last_error_chunk:
                     yield last_error_chunk
                 else:
@@ -698,13 +771,7 @@ class DynamicLLMRouter:
         logger.info(f"No routes found in database for model '{model}'. Falling back to direct provider routing.")
         if provider not in self.chat_providers:
             err_msg = f"Unknown chat provider: {provider}"
-            if log_id:
-                await db_manager.update_streaming_log(
-                    log_id=log_id,
-                    response_json=json.dumps({"error": err_msg}, ensure_ascii=False),
-                    status="failed",
-                    success=False,
-                )
+            await _finish_processing_log(log_id, {"error": err_msg}, "failed", False)
             yield f'data: {json.dumps({"error": {"message": err_msg, "type": "api_error"}}, ensure_ascii=False)}\n\n'
             return
 
@@ -732,29 +799,26 @@ class DynamicLLMRouter:
         key_id: str | None = None,
     ) -> dict:
         """Belirtilen model üzerinden embedding üretir (otomatik route ve key fallbacks ile)."""
-        routes = []
+        route_plan = RoutePlan.direct(model, provider)
         try:
-            routes = await db_manager.resolve_model_route("embed", model)
+            route_plan = await self._resolve_route_plan("embed", model, provider)
         except Exception as e:
             logger.warning(f"Embed route resolution failed for '{model}': {e}")
-
-        if not routes:
-            routes = [{"provider": provider, "name": model}]
 
         req_data = {
             "model": model,
             "input": input_text,
         }
-        log_id = await _create_processing_log(key_id, routes[0].get("provider"), model, "embed", req_data)
+        log_id = await _create_processing_log(key_id, route_plan.primary_provider, model, "embed", req_data)
 
-        p_provider = provider
+        p_provider = route_plan.primary_provider
         p_model = model
         last_err = None
         start_time = time.perf_counter()
         try:
-            for route in routes:
-                p_provider = route["provider"]
-                p_model = route["name"]
+            for route in route_plan.routes:
+                p_provider = route.provider
+                p_model = route.model
                 
                 plugin = self.embed_providers.get(p_provider)
                 if not plugin:
@@ -809,23 +873,6 @@ class DynamicLLMRouter:
                         if key_pool_id:
                             await db_manager.mark_provider_key_error(key_pool_id, str(e))
                         last_err = e
-                        
-                        # Log attempt failure
-                        res_err = {"error": str(e)}
-                        asyncio.create_task(
-                            _log_usage(
-                                self.app_state,
-                                key_id,
-                                p_provider,
-                                p_model,
-                                None,
-                                request_json=json.dumps(req_data, ensure_ascii=False),
-                                response_json=json.dumps(res_err, ensure_ascii=False),
-                                success=False,
-                                capability='embed',
-                                log_id=log_id,
-                            )
-                        )
         except asyncio.CancelledError:
             res_err = {"error": "Client disconnected / Request Cancelled"}
             asyncio.create_task(
@@ -845,13 +892,7 @@ class DynamicLLMRouter:
             raise
                     
         final_error = last_err or ValueError(f"Could not resolve embed route for model: {model}")
-        if log_id:
-            await db_manager.update_streaming_log(
-                log_id=log_id,
-                response_json=json.dumps({"error": str(final_error)}, ensure_ascii=False),
-                status="failed",
-                success=False,
-            )
+        await _finish_processing_log(log_id, {"error": str(final_error)}, "failed", False)
         raise final_error
 
     # -----------------------------------------------------------------------
@@ -870,14 +911,11 @@ class DynamicLLMRouter:
         **kwargs,
     ) -> tuple[bytes, str, dict[str, float]]:
         """Belirtilen model üzerinden ses üretir (otomatik route ve key fallbacks ile)."""
-        routes = []
+        route_plan = RoutePlan.direct(model, provider)
         try:
-            routes = await db_manager.resolve_model_route("tts", model)
+            route_plan = await self._resolve_route_plan("tts", model, provider)
         except Exception as e:
             logger.warning(f"TTS route resolution failed for '{model}': {e}")
-
-        if not routes:
-            routes = [{"provider": provider, "name": model}]
 
         req_data = {
             "model": model,
@@ -885,18 +923,18 @@ class DynamicLLMRouter:
             "voice": voice,
             **kwargs
         }
-        log_id = await _create_processing_log(key_id, routes[0].get("provider"), model, "tts", req_data)
+        log_id = await _create_processing_log(key_id, route_plan.primary_provider, model, "tts", req_data)
 
-        p_provider = provider
+        p_provider = route_plan.primary_provider
         p_model = model
         last_err = None
         start_time = time.perf_counter()
         try:
-            for route in routes:
-                p_provider = route["provider"]
-                p_model = route["name"]
-                p_temp = route.get("temperature")
-                p_def_config = route.get("default_config")
+            for route in route_plan.routes:
+                p_provider = route.provider
+                p_model = route.model
+                p_temp = route.temperature
+                p_def_config = route.default_config
                 if isinstance(p_def_config, str):
                     try:
                         import json as _json
@@ -994,23 +1032,6 @@ class DynamicLLMRouter:
                         if key_pool_id:
                             await db_manager.mark_provider_key_error(key_pool_id, str(e))
                         last_err = e
-                        
-                        # Log attempt failure
-                        res_err = {"error": str(e)}
-                        asyncio.create_task(
-                            _log_usage(
-                                self.app_state,
-                                key_id,
-                                p_provider,
-                                p_model,
-                                None,
-                                request_json=json.dumps(req_data, ensure_ascii=False),
-                                response_json=json.dumps(res_err, ensure_ascii=False),
-                                success=False,
-                                capability='tts',
-                                log_id=log_id,
-                            )
-                        )
         except asyncio.CancelledError:
             res_err = {"error": "Client disconnected / Request Cancelled"}
             asyncio.create_task(
@@ -1030,13 +1051,7 @@ class DynamicLLMRouter:
             raise
                     
         final_error = last_err or ValueError(f"Could not resolve TTS route for model: {model}")
-        if log_id:
-            await db_manager.update_streaming_log(
-                log_id=log_id,
-                response_json=json.dumps({"error": str(final_error)}, ensure_ascii=False),
-                status="failed",
-                success=False,
-            )
+        await _finish_processing_log(log_id, {"error": str(final_error)}, "failed", False)
         raise final_error
 
     # -----------------------------------------------------------------------
@@ -1059,14 +1074,11 @@ class DynamicLLMRouter:
         **kwargs,
     ) -> dict:
         """Belirtilen model üzerinden ses transkripsiyonu üretir (otomatik route ve key fallbacks ile)."""
-        routes = []
+        route_plan = RoutePlan.direct(model, provider)
         try:
-            routes = await db_manager.resolve_model_route("stt", model)
+            route_plan = await self._resolve_route_plan("stt", model, provider)
         except Exception as e:
             logger.warning(f"STT route resolution failed for '{model}': {e}")
-
-        if not routes:
-            routes = [{"provider": provider, "name": model}]
 
         req_data = {
             "model": model,
@@ -1075,16 +1087,16 @@ class DynamicLLMRouter:
             "bytes_len": len(file_bytes),
             **kwargs,
         }
-        log_id = await _create_processing_log(key_id, routes[0].get("provider"), model, "stt", req_data)
+        log_id = await _create_processing_log(key_id, route_plan.primary_provider, model, "stt", req_data)
 
-        p_provider = provider
+        p_provider = route_plan.primary_provider
         p_model = model
         last_err = None
         start_time = time.perf_counter()
         try:
-            for route in routes:
-                p_provider = route["provider"]
-                p_model = route["name"]
+            for route in route_plan.routes:
+                p_provider = route.provider
+                p_model = route.model
 
                 plugin = self.stt_providers.get(p_provider)
                 if not plugin:
@@ -1167,13 +1179,7 @@ class DynamicLLMRouter:
             raise
 
         final_error = last_err or ValueError(f"Could not resolve STT route for model: {model}")
-        if log_id:
-            await db_manager.update_streaming_log(
-                log_id=log_id,
-                response_json=json.dumps({"error": str(final_error)}, ensure_ascii=False),
-                status="failed",
-                success=False,
-            )
+        await _finish_processing_log(log_id, {"error": str(final_error)}, "failed", False)
         raise final_error
 
     # -----------------------------------------------------------------------
