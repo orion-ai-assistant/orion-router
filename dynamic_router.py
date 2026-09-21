@@ -127,11 +127,13 @@ async def _log_usage(app_state, key_id: str | None, provider: str, model: str, u
 
 async def _create_processing_log(key_id: str | None, provider: str | None, model: str, capability: str, request_data: dict) -> int | None:
     """Create the visible in-progress row before a provider request starts."""
+    if not provider:
+        logger.warning(f"Cannot create processing log without a resolved provider for model '{model}'")
+        return None
     try:
-        log_provider = provider or ("local" if model.startswith("local-") else "unknown")
         return await db_manager.create_streaming_log(
             key_id=key_id,
-            provider=log_provider,
+            provider=provider,
             model=model,
             request_json=json.dumps(request_data, ensure_ascii=False),
             response_json=json.dumps({"status": "processing"}, ensure_ascii=False),
@@ -574,7 +576,7 @@ class DynamicLLMRouter:
     ) -> AsyncGenerator[str, None]:
         """Model registry tablosunu sorgulayıp, fallback'leri ve key havuzunu döndürerek sohbet akışını yönetir."""
         req_data = {"model": model, "messages": messages, **kwargs}
-        log_id = await _create_processing_log(key_id, provider, model, "chat", req_data)
+        log_id = None
         routes = []
         try:
             routes = await db_manager.resolve_model_route("chat", model)
@@ -590,6 +592,9 @@ class DynamicLLMRouter:
             return
         except Exception as e:
             logger.warning(f"Model route resolution failed for '{model}': {e}")
+
+        resolved_provider = routes[0].get("provider") if routes else provider
+        log_id = await _create_processing_log(key_id, resolved_provider, model, "chat", req_data)
 
         if routes:
             success = False
@@ -740,8 +745,7 @@ class DynamicLLMRouter:
             "model": model,
             "input": input_text,
         }
-        log_provider = provider or routes[0].get("provider")
-        log_id = await _create_processing_log(key_id, log_provider, model, "embed", req_data)
+        log_id = await _create_processing_log(key_id, routes[0].get("provider"), model, "embed", req_data)
 
         p_provider = provider
         p_model = model
@@ -881,8 +885,7 @@ class DynamicLLMRouter:
             "voice": voice,
             **kwargs
         }
-        log_provider = provider or routes[0].get("provider")
-        log_id = await _create_processing_log(key_id, log_provider, model, "tts", req_data)
+        log_id = await _create_processing_log(key_id, routes[0].get("provider"), model, "tts", req_data)
 
         p_provider = provider
         p_model = model
@@ -1072,8 +1075,7 @@ class DynamicLLMRouter:
             "bytes_len": len(file_bytes),
             **kwargs,
         }
-        log_provider = provider or routes[0].get("provider")
-        log_id = await _create_processing_log(key_id, log_provider, model, "stt", req_data)
+        log_id = await _create_processing_log(key_id, routes[0].get("provider"), model, "stt", req_data)
 
         p_provider = provider
         p_model = model
