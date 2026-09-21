@@ -350,7 +350,6 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
               },
             ];
           });
-          abortControllerRef.current?.abort();
           return;
         }
 

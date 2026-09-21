@@ -325,11 +325,11 @@ class ChatRunner:
     ) -> AsyncGenerator[str, None]:
         req_data = {"model": model, "messages": messages, **kwargs}
         route_plan = None
+        route_resolution_error = None
         try:
             route_plan = await self.route_resolver.resolve("chat", model, provider)
         except ValueError as exc:
-            yield f"data: {json.dumps({'error': {'message': str(exc), 'type': 'api_error'}}, ensure_ascii=False)}\n\n"
-            return
+            route_resolution_error = str(exc)
         except Exception as exc:
             logger.warning("Model route resolution failed for '%s': %s", model, exc)
 
@@ -340,11 +340,21 @@ class ChatRunner:
 
         log_id = await self.telemetry.create_processing_log(
             key_id,
-            route_plan.primary_provider,
+            route_plan.primary_provider or provider or "unknown",
             model,
             "chat",
             req_data,
         )
+
+        if route_resolution_error:
+            await self.telemetry.finish_processing_log(
+                log_id,
+                {"error": route_resolution_error},
+                "failed",
+                False,
+            )
+            yield f"data: {json.dumps({'error': {'message': route_resolution_error, 'type': 'api_error'}}, ensure_ascii=False)}\n\n"
+            return
 
         if route_plan.routes:
             success = False
