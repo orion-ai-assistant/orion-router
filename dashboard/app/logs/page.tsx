@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { adminFetch } from '@/lib/api';
 import { money, dateTime } from '@/lib/utils';
 import { formatPayloadForDisplay, extractTtsAudio } from '@/lib/format-payload';
@@ -45,12 +45,14 @@ export default function LogsPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [payloadDialogOpen, setPayloadDialogOpen] = useState(false);
   const [activeLogDetails, setActiveLogDetails] = useState<LogDetails | null>(null);
+  const fetchSequence = useRef(0);
 
   // Copies tracking
   const [copiedReq, setCopiedReq] = useState(false);
   const [copiedRes, setCopiedRes] = useState(false);
 
   const fetchLogs = async (mode: 'initial' | 'poll' | 'refresh') => {
+    const sequence = ++fetchSequence.current;
     if (mode === 'initial') {
       setLoading(true);
     }
@@ -58,6 +60,9 @@ export default function LogsPage() {
       const res = await adminFetch('/dashboard/api/logs');
       if (res.ok) {
         const data = await res.json();
+        if (sequence !== fetchSequence.current) {
+          return;
+        }
         const incoming: LogItem[] = data.logs || [];
         if (mode === 'poll') {
           setLogs((prev) => {
@@ -70,7 +75,10 @@ export default function LogsPage() {
                 (fresh.status !== old.status ||
                   fresh.success !== old.success ||
                   fresh.cost !== old.cost ||
-                  fresh.tokens_used !== old.tokens_used)
+                  fresh.tokens_used !== old.tokens_used ||
+                  fresh.prompt_tokens !== old.prompt_tokens ||
+                  fresh.completion_tokens !== old.completion_tokens ||
+                  fresh.thoughts_tokens !== old.thoughts_tokens)
               ) {
                 changed = true;
                 return fresh;

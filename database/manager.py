@@ -432,7 +432,11 @@ class DatabaseManager:
         tokens_used: int | None = None,
         prompt_tokens: int | None = None,
         completion_tokens: int | None = None,
-        cost: float = 0.0,
+        thoughts_tokens: int | None = None,
+        cost: float | None = None,
+        prompt_cost: float | None = None,
+        completion_cost: float | None = None,
+        thoughts_cost: float | None = None,
         key_id: str | None = None,
         duration_ms: float | None = None,
         ttft_ms: float | None = None,
@@ -450,12 +454,19 @@ class DatabaseManager:
                         tokens_used = COALESCE($5, tokens_used),
                         prompt_tokens = COALESCE($6, prompt_tokens),
                         completion_tokens = COALESCE($7, completion_tokens),
-                        cost = COALESCE($8, cost),
-                        duration_ms = COALESCE($9, duration_ms),
-                        ttft_ms = COALESCE($10, ttft_ms)
-                    WHERE id = $1
+                        thoughts_tokens = COALESCE($8, thoughts_tokens),
+                        cost = COALESCE($9, cost),
+                                                prompt_cost = COALESCE($10, prompt_cost),
+                                                completion_cost = COALESCE($11, completion_cost),
+                                                thoughts_cost = COALESCE($12, thoughts_cost),
+                                                duration_ms = COALESCE($13, duration_ms),
+                                                ttft_ms = COALESCE($14, ttft_ms)
+                                        WHERE id = $1
+                                            AND ($3 = 'success' OR status NOT IN ('success', 'failed', 'interrupted'))
                     """,
-                    log_id, response_json, status, success, tokens_used, prompt_tokens, completion_tokens, cost, duration_ms, ttft_ms
+                    log_id, response_json, status, success, tokens_used, prompt_tokens,
+                                        completion_tokens, thoughts_tokens, cost, prompt_cost, completion_cost,
+                                        thoughts_cost, duration_ms, ttft_ms
                 )
                 if key_id and cost is not None and cost > 0:
                     await conn.execute(

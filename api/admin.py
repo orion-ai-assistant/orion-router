@@ -205,7 +205,14 @@ async def get_admin_logs():
         rows = await db_manager.fetch(
             """
             SELECT l.id, k.name as key_name, l.provider, l.requested_model,
-                   l.tokens_used, l.prompt_tokens, l.completion_tokens, l.thoughts_tokens,
+                   l.tokens_used, l.prompt_tokens, l.completion_tokens,
+                   COALESCE(
+                       NULLIF(l.thoughts_tokens, 0),
+                       CASE
+                           WHEN l.response_json->'usage'->>'thoughts_tokens' ~ '^[0-9]+$'
+                           THEN (l.response_json->'usage'->>'thoughts_tokens')::INTEGER
+                       END
+                   ) AS thoughts_tokens,
                    l.cost, l.success, l.created_at, l.ttft_ms, l.duration_ms,
                    COALESCE(l.capability, 'chat') as capability,
                    COALESCE(l.status, CASE WHEN l.success = true THEN 'success' WHEN l.success = false THEN 'failed' ELSE 'interrupted' END) as status

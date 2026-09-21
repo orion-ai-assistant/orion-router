@@ -17,6 +17,7 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
 from core.thinking import ThinkingConfig
+from core.config import LLM_HOST, LLM_PORT
 from providers.local.chat import LocalChatProvider
 from providers.gemini.chat import GeminiChatProvider
 from providers.openai.chat import OpenAIChatProvider
