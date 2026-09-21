@@ -1,424 +1,115 @@
 """
 dynamic_router.py
 -----------------
-Yetenek tabanlı (capability-based) LLM yönlendirici.
+Public facade for capability-based provider routing.
 
-providers/ altındaki her alt paketin __init__.py'sini tarar:
-  - BaseChat impl'leri    → chat_providers
-  - BaseEmbed impl'leri   → embed_providers
-  - BaseTTS impl'leri     → tts_providers
-  - BaseFileUpload impl'leri → file_providers
-
-Combo route (alias → primary/fallback) desteği chat için korunmuştur.
+The routing, provider discovery, telemetry, and capability-specific request
+flows live under core/. This module keeps the application-facing API stable.
 """
-import asyncio
-import json
-import time
-import importlib
-import inspect
-import logging
-import pkgutil
-import pathlib
-from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import AsyncGenerator, Any
 
-import providers
-from providers.base import BaseChat, BaseEmbed, BaseTTS, BaseSTT, BaseFileUpload
-from database import db_manager
+import logging
+from typing import Any, AsyncGenerator
+
+from core.provider_registry import ALLOWED_CAPABILITIES, ProviderRegistry
+from core.route_types import ResolvedRoute, RoutePlan
+from core.routing_services import (
+    ProviderKeyPool,
+    RouteResolver,
+    pool_key_on_quota_cooldown,
+)
+from core.runners.chat import (
+    ChatRunner,
+    inject_system_prompt,
+    sanitize_tool_ids_for_non_gemini,
+)
+from core.runners.embeddings import EmbeddingsRunner
+from core.runners.stt import STTRunner
+from core.runners.tts import TTSRunner
+from core.telemetry import TelemetryService
 
 logger = logging.getLogger("service-router.dynamic")
 
-# Quota aşılmış key'leri kısa süre atla — gereksiz 429 round-trip'lerini keser.
-QUOTA_COOLDOWN_SECONDS = 45
-
-# Provider klasöründe taranacak yetenek dosyaları.
-# Yeni bir yetenek eklemek için buraya adını yazıp providers/<name>/<yetenek>.py dosyasını oluşturun.
-ALLOWED_CAPABILITIES: list[str] = ["chat", "embeddings", "tts", "stt", "files", "image", "audio", "video"]
+_pool_key_on_quota_cooldown = pool_key_on_quota_cooldown
+_sanitize_tool_ids_for_non_gemini = sanitize_tool_ids_for_non_gemini
+_inject_system_prompt = inject_system_prompt
 
 
-@dataclass(frozen=True)
-class ResolvedRoute:
-    """A concrete provider/model route returned by the model registry."""
-
-    provider: str
-    model: str
-    temperature: float | None = None
-    thinking_level: str | int | None = None
-    system_prompt: str | None = None
-    default_config: dict[str, Any] | None = None
-
-    @classmethod
-    def from_record(cls, record: dict[str, Any]) -> "ResolvedRoute":
-        provider = record.get("provider")
-        model = record.get("name")
-        if not provider or not model:
-            raise ValueError("Model route must include both provider and model name.")
-        return cls(
-            provider=provider,
-            model=model,
-            temperature=record.get("temperature"),
-            thinking_level=record.get("thinking_level"),
-            system_prompt=record.get("system_prompt"),
-            default_config=record.get("default_config"),
-        )
+async def _log_usage(app_state, *args, **kwargs):
+    return await TelemetryService(app_state).log_usage(*args, **kwargs)
 
 
-@dataclass(frozen=True)
-class RoutePlan:
-    """Resolved fallback routes plus the provider selected for initial logging."""
-
-    routes: tuple[ResolvedRoute, ...]
-    requested_provider: str | None = None
-
-    @classmethod
-    def direct(cls, model: str, provider: str | None) -> "RoutePlan":
-        routes = (ResolvedRoute(provider=provider, model=model),) if provider else ()
-        return cls(routes=routes, requested_provider=provider)
-
-    @property
-    def primary_provider(self) -> str | None:
-        return self.routes[0].provider if self.routes else self.requested_provider
+async def _create_processing_log(*args, **kwargs):
+    return await TelemetryService().create_processing_log(*args, **kwargs)
 
 
-def _pool_key_on_quota_cooldown(pool_key: dict) -> bool:
-    last_error = pool_key.get("last_error") or ""
-    if "RESOURCE_EXHAUSTED" not in last_error and "429" not in last_error:
-        return False
-    last_at = pool_key.get("last_error_at")
-    if not last_at:
-        return False
-    if last_at.tzinfo is None:
-        last_at = last_at.replace(tzinfo=timezone.utc)
-    return datetime.now(timezone.utc) - last_at < timedelta(seconds=QUOTA_COOLDOWN_SECONDS)
+async def _finish_processing_log(*args, **kwargs):
+    return await TelemetryService().finish_processing_log(*args, **kwargs)
 
-
-# ---------------------------------------------------------------------------
-#  İç Yardımcılar
-# ---------------------------------------------------------------------------
-
-async def _log_usage(app_state, key_id: str | None, provider: str, model: str, usage: dict | None, request_json: str | None = None, response_json: str | None = None, success: bool | None = True, capability: str = 'chat', is_estimated: bool = False, ttft_ms: float | None = None, duration_ms: float | None = None, log_id: int | None = None):
-    """Arka plan görevi: token kullanımını, gecikme metriklerini ve request/response JSON verilerini DB'ye kaydeder."""
-    try:
-        if usage is None:
-            p, c, t = None, None, None
-            tokens_used = None
-        else:
-            p = usage.get("prompt_tokens")
-            c = usage.get("completion_tokens")
-            t = usage.get("thoughts_tokens")
-            tokens_used = (p or 0) + (c or 0) + (t or 0)
-
-        cost = None
-        p_cost, c_cost, t_cost = 0.0, 0.0, 0.0
-
-        should_calculate = False
-        if usage is not None:
-            if capability in ("tts", "embed"):
-                should_calculate = success is True
-            else:
-                should_calculate = success is True or (c or 0) > 0 or (t or 0) > 0
-
-        if should_calculate:
-            pricing_cache = app_state.pricing_cache if hasattr(app_state, "pricing_cache") else {}
-            if model in pricing_cache:
-                prices = pricing_cache[model]
-                p_cost = (p or 0) * prices.get("input", 0.0)
-                c_cost = (c or 0) * prices.get("output", 0.0)
-                t_cost = (t or 0) * prices.get("think", 0.0)
-                cost = p_cost + c_cost + t_cost
-        else:
-            cost = 0.0
-            p, c, t = None, None, None
-            tokens_used = None
-
-        if log_id is None:
-            await db_manager.log_request(
-                key_id=key_id,
-                provider=provider,
-                model=model,
-                tokens_used=tokens_used,
-                prompt_tokens=p,
-                completion_tokens=c,
-                thoughts_tokens=t,
-                cost=cost,
-                request_json=request_json,
-                response_json=response_json,
-                success=success,
-                capability=capability,
-                prompt_cost=p_cost,
-                completion_cost=c_cost,
-                thoughts_cost=t_cost,
-                ttft_ms=ttft_ms,
-                duration_ms=duration_ms
-            )
-        else:
-            await db_manager.update_streaming_log(
-                log_id=log_id,
-                response_json=response_json,
-                status="success" if success is True else ("failed" if success is False else "interrupted"),
-                success=success,
-                tokens_used=tokens_used,
-                prompt_tokens=p,
-                completion_tokens=c,
-                cost=cost,
-                key_id=key_id,
-                duration_ms=duration_ms,
-                ttft_ms=ttft_ms,
-            )
-        logger.info(f"Logged usage for {provider}/{model} [{capability}]: (In:{p} Out:{c} Think:{t}) | TTFT:{ttft_ms}ms Dur:{duration_ms}ms | Costs: (In:{p_cost:.4f} Out:{c_cost:.4f} Think:{t_cost:.4f}) | Success: {success}")
-    except Exception as e:
-        logger.error(f"Failed to log usage: {e}")
-
-async def _create_processing_log(key_id: str | None, provider: str | None, model: str, capability: str, request_data: dict) -> int | None:
-    """Create the visible in-progress row before a provider request starts."""
-    if not provider:
-        logger.warning(f"Cannot create processing log without a resolved provider for model '{model}'")
-        return None
-    try:
-        return await db_manager.create_streaming_log(
-            key_id=key_id,
-            provider=provider,
-            model=model,
-            request_json=json.dumps(request_data, ensure_ascii=False),
-            response_json=json.dumps({"status": "processing"}, ensure_ascii=False),
-            capability=capability,
-            status="processing",
-        )
-    except Exception as e:
-        logger.warning(f"Failed to create processing log: {e}")
-        return None
-
-
-async def _finish_processing_log(
-    log_id: int | None,
-    response: dict,
-    status: str,
-    success: bool | None,
-) -> None:
-    """Finalize a processing row when no usage payload is available."""
-    if log_id is None:
-        return
-    await db_manager.update_streaming_log(
-        log_id=log_id,
-        response_json=json.dumps(response, ensure_ascii=False),
-        status=status,
-        success=success,
-    )
-
-
-# ---------------------------------------------------------------------------
-#  Tool-call ID sanitiser
-# ---------------------------------------------------------------------------
-
-def _sanitize_tool_ids_for_non_gemini(messages: list[dict]) -> list[dict]:
-    """Gemini'nin uzun Base64 tool_call_id değerlerini kısa ID'lere dönüştürür.
-
-    Gemini, thought_signature verisini ``call_<name>__ts__<b64>`` biçiminde tool_call_id'ye
-    gömer.  Bu değerler Gemini-dışı modellere gönderildiğinde gereksiz yüzlerce token
-    harcar.  Bu fonksiyon:
-      1) assistant mesajlarındaki tool_calls[].id içinde ``__ts__`` varsa kısa bir ID ile
-         değiştirir (``call_0``, ``call_1``, …).
-      2) Takip eden ``role: tool`` mesajlarındaki tool_call_id'yi de aynı kısa ID ile eşler.
-    """
-    id_map: dict[str, str] = {}
-    counter = 0
-    out: list[dict] = []
-
-    for msg in messages:
-        msg = dict(msg)  # shallow copy – orijinali değiştirme
-
-        # --- assistant + tool_calls ---
-        if msg.get("role") == "assistant" and msg.get("tool_calls"):
-            new_tcs = []
-            for tc in msg["tool_calls"]:
-                tc = dict(tc)
-                old_id = tc.get("id", "")
-                if "__ts__" in old_id:
-                    if old_id not in id_map:
-                        id_map[old_id] = f"call_{counter}"
-                        counter += 1
-                    tc["id"] = id_map[old_id]
-                new_tcs.append(tc)
-            msg["tool_calls"] = new_tcs
-
-        # --- tool response ---
-        if msg.get("role") == "tool":
-            old_tcid = msg.get("tool_call_id", "")
-            if old_tcid in id_map:
-                msg = dict(msg)
-                msg["tool_call_id"] = id_map[old_tcid]
-
-        out.append(msg)
-    return out
-
-
-def _inject_system_prompt(messages: list[dict[str, Any]], system_prompt: str | None) -> list[dict[str, Any]]:
-    """Prepends or merges a system prompt with existing system messages."""
-    route_messages = list(messages)
-    if not system_prompt:
-        return route_messages
-
-    existing_sys = [m.get("content", "") for m in route_messages if m.get("role") == "system"]
-    combined_sys = system_prompt + ("\n" + "\n".join(existing_sys) if existing_sys else "")
-    return [{"role": "system", "content": combined_sys}] + [
-        m for m in route_messages if m.get("role") != "system"
-    ]
-
-
-# ---------------------------------------------------------------------------
-#  DynamicLLMRouter
-# ---------------------------------------------------------------------------
 
 class DynamicLLMRouter:
     def __init__(self, app_state=None):
         self.app_state = app_state
-        self.chat_providers: dict[str, BaseChat] = {}
-        self.embed_providers: dict[str, BaseEmbed] = {}
-        self.tts_providers: dict[str, BaseTTS] = {}
-        self.stt_providers: dict[str, BaseSTT] = {}
-        self.file_providers: dict[str, BaseFileUpload] = {}
-        self._load_providers()
+        self.registry = ProviderRegistry()
+        self.route_resolver = RouteResolver()
+        self.key_pool = ProviderKeyPool(app_state)
+        self.telemetry = TelemetryService(app_state)
+        self.chat_runner = ChatRunner(
+            self.registry,
+            self.route_resolver,
+            self.key_pool,
+            self.telemetry,
+        )
+        self.embeddings_runner = EmbeddingsRunner(
+            self.registry,
+            self.route_resolver,
+            self.key_pool,
+            self.telemetry,
+        )
+        self.tts_runner = TTSRunner(
+            self.registry,
+            self.route_resolver,
+            self.key_pool,
+            self.telemetry,
+        )
+        self.stt_runner = STTRunner(
+            self.registry,
+            self.route_resolver,
+            self.key_pool,
+            self.telemetry,
+        )
+
+    @property
+    def chat_providers(self):
+        return self.registry.chat_providers
+
+    @property
+    def embed_providers(self):
+        return self.registry.embed_providers
+
+    @property
+    def tts_providers(self):
+        return self.registry.tts_providers
+
+    @property
+    def stt_providers(self):
+        return self.registry.stt_providers
+
+    @property
+    def file_providers(self):
+        return self.registry.file_providers
 
     def _load_providers(self):
-        """providers/ altındaki tüm alt paketleri ve yetenek dosyalarını tarar.
-
-        Keşif Mantığı:
-          - providers/<name>/ klasörü bulunur.
-          - Yalnızca belirli yetenekleri ifade eden dosyalar (chat.py, embeddings.py, tts.py, stt.py, files.py vb.) taranır.
-          - Bu sayede test_ veya _ ile başlayan dosyaları kontrol etmeye gerek kalmaz; 
-            sadece izin verilen yetenek dosyaları modül olarak yüklenir.
-          - BaseChat, BaseEmbed, BaseTTS, BaseSTT, BaseFileUpload sınıflarından türetilen sınıflar otomatik kaydedilir.
-          - Geliştiricinin __init__.py içine açıkça export eklemesi gerekmez.
-        """
-        BASE_CLASSES = (BaseChat, BaseEmbed, BaseTTS, BaseSTT, BaseFileUpload)
-
-        def _register(obj, default_name: str):
-            """Bir sınıfı ilgili provider sözlüğüne kaydeder."""
-            pname = getattr(obj, "provider_name", None)
-            if not pname:
-                pname = default_name
-            if not pname:
-                return
-
-            if issubclass(obj, BaseChat) and obj is not BaseChat:
-                if pname not in self.chat_providers:
-                    self.chat_providers[pname] = obj()
-                    logger.info(f"Loaded chat provider: {pname} ({obj.__name__})")
-
-            if issubclass(obj, BaseEmbed) and obj is not BaseEmbed:
-                if pname not in self.embed_providers:
-                    self.embed_providers[pname] = obj()
-                    logger.info(f"Loaded embed provider: {pname} ({obj.__name__})")
-
-            if issubclass(obj, BaseTTS) and obj is not BaseTTS:
-                if pname not in self.tts_providers:
-                    self.tts_providers[pname] = obj()
-                    logger.info(f"Loaded TTS provider: {pname} ({obj.__name__})")
-
-            if issubclass(obj, BaseSTT) and obj is not BaseSTT:
-                if pname not in self.stt_providers:
-                    self.stt_providers[pname] = obj()
-                    logger.info(f"Loaded STT provider: {pname} ({obj.__name__})")
-
-            if issubclass(obj, BaseFileUpload) and obj is not BaseFileUpload:
-                if pname not in self.file_providers:
-                    self.file_providers[pname] = obj()
-                    logger.info(f"Loaded file provider: {pname} ({obj.__name__})")
-
-        providers_path = pathlib.Path(providers.__path__[0])
-        
-        for provider_dir in providers_path.iterdir():
-            if not provider_dir.is_dir() or provider_dir.name == "__pycache__":
-                continue
-                
-            name = provider_dir.name
-
-            # 1. Paketin kökünü (__init__.py varsa) import etmeyi dene (geriye dönük uyumluluk)
-            modules_to_scan = []
-            try:
-                pkg_module = importlib.import_module(f"providers.{name}")
-                modules_to_scan.append(pkg_module)
-            except ImportError:
-                pass  # __init__.py yoksa sorun değil, namespace package olarak çalışır
-            except Exception as e:
-                logger.error(f"Failed to import provider package 'providers.{name}': {e}")
-
-            # 2. Yalnızca izin verilen yetenek dosyalarını tara (bkz. ALLOWED_CAPABILITIES)
-            for cap in ALLOWED_CAPABILITIES:
-                py_file = provider_dir / f"{cap}.py"
-                if not py_file.exists():
-                    continue
-                    
-                try:
-                    submod = importlib.import_module(f"providers.{name}.{cap}")
-                    modules_to_scan.append(submod)
-                except Exception as e:
-                    logger.error(f"Failed to import submodule 'providers.{name}.{cap}': {e}")
-
-            # 3. Bulunan tüm modüllerdeki sınıfları tara ve kaydet
-            seen_classes: set = set()
-            for mod in modules_to_scan:
-                for _, obj in inspect.getmembers(mod, inspect.isclass):
-                    if obj in seen_classes:
-                        continue  # Aynı sınıfı birden fazla kez kaydetme
-                    if not any(issubclass(obj, bc) for bc in BASE_CLASSES):
-                        continue
-                    seen_classes.add(obj)
-                    _register(obj, name)
-
+        self.registry.load()
 
     def _get_db_key(self, provider: str) -> str | None:
-        """DB'deki provider API anahtarını döner (gerçek upstream key).
-        
-        Orion sanal anahtarı (sk-orion-...) ile karıştırılmaz;
-        bu key doğrudan upstream API'ye gönderilecek gerçek anahtardır.
-        """
-        db_keys = getattr(self.app_state, "provider_keys", {})
-        key = db_keys.get(provider)
-        return key if key else None
+        return self.key_pool.get_db_key(provider)
 
-    async def _get_keys_for_provider(self, provider: str, client_key: str | None = None) -> list[tuple[str | None, str | None]]:
-        """Returns a list of (api_key, key_pool_id) for the provider.
-        
-        Ordered by priority. If key pool is empty, falls back to legacy config key or client-provided key.
-        """
-        keys = []
-        try:
-            pool_keys = await db_manager.get_active_provider_keys(provider)
-            usable_keys = [pk for pk in pool_keys if not _pool_key_on_quota_cooldown(pk)]
-            skipped = len(pool_keys) - len(usable_keys)
-            if skipped:
-                logger.info(
-                    "Skipping %d provider key(s) for %s on quota cooldown.",
-                    skipped,
-                    provider,
-                )
-            if not usable_keys and pool_keys:
-                usable_keys = pool_keys
-                logger.info(
-                    "All active key(s) for %s are on quota cooldown; trying anyway.",
-                    provider,
-                )
-            for pk in usable_keys:
-                keys.append((pk["api_key"], pk["id"]))
-        except Exception as e:
-            logger.error(f"Failed to fetch keys from pool for {provider}: {e}")
-            
-        if not keys:
-            db_key = self._get_db_key(provider)
-            if db_key:
-                keys.append((db_key, None))
-            else:
-                clean_client_key = client_key
-                if clean_client_key and clean_client_key.startswith("Bearer "):
-                    clean_client_key = clean_client_key.removeprefix("Bearer ").strip()
-
-                if clean_client_key and not clean_client_key.startswith("sk-orion-"):
-                    keys.append((clean_client_key, None))
-                else:
-                    keys.append((None, None))
-        return keys
+    async def _get_keys_for_provider(
+        self,
+        provider: str,
+        client_key: str | None = None,
+    ) -> list[tuple[str | None, str | None]]:
+        return await self.key_pool.get_keys_for_provider(provider, client_key)
 
     async def _resolve_route_plan(
         self,
@@ -426,225 +117,11 @@ class DynamicLLMRouter:
         model: str,
         provider: str | None,
     ) -> RoutePlan:
-        """Resolve registry routes once and normalize direct-provider fallback."""
-        records = await db_manager.resolve_model_route(capability, model)
-        if records:
-            return RoutePlan(
-                routes=tuple(ResolvedRoute.from_record(record) for record in records),
-                requested_provider=provider,
-            )
-        if provider:
-            return RoutePlan(
-                routes=(ResolvedRoute(provider=provider, model=model),),
-                requested_provider=provider,
-            )
-        return RoutePlan(routes=(), requested_provider=None)
+        return await self.route_resolver.resolve(capability, model, provider)
 
-    # -----------------------------------------------------------------------
-    #  Chat
-    # -----------------------------------------------------------------------
-
-    async def _stream(
-        self, plugin: BaseChat, key_id, provider, model, messages, api_key, auth_header, log_id=None, **kwargs
-    ):
-        """Pluginden SSE chunk'larını yield eder; internal_usage'ı DB'ye kaydeder. Hataları merkezi loglar."""
-        accumulated_content = ""
-        accumulated_reasoning = ""
-        accumulated_tool_calls: list[dict] = []
-        usage = None
-        has_error = False
-        status_val = True
-        error_details = None
-        is_estimated = False
-        
-        start_time = time.perf_counter()
-        ttft_ms: float | None = None
-        
-        logger.info(f"Starting chat stream: provider={provider}, model={model}, kwargs={kwargs}")
-        
-        # Gemini-dışı provider'lara giden mesajlardaki uzun tool_call_id'leri kısalt
-        if provider != "gemini":
-            messages = _sanitize_tool_ids_for_non_gemini(messages)
-        
-        try:
-            async for chunk in plugin.stream_chat(
-                model=model, messages=messages,
-                api_key=api_key, auth_header=auth_header, **kwargs
-            ):
-                if isinstance(chunk, dict) and "internal_usage" in chunk:
-                    usage = chunk["internal_usage"]
-                else:
-                    if isinstance(chunk, str):
-                        if '"error":' in chunk:
-                            logger.error(f"[{provider}] API Error chunk: {chunk.strip()}")
-                            has_error = True
-                            status_val = False
-                            error_details = chunk.strip()
-                        # Accumulate content and reasoning content from JSON chunk
-                        try:
-                            data_str = chunk.strip()
-                            if data_str.startswith("data:"):
-                                data_str = data_str[5:].strip()
-                            if data_str and data_str != "[DONE]":
-                                chunk_data = json.loads(data_str)
-                                choices = chunk_data.get("choices", [])
-                                if choices:
-                                    delta = choices[0].get("delta", {})
-                                    has_token = False
-                                    if "reasoning_content" in delta and delta["reasoning_content"]:
-                                        accumulated_reasoning += delta["reasoning_content"]
-                                        has_token = True
-                                    if "content" in delta and delta["content"]:
-                                        accumulated_content += delta["content"]
-                                        has_token = True
-                                    if "tool_calls" in delta:
-                                        has_token = True
-                                        for tc_delta in delta["tool_calls"]:
-                                            idx = tc_delta.get("index", 0)
-                                            # Yeni tool_call mı, yoksa mevcut olana ekleme mi?
-                                            while len(accumulated_tool_calls) <= idx:
-                                                accumulated_tool_calls.append({"id": "", "type": "function", "function": {"name": "", "arguments": ""}})
-                                            entry = accumulated_tool_calls[idx]
-                                            if tc_delta.get("id"):
-                                                entry["id"] = tc_delta["id"]
-                                            fn = tc_delta.get("function", {})
-                                            if fn.get("name"):
-                                                entry["function"]["name"] = fn["name"]
-                                            if fn.get("arguments"):
-                                                entry["function"]["arguments"] += fn["arguments"]
-                                    if has_token and ttft_ms is None:
-                                        ttft_ms = round((time.perf_counter() - start_time) * 1000, 2)
-                        except Exception:
-                            pass
-                    yield chunk
-
-            if not has_error and status_val is True:
-                total_duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
-                if ttft_ms is None:
-                    ttft_ms = total_duration_ms
-
-                comp_tokens = (usage.get("completion_tokens") if usage else None) or (len(accumulated_content) // 4 if is_estimated else 0)
-                metrics_payload = {
-                    "ttft_ms": ttft_ms,
-                    "total_duration_ms": total_duration_ms,
-                }
-                if comp_tokens and total_duration_ms > 0:
-                    metrics_payload["tokens_per_second"] = round(comp_tokens / (total_duration_ms / 1000.0), 2)
-
-                final_chunk = {
-                    "id": f"chatcmpl-{int(time.time())}",
-                    "object": "chat.completion.chunk",
-                    "created": int(time.time()),
-                    "model": model,
-                    "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
-                    "metrics": metrics_payload,
-                }
-                if usage:
-                    final_chunk["usage"] = usage
-
-                yield f'data: {json.dumps(final_chunk, ensure_ascii=False)}\n\n'
-                yield 'data: [DONE]\n\n'
-        except asyncio.CancelledError:
-            has_error = True
-            status_val = None
-            error_details = "Client disconnected / Request Cancelled"
-            logger.info(f"[{provider}] Stream Cancelled")
-            raise
-        except Exception as e:
-            has_error = True
-            status_val = False
-            if isinstance(e, RuntimeError) or "connect" in str(e).lower():
-                logger.warning(f"[{provider}] Stream Connection Failed: {e}")
-            else:
-                logger.error(f"[{provider}] Stream Exception: {e}", exc_info=True)
-                
-            err_msg = str(e)
-            yield f'data: {json.dumps({"error": {"message": err_msg, "type": "api_error"}}, ensure_ascii=False)}\n\n'
-        finally:
-            total_duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
-            if ttft_ms is None and (accumulated_content or accumulated_reasoning or accumulated_tool_calls):
-                ttft_ms = total_duration_ms
-            if ttft_ms is None and status_val is None:
-                ttft_ms = total_duration_ms
-
-            # API'den usage sadece stream sonunda gelir.
-            # Eğer API stream_options: include_usage desteklemiyorsa veya kullanıcı erkenden keserse usage boş kalır.
-            # Bu durumda tahmini token kullanımını hesapla ki harcanan miktar bilinsin.
-            if usage is None and status_val in (True, None):
-                usage = {
-                    "prompt_tokens": max(1, len(json.dumps(messages)) // 4),
-                    "completion_tokens": max(1, len(accumulated_content) // 4) if accumulated_content else 0,
-                    "thoughts_tokens": max(1, len(accumulated_reasoning) // 4) if accumulated_reasoning else 0
-                }
-                is_estimated = True
-
-            # Provider'dan gelen usage'ı kontrol et, 0 ise ücret yansımamış demektir, sadece uyar
-            if usage and accumulated_content and usage.get("completion_tokens", 0) == 0:
-                logger.warning(f"[{provider}] API reported 0 completion_tokens despite generating {len(accumulated_content)} chars.")
-            if usage and accumulated_reasoning and usage.get("thoughts_tokens", 0) == 0:
-                logger.warning(f"[{provider}] API reported 0 thoughts_tokens despite generating {len(accumulated_reasoning)} reasoning chars.")
-                
-            req_data = {
-                "model": model,
-                "messages": messages,
-            }
-            for k, v in kwargs.items():
-                if v is not None:
-                    req_data[k] = v
-
-            if status_val is False:
-                res_data = {
-                    "error": error_details,
-                    "metrics": {
-                        "total_duration_ms": total_duration_ms,
-                    }
-                }
-                if ttft_ms is not None:
-                    res_data["metrics"]["ttft_ms"] = ttft_ms
-            else:
-                msg_data: dict[str, Any] = {
-                    "role": "assistant",
-                    "content": accumulated_content,
-                }
-                
-                # Kullanıcı düşünce kısmını loglarda (response_json'da) görmek istiyor
-                if accumulated_reasoning:
-                    msg_data["reasoning_content"] = accumulated_reasoning
-                
-                if accumulated_tool_calls:
-                    msg_data["tool_calls"] = accumulated_tool_calls
-
-                metrics_dict = {
-                    "ttft_ms": ttft_ms,
-                    "total_duration_ms": total_duration_ms,
-                }
-                comp_tokens = (usage.get("completion_tokens") if usage else None) or (len(accumulated_content) // 4 if is_estimated else 0)
-                if comp_tokens and total_duration_ms > 0:
-                    metrics_dict["tokens_per_second"] = round(comp_tokens / (total_duration_ms / 1000.0), 2)
-
-                res_data = {
-                    "choices": [{"message": msg_data}],
-                    "metrics": metrics_dict,
-                }
-                if usage:
-                    res_data["usage"] = usage
-            
-            asyncio.create_task(
-                _log_usage(
-                    self.app_state,
-                    key_id,
-                    provider,
-                    model,
-                    usage,
-                    request_json=json.dumps(req_data, ensure_ascii=False) if req_data else None,
-                    response_json=json.dumps(res_data, ensure_ascii=False) if res_data else None,
-                    success=status_val,
-                    is_estimated=is_estimated,
-                    ttft_ms=ttft_ms,
-                    duration_ms=total_duration_ms,
-                    log_id=log_id,
-                )
-            )
+    async def _stream(self, *args, **kwargs):
+        async for chunk in self.chat_runner.stream(*args, **kwargs):
+            yield chunk
 
     async def run_combo(
         self,
@@ -656,138 +133,16 @@ class DynamicLLMRouter:
         key_id: str | None = None,
         **kwargs,
     ) -> AsyncGenerator[str, None]:
-        """Model registry tablosunu sorgulayıp, fallback'leri ve key havuzunu döndürerek sohbet akışını yönetir."""
-        req_data = {"model": model, "messages": messages, **kwargs}
-        log_id = None
-        route_plan = RoutePlan.direct(model, provider)
-        try:
-            route_plan = await self._resolve_route_plan("chat", model, provider)
-        except ValueError as e:
-            yield f'data: {json.dumps({"error": {"message": str(e), "type": "api_error"}}, ensure_ascii=False)}\n\n'
-            return
-        except Exception as e:
-            logger.warning(f"Model route resolution failed for '{model}': {e}")
-
-        log_id = await _create_processing_log(key_id, route_plan.primary_provider, model, "chat", req_data)
-
-        if route_plan.routes:
-            success = False
-            last_error_chunk = None
-            for route in route_plan.routes:
-                p_provider = route.provider
-                p_model = route.model
-                p_temp = route.temperature
-                p_think = route.thinking_level
-                p_system_prompt = route.system_prompt
-                
-                route_kwargs = {**kwargs}
-
-                if route_kwargs.get("temperature") is None and p_temp is not None:
-                    try:
-                        route_kwargs["temperature"] = float(p_temp)
-                    except (ValueError, TypeError):
-                        pass
-
-                incoming_think = next(
-                    (route_kwargs[k] for k in ("thinking_level", "reasoning_effort", "thinking_budget")
-                     if route_kwargs.get(k) not in (None, "")),
-                    None,
-                )
-                route_kwargs["thinking_level"] = incoming_think if incoming_think not in (None, "") else p_think
-
-                if not route_kwargs.get("system_prompt") and p_system_prompt:
-                    route_kwargs["system_prompt"] = p_system_prompt
-
-                plugin = self.chat_providers.get(p_provider)
-                if not plugin:
-                    logger.warning(f"Provider plugin {p_provider} not loaded, skipping route.")
-                    continue
-
-                route_messages = _inject_system_prompt(messages, route_kwargs.pop("system_prompt", None))
-                
-                keys_to_try = await self._get_keys_for_provider(p_provider, api_key or auth_header)
-                
-                for key_val, key_pool_id in keys_to_try:
-                    logger.info(f"Trying route {p_provider}/{p_model} using key {key_pool_id or 'default'}")
-                    failed = False
-                    yielded_any = False
-                    
-                    try:
-                        async for chunk in self._stream(
-                            plugin=plugin,
-                            key_id=key_id,
-                            provider=p_provider,
-                            model=p_model,
-                            messages=route_messages,
-                            api_key=key_val,
-                            auth_header=auth_header if not key_val else None,
-                            log_id=log_id,
-                            **route_kwargs
-                        ):
-                            if isinstance(chunk, str) and '"error"' in chunk:
-                                if not yielded_any:
-                                    logger.warning(f"Route {p_provider}/{p_model} failed with error chunk, trying fallback.")
-                                    failed = True
-                                    last_error_chunk = chunk
-                                    if key_pool_id:
-                                        await db_manager.mark_provider_key_error(key_pool_id, "API returned error chunk")
-                                    break
-                            
-                            yielded_any = True
-                            yield chunk
-                        
-                        if not failed:
-                            success = True
-                            break
-                            
-                    except Exception as e:
-                        logger.error(f"Route {p_provider}/{p_model} failed: {e}")
-                        if key_pool_id:
-                            await db_manager.mark_provider_key_error(key_pool_id, str(e))
-                        failed = True
-                        last_error_chunk = f'data: {json.dumps({"error": {"message": str(e), "type": "api_error"}}, ensure_ascii=False)}\n\n'
-                        
-                    if failed and yielded_any:
-                        success = True # Stop attempting other fallbacks to prevent corrupted streams
-                        break
-                        
-                if success:
-                    break
-            
-            if not success and not yielded_any:
-                await _finish_processing_log(
-                    log_id,
-                    {"error": "All routes and fallbacks failed."},
-                    "failed",
-                    False,
-                )
-                if last_error_chunk:
-                    yield last_error_chunk
-                else:
-                    yield f'data: {json.dumps({"error": {"message": "All routes and fallbacks failed.", "type": "api_error"}}, ensure_ascii=False)}\n\n'
-            return
-
-        # Backend Registry'de bulunamadıysa: Geriye uyumlu eski yönlendirme akışı (Direct routing)
-        logger.info(f"No routes found in database for model '{model}'. Falling back to direct provider routing.")
-        if provider not in self.chat_providers:
-            err_msg = f"Unknown chat provider: {provider}"
-            await _finish_processing_log(log_id, {"error": err_msg}, "failed", False)
-            yield f'data: {json.dumps({"error": {"message": err_msg, "type": "api_error"}}, ensure_ascii=False)}\n\n'
-            return
-
-        db_key = self._get_db_key(provider)
-        
-        route_messages = _inject_system_prompt(messages, kwargs.pop("system_prompt", None))
-
-        async for chunk in self._stream(
-            self.chat_providers[provider], key_id, provider, model,
-            route_messages, db_key or api_key, auth_header, log_id=log_id, **kwargs
+        async for chunk in self.chat_runner.run_combo(
+            provider,
+            model,
+            messages,
+            api_key=api_key,
+            auth_header=auth_header,
+            key_id=key_id,
+            **kwargs,
         ):
             yield chunk
-
-    # -----------------------------------------------------------------------
-    #  Embeddings
-    # -----------------------------------------------------------------------
 
     async def run_embeddings(
         self,
@@ -798,106 +153,14 @@ class DynamicLLMRouter:
         auth_header: str | None = None,
         key_id: str | None = None,
     ) -> dict:
-        """Belirtilen model üzerinden embedding üretir (otomatik route ve key fallbacks ile)."""
-        route_plan = RoutePlan.direct(model, provider)
-        try:
-            route_plan = await self._resolve_route_plan("embed", model, provider)
-        except Exception as e:
-            logger.warning(f"Embed route resolution failed for '{model}': {e}")
-
-        req_data = {
-            "model": model,
-            "input": input_text,
-        }
-        log_id = await _create_processing_log(key_id, route_plan.primary_provider, model, "embed", req_data)
-
-        p_provider = route_plan.primary_provider
-        p_model = model
-        last_err = None
-        start_time = time.perf_counter()
-        try:
-            for route in route_plan.routes:
-                p_provider = route.provider
-                p_model = route.model
-                
-                plugin = self.embed_providers.get(p_provider)
-                if not plugin:
-                    last_err = ValueError(f"Embed provider not available: {p_provider}")
-                    continue
-                    
-                keys_to_try = await self._get_keys_for_provider(p_provider, api_key or auth_header)
-                
-                for key_val, key_pool_id in keys_to_try:
-                    logger.info(f"Routing embeddings to {p_provider} (model={p_model}) using key {key_pool_id or 'default'}")
-                    try:
-                        result = await plugin.generate_embeddings(
-                            model=p_model,
-                            input_text=input_text,
-                            api_key=key_val,
-                            auth_header=auth_header if not key_val else None,
-                        )
-                        
-                        duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
-                        # Log success — store vector dimension in completion_tokens
-                        p_tokens = 0
-                        vector_dim = 0
-                        if isinstance(result, dict):
-                            if "usage" in result:
-                                p_tokens = result["usage"].get("prompt_tokens", 0)
-                            try:
-                                vector_dim = len(result["data"][0]["embedding"])
-                            except Exception:
-                                pass
-                            if "metrics" not in result:
-                                result["metrics"] = {"total_duration_ms": duration_ms}
-                        
-                        usage = {"prompt_tokens": p_tokens, "completion_tokens": vector_dim, "thoughts_tokens": 0}
-                        asyncio.create_task(
-                            _log_usage(
-                                self.app_state,
-                                key_id,
-                                p_provider,
-                                p_model,
-                                usage,
-                                request_json=json.dumps(req_data, ensure_ascii=False),
-                                response_json=json.dumps(result, ensure_ascii=False),
-                                success=True,
-                                capability='embed',
-                                duration_ms=duration_ms,
-                                log_id=log_id,
-                            )
-                        )
-                        return result
-                    except Exception as e:
-                        logger.error(f"Embed route {p_provider}/{p_model} failed: {e}")
-                        if key_pool_id:
-                            await db_manager.mark_provider_key_error(key_pool_id, str(e))
-                        last_err = e
-        except asyncio.CancelledError:
-            res_err = {"error": "Client disconnected / Request Cancelled"}
-            asyncio.create_task(
-                _log_usage(
-                    self.app_state,
-                    key_id,
-                    p_provider,
-                    p_model,
-                    None,
-                    request_json=json.dumps(req_data, ensure_ascii=False),
-                    response_json=json.dumps(res_err, ensure_ascii=False),
-                    success=None,
-                    capability='embed',
-                    log_id=log_id,
-                )
-            )
-            raise
-                    
-        final_error = last_err or ValueError(f"Could not resolve embed route for model: {model}")
-        await _finish_processing_log(log_id, {"error": str(final_error)}, "failed", False)
-        raise final_error
-
-    # -----------------------------------------------------------------------
-    #  TTS
-    # -----------------------------------------------------------------------
+        return await self.embeddings_runner.run_embeddings(
+            provider,
+            model,
+            input_text,
+            api_key=api_key,
+            auth_header=auth_header,
+            key_id=key_id,
+        )
 
     async def run_speech(
         self,
@@ -910,153 +173,16 @@ class DynamicLLMRouter:
         key_id: str | None = None,
         **kwargs,
     ) -> tuple[bytes, str, dict[str, float]]:
-        """Belirtilen model üzerinden ses üretir (otomatik route ve key fallbacks ile)."""
-        route_plan = RoutePlan.direct(model, provider)
-        try:
-            route_plan = await self._resolve_route_plan("tts", model, provider)
-        except Exception as e:
-            logger.warning(f"TTS route resolution failed for '{model}': {e}")
-
-        req_data = {
-            "model": model,
-            "input": input_text,
-            "voice": voice,
-            **kwargs
-        }
-        log_id = await _create_processing_log(key_id, route_plan.primary_provider, model, "tts", req_data)
-
-        p_provider = route_plan.primary_provider
-        p_model = model
-        last_err = None
-        start_time = time.perf_counter()
-        try:
-            for route in route_plan.routes:
-                p_provider = route.provider
-                p_model = route.model
-                p_temp = route.temperature
-                p_def_config = route.default_config
-                if isinstance(p_def_config, str):
-                    try:
-                        import json as _json
-                        p_def_config = _json.loads(p_def_config)
-                    except Exception:
-                        p_def_config = {}
-                elif not isinstance(p_def_config, dict):
-                    p_def_config = {}
-
-                route_kwargs = {}
-                for k, v in p_def_config.items():
-                    if v is not None and v != "":
-                        route_kwargs[k] = v
-                for k, v in kwargs.items():
-                    if v is not None and v != "":
-                        route_kwargs[k] = v
-
-                if p_temp is not None and route_kwargs.get("temperature") is None:
-                    try:
-                        route_kwargs["temperature"] = float(p_temp)
-                    except Exception:
-                        pass
-
-                target_voice = voice
-                if (not target_voice or str(target_voice).lower() in ("none", "null", "default", "alloy")) and p_def_config.get("voice"):
-                    target_voice = p_def_config.get("voice")
-
-                # If tts_instruct is not explicitly provided, construct from character design configs
-                if not route_kwargs.get("tts_instruct") and not route_kwargs.get("instructions"):
-                    instructs = []
-                    for field in ("gender", "age", "pitch", "style", "accent", "dialect"):
-                        val = route_kwargs.get(field)
-                        if val and str(val).strip() and str(val).strip().lower() != "auto":
-                            instructs.append(str(val).strip())
-                    if instructs:
-                        route_kwargs["tts_instruct"] = ", ".join(instructs)
-                
-                plugin = self.tts_providers.get(p_provider)
-                if not plugin:
-                    last_err = ValueError(f"TTS provider not available: {p_provider}")
-                    continue
-                    
-                keys_to_try = await self._get_keys_for_provider(p_provider, api_key or auth_header)
-                
-                for key_val, key_pool_id in keys_to_try:
-                    logger.info(f"Routing TTS to {p_provider} (model={p_model}, voice={target_voice}) using key {key_pool_id or 'default'}, kwargs={route_kwargs}")
-                    try:
-                        audio_bytes, content_type, usage_meta = await plugin.generate_speech(
-                            model=p_model,
-                            input_text=input_text,
-                            voice=target_voice,
-                            api_key=key_val,
-                            auth_header=auth_header if not key_val else None,
-                            **route_kwargs
-                        )
-                        
-                        duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
-                        # Log success — store audio tokens
-                        import base64
-                        audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
-                        prompt_tokens = usage_meta.get("prompt_tokens", 0)
-                        completion_tokens = usage_meta.get("completion_tokens", 0)
-                        usage = {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens, "thoughts_tokens": 0}
-                        res_success = {
-                            "detail": "Audio generation successful",
-                            "content_type": content_type,
-                            "size_bytes": len(audio_bytes),
-                            "estimated_duration_seconds": completion_tokens / 25.0,
-                            "audio_base64": audio_b64,
-                            "metrics": {
-                                "total_duration_ms": duration_ms
-                            }
-                        }
-                        asyncio.create_task(
-                            _log_usage(
-                                self.app_state,
-                                key_id,
-                                p_provider,
-                                p_model,
-                                usage,
-                                request_json=json.dumps(req_data, ensure_ascii=False),
-                                response_json=json.dumps(res_success, ensure_ascii=False),
-                                success=True,
-                                capability='tts',
-                                duration_ms=duration_ms,
-                                log_id=log_id,
-                            )
-                        )
-                        response_metadata = {
-                            key: value for key, value in res_success.items() if key != "audio_base64"
-                        }
-                        return audio_bytes, content_type, response_metadata
-                    except Exception as e:
-                        logger.error(f"TTS route {p_provider}/{p_model} failed: {e}")
-                        if key_pool_id:
-                            await db_manager.mark_provider_key_error(key_pool_id, str(e))
-                        last_err = e
-        except asyncio.CancelledError:
-            res_err = {"error": "Client disconnected / Request Cancelled"}
-            asyncio.create_task(
-                _log_usage(
-                    self.app_state,
-                    key_id,
-                    p_provider,
-                    p_model,
-                    None,
-                    request_json=json.dumps(req_data, ensure_ascii=False),
-                    response_json=json.dumps(res_err, ensure_ascii=False),
-                    success=None,
-                    capability='tts',
-                    log_id=log_id,
-                )
-            )
-            raise
-                    
-        final_error = last_err or ValueError(f"Could not resolve TTS route for model: {model}")
-        await _finish_processing_log(log_id, {"error": str(final_error)}, "failed", False)
-        raise final_error
-
-    # -----------------------------------------------------------------------
-    #  STT (Speech-to-Text / Transcription)
-    # -----------------------------------------------------------------------
+        return await self.tts_runner.run_speech(
+            provider,
+            model,
+            input_text,
+            voice=voice,
+            api_key=api_key,
+            auth_header=auth_header,
+            key_id=key_id,
+            **kwargs,
+        )
 
     async def run_transcription(
         self,
@@ -1073,118 +199,20 @@ class DynamicLLMRouter:
         key_id: str | None = None,
         **kwargs,
     ) -> dict:
-        """Belirtilen model üzerinden ses transkripsiyonu üretir (otomatik route ve key fallbacks ile)."""
-        route_plan = RoutePlan.direct(model, provider)
-        try:
-            route_plan = await self._resolve_route_plan("stt", model, provider)
-        except Exception as e:
-            logger.warning(f"STT route resolution failed for '{model}': {e}")
-
-        req_data = {
-            "model": model,
-            "filename": filename,
-            "language": language,
-            "bytes_len": len(file_bytes),
+        return await self.stt_runner.run_transcription(
+            provider,
+            model,
+            file_bytes,
+            filename=filename,
+            language=language,
+            prompt=prompt,
+            response_format=response_format,
+            temperature=temperature,
+            api_key=api_key,
+            auth_header=auth_header,
+            key_id=key_id,
             **kwargs,
-        }
-        log_id = await _create_processing_log(key_id, route_plan.primary_provider, model, "stt", req_data)
-
-        p_provider = route_plan.primary_provider
-        p_model = model
-        last_err = None
-        start_time = time.perf_counter()
-        try:
-            for route in route_plan.routes:
-                p_provider = route.provider
-                p_model = route.model
-
-                plugin = self.stt_providers.get(p_provider)
-                if not plugin:
-                    last_err = ValueError(f"STT provider not available: {p_provider}")
-                    continue
-
-                keys_to_try = await self._get_keys_for_provider(p_provider, api_key or auth_header)
-
-                for key_val, key_pool_id in keys_to_try:
-                    logger.info(
-                        f"Routing STT to {p_provider} (model={p_model}, filename={filename}) "
-                        f"using key {key_pool_id or 'default'}"
-                    )
-                    try:
-                        result = await plugin.generate_transcription(
-                            model=p_model,
-                            file_bytes=file_bytes,
-                            filename=filename,
-                            language=language,
-                            prompt=prompt,
-                            response_format=response_format,
-                            temperature=temperature,
-                            api_key=key_val,
-                            auth_header=auth_header if not key_val else None,
-                            **kwargs,
-                        )
-
-                        duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
-                        # Log usage
-                        duration = result.get("duration", 0) or 0
-                        text_res = result.get("text", "")
-                        prompt_tokens = int(float(duration) * 25) if duration else max(1, len(file_bytes) // 3200)
-                        completion_tokens = len(text_res.split())
-                        usage = {
-                            "prompt_tokens": prompt_tokens,
-                            "completion_tokens": completion_tokens,
-                            "thoughts_tokens": 0,
-                        }
-                        if isinstance(result, dict) and "metrics" not in result:
-                            result["metrics"] = {"total_duration_ms": duration_ms}
-
-                        asyncio.create_task(
-                            _log_usage(
-                                self.app_state,
-                                key_id,
-                                p_provider,
-                                p_model,
-                                usage,
-                                request_json=json.dumps(req_data, ensure_ascii=False),
-                                response_json=json.dumps(result, ensure_ascii=False),
-                                success=True,
-                                capability="stt",
-                                duration_ms=duration_ms,
-                                log_id=log_id,
-                            )
-                        )
-                        return result
-                    except Exception as e:
-                        logger.error(f"STT route {p_provider}/{p_model} failed: {e}")
-                        if key_pool_id:
-                            await db_manager.mark_provider_key_error(key_pool_id, str(e))
-                        last_err = e
-
-        except asyncio.CancelledError:
-            res_err = {"error": "Client disconnected / Request Cancelled"}
-            asyncio.create_task(
-                _log_usage(
-                    self.app_state,
-                    key_id,
-                    p_provider,
-                    p_model,
-                    None,
-                    request_json=json.dumps(req_data, ensure_ascii=False),
-                    response_json=json.dumps(res_err, ensure_ascii=False),
-                    success=None,
-                    capability="stt",
-                    log_id=log_id,
-                )
-            )
-            raise
-
-        final_error = last_err or ValueError(f"Could not resolve STT route for model: {model}")
-        await _finish_processing_log(log_id, {"error": str(final_error)}, "failed", False)
-        raise final_error
-
-    # -----------------------------------------------------------------------
-    #  File Upload
-    # -----------------------------------------------------------------------
+        )
 
     async def upload_file(
         self,
@@ -1194,13 +222,12 @@ class DynamicLLMRouter:
         display_name: str,
         api_key: str | None = None,
     ) -> dict:
-        """Belirtilen provider üzerinden dosya yükler."""
         plugin = self.file_providers.get(provider)
         if not plugin:
             raise ValueError(f"File upload provider not available: {provider}")
 
         db_key = self._get_db_key(provider)
-        logger.info(f"Routing file upload to {provider}: {display_name} ({mime_type})")
+        logger.info("Routing file upload to %s: %s (%s)", provider, display_name, mime_type)
         return await plugin.upload_file(
             file_bytes=file_bytes,
             mime_type=mime_type,
@@ -1208,23 +235,5 @@ class DynamicLLMRouter:
             api_key=db_key or api_key,
         )
 
-    # -----------------------------------------------------------------------
-    #  Yetenek Sorgusu
-    # -----------------------------------------------------------------------
-
     def get_capabilities(self) -> dict:
-        """Her provider için desteklenen yetenekleri döner (admin/debug için)."""
-        all_providers = (
-            set(self.chat_providers) | set(self.embed_providers)
-            | set(self.tts_providers) | set(self.stt_providers) | set(self.file_providers)
-        )
-        return {
-            p: {
-                "chat": p in self.chat_providers,
-                "embed": p in self.embed_providers,
-                "tts": p in self.tts_providers,
-                "stt": p in self.stt_providers,
-                "file_upload": p in self.file_providers,
-            }
-            for p in sorted(all_providers)
-        }
+        return self.registry.get_capabilities()
