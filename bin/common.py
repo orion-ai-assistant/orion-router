@@ -1,4 +1,5 @@
 import os
+import json
 import sys
 import time
 import subprocess
@@ -161,6 +162,29 @@ def psql(query_args: list, pg_user: str, pg_port: int) -> subprocess.CompletedPr
     base = [str(PSQL), "-U", pg_user, "-p", str(pg_port), "-d", "postgres"]
     return run_silent(base + query_args)
 
+def postgres_is_ready(pg_data: Path, pg_port: int, pg_user: str) -> bool:
+    """Check that the listener belongs to this data directory and answers queries."""
+    if not PSQL.exists() or not is_port_open(pg_port):
+        return False
+
+    env = {**os.environ, "PGCONNECT_TIMEOUT": "2"}
+    result = run(
+        [str(PSQL), "-h", "127.0.0.1", "-U", pg_user, "-p", str(pg_port),
+         "-d", "postgres", "-w", "-At", "-c", "SHOW data_directory"],
+        timeout=3,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0 or not result.stdout.strip():
+        return False
+
+    try:
+        actual_dir = Path(result.stdout.strip()).resolve()
+        return os.path.normcase(str(actual_dir)) == os.path.normcase(str(pg_data.resolve()))
+    except OSError:
+        return False
+
 def read_env(key: str, default: str) -> str:
     env_file = ROOT / ".env"
     if env_file.exists():
@@ -179,6 +203,67 @@ def is_port_open(port: int) -> bool:
             return True
     except Exception:
         return False
+
+def _windows_listening_pids(port: int) -> list[str]:
+    """Return unique Windows PIDs listening on the exact local port."""
+    if sys.platform != "win32":
+        return []
+
+    try:
+        result = run(
+            ["netstat", "-aon"],
+            capture_output=True, text=True, timeout=DEFAULT_TIMEOUT
+        )
+    except Exception:
+        return []
+
+    pids = set()
+    for line in result.stdout.splitlines():
+        parts = line.split()
+        if len(parts) < 5 or parts[0].upper() != "TCP" or parts[3].upper() != "LISTENING":
+            continue
+        if parts[1].rsplit(":", 1)[-1] != str(port):
+            continue
+        pid = parts[-1]
+        if pid.isdigit() and pid != "0":
+            pids.add(pid)
+    return sorted(pids, key=int)
+
+def _windows_orphan_postgres_children(parent_pid: str) -> list[str]:
+    """Find only Orion PostgreSQL children whose vanished parent owned the port."""
+    if sys.platform != "win32" or not parent_pid.isdigit():
+        return []
+
+    command = (
+        f"Get-CimInstance Win32_Process -Filter 'ParentProcessId = {parent_pid}' | "
+        "Select-Object ProcessId,ExecutablePath,CommandLine | ConvertTo-Json -Compress"
+    )
+    result = run(
+        ["powershell", "-NoProfile", "-NonInteractive", "-Command", command],
+        capture_output=True, text=True, timeout=DEFAULT_TIMEOUT,
+    )
+    if result.returncode != 0 or not result.stdout.strip():
+        return []
+
+    try:
+        records = json.loads(result.stdout)
+    except (ValueError, TypeError):
+        return []
+    if isinstance(records, dict):
+        records = [records]
+
+    expected_exe = os.path.normcase(os.path.normpath(str(PG_BIN / "postgres.exe")))
+    children = []
+    for record in records:
+        pid = str(record.get("ProcessId", ""))
+        command_line = record.get("CommandLine") or ""
+        exe = record.get("ExecutablePath") or ""
+        if not exe and command_line.startswith('"'):
+            exe = command_line.split('"', 2)[1]
+        if (pid.isdigit() and "--fork" in command_line
+                and os.path.normcase(os.path.normpath(exe)) == expected_exe):
+            children.append(pid)
+    return children
 
 def kill_port(port: int) -> bool:
     if not is_port_open(port):
@@ -204,20 +289,27 @@ def kill_port(port: int) -> bool:
             pass
 
     if sys.platform == "win32":
-        try:
+        for pid in _windows_listening_pids(port):
             result = run(
-                ["netstat", "-aon"],
-                capture_output=True, text=True, timeout=DEFAULT_TIMEOUT
+                ["taskkill", "/f", "/t", "/pid", pid],
+                capture_output=True, text=True, timeout=DEFAULT_TIMEOUT,
             )
-            for line in result.stdout.splitlines():
-                if f":{port} " in line and "LISTENING" in line:
-                    pid = line.split()[-1]
-                    if pid.isdigit() and pid != "0":
-                        run_silent(["taskkill", "/f", "/t", "/pid", pid])
-                        dim(t("port_killed", port=port, pid=pid))
+            if result.returncode != 0 and port in _ORION_PG_PORTS:
+                for child_pid in _windows_orphan_postgres_children(pid):
+                    child_result = run_silent(["taskkill", "/f", "/t", "/pid", child_pid])
+                    if child_result.returncode == 0:
+                        dim(t("port_killed", port=port, pid=child_pid))
                         killed_any = True
-        except Exception:
-            pass
+                if killed_any and not is_port_open(port):
+                    continue
+            if result.returncode == 0:
+                dim(t("port_killed", port=port, pid=pid))
+                killed_any = True
+            else:
+                warn(t("port_kill_failed", port=port, pid=pid))
+                reason = (result.stderr or result.stdout or "").strip()
+                if reason:
+                    dim(reason)
     else:
         try:
             res = run(["lsof", "-t", f"-i:{port}"], capture_output=True, text=True, timeout=5)
@@ -252,9 +344,10 @@ def kill_portable_postgres(data_dir: Path, label: str, port: int | None = None) 
                 pid = lines[0]
                 check = run_silent(["tasklist", "/fi", f"PID eq {pid}", "/fo", "csv", "/nh"])
                 if check.returncode == 0:
-                    run_silent(["taskkill", "/f", "/t", "/pid", pid])
-                    dim(t("old_pg_killed", pid=pid, name=label))
-                    killed_any = True
+                    result = run_silent(["taskkill", "/f", "/t", "/pid", pid])
+                    if result.returncode == 0:
+                        dim(t("old_pg_killed", pid=pid, name=label))
+                        killed_any = True
         except Exception:
             pass
 
@@ -263,11 +356,9 @@ def kill_portable_postgres(data_dir: Path, label: str, port: int | None = None) 
     else:
         time.sleep(1.0)
 
-    for file_name in ["postmaster.pid", "postmaster.opts"]:
-        try:
-            (data_dir / file_name).unlink(missing_ok=True)
-        except Exception:
-            pass
+    if port is not None and is_port_open(port):
+        return False
+
     return killed_any
 
 # Orion Router'ın kullandığı PostgreSQL portları (prod: POSTGRES_PORT, dev: POSTGRES_DEV_PORT)
@@ -377,9 +468,30 @@ def free_ports(ports: list[int], pg_data: Path, pg_label: str) -> None:
             pg_port = port
             break
             
-    kill_portable_postgres(pg_data, pg_label, port=pg_port)
+    if pg_port is not None:
+        kill_portable_postgres(pg_data, pg_label, port=pg_port)
     for port in ports:
         kill_port(port)
+
+    deadline = time.time() + 5.0
+    busy_ports = list(ports)
+    while busy_ports and time.time() < deadline:
+        if sys.platform == "win32":
+            busy_ports = [port for port in ports if _windows_listening_pids(port)]
+        else:
+            busy_ports = [port for port in ports if is_port_open(port)]
+        if busy_ports:
+            time.sleep(0.25)
+
+    if busy_ports:
+        details = []
+        for port in busy_ports:
+            pids = _windows_listening_pids(port)
+            details.append(f"{port} (PID {', '.join(pids)})" if pids else str(port))
+        err(t("port_cleanup_failed", ports=", ".join(details)))
+        if sys.platform == "win32":
+            warn(t("port_cleanup_admin_hint"))
+        raise SystemExit(1)
 
 def download_postgres() -> None:
     if (TOOLS_DIR / "pgsql.ready").is_file():
@@ -505,16 +617,7 @@ def init_database(pg_data: Path, pg_user: str, _repair_attempted: bool = False) 
 def start_postgres(pg_data: Path, pg_port: int, pg_log: Path, label: str) -> None:
     info(t("starting_pg"))
 
-    def _cleanup_stale_locks() -> None:
-        for file_name in ["postmaster.pid", "postmaster.opts"]:
-            try:
-                (pg_data / file_name).unlink(missing_ok=True)
-            except Exception:
-                pass
-
     for attempt in range(1, 4):
-        _cleanup_stale_locks()
-
         deadline = time.time() + 5.0
         while time.time() < deadline:
             try:

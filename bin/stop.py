@@ -32,7 +32,7 @@ from bin.common import (
     ROOT, PG_CTL, DEFAULT_TIMEOUT,
     RESET, BOLD, CYAN, GREEN, YELLOW, RED, GRAY,
     ok, info, warn, err, dim,
-    run, run_silent, read_env,
+    run, run_silent, read_env, _windows_listening_pids, _windows_orphan_postgres_children,
 )
 from bin.i18n import t
 import os
@@ -69,16 +69,15 @@ def is_port_open(port: int) -> bool:
 # Graceful PostgreSQL Stop (önce pg_ctl, sonra force)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _stop_postgres_graceful(data_dir: Path, port: int, label: str) -> None:
+def _stop_postgres_graceful(data_dir: Path, port: int, label: str) -> bool:
     """pg_ctl -m fast ile graceful kapat. Kapanmazsa force-kill fallback."""
     if not data_dir.exists():
-        return
+        return True
 
     if not is_port_open(port):
         if not QUIET_MODE:
             dim(f"PostgreSQL ({label}) zaten çalışmıyor.")
-        _cleanup_pg_files(data_dir)
-        return
+        return True
 
     if not QUIET_MODE:
         info(t("stopping_pg_label", label=label))
@@ -91,38 +90,36 @@ def _stop_postgres_graceful(data_dir: Path, port: int, label: str) -> None:
         if result.returncode == 0 and not is_port_open(port):
             if not QUIET_MODE:
                 ok(t("stopped_pg_label", label=label))
-            _cleanup_pg_files(data_dir)
-            return
+            return True
 
     # Graceful başarısız → force fallback
     if not QUIET_MODE:
         warn(f"PostgreSQL ({label}) graceful kapanmadı, zorla durduruluyor...")
 
-    _force_kill_postgres_port(port, data_dir, label)
+    return _force_kill_postgres_port(port, data_dir, label)
 
 
-def _force_kill_postgres_port(port: int, data_dir: Path, label: str) -> None:
-    """Porta bağlı postgres sürecini zorla öldür."""
+def _force_kill_postgres_port(port: int, data_dir: Path, label: str) -> bool:
+    """Porta bağlı postgres sürecini zorla öldür ve sonucu doğrula."""
     killed = False
     if sys.platform == "win32":
         try:
-            result = run(
-                ["netstat", "-aon"], capture_output=True, text=True, timeout=DEFAULT_TIMEOUT
-            )
-            for line in result.stdout.splitlines():
-                if f":{port} " in line and "LISTENING" in line:
-                    pid = line.split()[-1]
-                    if pid.isdigit() and pid != "0":
-                        run_silent(["taskkill", "/f", "/t", "/pid", pid])
-                        killed = True
-            if not killed:
+            listener_pids = _windows_listening_pids(port)
+            for pid in listener_pids:
+                result = run_silent(["taskkill", "/f", "/t", "/pid", pid])
+                killed = result.returncode == 0 or killed
+                if result.returncode != 0:
+                    for child_pid in _windows_orphan_postgres_children(pid):
+                        child_result = run_silent(["taskkill", "/f", "/t", "/pid", child_pid])
+                        killed = child_result.returncode == 0 or killed
+            if not listener_pids:
                 # PID dosyasından dene
                 pid_file = data_dir / "postmaster.pid"
                 if pid_file.exists():
                     lines = pid_file.read_text().splitlines()
                     if lines and lines[0].isdigit():
-                        run_silent(["taskkill", "/f", "/t", "/pid", lines[0]])
-                        killed = True
+                        result = run_silent(["taskkill", "/f", "/t", "/pid", lines[0]])
+                        killed = result.returncode == 0
         except Exception:
             pass
     else:
@@ -131,25 +128,23 @@ def _force_kill_postgres_port(port: int, data_dir: Path, label: str) -> None:
             if res.returncode == 0:
                 for pid in res.stdout.splitlines():
                     if pid.strip().isdigit():
-                        run_silent(["kill", "-9", pid.strip()])
-                        killed = True
+                        result = run_silent(["kill", "-9", pid.strip()])
+                        killed = result.returncode == 0 or killed
         except Exception:
             pass
 
     if killed:
         time.sleep(1.0)
+
+    if is_port_open(port):
         if not QUIET_MODE:
-            dim(f"  PostgreSQL ({label}) port {port} zorla temizlendi.")
+            warn(f"PostgreSQL ({label}) port {port} kapatılamadı.")
+        return False
 
-    _cleanup_pg_files(data_dir)
+    if killed and not QUIET_MODE:
+        dim(f"  PostgreSQL ({label}) port {port} zorla temizlendi.")
 
-
-def _cleanup_pg_files(data_dir: Path) -> None:
-    for fname in ["postmaster.pid", "postmaster.opts"]:
-        try:
-            (data_dir / fname).unlink(missing_ok=True)
-        except Exception:
-            pass
+    return True
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -288,6 +283,19 @@ def main() -> None:
 
     if not QUIET_MODE:
         print()
+
+    busy_ports = [port for port in [DEV_PORT, PROD_PORT, *ROUTER_PORTS] if is_port_open(port)]
+    if busy_ports:
+        details = []
+        for port in busy_ports:
+            pids = _windows_listening_pids(port)
+            details.append(f"{port} (PID {', '.join(pids)})" if pids else str(port))
+        err(t("port_cleanup_failed", ports=", ".join(details)))
+        if sys.platform == "win32":
+            warn(t("port_cleanup_admin_hint"))
+        raise SystemExit(1)
+
+    if not QUIET_MODE:
         ok(t("all_services_cleared"))
 
 

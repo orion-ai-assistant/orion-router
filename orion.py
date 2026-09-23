@@ -74,7 +74,8 @@ def main():
         try:
             # İlgili scripti doğrudan çalıştır
             args = [sys.executable, str(script_path)]
-            subprocess.run(args, cwd=ROOT)
+            result = subprocess.run(args, cwd=ROOT)
+            sys.exit(result.returncode)
         except KeyboardInterrupt:
             # CTRL+C ile kesildiğinde ana script temiz sonlansın
             pass

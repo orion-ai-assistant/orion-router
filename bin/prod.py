@@ -29,7 +29,7 @@ from bin.common import (
     RESET, BOLD, CYAN, GREEN, YELLOW, RED, GRAY,
     ok, info, warn, err, dim,
     acquire_lock, release_lock, run, run_silent, psql, read_env,
-    kill_port, kill_portable_postgres, free_ports,
+    kill_port, kill_portable_postgres, free_ports, postgres_is_ready,
     download_postgres, init_database, start_postgres, wait_for_postgres, stop_postgres,
     setup_db_and_user, set_env
 )
@@ -91,7 +91,9 @@ def launch(router_port: str) -> list[tuple[str, subprocess.Popen]]:
     return procs
 
 
-def shutdown(procs: list) -> None:
+def shutdown(procs: list, stop_pg: bool) -> None:
+    if not procs and not stop_pg:
+        return
     print(f"\n{RED}✘  {t('shutdown_received')}{RESET}", flush=True)
     for name, proc in procs:
         try:
@@ -103,9 +105,11 @@ def shutdown(procs: list) -> None:
             dim(t("service_closed", name=name, pid=proc.pid))
         except Exception:
             pass
-    info(t("stopping_pg_label", label="PostgreSQL"))
-    stop_postgres(PG_DATA)
-    ok(t("all_services_shutdown"))
+    if stop_pg:
+        info(t("stopping_pg_label", label="PostgreSQL"))
+        stop_postgres(PG_DATA)
+    if procs or stop_pg:
+        ok(t("all_services_shutdown"))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -124,19 +128,26 @@ def main() -> None:
         sys.exit(1)
 
     procs = []
+    started_postgres = False
     try:
         banner()
 
         run_silent([sys.executable, "-c", "import core.config"], cwd=ROOT)
         router_port = read_env("ROUTER_PORT", "20128")
+        reuse_postgres = postgres_is_ready(PG_DATA, PG_PORT, PG_USER)
 
-        free_ports([int(router_port), PG_PORT], PG_DATA, "prod")
+        ports_to_clean = [int(router_port)] if reuse_postgres else [int(router_port), PG_PORT]
+        free_ports(ports_to_clean, PG_DATA, "prod")
         print()
 
         download_postgres()
         init_database(PG_DATA, PG_USER)
-        start_postgres(PG_DATA, PG_PORT, PG_LOG, "prod")
-        wait_for_postgres(PG_DATA, PG_PORT, PG_LOG, PG_USER, "prod")
+        if reuse_postgres:
+            ok(t("pg_reusing_existing"))
+        else:
+            start_postgres(PG_DATA, PG_PORT, PG_LOG, "prod")
+            started_postgres = True
+            wait_for_postgres(PG_DATA, PG_PORT, PG_LOG, PG_USER, "prod")
         setup_db_and_user(PG_USER, PG_PASS, PG_PORT, PG_DB)
         print()
 
@@ -184,7 +195,7 @@ def main() -> None:
     except KeyboardInterrupt:
         pass
     finally:
-        shutdown(procs)
+        shutdown(procs, started_postgres)
         release_lock(".orion.prod.lock")
 
 if __name__ == "__main__":
