@@ -612,6 +612,8 @@ async def create_model(request: Request):
     body = await request.json()
     name = _require_text(body.get("name"), "name")
     provider = _require_text(body.get("provider"), "provider").lower()
+    if provider == "local":
+        raise HTTPException(status_code=400, detail="Local models are built in and cannot be added manually")
     capability = _require_text(body.get("capability", "chat"), "capability")
     temperature = body.get("temperature", None)
     if capability in ("chat", "tts"):
@@ -677,6 +679,13 @@ async def update_model(model_id: str, request: Request):
     name = _require_text(body.get("name", existing["name"]), "name")
     provider = _require_text(body.get("provider", existing["provider"]), "provider").lower()
     capability = _require_text(body.get("capability", existing["capability"]), "capability")
+    if existing["provider"] == "local":
+        if name != existing["name"]:
+            raise HTTPException(status_code=400, detail="Local model names are fixed and cannot be changed")
+        if capability != existing["capability"]:
+            raise HTTPException(status_code=400, detail="Local model capabilities are fixed and cannot be changed")
+        if provider != existing["provider"]:
+            raise HTTPException(status_code=400, detail="Local model providers are fixed and cannot be changed")
     temperature = body.get("temperature", existing["temperature"])
     if capability in ("chat", "tts"):
         temperature = float(temperature) if temperature not in (None, "") else None

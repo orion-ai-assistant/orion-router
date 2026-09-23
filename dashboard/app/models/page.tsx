@@ -158,6 +158,7 @@ export default function ModelsPage() {
     voices: string[];
     languages: string[];
   }>({ active: false, engine: null, voices: [], languages: [] });
+  const addableProviders = useMemo(() => providers.filter((name) => name !== 'local'), [providers]);
 
   // Modals visibility
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
@@ -200,9 +201,10 @@ export default function ModelsPage() {
       if (res.ok) {
         const data = await res.json();
         const pNames = Object.keys(data.providers || {});
+        const firstAddableProvider = pNames.find((name) => name !== 'local') || '';
         setProviders(pNames);
-        if (pNames.length > 0) {
-          setAddForm((prev) => ({ ...prev, provider: pNames[0] }));
+        if (firstAddableProvider) {
+          setAddForm((prev) => ({ ...prev, provider: firstAddableProvider }));
         }
       }
     } catch (e) {
@@ -450,7 +452,7 @@ export default function ModelsPage() {
       if (res.ok) {
         setAddForm({
           name: '',
-          provider: providers[0] || '',
+          provider: addableProviders[0] || '',
           capability: 'chat',
           temperature: '',
           input_price: '0',
@@ -1056,7 +1058,7 @@ export default function ModelsPage() {
                   required
                   className="orion-native-select"
                 >
-                  {providers.map((name) => (
+                  {addableProviders.map((name) => (
                     <option key={name} value={name}>
                       {name}
                     </option>
@@ -1217,7 +1219,8 @@ export default function ModelsPage() {
                 value={editingModel.name}
                 onChange={(e) => setEditingModel({ ...editingModel, name: e.target.value })}
                 required
-                className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
+                disabled={editingModel.provider === 'local'}
+                className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3 disabled:cursor-not-allowed disabled:opacity-60"
               />
             </div>
 
@@ -1252,6 +1255,7 @@ export default function ModelsPage() {
                       temperature: (e.target.value === 'chat' || e.target.value === 'tts') ? editingModel.temperature : null,
                     })
                   }
+                  disabled={editingModel.provider === 'local'}
                   className="orion-native-select"
                 >
                   <option value="chat">chat</option>
