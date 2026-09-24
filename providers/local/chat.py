@@ -72,6 +72,12 @@ class LocalChatProvider(BaseChat):
         if kwargs.get("temperature") is not None:
             payload["temperature"] = float(kwargs["temperature"])
 
+        for key in ("top_p", "min_p", "repeat_penalty"):
+            if kwargs.get(key) is not None:
+                payload[key] = float(kwargs[key])
+        if kwargs.get("top_k") is not None:
+            payload["top_k"] = int(kwargs["top_k"])
+
         if kwargs.get("chat_template_kwargs") and isinstance(kwargs["chat_template_kwargs"], dict):
             payload["chat_template_kwargs"] = dict(kwargs["chat_template_kwargs"])
 

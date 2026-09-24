@@ -365,11 +365,32 @@ class ChatRunner:
                 p_model = route.model
                 route_kwargs = {**kwargs}
 
+                if p_provider == "local":
+                    config = route.default_config
+                    if isinstance(config, str):
+                        try:
+                            config = json.loads(config)
+                        except json.JSONDecodeError:
+                            config = {}
+                    sampling = config.get("local_sampling") if isinstance(config, dict) else None
+                    defaults = {"top_p": 0.95, "top_k": 64, "min_p": 0.03, "repeat_penalty": 1.05}
+                    for key, default in defaults.items():
+                        if route_kwargs.get(key) is None:
+                            configured = sampling.get(key) if isinstance(sampling, dict) else None
+                            route_kwargs[key] = default if configured is None else configured
+
                 if route_kwargs.get("temperature") is None and route.temperature is not None:
                     try:
-                        route_kwargs["temperature"] = float(route.temperature)
+                        route_temperature = float(route.temperature)
+                        if p_provider == "local" and route_temperature == 0 and (
+                            not isinstance(config, dict) or config.get("local_chat_defaults_version") != 1
+                        ):
+                            route_temperature = 1.0
+                        route_kwargs["temperature"] = route_temperature
                     except (ValueError, TypeError):
                         pass
+                if p_provider == "local" and route_kwargs.get("temperature") is None:
+                    route_kwargs["temperature"] = 1.0
 
                 incoming_think = next(
                     (

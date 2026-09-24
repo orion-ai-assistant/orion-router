@@ -267,7 +267,7 @@ class DatabaseManager:
         await conn.execute("DELETE FROM router_models WHERE name = 'local-model' AND capability = 'tts'")
 
         defaults = [
-            ("local-chat", "local", "chat", None),
+            ("local-chat", "local", "chat", 1.0),
             ("local-embed", "local", "embed", None),
             ("local-tts", "local", "tts", None),
             ("local-stt", "local", "stt", None),

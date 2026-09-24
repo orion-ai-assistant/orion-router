@@ -282,6 +282,8 @@
   "models.toast.enterNameSelectProvider": "Please enter a model name and select a provider.",
   "models.toast.nameProviderEmpty": "Model name and provider cannot be empty.",
   "models.toast.invalidTemperature": "Temperature must be a number between 0.0 and 2.0",
+  "models.localSampling": "Advanced Generation Settings",
+  "models.toast.invalidLocalSampling": "Enter valid numbers for advanced generation settings (Top K must be an integer).",
   "models.toast.addSuccess": "Model added successfully!",
   "models.toast.addFailed": "Failed to add model",
   "models.toast.updateSuccess": "Model updated successfully!",

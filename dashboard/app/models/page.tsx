@@ -145,6 +145,33 @@ const cleanNumberInput = (val: string): string => {
   return val;
 };
 
+const localSamplingDefaults = { top_p: 0.95, top_k: 64, min_p: 0.03, repeat_penalty: 1.05 };
+type LocalSamplingKey = keyof typeof localSamplingDefaults;
+
+const parseModelConfig = (value: unknown): Record<string, any> => {
+  if (typeof value === 'string') {
+    try { value = JSON.parse(value); } catch { return {}; }
+  }
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : {};
+};
+
+const localSamplingConfig = (config: Record<string, any>): Record<LocalSamplingKey, number | string> => ({
+  top_p: config.local_sampling?.top_p ?? localSamplingDefaults.top_p,
+  top_k: config.local_sampling?.top_k ?? localSamplingDefaults.top_k,
+  min_p: config.local_sampling?.min_p ?? localSamplingDefaults.min_p,
+  repeat_penalty: config.local_sampling?.repeat_penalty ?? localSamplingDefaults.repeat_penalty,
+});
+
+const validateLocalSampling = (config: Record<string, any>): boolean => {
+  const sampling = localSamplingConfig(config);
+  return (Object.keys(localSamplingDefaults) as LocalSamplingKey[]).every((key) => {
+    const value = Number(sampling[key]);
+    return String(sampling[key]).trim() !== '' && Number.isFinite(value) && value >= 0 &&
+      (key !== 'top_p' && key !== 'min_p' || value <= 1) &&
+      (key !== 'top_k' || Number.isInteger(value));
+  });
+};
+
 export default function ModelsPage() {
   const { showToast, confirmAction, t } = useApp();
   const [models, setModels] = useState<ModelItem[]>([]);
@@ -194,6 +221,8 @@ export default function ModelsPage() {
 
   const [showAddTtsDefaults, setShowAddTtsDefaults] = useState(false);
   const [showEditTtsDefaults, setShowEditTtsDefaults] = useState(false);
+  const [showAddLocalSampling, setShowAddLocalSampling] = useState(false);
+  const [showEditLocalSampling, setShowEditLocalSampling] = useState(false);
 
   const loadProviders = async () => {
     try {
@@ -264,7 +293,9 @@ export default function ModelsPage() {
           const think_price = model.think_price || 0;
           const thinking_level = model.thinking_level || null;
           const system_prompt = model.system_prompt || null;
-          const default_config = TTSDefaultConfig.fromObject(model.default_config).toObject();
+          const default_config = capability === 'tts'
+            ? TTSDefaultConfig.fromObject(model.default_config).toObject()
+            : parseModelConfig(model.default_config);
 
           return {
             ...model,
@@ -419,6 +450,10 @@ export default function ModelsPage() {
       showToast(t('models.toast.invalidTemperature'), 'error');
       return;
     }
+    if (provider === 'local' && capability === 'chat' && !validateLocalSampling(addForm.default_config)) {
+      showToast(t('models.toast.invalidLocalSampling'), 'error');
+      return;
+    }
 
     try {
       let configObj = {};
@@ -431,6 +466,12 @@ export default function ModelsPage() {
           }
         }
         configObj = config.toObject();
+      } else if (provider === 'local' && capability === 'chat') {
+        configObj = {
+          ...addForm.default_config,
+          local_chat_defaults_version: 1,
+          local_sampling: localSamplingConfig(addForm.default_config),
+        };
       }
 
       const res = await adminFetch('/dashboard/api/models', {
@@ -463,6 +504,7 @@ export default function ModelsPage() {
           default_config: {},
         });
         setShowAddModal(false);
+        setShowAddLocalSampling(false);
         showToast(t('models.toast.addSuccess'));
         await loadModels();
       } else {
@@ -490,6 +532,10 @@ export default function ModelsPage() {
       showToast(t('models.toast.invalidTemperature'), 'error');
       return;
     }
+    if (provider === 'local' && editingModel.capability === 'chat' && !validateLocalSampling(editingModel.default_config || {})) {
+      showToast(t('models.toast.invalidLocalSampling'), 'error');
+      return;
+    }
 
     try {
       let configObj = {};
@@ -502,6 +548,12 @@ export default function ModelsPage() {
           }
         }
         configObj = config.toObject();
+      } else if (provider === 'local' && editingModel.capability === 'chat') {
+        configObj = {
+          ...editingModel.default_config,
+          local_chat_defaults_version: 1,
+          local_sampling: localSamplingConfig(editingModel.default_config || {}),
+        };
       }
 
       const res = await adminFetch(`/dashboard/api/models/${editingModel.id}`, {
@@ -579,13 +631,60 @@ export default function ModelsPage() {
   const openEditModal = (model: ModelItem) => {
     setEditingModel({
       ...model,
-      temperature: model.temperature === null ? '' : (model.temperature as any),
+      temperature: model.provider === 'local' && model.capability === 'chat' &&
+        model.default_config?.local_chat_defaults_version !== 1 && (model.temperature === null || model.temperature === 0)
+        ? 1 : model.temperature,
       input_price: formatPriceForInput(model.input_price),
       output_price: formatPriceForInput(model.output_price),
       think_price: formatPriceForInput(model.think_price),
     });
     setShowEditTtsDefaults(false);
+    setShowEditLocalSampling(false);
     setShowEditModal(true);
+  };
+
+  const renderLocalSampling = (
+    formState: { provider: string; capability: string; default_config?: Record<string, any> },
+    setFormState: (value: any) => void,
+    expanded: boolean,
+    setExpanded: (value: boolean) => void,
+  ) => {
+    if (formState.provider !== 'local' || formState.capability !== 'chat') return null;
+    const config = formState.default_config || {};
+    const sampling = localSamplingConfig(config);
+    const updateSampling = (key: string, value: boolean | string) => {
+      setFormState({
+        ...formState,
+        default_config: { ...config, local_sampling: { ...sampling, [key]: value } },
+      });
+    };
+
+    return (
+      <div className="flex flex-col gap-2">
+        <button type="button" onClick={() => setExpanded(!expanded)} aria-expanded={expanded} className="self-start flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
+          <span>{t('models.localSampling')}</span>
+          <span aria-hidden="true" className="text-[11px]">{expanded ? '▾' : '▸'}</span>
+        </button>
+        {expanded && (
+            <div className="grid grid-cols-2 gap-2 pl-1">
+              {(Object.keys(localSamplingDefaults) as LocalSamplingKey[]).map((key) => (
+                <label key={key} className="flex flex-col gap-1 text-xs text-zinc-400 font-medium">
+                  {key.toUpperCase().replace('_', ' ')}
+                  <Input
+                    type="number"
+                    min="0"
+                    max={key === 'top_p' || key === 'min_p' ? '1' : undefined}
+                    step={key === 'top_k' ? '1' : '0.01'}
+                    value={sampling[key]}
+                    onChange={(e) => updateSampling(key, e.target.value)}
+                    className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm"
+                  />
+                </label>
+              ))}
+            </div>
+        )}
+      </div>
+    );
   };
 
   const renderTtsDefaults = (formState: any, setFormState: Function, showDefaults: boolean, setShowDefaults: Function) => {
@@ -1121,6 +1220,8 @@ export default function ModelsPage() {
               </div>
             )}
 
+            {renderLocalSampling(addForm, setAddForm, showAddLocalSampling, setShowAddLocalSampling)}
+
             {(addForm.capability === 'chat') && (
               <div className="flex flex-col gap-2">
                 <label className="text-zinc-400 text-sm font-medium">{t('models.systemPrompt')}</label>
@@ -1297,6 +1398,8 @@ export default function ModelsPage() {
                 )}
               </div>
             )}
+
+            {renderLocalSampling(editingModel, setEditingModel, showEditLocalSampling, setShowEditLocalSampling)}
 
             {(editingModel.capability === 'chat') && (
               <div className="flex flex-col gap-2">

@@ -282,6 +282,8 @@
   "models.toast.enterNameSelectProvider": "Lütfen bir model adı girin ve sağlayıcı seçin.",
   "models.toast.nameProviderEmpty": "Model adı ve sağlayıcı boş olamaz.",
   "models.toast.invalidTemperature": "Sıcaklık (temperature) 0.0 ile 2.0 arasında bir sayı olmalıdır",
+  "models.localSampling": "Gelişmiş Üretim Ayarları",
+  "models.toast.invalidLocalSampling": "Gelişmiş üretim ayarlarına geçerli sayılar girin (Top K tam sayı olmalı).",
   "models.toast.addSuccess": "Model başarıyla eklendi!",
   "models.toast.addFailed": "Model eklenemedi",
   "models.toast.updateSuccess": "Model başarıyla güncellendi!",
