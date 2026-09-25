@@ -144,6 +144,8 @@
   "playground.config": "Yapılandırma",
   "playground.modelOrGroup": "Model veya Grup",
   "playground.temperature": "Temperature",
+  "playground.localSampling": "Gelişmiş Üretim Ayarları",
+  "playground.invalidSampling": "Gelişmiş üretim ayarlarına geçerli sayılar girin (Top K tam sayı olmalı).",
   "playground.thinking": "Thinking",
   "playground.systemPrompt": "Sistem Yönergesi",
   "playground.audioSettings": "Ses Ayarları",

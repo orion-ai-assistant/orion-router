@@ -24,6 +24,24 @@ from core.thinking import ThinkingConfig
 logger = logging.getLogger("service-router.gemini")
 
 
+def _gemini_schema(schema: Any) -> Any:
+    """Remove OpenAI JSON Schema keywords unsupported by Gemini tools."""
+    if isinstance(schema, list):
+        return [_gemini_schema(item) for item in schema]
+    if not isinstance(schema, dict):
+        return schema
+
+    cleaned = {}
+    for key, value in schema.items():
+        if key in ("additionalProperties", "additional_properties", "propertyNames", "property_names"):
+            continue
+        if key == "properties" and isinstance(value, dict):
+            cleaned[key] = {name: _gemini_schema(prop) for name, prop in value.items()}
+        else:
+            cleaned[key] = _gemini_schema(value)
+    return cleaned
+
+
 class GeminiChatProvider(BaseChat):
 
     def apply_thinking(self, config_kwargs: dict[str, Any], thinking: ThinkingConfig) -> None:
@@ -73,6 +91,11 @@ class GeminiChatProvider(BaseChat):
         # OpenAI mesaj formatını Gemini formatına çevir
         contents = []
         system_instruction = None
+        tool_names = {
+            call.get("id"): (call.get("function") or {}).get("name")
+            for message in messages if message.get("role") == "assistant"
+            for call in message.get("tool_calls") or []
+        }
         for msg in messages:
             role = msg.get("role", "user")
             content = msg.get("content", "")
@@ -84,7 +107,7 @@ class GeminiChatProvider(BaseChat):
                 continue
 
             if role == "tool":
-                name = msg.get("name", "unknown")
+                name = msg.get("name") or tool_names.get(msg.get("tool_call_id")) or "unknown"
                 try:
                     resp_dict = json.loads(content)
                 except Exception:
@@ -178,7 +201,7 @@ class GeminiChatProvider(BaseChat):
                                 types.FunctionDeclaration(
                                     name=fn.get("name", ""),
                                     description=fn.get("description", ""),
-                                    parameters=fn.get("parameters", {}),
+                                    parameters=_gemini_schema(fn.get("parameters", {})),
                                 )
                             ]
                         )
@@ -198,6 +221,7 @@ class GeminiChatProvider(BaseChat):
                 model=model, contents=contents, config=config
             )
             final_usage = None
+            tool_index = 0
 
             async for chunk in stream:
                 if hasattr(chunk, "usage_metadata") and chunk.usage_metadata:
@@ -230,11 +254,12 @@ class GeminiChatProvider(BaseChat):
                             ts_str = f"__ts__{ts_b64}"
 
                         tc = {
-                            "index": 0,
+                            "index": tool_index,
                             "id": f"call_{name}{ts_str}",
                             "type": "function",
                             "function": {"name": name, "arguments": args_json}
                         }
+                        tool_index += 1
                         yield f'data: {{"choices":[{{"delta":{{"tool_calls":[{json.dumps(tc, ensure_ascii=False)}]}}}}]}}\n\n'
                         continue
 

@@ -144,6 +144,8 @@
   "playground.config": "Configuration",
   "playground.modelOrGroup": "Model or Group",
   "playground.temperature": "Temperature",
+  "playground.localSampling": "Advanced Generation Settings",
+  "playground.invalidSampling": "Enter valid numbers for advanced generation settings (Top K must be an integer).",
   "playground.thinking": "Thinking",
   "playground.systemPrompt": "System Prompt",
   "playground.audioSettings": "Audio Settings",

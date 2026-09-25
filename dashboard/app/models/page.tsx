@@ -145,7 +145,7 @@ const cleanNumberInput = (val: string): string => {
   return val;
 };
 
-const localSamplingDefaults = { top_p: 0.95, top_k: 64, min_p: 0.03, repeat_penalty: 1.05 };
+const localSamplingDefaults = { top_p: 0.95, top_k: 64, min_p: 0.05, repeat_penalty: 1 };
 type LocalSamplingKey = keyof typeof localSamplingDefaults;
 
 const parseModelConfig = (value: unknown): Record<string, any> => {

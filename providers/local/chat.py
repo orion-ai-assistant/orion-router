@@ -51,17 +51,8 @@ class LocalChatProvider(BaseChat):
         elif thinking.budget is not None:
             payload["thinking_budget_tokens"] = thinking.budget
 
-    async def stream_chat(
-        self,
-        model: str,
-        messages: list[dict[str, Any]],
-        api_key: str | None = None,
-        auth_header: str | None = None,
-        **kwargs,
-    ) -> AsyncGenerator[Any, None]:
-
-        url = f"http://{LLM_HOST}:{LLM_PORT}/v1/chat/completions"
-
+    def build_payload(self, model: str, messages: list[dict[str, Any]], **kwargs) -> dict[str, Any]:
+        """Build the exact JSON body sent to the local chat server."""
         payload = {
             "model": model or "local-chat",
             "messages": messages,
@@ -90,6 +81,20 @@ class LocalChatProvider(BaseChat):
             tool_choice = kwargs.get("tool_choice")
             if tool_choice:
                 payload["tool_choice"] = tool_choice
+
+        return payload
+
+    async def stream_chat(
+        self,
+        model: str,
+        messages: list[dict[str, Any]],
+        api_key: str | None = None,
+        auth_header: str | None = None,
+        **kwargs,
+    ) -> AsyncGenerator[Any, None]:
+
+        url = f"http://{LLM_HOST}:{LLM_PORT}/v1/chat/completions"
+        payload = self.build_payload(model, messages, **kwargs)
 
         # Kaç karakter reasoning (think) geldi — API breakdown vermezse tahmin için
         thought_chars = 0

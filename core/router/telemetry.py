@@ -161,3 +161,14 @@ class TelemetryService:
             status=status,
             success=success,
         )
+
+    async def update_processing_request(self, log_id: int | None, request_data: dict) -> None:
+        if log_id is None:
+            return
+        try:
+            await db_manager.update_streaming_request(
+                log_id,
+                json.dumps(request_data, ensure_ascii=False),
+            )
+        except Exception as exc:
+            logger.warning("Failed to update processing request log: %s", exc)

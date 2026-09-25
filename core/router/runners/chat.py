@@ -110,6 +110,12 @@ class ChatRunner:
         if provider != "gemini":
             messages = sanitize_tool_ids_for_non_gemini(messages)
 
+        if provider == "local" and hasattr(plugin, "build_payload"):
+            await self.telemetry.update_processing_request(
+                log_id,
+                plugin.build_payload(model, messages, **kwargs),
+            )
+
         try:
             async for chunk in plugin.stream_chat(
                 model=model,
@@ -323,7 +329,11 @@ class ChatRunner:
         key_id: str | None = None,
         **kwargs,
     ) -> AsyncGenerator[str, None]:
-        req_data = {"model": model, "messages": messages, **kwargs}
+        req_data = {
+            "model": model,
+            "messages": messages,
+            **{key: value for key, value in kwargs.items() if value is not None},
+        }
         route_plan = None
         route_resolution_error = None
         try:
@@ -373,7 +383,7 @@ class ChatRunner:
                         except json.JSONDecodeError:
                             config = {}
                     sampling = config.get("local_sampling") if isinstance(config, dict) else None
-                    defaults = {"top_p": 0.95, "top_k": 64, "min_p": 0.03, "repeat_penalty": 1.05}
+                    defaults = {"top_p": 0.95, "top_k": 64, "min_p": 0.05, "repeat_penalty": 1}
                     for key, default in defaults.items():
                         if route_kwargs.get(key) is None:
                             configured = sampling.get(key) if isinstance(sampling, dict) else None

@@ -27,6 +27,103 @@ class OpenAIChatProvider(BaseChat):
         if thinking.level is not None:
             payload["reasoning_effort"] = thinking.level
 
+    @staticmethod
+    def _responses_input(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        items = []
+        for message in messages:
+            role = message.get("role")
+            if role == "tool":
+                items.append({
+                    "type": "function_call_output",
+                    "call_id": message["tool_call_id"],
+                    "output": message.get("content", ""),
+                })
+            elif role == "assistant" and message.get("tool_calls"):
+                if message.get("content"):
+                    items.append({"role": "assistant", "content": message["content"]})
+                for call in message["tool_calls"]:
+                    fn = call.get("function") or {}
+                    items.append({
+                        "type": "function_call",
+                        "call_id": call["id"],
+                        "name": fn.get("name", ""),
+                        "arguments": fn.get("arguments", "{}"),
+                    })
+            else:
+                items.append({"role": role, "content": message.get("content", "")})
+        return items
+
+    def _responses_payload(self, model: str, messages: list[dict[str, Any]], kwargs: dict) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "model": model,
+            "input": self._responses_input(messages),
+            "stream": True,
+            "store": False,
+        }
+        thinking = self.extract_thinking_config(kwargs)
+        if thinking.level is not None:
+            payload["reasoning"] = {"effort": thinking.level}
+        elif thinking.is_disabled:
+            payload["reasoning"] = {"effort": "none"}
+        if thinking.level is None and kwargs.get("temperature") is not None:
+            payload["temperature"] = float(kwargs["temperature"])
+
+        tools = kwargs.get("tools")
+        if tools:
+            payload["tools"] = [
+                {"type": "function", **tool.get("function", {})}
+                if tool.get("type") == "function" else tool
+                for tool in tools
+            ]
+            choice = kwargs.get("tool_choice")
+            if isinstance(choice, dict) and choice.get("type") == "function":
+                payload["tool_choice"] = {"type": "function", "name": choice.get("function", {}).get("name", "")}
+            elif choice:
+                payload["tool_choice"] = choice
+        return payload
+
+    async def _stream_responses(self, client, headers: dict, payload: dict) -> AsyncGenerator[Any, None]:
+        url = f"{_BASE_URL}/v1/responses"
+        tool_indexes: dict[int, int] = {}
+        async with client.stream("POST", url, json=payload, headers=headers, timeout=None) as response:
+            if response.status_code != 200:
+                err = await response.aread()
+                message = err.decode(errors="ignore")
+                if response.status_code == 400 and "reasoning" in payload and "reasoning" in message.lower():
+                    fallback = {key: value for key, value in payload.items() if key not in ("reasoning", "temperature")}
+                    async for chunk in self._stream_responses(client, headers, fallback):
+                        yield chunk
+                    return
+                raise RuntimeError(f"OpenAI Responses HTTP Error {response.status_code}: {message}")
+
+            async for event in self._iter_sse_lines(response):
+                kind = event.get("type")
+                if kind == "response.output_text.delta":
+                    yield f'data: {json.dumps({"choices": [{"delta": {"content": event.get("delta", "")}}]}, ensure_ascii=False)}\n\n'
+                elif kind == "response.output_item.added" and event.get("item", {}).get("type") == "function_call":
+                    item = event["item"]
+                    output_index = event.get("output_index", 0)
+                    tool_indexes[output_index] = len(tool_indexes)
+                    call = {"index": tool_indexes[output_index], "id": item.get("call_id"), "type": "function", "function": {"name": item.get("name", ""), "arguments": item.get("arguments", "")}}
+                    yield f'data: {json.dumps({"choices": [{"delta": {"tool_calls": [call]}}]}, ensure_ascii=False)}\n\n'
+                elif kind == "response.function_call_arguments.delta":
+                    output_index = event.get("output_index", 0)
+                    if output_index in tool_indexes:
+                        call = {"index": tool_indexes[output_index], "function": {"arguments": event.get("delta", "")}}
+                        yield f'data: {json.dumps({"choices": [{"delta": {"tool_calls": [call]}}]}, ensure_ascii=False)}\n\n'
+                elif kind == "response.completed":
+                    usage = event.get("response", {}).get("usage") or {}
+                    if usage:
+                        reasoning = (usage.get("output_tokens_details") or {}).get("reasoning_tokens", 0) or 0
+                        yield {"internal_usage": {
+                            "prompt_tokens": usage.get("input_tokens", 0),
+                            "completion_tokens": max(0, (usage.get("output_tokens", 0) or 0) - reasoning),
+                            "thoughts_tokens": reasoning,
+                        }}
+                elif kind in ("error", "response.failed"):
+                    error = event.get("error") or event.get("response", {}).get("error") or event
+                    raise RuntimeError(f"OpenAI Responses stream error: {error}")
+
     async def stream_chat(
         self,
         model: str,
@@ -57,11 +154,10 @@ class OpenAIChatProvider(BaseChat):
             "stream": True,
             "stream_options": {"include_usage": True},
         }
-        if kwargs.get("temperature") is not None:
-            payload["temperature"] = float(kwargs["temperature"])
-
         thinking = self.extract_thinking_config(kwargs)
         self.apply_thinking(payload, thinking)
+        if "reasoning_effort" not in payload and kwargs.get("temperature") is not None:
+            payload["temperature"] = float(kwargs["temperature"])
 
         tools = kwargs.get("tools")
         if tools:
@@ -71,27 +167,63 @@ class OpenAIChatProvider(BaseChat):
                 payload["tool_choice"] = tool_choice
 
         client = get_http_client()
+        if tools and thinking.is_active:
+            async for chunk in self._stream_responses(client, headers, self._responses_payload(model, messages, kwargs)):
+                yield chunk
+            return
+
         async with client.stream("POST", url, json=payload, headers=headers, timeout=None) as response:
             if response.status_code != 200:
                 err = await response.aread()
-                raise RuntimeError(f"OpenAI HTTP Error {response.status_code}: {err.decode(errors='ignore')}")
+                message = err.decode(errors="ignore")
+                if response.status_code == 400 and tools and any(
+                    marker in message.lower() for marker in ("tool", "function call", "responses api", "reasoning_effort")
+                ):
+                    async for chunk in self._stream_responses(client, headers, self._responses_payload(model, messages, kwargs)):
+                        yield chunk
+                    return
+                if response.status_code == 400 and "reasoning_effort" in payload and any(
+                    marker in message.lower() for marker in ("reasoning_effort", "reasoning effort")
+                ):
+                    fallback = {key: value for key, value in payload.items() if key != "reasoning_effort"}
+                    if kwargs.get("temperature") is not None:
+                        fallback["temperature"] = float(kwargs["temperature"])
+                    async with client.stream("POST", url, json=fallback, headers=headers, timeout=None) as retry:
+                        if retry.status_code != 200:
+                            retry_error = await retry.aread()
+                            raise RuntimeError(f"OpenAI HTTP Error {retry.status_code}: {retry_error.decode(errors='ignore')}")
+                        async for data in self._iter_sse_lines(retry):
+                            async for chunk in self._chat_chunks(data):
+                                yield chunk
+                    return
+                if response.status_code == 400 and "temperature" in payload and "temperature" in message.lower():
+                    fallback = {key: value for key, value in payload.items() if key != "temperature"}
+                    async with client.stream("POST", url, json=fallback, headers=headers, timeout=None) as retry:
+                        if retry.status_code != 200:
+                            retry_error = await retry.aread()
+                            raise RuntimeError(f"OpenAI HTTP Error {retry.status_code}: {retry_error.decode(errors='ignore')}")
+                        async for data in self._iter_sse_lines(retry):
+                            async for chunk in self._chat_chunks(data):
+                                yield chunk
+                    return
+                raise RuntimeError(f"OpenAI HTTP Error {response.status_code}: {message}")
 
             async for data in self._iter_sse_lines(response):
-                    if data.get("usage"):
-                        usage = data["usage"]
-                        details = usage.get("completion_tokens_details") or {}
-                        r = details.get("reasoning_tokens", 0) or 0
-                        if r:
-                            usage["thoughts_tokens"] = r
-                            raw_completion = usage.get("completion_tokens", 0) or 0
-                            usage["completion_tokens"] = max(0, raw_completion - r)
-                        yield {"internal_usage": usage}
-                        continue
+                async for chunk in self._chat_chunks(data):
+                    yield chunk
 
-                    delta = (data.get("choices") or [{}])[0].get("delta", {})
-                    if delta.get("reasoning_content"):
-                        yield f'data: {{"choices":[{{"delta":{{"reasoning_content":{json.dumps(delta["reasoning_content"], ensure_ascii=False)}}}}}]}}\n\n'
-                    if delta.get("content"):
-                        yield f'data: {{"choices":[{{"delta":{{"content":{json.dumps(delta["content"], ensure_ascii=False)}}}}}]}}\n\n'
-                    if delta.get("tool_calls"):
-                        yield f'data: {{"choices":[{{"delta":{{"tool_calls":{json.dumps(delta["tool_calls"], ensure_ascii=False)}}}}}]}}\n\n'
+    async def _chat_chunks(self, data: dict) -> AsyncGenerator[Any, None]:
+        if data.get("usage"):
+            usage = data["usage"]
+            details = usage.get("completion_tokens_details") or {}
+            reasoning = details.get("reasoning_tokens", 0) or 0
+            if reasoning:
+                usage["thoughts_tokens"] = reasoning
+                usage["completion_tokens"] = max(0, (usage.get("completion_tokens", 0) or 0) - reasoning)
+            yield {"internal_usage": usage}
+            return
+
+        delta = (data.get("choices") or [{}])[0].get("delta", {})
+        for key in ("reasoning_content", "content", "tool_calls"):
+            if delta.get(key):
+                yield f'data: {json.dumps({"choices": [{"delta": {key: delta[key]}}]}, ensure_ascii=False)}\n\n'

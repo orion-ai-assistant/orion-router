@@ -26,6 +26,26 @@ interface ChatTabProps {
   groups: any[];
 }
 
+const samplingDefaults = { top_p: '0.95', top_k: '64', min_p: '0.05', repeat_penalty: '1' };
+type SamplingKey = keyof typeof samplingDefaults;
+
+const readSampling = (config: any): Record<SamplingKey, string> => {
+  const values = config?.local_sampling || {};
+  return {
+    top_p: String(values.top_p ?? samplingDefaults.top_p),
+    top_k: String(values.top_k ?? samplingDefaults.top_k),
+    min_p: String(values.min_p ?? samplingDefaults.min_p),
+    repeat_penalty: String(values.repeat_penalty ?? samplingDefaults.repeat_penalty),
+  };
+};
+
+const modelTemperature = (model: any): number | null => {
+  if (!model) return null;
+  if (model.provider === 'local' && model.default_config?.local_chat_defaults_version !== 1 &&
+      (model.temperature === null || Number(model.temperature) === 0)) return 1;
+  return model.temperature ?? null;
+};
+
 export default function ChatTab({ models, groups }: ChatTabProps) {
   const { showToast, locale, t } = useApp();
 
@@ -43,6 +63,13 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
   const [chatTemp, setChatTemp] = useState(getSavedState('pg_chatTemp', ''));
   const [chatThinking, setChatThinking] = useState(getSavedState('pg_chatThinking', ''));
   const [chatSystemPrompt, setChatSystemPrompt] = useState(getSavedState('pg_chatSystemPrompt', ''));
+  const initialSamplingSavedRef = useRef(typeof window !== 'undefined' && localStorage.getItem('pg_chatSampling') !== null);
+  const [chatSampling, setChatSampling] = useState<Record<SamplingKey, string>>(() => {
+    if (typeof window === 'undefined') return { ...samplingDefaults };
+    try { return { ...samplingDefaults, ...JSON.parse(localStorage.getItem('pg_chatSampling') || '{}') }; }
+    catch { return { ...samplingDefaults }; }
+  });
+  const [showSampling, setShowSampling] = useState(false);
   const [chatMessages, setChatMessages] = useState<Message[]>((() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('pg_chatMessages');
@@ -69,12 +96,19 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
 
   // Update Chat settings when model selection changes
   useEffect(() => {
-    if (!chatModel) return;
+    if (!chatModel || (models.length === 0 && groups.length === 0)) return;
 
     const isInitialLoadForSavedModel = initialChatModelRef.current === chatModel;
 
     if (isInitialLoadForSavedModel) {
       initialChatModelRef.current = null;
+      const group = groups.find((g) => g.name === chatModel && g.capability === 'chat');
+      const modelName = group?.items?.[0]?.name || chatModel;
+      const model = models.find((m) => m.name === modelName && m.capability === 'chat');
+      if (chatTemp === '0' && model?.provider === 'local' && modelTemperature(model) === 1 &&
+          Number(model.temperature) === 0 && model.default_config?.local_chat_defaults_version !== 1) {
+        setChatTemp('1');
+      }
     } else {
       // Apply defaults
       const group = groups.find((g) => g.name === chatModel && g.capability === 'chat');
@@ -84,7 +118,7 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
         if (primaryItem) {
           const modelDetail = models.find((m) => m.name === primaryItem.name && m.capability === 'chat');
           defaults = {
-            temperature: modelDetail?.temperature ?? null,
+            temperature: modelTemperature(modelDetail),
             thinking_level: primaryItem.thinking_level || modelDetail?.thinking_level || null,
             system_prompt: primaryItem.system_prompt || modelDetail?.system_prompt || null,
           };
@@ -93,7 +127,7 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
         const model = models.find((m) => m.name === chatModel && m.capability === 'chat');
         if (model) {
           defaults = {
-            temperature: model.temperature ?? null,
+            temperature: modelTemperature(model),
             thinking_level: model.thinking_level || null,
             system_prompt: model.system_prompt || null,
           };
@@ -104,6 +138,12 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
       setChatThinking(defaults.thinking_level !== undefined && defaults.thinking_level !== null ? String(defaults.thinking_level) : '');
       setChatSystemPrompt(defaults.system_prompt !== undefined && defaults.system_prompt !== null ? String(defaults.system_prompt) : '');
     }
+    if (!isInitialLoadForSavedModel || !initialSamplingSavedRef.current) {
+      const group = groups.find((g) => g.name === chatModel && g.capability === 'chat');
+      const modelName = group?.items?.[0]?.name || chatModel;
+      const model = models.find((m) => m.name === modelName && m.capability === 'chat');
+      setChatSampling(readSampling(model?.default_config));
+    }
   }, [chatModel, groups, models]);
 
   // Save states to localStorage
@@ -113,10 +153,11 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
       localStorage.setItem('pg_chatTemp', chatTemp);
       localStorage.setItem('pg_chatThinking', chatThinking);
       localStorage.setItem('pg_chatSystemPrompt', chatSystemPrompt);
+      localStorage.setItem('pg_chatSampling', JSON.stringify(chatSampling));
       localStorage.setItem('pg_chatMessages', JSON.stringify(chatMessages));
       localStorage.setItem('pg_chatInput', chatInput);
     }
-  }, [chatModel, chatTemp, chatThinking, chatSystemPrompt, chatMessages, chatInput]);
+  }, [chatModel, chatTemp, chatThinking, chatSystemPrompt, chatSampling, chatMessages, chatInput]);
 
   // Scroll chat window to bottom on new messages
   useEffect(() => {
@@ -135,7 +176,7 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
       if (primaryItem) {
         const modelDetail = models.find((m) => m.name === primaryItem.name && m.capability === 'chat');
         return {
-          temperature: modelDetail?.temperature ?? null,
+          temperature: modelTemperature(modelDetail),
           thinking_level: primaryItem.thinking_level || modelDetail?.thinking_level || null,
           system_prompt: primaryItem.system_prompt || modelDetail?.system_prompt || null,
         };
@@ -147,7 +188,7 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
     const model = models.find((m) => m.name === chatModel && m.capability === 'chat');
     if (model) {
       return {
-        temperature: model.temperature ?? null,
+        temperature: modelTemperature(model),
         thinking_level: model.thinking_level || null,
         system_prompt: model.system_prompt || null,
       };
@@ -223,6 +264,20 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
     const text = chatInput.trim();
     if (!text) return;
 
+    if (isLocalChat) {
+      const invalid = (Object.keys(samplingDefaults) as SamplingKey[]).some((key) => {
+        const raw = chatSampling[key].trim();
+        const value = Number(raw);
+        return !raw || !Number.isFinite(value) || value < 0 ||
+          ((key === 'top_p' || key === 'min_p') && value > 1) ||
+          (key === 'top_k' && !Number.isInteger(value));
+      });
+      if (invalid) {
+        showToast(t('playground.invalidSampling'), 'error');
+        return;
+      }
+    }
+
     const userMsg: Message = {
       id: 'user-' + Date.now() + '-' + Math.random(),
       role: 'user',
@@ -249,6 +304,11 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
     const parsedTemp = parseFloat(chatTemp);
     if (!isNaN(parsedTemp)) {
       payload.temperature = parsedTemp;
+    }
+    if (isLocalChat) {
+      for (const key of Object.keys(samplingDefaults) as SamplingKey[]) {
+        payload[key] = Number(chatSampling[key]);
+      }
     }
 
     const trimmedThinking = chatThinking.trim();
@@ -506,6 +566,11 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
   };
 
   const selectedChatGroup = groups.find((g) => g.name === chatModel && g.capability === 'chat');
+  const isLocalChat = selectedChatGroup
+    ? selectedChatGroup.items?.length > 0 && selectedChatGroup.items.every((item: { name: string }) =>
+        models.some((model) => model.name === item.name && model.capability === 'chat' && model.provider === 'local')
+      )
+    : models.some((model) => model.name === chatModel && model.capability === 'chat' && model.provider === 'local');
   const resolvedDefaults = getResolvedDefaults();
   const hasTempOverride = chatTemp !== '';
   const hasThinkingOverride = chatThinking !== '';
@@ -624,7 +689,7 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
             className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs placeholder:text-zinc-600"
           />
         </div>
-        <div className="flex flex-col gap-1 flex-1 min-h-0">
+        <div className="flex flex-col gap-1">
           <div className="flex justify-between items-center mb-1 relative group">
             <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.systemPrompt')}</label>
             {selectedChatGroup ? (
@@ -680,9 +745,35 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
             value={chatSystemPrompt}
             onChange={(e) => setChatSystemPrompt(e.target.value)}
             placeholder={t('playground.systemPromptPlaceholder')}
-            className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs h-20 resize-none custom-scrollbar overflow-y-auto no-field-sizing placeholder:text-zinc-600 flex-1"
+            className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs h-24 min-h-24 resize-none custom-scrollbar overflow-y-auto no-field-sizing placeholder:text-zinc-600"
           />
         </div>
+        {isLocalChat && (
+          <div className="flex flex-col gap-2 border-t border-zinc-800/60 pt-2">
+            <button type="button" onClick={() => setShowSampling(!showSampling)} aria-expanded={showSampling} className="self-start flex items-center gap-1.5 text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors">
+              <span>{t('playground.localSampling')}</span>
+              <span aria-hidden="true">{showSampling ? '▾' : '▸'}</span>
+            </button>
+            {showSampling && (
+              <div className="grid grid-cols-2 gap-2">
+                {(Object.keys(samplingDefaults) as SamplingKey[]).map((key) => (
+                  <label key={key} className="flex flex-col gap-1 text-[10px] font-semibold text-zinc-400">
+                    {key.toUpperCase().replace('_', ' ')}
+                    <Input
+                      type="number"
+                      min="0"
+                      max={key === 'top_p' || key === 'min_p' ? '1' : undefined}
+                      step={key === 'top_k' ? '1' : '0.01'}
+                      value={chatSampling[key]}
+                      onChange={(e) => setChatSampling((current) => ({ ...current, [key]: e.target.value }))}
+                      className="bg-black/40 border border-zinc-850 text-white rounded px-2 py-1 text-xs"
+                    />
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Main Area */}

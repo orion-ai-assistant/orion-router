@@ -474,6 +474,13 @@ class DatabaseManager:
                         cost, key_id,
                     )
 
+    async def update_streaming_request(self, log_id: int, request_json: str) -> None:
+        await self.execute(
+            "UPDATE router_request_logs SET request_json = $2::jsonb WHERE id = $1",
+            log_id,
+            request_json,
+        )
+
     async def get_active_provider_keys(self, provider: str) -> list[dict]:
         from core.security import decrypt
         rows = await self.fetch(
