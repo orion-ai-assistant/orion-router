@@ -1,6 +1,80 @@
 const MAX_DISPLAY_LINES = 400;
 const MAX_DISPLAY_CHARS = 32_000;
 
+const KEY_PRIORITY: Record<string, number> = {
+  // 1. Identifiers & Targets
+  id: 10,
+  object: 11,
+  model: 20,
+
+  // 2. Input / Messages / Prompts
+  messages: 30,
+  input: 31,
+  prompt: 32,
+
+  // 3. Core Sampling Parameters (kept closely grouped together)
+  temperature: 40,
+  top_p: 41,
+  top_k: 42,
+  min_p: 43,
+  repeat_penalty: 44,
+  presence_penalty: 45,
+  frequency_penalty: 46,
+  max_tokens: 47,
+  max_completion_tokens: 48,
+  seed: 49,
+  stop: 50,
+
+  // 4. Thinking & Reasoning Parameters
+  reasoning_effort: 60,
+  thinking_budget_tokens: 61,
+  chat_template_kwargs: 62,
+
+  // 5. Stream Options & Control
+  stream: 70,
+  stream_options: 71,
+
+  // 6. Tools & Functions (placed near bottom so large tool schemas don't scatter other keys)
+  tools: 80,
+  tool_choice: 81,
+  functions: 82,
+  function_call: 83,
+
+  // 7. Response Structure
+  choices: 90,
+  role: 91,
+  content: 92,
+  reasoning_content: 93,
+  tool_calls: 94,
+  usage: 100,
+  metrics: 110,
+  error: 120,
+};
+
+function orderKeysForDisplay(obj: unknown): unknown {
+  if (obj === null || obj === undefined) return obj;
+  if (Array.isArray(obj)) {
+    return obj.map(orderKeysForDisplay);
+  }
+  if (typeof obj === 'object') {
+    const sortedObj: Record<string, unknown> = {};
+    const keys = Object.keys(obj as object);
+
+    keys.sort((a, b) => {
+      const pA = KEY_PRIORITY[a] ?? 500;
+      const pB = KEY_PRIORITY[b] ?? 500;
+      if (pA !== pB) return pA - pB;
+      return a.localeCompare(b);
+    });
+
+    for (const key of keys) {
+      sortedObj[key] = orderKeysForDisplay((obj as Record<string, unknown>)[key]);
+    }
+    return sortedObj;
+  }
+  return obj;
+}
+
 function sanitizeForDisplay(obj: unknown): unknown {
   if (obj === null || obj === undefined) return obj;
   if (Array.isArray(obj)) {
@@ -114,8 +188,9 @@ export function formatPayloadForDisplay(raw: unknown): FormattedPayload {
     }
   }
 
-  const fullText = toPrettyJson(parsed);
-  const displayText = truncateDisplayText(toPrettyJson(sanitizeForDisplay(parsed)));
+  const ordered = orderKeysForDisplay(parsed);
+  const fullText = toPrettyJson(ordered);
+  const displayText = truncateDisplayText(toPrettyJson(sanitizeForDisplay(ordered)));
   return { fullText, displayText, displayHtml: highlightJsonHtml(displayText) };
 }
 

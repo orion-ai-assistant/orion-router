@@ -57,18 +57,18 @@ class LocalChatProvider(BaseChat):
         payload = {
             "model": model or LOCAL_CHAT_MODEL_NAME,
             "messages": messages,
-            "stream": True,
-            "stream_options": {"include_usage": True},
         }
 
-        if kwargs.get("temperature") is not None:
-            payload["temperature"] = float(kwargs["temperature"])
-
-        for key in ("top_p", "min_p", "repeat_penalty"):
+        # Sampling parametreleri toplu ve düzenli sırada
+        for key in ("temperature", "top_p", "top_k", "min_p", "repeat_penalty"):
             if kwargs.get(key) is not None:
-                payload[key] = float(kwargs[key])
-        if kwargs.get("top_k") is not None:
-            payload["top_k"] = int(kwargs["top_k"])
+                if key == "top_k":
+                    payload[key] = int(kwargs[key])
+                else:
+                    payload[key] = float(kwargs[key])
+
+        payload["stream"] = True
+        payload["stream_options"] = {"include_usage": True}
 
         if kwargs.get("chat_template_kwargs") and isinstance(kwargs["chat_template_kwargs"], dict):
             payload["chat_template_kwargs"] = dict(kwargs["chat_template_kwargs"])
@@ -97,8 +97,9 @@ class LocalChatProvider(BaseChat):
         url = f"http://{LLM_HOST}:{LLM_PORT}/v1/chat/completions"
         payload = self.build_payload(model, messages, **kwargs)
 
-        # Kaç karakter reasoning (think) geldi — API breakdown vermezse tahmin için
+        # Kaç karakter reasoning ve yanıt metni geldiğini takip ediyoruz
         thought_chars = 0
+        content_chars = 0
 
         client = get_http_client()
         try:
@@ -120,23 +121,38 @@ class LocalChatProvider(BaseChat):
                         details = usage.get("completion_tokens_details") or {}
                         api_reasoning = details.get("reasoning_tokens", 0) or 0
 
-                        if api_reasoning:
-                            # API net breakdown verdi
+                        if api_reasoning and raw_completion > api_reasoning:
                             usage["thoughts_tokens"] = api_reasoning
-                            usage["completion_tokens"] = max(0, raw_completion - api_reasoning)
+                            usage["completion_tokens"] = raw_completion - api_reasoning
+                        elif api_reasoning and content_chars > 0 and raw_completion <= api_reasoning:
+                            est_content = max(1, content_chars // 4)
+                            usage["thoughts_tokens"] = api_reasoning
+                            usage["completion_tokens"] = est_content
+                            usage["total_tokens"] = usage.get("prompt_tokens", 0) + api_reasoning + est_content
                         elif thought_chars > 0:
-                            # API vermedi ama think stream'i geldi → char oranıyla böl
-                            # raw_completion = toplam output (think + text)
-                            # think oranı = thought_chars / (thought_chars + out_chars)
-                            # Burada out_chars'ı bilmiyoruz, ama orantıyı kullanabiliriz:
-                            # think_tokens ≈ raw_completion * (thought_chars / total_chars)
-                            # total_chars hesabı yapamıyoruz burada, basit yaklaşım:
-                            # think_tokens ≈ thought_chars // 4 (char/token oranı)
-                            est_think = thought_chars // 4
-                            est_think = min(est_think, raw_completion)  # toplam aşmasın
-                            usage["thoughts_tokens"] = est_think
-                            usage["completion_tokens"] = max(0, raw_completion - est_think)
-                        # else: API breakdown yok, think yok → tüm completion_tokens out'ta kalır
+                            total_chars = thought_chars + content_chars
+                            if content_chars > 0 and total_chars > 0:
+                                if raw_completion > 0:
+                                    est_content = max(1, round(raw_completion * (content_chars / total_chars)))
+                                    if raw_completion > 1:
+                                        est_content = min(est_content, raw_completion - 1)
+                                    est_think = max(1, raw_completion - est_content)
+                                else:
+                                    est_think = max(1, thought_chars // 4)
+                                    est_content = max(1, content_chars // 4)
+                                    raw_completion = est_think + est_content
+                                    usage["total_tokens"] = usage.get("prompt_tokens", 0) + raw_completion
+                                usage["thoughts_tokens"] = est_think
+                                usage["completion_tokens"] = est_content
+                            else:
+                                usage["thoughts_tokens"] = raw_completion
+                                usage["completion_tokens"] = 0
+                        else:
+                            if content_chars > 0 and raw_completion == 0:
+                                raw_completion = max(1, content_chars // 4)
+                                usage["total_tokens"] = usage.get("prompt_tokens", 0) + raw_completion
+                            usage["thoughts_tokens"] = 0
+                            usage["completion_tokens"] = raw_completion
 
                         yield {"internal_usage": usage}
                         continue
@@ -151,6 +167,7 @@ class LocalChatProvider(BaseChat):
 
                     if delta.get("content"):
                         c = delta["content"]
+                        content_chars += len(c)
                         yield f'data: {{"choices":[{{"delta":{{"content":{json.dumps(c, ensure_ascii=False)}}}}}]}}\n\n'
 
                     if delta.get("tool_calls"):

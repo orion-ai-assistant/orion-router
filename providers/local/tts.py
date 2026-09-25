@@ -135,8 +135,8 @@ class LocalTTSProvider(BaseTTS):
             
         # Basit kullanım istatistiği dönüyoruz
         usage_dict = {
-            "prompt_tokens": len(input_text),
-            "completion_tokens": len(audio_bytes) // 100  # kaba bir tahmin
+            "prompt_tokens": max(1, len(input_text)),
+            "completion_tokens": max(1, len(audio_bytes) // 100) if audio_bytes else 0
         }
 
         logger.info(f"Local TTS complete: {len(audio_bytes)} bytes WAV")

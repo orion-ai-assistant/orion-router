@@ -250,9 +250,18 @@ class ChatRunner:
                 is_estimated = True
 
             if usage and accumulated_content and usage.get("completion_tokens", 0) == 0:
-                logger.warning(
-                    "[%s] API reported 0 completion_tokens despite generating %d chars.",
+                est_c = max(1, len(accumulated_content) // 4)
+                t_tokens = usage.get("thoughts_tokens", 0) or 0
+                if t_tokens > est_c:
+                    usage["thoughts_tokens"] = t_tokens - est_c
+                    usage["completion_tokens"] = est_c
+                else:
+                    usage["completion_tokens"] = est_c
+                    usage["total_tokens"] = usage.get("prompt_tokens", 0) + t_tokens + est_c
+                logger.info(
+                    "[%s] Corrected 0 completion_tokens to %d for %d generated content characters.",
                     provider,
+                    usage["completion_tokens"],
                     len(accumulated_content),
                 )
             if usage and accumulated_reasoning and usage.get("thoughts_tokens", 0) == 0:
@@ -263,8 +272,17 @@ class ChatRunner:
                 )
 
             req_data = {"model": model, "messages": messages}
+            for key in ("temperature", "top_p", "top_k", "min_p", "repeat_penalty", "presence_penalty", "frequency_penalty", "max_tokens", "max_completion_tokens", "seed"):
+                if key in kwargs and kwargs[key] is not None:
+                    req_data[key] = kwargs[key]
+            for key in ("stream", "stream_options", "reasoning_effort", "thinking_budget_tokens", "chat_template_kwargs"):
+                if key in kwargs and kwargs[key] is not None:
+                    req_data[key] = kwargs[key]
+            for key in ("tools", "tool_choice"):
+                if key in kwargs and kwargs[key] is not None:
+                    req_data[key] = kwargs[key]
             for key, value in kwargs.items():
-                if value is not None:
+                if key not in req_data and value is not None:
                     req_data[key] = value
 
             if status_val is False:
