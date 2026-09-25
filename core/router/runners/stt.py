@@ -95,17 +95,19 @@ class STTRunner:
                         duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
                         duration = result.get("duration", 0) or 0
                         text_res = result.get("text", "")
-                        prompt_tokens = (
-                            int(float(duration) * 25)
-                            if duration
-                            else max(1, len(file_bytes) // 3200)
-                        )
-                        completion_tokens = len(text_res.split())
-                        usage = {
-                            "prompt_tokens": prompt_tokens,
-                            "completion_tokens": completion_tokens,
-                            "thoughts_tokens": 0,
-                        }
+                        reported_usage = result.get("usage")
+                        if isinstance(reported_usage, dict):
+                            usage = {
+                                "prompt_tokens": reported_usage.get("prompt_tokens"),
+                                "completion_tokens": reported_usage.get("completion_tokens"),
+                                "thoughts_tokens": reported_usage.get("thoughts_tokens", 0),
+                            }
+                        else:
+                            usage = {
+                                "prompt_tokens": int(float(duration) * 25) if duration else max(1, len(file_bytes) // 3200),
+                                "completion_tokens": len(text_res.split()),
+                                "thoughts_tokens": 0,
+                            }
                         if isinstance(result, dict) and "metrics" not in result:
                             result["metrics"] = {"total_duration_ms": duration_ms}
 

@@ -10,7 +10,7 @@ from database.manager import DatabaseManager
 
 def test_catalog_has_one_source_for_models_and_local_defaults():
     catalog = load_model_catalog()
-    assert catalog["pricing_unit"] == "per_usage_unit"
+    assert catalog["pricing_unit"] == "per_million_tokens"
     assert bundled_model("local", "chat")["settings"]["local_sampling"] == LOCAL_SAMPLING_DEFAULTS
     assert LOCAL_SAMPLING_DEFAULTS == {
         "top_p": 0.95, "top_k": 64, "min_p": 0.05, "repeat_penalty": 1,

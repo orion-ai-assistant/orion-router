@@ -280,8 +280,9 @@ async def audio_transcriptions_stream(
                 # Fiyatlandırma ve maliyet
                 pricing_cache = getattr(websocket.app.state, "pricing_cache", {})
                 prices = pricing_cache.get(LOCAL_STT_MODEL["name"], {})
-                p_cost = (prompt_tokens or 0) * (prices.get("input") or 0.0)
-                c_cost = (completion_tokens or 0) * (prices.get("output") or 0.0)
+                # Fiyatlar 1M token başına; birim maliyete çevirmek için 1_000_000'a bölüyoruz.
+                p_cost = (prompt_tokens or 0) / 1_000_000 * (prices.get("input") or 0.0)
+                c_cost = (completion_tokens or 0) / 1_000_000 * (prices.get("output") or 0.0)
                 cost = p_cost + c_cost
 
                 # Durum belirleme

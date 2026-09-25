@@ -75,20 +75,15 @@ class EmbeddingsRunner:
 
                         duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
                         p_tokens = 0
-                        vector_dim = 0
                         if isinstance(result, dict):
                             if "usage" in result:
                                 p_tokens = result["usage"].get("prompt_tokens", 0)
-                            try:
-                                vector_dim = len(result["data"][0]["embedding"])
-                            except Exception:
-                                pass
                             if "metrics" not in result:
                                 result["metrics"] = {"total_duration_ms": duration_ms}
 
                         usage = {
                             "prompt_tokens": p_tokens,
-                            "completion_tokens": vector_dim,
+                            "completion_tokens": 0,
                             "thoughts_tokens": 0,
                         }
                         asyncio.create_task(

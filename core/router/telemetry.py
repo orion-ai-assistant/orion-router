@@ -53,9 +53,10 @@ class TelemetryService:
                 )
                 if model in pricing_cache:
                     prices = pricing_cache[model]
-                    p_cost = (p or 0) * (prices.get("input") or 0.0)
-                    c_cost = (c or 0) * (prices.get("output") or 0.0)
-                    t_cost = (t or 0) * (prices.get("think") or 0.0)
+                    # Fiyatlar 1M token/karakter başına; birim maliyete çevirmek için 1_000_000'a bölüyoruz.
+                    p_cost = (p or 0) / 1_000_000 * (prices.get("input") or 0.0)
+                    c_cost = (c or 0) / 1_000_000 * (prices.get("output") or 0.0)
+                    t_cost = (t or 0) / 1_000_000 * (prices.get("think") or 0.0)
                     if all(prices.get(key) is not None or not count for key, count in (
                         ("input", p), ("output", c), ("think", t)
                     )):

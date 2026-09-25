@@ -18,7 +18,7 @@ from fastapi import FastAPI
 from database import db_manager
 from dynamic_router import DynamicLLMRouter
 from core.config import ROUTER_PORT
-from core.model_catalog import load_model_catalog
+from core.model_catalog import load_model_catalog, unit_pricing
 from core.http_client import close_http_clients
 from providers.gemini.client import close_gemini_clients
 
@@ -189,9 +189,9 @@ async def lifespan(app: FastAPI):
     # --- Fiyatlandırmayı seed et ---
     try:
         for model in load_model_catalog()["models"]:
-            if model.get("pricing") is None:
+            pricing = unit_pricing(model)
+            if pricing is None:
                 continue
-            pricing = model["pricing"]
             await db_manager.upsert_pricing(
                 model["name"],
                 pricing.get("input"),

@@ -68,19 +68,19 @@ class OpenAITTSProvider(BaseTTS):
             err_detail = response.read().decode(errors="ignore")
             raise RuntimeError(f"OpenAI TTS API Error {response.status_code}: {err_detail}")
 
-            content_type = response.headers.get("content-type", "audio/mpeg")
-            audio_bytes = response.content
+        content_type = response.headers.get("content-type", "audio/mpeg")
+        audio_bytes = response.content
 
-            # OpenAI TTS sadece girdi karakter sayısı üzerinden faturalandırır,
-            # çıktı (ses) için ayrı ücret yoktur.
-            character_count = len(input_text)
-            usage_dict = {
-                "prompt_tokens": character_count,
-                "completion_tokens": 0,
-            }
+        # OpenAI TTS sadece girdi karakter sayısı üzerinden faturalandırır,
+        # çıktı (ses) için ayrı ücret yoktur.
+        character_count = len(input_text)
+        usage_dict = {
+            "prompt_tokens": character_count,
+            "completion_tokens": 0,
+        }
 
-            logger.info(
-                f"OpenAI TTS complete: {len(audio_bytes)} bytes, format={content_type} "
-                f"(Billed characters: {character_count})"
-            )
-            return audio_bytes, content_type, usage_dict
+        logger.info(
+            f"OpenAI TTS complete: {len(audio_bytes)} bytes, format={content_type} "
+            f"(Billed characters: {character_count})"
+        )
+        return audio_bytes, content_type, usage_dict
