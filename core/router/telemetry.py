@@ -53,10 +53,13 @@ class TelemetryService:
                 )
                 if model in pricing_cache:
                     prices = pricing_cache[model]
-                    p_cost = (p or 0) * prices.get("input", 0.0)
-                    c_cost = (c or 0) * prices.get("output", 0.0)
-                    t_cost = (t or 0) * prices.get("think", 0.0)
-                    cost = p_cost + c_cost + t_cost
+                    p_cost = (p or 0) * (prices.get("input") or 0.0)
+                    c_cost = (c or 0) * (prices.get("output") or 0.0)
+                    t_cost = (t or 0) * (prices.get("think") or 0.0)
+                    if all(prices.get(key) is not None or not count for key, count in (
+                        ("input", p), ("output", c), ("think", t)
+                    )):
+                        cost = p_cost + c_cost + t_cost
             else:
                 cost = 0.0
                 p, c, t = None, None, None

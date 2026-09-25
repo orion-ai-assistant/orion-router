@@ -17,6 +17,7 @@ import websockets
 
 from core.config import STT_HOST, STT_PORT
 from core.dependencies import authenticate_request, authenticate_websocket
+from core.model_catalog import bundled_model
 from core.utils import run_with_disconnect_check
 from database import db_manager
 from dynamic_router import DynamicLLMRouter
@@ -24,13 +25,14 @@ from dynamic_router import DynamicLLMRouter
 logger = logging.getLogger("service-router.transcriptions")
 
 router = APIRouter(tags=["Audio", "Transcriptions"])
+LOCAL_STT_MODEL = bundled_model("local", "stt")
 
 
 @router.post("/v1/audio/transcriptions")
 async def audio_transcriptions(
     request: Request,
     file: UploadFile = File(...),
-    model: str = Form("local-stt"),
+    model: str = Form(LOCAL_STT_MODEL["name"]),
     language: str | None = Form(None),
     prompt: str | None = Form(None),
     response_format: str = Form("json"),
@@ -41,7 +43,7 @@ async def audio_transcriptions(
 
     Desteklenen form alanları:
       - file: Transcribe edilecek ses dosyası (WAV, MP3, OGG, FLAC, M4A, WebM vb.)
-      - model: Hedef STT modeli (Varsayılan: local-stt)
+      - model: Hedef STT modeli (varsayılan model katalogdan alınır)
       - language: Hedef dil kodu (örn: 'tr', 'en')
       - prompt: Whisper'a ipucu / bağlam metni
       - response_format: 'json', 'text', 'verbose_json'
@@ -61,7 +63,7 @@ async def audio_transcriptions(
         raise HTTPException(status_code=400, detail="Uploaded audio file is empty.")
 
     filename = file.filename or "audio.wav"
-    target_model = (model or "local-stt").strip()
+    target_model = (model or LOCAL_STT_MODEL["name"]).strip()
 
     dynamic_router: DynamicLLMRouter = request.app.state.dynamic_router
 
@@ -141,7 +143,7 @@ async def audio_transcriptions_stream(
         "type": "streaming",
         "protocol": "websocket",
         "endpoint": "/v1/audio/transcriptions/stream",
-        "model": "local-stt",
+        "model": LOCAL_STT_MODEL["name"],
         "language": language or "tr",
         "prompt": prompt or None,
     }
@@ -149,7 +151,7 @@ async def audio_transcriptions_stream(
         log_id = await db_manager.create_streaming_log(
             key_id=auth.get("key_id"),
             provider="local",
-            model="local-stt",
+            model=LOCAL_STT_MODEL["name"],
             request_json=json.dumps(req_payload, ensure_ascii=False),
             response_json=json.dumps({
                 "text": "",
@@ -277,9 +279,9 @@ async def audio_transcriptions_stream(
 
                 # Fiyatlandırma ve maliyet
                 pricing_cache = getattr(websocket.app.state, "pricing_cache", {})
-                prices = pricing_cache.get("local-stt") or pricing_cache.get("whisper-small-finetuned-tr", {})
-                p_cost = (prompt_tokens or 0) * prices.get("input", 0.0)
-                c_cost = (completion_tokens or 0) * prices.get("output", 0.0)
+                prices = pricing_cache.get(LOCAL_STT_MODEL["name"], {})
+                p_cost = (prompt_tokens or 0) * (prices.get("input") or 0.0)
+                c_cost = (completion_tokens or 0) * (prices.get("output") or 0.0)
                 cost = p_cost + c_cost
 
                 # Durum belirleme
@@ -341,4 +343,3 @@ async def audio_transcriptions_stream(
                 pass
 
         logger.info("WebSocket STT streaming closed cleanly.")
-

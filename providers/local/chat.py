@@ -12,6 +12,7 @@ from providers.base import BaseChat
 from core.thinking import ThinkingConfig
 from core.config import LLM_HOST, LLM_PORT
 from core.http_client import get_http_client
+from core.local_chat_defaults import LOCAL_CHAT_MODEL_NAME
 
 
 def _response_error_message(body: bytes) -> str:
@@ -54,7 +55,7 @@ class LocalChatProvider(BaseChat):
     def build_payload(self, model: str, messages: list[dict[str, Any]], **kwargs) -> dict[str, Any]:
         """Build the exact JSON body sent to the local chat server."""
         payload = {
-            "model": model or "local-chat",
+            "model": model or LOCAL_CHAT_MODEL_NAME,
             "messages": messages,
             "stream": True,
             "stream_options": {"include_usage": True},

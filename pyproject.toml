@@ -23,4 +23,5 @@ include = [
   "/*.py",
   "/providers",
   "/dashboard",
+  "/data",
 ]

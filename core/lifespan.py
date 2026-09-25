@@ -6,7 +6,6 @@ Veritabanını başlatır, JSON seed dosyalarını DB'ye senkronize eder
 ve uygulama state'ini (pricing cache, model info cache, dynamic router) hazırlar.
 """
 import asyncio
-import json
 import logging
 import os
 import sys
@@ -18,7 +17,8 @@ from fastapi import FastAPI
 
 from database import db_manager
 from dynamic_router import DynamicLLMRouter
-from core.config import MODEL_PRICING_PATH, ROUTER_PORT
+from core.config import ROUTER_PORT
+from core.model_catalog import load_model_catalog
 from core.http_client import close_http_clients
 from providers.gemini.client import close_gemini_clients
 
@@ -187,22 +187,20 @@ async def lifespan(app: FastAPI):
                 logger.error(f"PostgreSQL otomatik yeniden başlatma sırasında hata oluştu: {restart_err}")
 
     # --- Fiyatlandırmayı seed et ---
-    if MODEL_PRICING_PATH.exists():
-        try:
-            with open(MODEL_PRICING_PATH, "r", encoding="utf-8") as f:
-                pricing_data = json.load(f)
-            # JSON'da olan fiyatları DB'ye kopyalayıp güncelliyoruz (ON CONFLICT DO UPDATE).
-            # DB'de olan ama JSON'da olmayan diğer fiyat kayıtları silinmeden korunur.
-            for m_name, p_data in pricing_data.items():
-                await db_manager.upsert_pricing(
-                    m_name,
-                    p_data.get("input", 0),
-                    p_data.get("output", 0),
-                    p_data.get("think", 0),
-                )
-            logger.info("Synced model pricing from JSON to DB (existing keys updated, others preserved).")
-        except Exception as e:
-            logger.error(f"Error seeding pricing: {e}")
+    try:
+        for model in load_model_catalog()["models"]:
+            if model.get("pricing") is None:
+                continue
+            pricing = model["pricing"]
+            await db_manager.upsert_pricing(
+                model["name"],
+                pricing.get("input"),
+                pricing.get("output"),
+                pricing.get("think"),
+            )
+        logger.info("Synced model pricing from models.json to DB.")
+    except Exception as exc:
+        logger.error("Error seeding pricing: %s", exc)
 
 
     # --- Cache'i yükle ---

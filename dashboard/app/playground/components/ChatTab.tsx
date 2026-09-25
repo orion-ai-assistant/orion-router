@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { getAdminKey } from '@/lib/api';
+import { localSamplingInputDefaults, localTemperatureDefault, type LocalSamplingKey } from '@/lib/local-chat-defaults';
 
 interface RouteOption {
   value: string;
@@ -26,8 +27,8 @@ interface ChatTabProps {
   groups: any[];
 }
 
-const samplingDefaults = { top_p: '0.95', top_k: '64', min_p: '0.05', repeat_penalty: '1' };
-type SamplingKey = keyof typeof samplingDefaults;
+const samplingDefaults = localSamplingInputDefaults;
+type SamplingKey = LocalSamplingKey;
 
 const readSampling = (config: any): Record<SamplingKey, string> => {
   const values = config?.local_sampling || {};
@@ -42,7 +43,7 @@ const readSampling = (config: any): Record<SamplingKey, string> => {
 const modelTemperature = (model: any): number | null => {
   if (!model) return null;
   if (model.provider === 'local' && model.default_config?.local_chat_defaults_version !== 1 &&
-      (model.temperature === null || Number(model.temperature) === 0)) return 1;
+      (model.temperature === null || Number(model.temperature) === 0)) return localTemperatureDefault;
   return model.temperature ?? null;
 };
 
@@ -105,9 +106,9 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
       const group = groups.find((g) => g.name === chatModel && g.capability === 'chat');
       const modelName = group?.items?.[0]?.name || chatModel;
       const model = models.find((m) => m.name === modelName && m.capability === 'chat');
-      if (chatTemp === '0' && model?.provider === 'local' && modelTemperature(model) === 1 &&
+      if (chatTemp === '0' && model?.provider === 'local' && modelTemperature(model) === localTemperatureDefault &&
           Number(model.temperature) === 0 && model.default_config?.local_chat_defaults_version !== 1) {
-        setChatTemp('1');
+        setChatTemp(String(localTemperatureDefault));
       }
     } else {
       // Apply defaults

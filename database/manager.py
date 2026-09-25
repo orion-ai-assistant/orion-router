@@ -11,6 +11,8 @@ from core.config import (
     POSTGRES_USER,
     POSTGRES_PASSWORD,
 )
+from core.local_chat_defaults import LOCAL_CHAT_MODEL, LOCAL_SAMPLING_DEFAULTS
+from core.model_catalog import load_model_catalog
 
 logger = logging.getLogger("service-router.db")
 
@@ -256,39 +258,56 @@ class DatabaseManager:
             )
 
     async def _seed_default_models(self, conn: asyncpg.Connection) -> None:
-        # Delete old/invalid preview model if it exists
-        await conn.execute(
-            "DELETE FROM router_models WHERE name = 'gemini-3.1-flash-tts-preview' AND capability = 'tts'"
-        )
+        catalog = load_model_catalog()
+        legacy = catalog.get("legacy_models", {})
+        for rename in legacy.get("renames", []):
+            await conn.execute(
+                """UPDATE router_models SET name = $2
+                   WHERE name = $1 AND capability = $3
+                     AND NOT EXISTS (
+                       SELECT 1 FROM router_models
+                       WHERE name = $2 AND capability = $3
+                     )""",
+                rename["from"], rename["to"], rename["capability"],
+            )
+        for deletion in legacy.get("deletes", []):
+            await conn.execute(
+                "DELETE FROM router_models WHERE name = $1 AND capability = $2",
+                deletion["name"], deletion["capability"],
+            )
 
-        # Migrate legacy local model names to unified local- naming
-        await conn.execute("UPDATE router_models SET name = 'local-chat' WHERE name = 'local-model' AND capability = 'chat'")
-        await conn.execute("UPDATE router_models SET name = 'local-stt' WHERE name = 'whisper-small-finetuned-tr' AND capability = 'stt'")
-        await conn.execute("DELETE FROM router_models WHERE name = 'local-model' AND capability = 'tts'")
-
-        defaults = [
-            ("local-chat", "local", "chat", 1.0),
-            ("local-embed", "local", "embed", None),
-            ("local-tts", "local", "tts", None),
-            ("local-stt", "local", "stt", None),
-            ("gpt-4o-mini", "openai", "chat", 0.7),
-            ("gemini-3.1-flash-lite", "gemini", "chat", 0.7),
-            ("gemini-3.1-flash-tts-preview", "gemini", "tts", None),
-            ("tts-1", "openai", "tts", None),
-            ("gemini-3.5-transcribe", "gemini", "stt", None),
-        ]
-        for name, provider, capability, temperature in defaults:
+        for model in catalog["models"]:
+            if not model.get("seed", True):
+                continue
             await conn.execute(
                 """
-                INSERT INTO router_models (name, provider, capability, temperature, is_active)
-                VALUES ($1, $2, $3, $4, true)
+                INSERT INTO router_models (name, provider, capability, temperature, is_active, default_config)
+                VALUES ($1, $2, $3, $4, true, $5::jsonb)
                 ON CONFLICT (name, capability) DO NOTHING
                 """,
-                name,
-                provider,
-                capability,
-                temperature,
+                model["name"],
+                model["provider"],
+                model["capability"],
+                model.get("temperature"),
+                json.dumps(model.get("settings", {})),
             )
+
+        # Fill only missing local sampling settings on existing installations.
+        await conn.execute(
+            """
+            UPDATE router_models
+            SET default_config = jsonb_set(
+                COALESCE(default_config, '{}'::jsonb),
+                '{local_sampling}',
+                $1::jsonb
+            )
+            WHERE name = $2 AND capability = $3
+              AND NOT (COALESCE(default_config, '{}'::jsonb) ? 'local_sampling')
+            """,
+            json.dumps(LOCAL_SAMPLING_DEFAULTS),
+            LOCAL_CHAT_MODEL["name"],
+            LOCAL_CHAT_MODEL["capability"],
+        )
 
     async def init_db(self) -> None:
         """Initialize the asyncpg connection pool and ensure tables exist."""
@@ -324,7 +343,7 @@ class DatabaseManager:
 
     # --- Repository Methods ---
     
-    async def upsert_pricing(self, model_name: str, input_price: float, output_price: float, think_price: float):
+    async def upsert_pricing(self, model_name: str, input_price: float | None, output_price: float | None, think_price: float | None):
         pool = await self.get_db_pool()
         async with pool.acquire() as conn:
             await conn.execute(
@@ -347,9 +366,9 @@ class DatabaseManager:
             result = {}
             for row in rows:
                 result[row["model_name"]] = {
-                    "input": float(row["input_price"]),
-                    "output": float(row["output_price"]),
-                    "think": float(row["think_price"])
+                    "input": float(row["input_price"]) if row["input_price"] is not None else None,
+                    "output": float(row["output_price"]) if row["output_price"] is not None else None,
+                    "think": float(row["think_price"]) if row["think_price"] is not None else None,
                 }
             return result
             

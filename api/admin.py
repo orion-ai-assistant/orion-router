@@ -49,6 +49,10 @@ def _parse_default_config(val):
     return {}
 
 
+def _optional_price(value) -> float | None:
+    return None if value in (None, "", "-") else float(value)
+
+
 
 @router.get("/api/settings/is-default-password")
 async def is_default_password():
@@ -599,9 +603,9 @@ async def list_models():
     for row in rows:
         item = dict(row)
         item["temperature"] = float(item["temperature"]) if item["temperature"] is not None else None
-        item["input_price"] = float(item["input_price"]) if item["input_price"] is not None else 0.0
-        item["output_price"] = float(item["output_price"]) if item["output_price"] is not None else 0.0
-        item["think_price"] = float(item["think_price"]) if item["think_price"] is not None else 0.0
+        item["input_price"] = _optional_price(item["input_price"])
+        item["output_price"] = _optional_price(item["output_price"])
+        item["think_price"] = _optional_price(item["think_price"])
         item["default_config"] = _parse_default_config(item.get("default_config"))
         models.append(item)
     return {"models": models}
@@ -621,9 +625,9 @@ async def create_model(request: Request):
     else:
         temperature = None
     is_active = bool(body.get("is_active", True))
-    input_price = float(body.get("input_price", 0.0) if body.get("input_price") not in (None, "") else 0.0)
-    output_price = float(body.get("output_price", 0.0) if body.get("output_price") not in (None, "") else 0.0)
-    think_price = float(body.get("think_price", 0.0) if body.get("think_price") not in (None, "") else 0.0)
+    input_price = _optional_price(body.get("input_price"))
+    output_price = _optional_price(body.get("output_price"))
+    think_price = _optional_price(body.get("think_price"))
     thinking_level = body.get("thinking_level")
     thinking_level = str(thinking_level).strip() if thinking_level not in (None, "") else None
     system_prompt = body.get("system_prompt")
@@ -670,7 +674,12 @@ async def create_model(request: Request):
 async def update_model(model_id: str, request: Request):
     body = await request.json()
     existing = await db_manager.fetchrow(
-        "SELECT name, provider, capability, temperature, is_active, thinking_level, system_prompt, default_config FROM router_models WHERE id = $1",
+        """SELECT m.name, m.provider, m.capability, m.temperature, m.is_active,
+                  m.thinking_level, m.system_prompt, m.default_config,
+                  p.input_price, p.output_price, p.think_price
+           FROM router_models m
+           LEFT JOIN router_model_pricing p ON p.model_name = m.name
+           WHERE m.id = $1""",
         model_id,
     )
     if not existing:
@@ -692,9 +701,9 @@ async def update_model(model_id: str, request: Request):
     else:
         temperature = None
     is_active = bool(body.get("is_active", existing["is_active"]))
-    input_price = float(body.get("input_price", 0.0) if body.get("input_price") not in (None, "") else 0.0)
-    output_price = float(body.get("output_price", 0.0) if body.get("output_price") not in (None, "") else 0.0)
-    think_price = float(body.get("think_price", 0.0) if body.get("think_price") not in (None, "") else 0.0)
+    input_price = _optional_price(body.get("input_price", existing["input_price"]))
+    output_price = _optional_price(body.get("output_price", existing["output_price"]))
+    think_price = _optional_price(body.get("think_price", existing["think_price"]))
     
     new_thinking = body.get("thinking_level", existing["thinking_level"])
     thinking_level = str(new_thinking).strip() if new_thinking not in (None, "") else None

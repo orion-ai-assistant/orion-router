@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Trash2 } from 'lucide-react';
+import { localSamplingDefaults, localTemperatureDefault, type LocalSamplingKey } from '@/lib/local-chat-defaults';
 
 interface ModelItem {
   id: string;
@@ -20,9 +21,9 @@ interface ModelItem {
   capability: 'chat' | 'tts' | 'embed' | 'stt';
   temperature: number | null;
   is_active: boolean;
-  input_price: number | string;
-  output_price: number | string;
-  think_price: number | string;
+  input_price: number | string | null;
+  output_price: number | string | null;
+  think_price: number | string | null;
   thinking_level?: string | null;
   system_prompt?: string | null;
   default_config?: Record<string, any>;
@@ -32,9 +33,9 @@ interface ModelItem {
     capability: 'chat' | 'tts' | 'embed' | 'stt';
     temperature: number | null;
     is_active: boolean;
-    input_price: number;
-    output_price: number;
-    think_price: number;
+    input_price: number | null;
+    output_price: number | null;
+    think_price: number | null;
     thinking_level?: string | null;
     system_prompt?: string | null;
     default_config?: Record<string, any>;
@@ -145,8 +146,14 @@ const cleanNumberInput = (val: string): string => {
   return val;
 };
 
-const localSamplingDefaults = { top_p: 0.95, top_k: 64, min_p: 0.05, repeat_penalty: 1 };
-type LocalSamplingKey = keyof typeof localSamplingDefaults;
+const optionalPrice = (value: number | string | null): number | null => {
+  if (value === null || value === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const priceLabel = (value: number | string | null): string =>
+  value === null || value === '' ? '-' : money(value);
 
 const parseModelConfig = (value: unknown): Record<string, any> => {
   if (typeof value === 'string') {
@@ -197,9 +204,9 @@ export default function ModelsPage() {
     provider: '',
     capability: 'chat' as 'chat' | 'tts' | 'embed' | 'stt',
     temperature: '' as string | number,
-    input_price: '0' as string | number,
-    output_price: '0' as string | number,
-    think_price: '0' as string | number,
+    input_price: '' as string | number,
+    output_price: '' as string | number,
+    think_price: '' as string | number,
     thinking_level: '',
     system_prompt: '',
     default_config: {} as Record<string, any>,
@@ -212,9 +219,9 @@ export default function ModelsPage() {
     capability: 'chat',
     temperature: null,
     is_active: true,
-    input_price: '0',
-    output_price: '0',
-    think_price: '0',
+    input_price: '',
+    output_price: '',
+    think_price: '',
     thinking_level: null,
     system_prompt: null,
   });
@@ -288,9 +295,9 @@ export default function ModelsPage() {
           const capability = model.capability || 'chat';
           const temperature = model.temperature !== null ? parseFloat(model.temperature) : null;
           const is_active = !!model.is_active;
-          const input_price = model.input_price || 0;
-          const output_price = model.output_price || 0;
-          const think_price = model.think_price || 0;
+          const input_price = model.input_price ?? null;
+          const output_price = model.output_price ?? null;
+          const think_price = model.think_price ?? null;
           const thinking_level = model.thinking_level || null;
           const system_prompt = model.system_prompt || null;
           const default_config = capability === 'tts'
@@ -482,9 +489,9 @@ export default function ModelsPage() {
           capability,
           temperature: tempVal,
           is_active: true,
-          input_price: parseFloat(addForm.input_price as string) || 0,
-          output_price: parseFloat(addForm.output_price as string) || 0,
-          think_price: parseFloat(addForm.think_price as string) || 0,
+          input_price: optionalPrice(addForm.input_price),
+          output_price: optionalPrice(addForm.output_price),
+          think_price: optionalPrice(addForm.think_price),
           thinking_level: addForm.thinking_level || null,
           system_prompt: addForm.system_prompt || null,
           default_config: configObj,
@@ -496,9 +503,9 @@ export default function ModelsPage() {
           provider: addableProviders[0] || '',
           capability: 'chat',
           temperature: '',
-          input_price: '0',
-          output_price: '0',
-          think_price: '0',
+          input_price: '',
+          output_price: '',
+          think_price: '',
           thinking_level: '',
           system_prompt: '',
           default_config: {},
@@ -564,9 +571,9 @@ export default function ModelsPage() {
           capability: editingModel.capability,
           temperature: tempVal,
           is_active: !!editingModel.is_active,
-          input_price: parseFloat(editingModel.input_price as string) || 0,
-          output_price: parseFloat(editingModel.output_price as string) || 0,
-          think_price: parseFloat(editingModel.think_price as string) || 0,
+          input_price: optionalPrice(editingModel.input_price),
+          output_price: optionalPrice(editingModel.output_price),
+          think_price: optionalPrice(editingModel.think_price),
           thinking_level: editingModel.thinking_level || null,
           system_prompt: editingModel.system_prompt || null,
           default_config: configObj,
@@ -619,9 +626,9 @@ export default function ModelsPage() {
       model.capability !== model._original.capability ||
       normalizeTemperature(model.temperature) !== model._original.temperature ||
       !!model.is_active !== model._original.is_active ||
-      Number(model.input_price || 0) !== Number(model._original.input_price || 0) ||
-      Number(model.output_price || 0) !== Number(model._original.output_price || 0) ||
-      Number(model.think_price || 0) !== Number(model._original.think_price || 0) ||
+      optionalPrice(model.input_price) !== optionalPrice(model._original.input_price) ||
+      optionalPrice(model.output_price) !== optionalPrice(model._original.output_price) ||
+      optionalPrice(model.think_price) !== optionalPrice(model._original.think_price) ||
       (model.thinking_level || null) !== (model._original.thinking_level || null) ||
       (model.system_prompt || null) !== (model._original.system_prompt || null) ||
       JSON.stringify(model.default_config || {}) !== JSON.stringify(model._original.default_config || {})
@@ -633,7 +640,7 @@ export default function ModelsPage() {
       ...model,
       temperature: model.provider === 'local' && model.capability === 'chat' &&
         model.default_config?.local_chat_defaults_version !== 1 && (model.temperature === null || model.temperature === 0)
-        ? 1 : model.temperature,
+        ? localTemperatureDefault : model.temperature,
       input_price: formatPriceForInput(model.input_price),
       output_price: formatPriceForInput(model.output_price),
       think_price: formatPriceForInput(model.think_price),
@@ -1094,19 +1101,19 @@ export default function ModelsPage() {
                       {(model.capability === 'chat' || model.capability === 'tts' || model.capability === 'embed' || model.capability === 'stt') && (
                         <div className="flex flex-col items-center justify-center gap-0.5">
                           <span className="text-[9px] font-semibold text-zinc-500 capitalize tracking-wider">{t('models.in')}</span>
-                          <span className="text-xs font-mono text-zinc-300">{money(model.input_price)}</span>
+                          <span className="text-xs font-mono text-zinc-300">{priceLabel(model.input_price)}</span>
                         </div>
                       )}
                       {(model.capability === 'chat' || model.capability === 'tts' || model.capability === 'stt') && (
                         <div className="flex flex-col items-center justify-center gap-0.5">
                           <span className="text-[9px] font-semibold text-zinc-500 capitalize tracking-wider">{t('models.out')}</span>
-                          <span className="text-xs font-mono text-zinc-300">{money(model.output_price)}</span>
+                          <span className="text-xs font-mono text-zinc-300">{priceLabel(model.output_price)}</span>
                         </div>
                       )}
-                      {model.capability === 'chat' && Number(model.think_price) > 0 && (
+                      {model.capability === 'chat' && (
                         <div className="flex flex-col items-center justify-center gap-0.5">
                           <span className="text-[9px] font-semibold text-zinc-500 capitalize tracking-wider">{t('models.thinkPrice')}</span>
-                          <span className="text-xs font-mono text-zinc-300">{money(model.think_price)}</span>
+                          <span className="text-xs font-mono text-zinc-300">{priceLabel(model.think_price)}</span>
                         </div>
                       )}
                     </div>

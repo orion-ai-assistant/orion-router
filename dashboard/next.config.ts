@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import os from "os";
+import path from "path";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -22,6 +23,9 @@ const getLocalIPs = (): string[] => {
 
 const nextConfig: NextConfig = {
   output: isDev ? undefined : "export",
+  turbopack: {
+    root: path.join(__dirname, '..'),
+  },
   basePath: "/dashboard",
   images: {
     unoptimized: true, 

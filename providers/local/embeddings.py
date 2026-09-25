@@ -12,6 +12,7 @@ import httpx
 from providers.base import BaseEmbed
 from core.config import EMBED_HOST, EMBED_PORT
 from core.http_client import get_http_client
+from core.model_catalog import bundled_model
 
 logger = logging.getLogger("service-router.local.embed")
 
@@ -49,7 +50,7 @@ class LocalEmbedProvider(BaseEmbed):
         # llama-cpp-embed OpenAI uyumlu {"input": text, "model": model} formatı bekler
         payload = {
             "input": input_text,
-            "model": model or "local-embed"
+            "model": model or bundled_model("local", "embed")["name"]
         }
 
         logger.info(f"Routing embeddings to local: {url}")

@@ -5,6 +5,7 @@ import time
 from typing import Any, AsyncGenerator
 
 from providers.base import BaseChat
+from core.local_chat_defaults import LOCAL_SAMPLING_DEFAULTS, LOCAL_TEMPERATURE_DEFAULT
 
 logger = logging.getLogger("service-router.dynamic")
 
@@ -383,8 +384,7 @@ class ChatRunner:
                         except json.JSONDecodeError:
                             config = {}
                     sampling = config.get("local_sampling") if isinstance(config, dict) else None
-                    defaults = {"top_p": 0.95, "top_k": 64, "min_p": 0.05, "repeat_penalty": 1}
-                    for key, default in defaults.items():
+                    for key, default in LOCAL_SAMPLING_DEFAULTS.items():
                         if route_kwargs.get(key) is None:
                             configured = sampling.get(key) if isinstance(sampling, dict) else None
                             route_kwargs[key] = default if configured is None else configured
@@ -395,12 +395,12 @@ class ChatRunner:
                         if p_provider == "local" and route_temperature == 0 and (
                             not isinstance(config, dict) or config.get("local_chat_defaults_version") != 1
                         ):
-                            route_temperature = 1.0
+                            route_temperature = LOCAL_TEMPERATURE_DEFAULT
                         route_kwargs["temperature"] = route_temperature
                     except (ValueError, TypeError):
                         pass
                 if p_provider == "local" and route_kwargs.get("temperature") is None:
-                    route_kwargs["temperature"] = 1.0
+                    route_kwargs["temperature"] = LOCAL_TEMPERATURE_DEFAULT
 
                 incoming_think = next(
                     (
