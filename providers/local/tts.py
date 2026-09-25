@@ -3,13 +3,10 @@ import logging
 from providers.base import BaseTTS
 from core.config import TTS_HOST, TTS_PORT
 from core.http_client import get_http_client
-from core.model_catalog import bundled_model, load_model_catalog
+from core.model_catalog import bundled_model
 
 logger = logging.getLogger("service-router.local.tts")
-_LOCAL_TTS_NAMES = {bundled_model("local", "tts")["name"]} | {
-    item["name"] for item in load_model_catalog().get("legacy_models", {}).get("deletes", [])
-    if item.get("capability") == "tts"
-}
+_LOCAL_TTS_NAMES = {bundled_model("local", "tts")["name"]}
 
 class LocalTTSProvider(BaseTTS):
 

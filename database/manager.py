@@ -11,7 +11,6 @@ from core.config import (
     POSTGRES_USER,
     POSTGRES_PASSWORD,
 )
-from core.local_chat_defaults import LOCAL_CHAT_MODEL, LOCAL_SAMPLING_DEFAULTS
 from core.model_catalog import load_model_catalog
 
 logger = logging.getLogger("service-router.db")
@@ -259,23 +258,6 @@ class DatabaseManager:
 
     async def _seed_default_models(self, conn: asyncpg.Connection) -> None:
         catalog = load_model_catalog()
-        legacy = catalog.get("legacy_models", {})
-        for rename in legacy.get("renames", []):
-            await conn.execute(
-                """UPDATE router_models SET name = $2
-                   WHERE name = $1 AND capability = $3
-                     AND NOT EXISTS (
-                       SELECT 1 FROM router_models
-                       WHERE name = $2 AND capability = $3
-                     )""",
-                rename["from"], rename["to"], rename["capability"],
-            )
-        for deletion in legacy.get("deletes", []):
-            await conn.execute(
-                "DELETE FROM router_models WHERE name = $1 AND capability = $2",
-                deletion["name"], deletion["capability"],
-            )
-
         for model in catalog["models"]:
             if not model.get("seed", True):
                 continue
@@ -291,23 +273,6 @@ class DatabaseManager:
                 model.get("temperature"),
                 json.dumps(model.get("settings", {})),
             )
-
-        # Fill only missing local sampling settings on existing installations.
-        await conn.execute(
-            """
-            UPDATE router_models
-            SET default_config = jsonb_set(
-                COALESCE(default_config, '{}'::jsonb),
-                '{local_sampling}',
-                $1::jsonb
-            )
-            WHERE name = $2 AND capability = $3
-              AND NOT (COALESCE(default_config, '{}'::jsonb) ? 'local_sampling')
-            """,
-            json.dumps(LOCAL_SAMPLING_DEFAULTS),
-            LOCAL_CHAT_MODEL["name"],
-            LOCAL_CHAT_MODEL["capability"],
-        )
 
     async def init_db(self) -> None:
         """Initialize the asyncpg connection pool and ensure tables exist."""

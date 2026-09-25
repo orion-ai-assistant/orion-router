@@ -1,22 +1,7 @@
 {
   "pricing_unit": "per_usage_unit",
   "models": [
-    {
-      "name": "local-chat",
-      "provider": "local",
-      "capability": "chat",
-      "temperature": 1,
-      "settings": {
-        "local_chat_defaults_version": 1,
-        "local_sampling": {
-          "top_p": 0.95,
-          "top_k": 64,
-          "min_p": 0.05,
-          "repeat_penalty": 1
-        }
-      },
-      "pricing": { "input": 0, "output": 0, "think": 0 }
-    },
+    {"name": "local-chat", "provider": "local", "capability": "chat", "temperature": 1, "settings": {"local_sampling": {"top_p": 0.95, "top_k": 64, "min_p": 0.05, "repeat_penalty": 1}}, "pricing": {"input": 0, "output": 0, "think": 0}},
     { "name": "local-embed", "provider": "local", "capability": "embed", "pricing": { "input": 0, "output": 0, "think": 0 } },
     { "name": "local-tts", "provider": "local", "capability": "tts", "pricing": { "input": 0, "output": 0, "think": 0 } },
     { "name": "local-stt", "provider": "local", "capability": "stt", "pricing": { "input": 0, "output": 0, "think": 0 } },
@@ -24,17 +9,6 @@
     { "name": "gemini-3.1-flash-lite", "provider": "gemini", "capability": "chat", "temperature": 0.7 },
     { "name": "gemini-3.1-flash-tts-preview", "provider": "gemini", "capability": "tts", "pricing": { "input": 0.000001, "output": 0.000020, "think": 0 } },
     { "name": "tts-1", "provider": "openai", "capability": "tts", "pricing": { "input": 0.000015, "output": 0, "think": 0 } },
-    { "name": "gemini-3.5-transcribe", "provider": "gemini", "capability": "stt" },
-    { "name": "gemma-2-9b-it", "seed": false, "pricing": { "input": 0.0000001, "output": 0.0000002, "think": 0.0000002 } },
-    { "name": "gemini-2.5-flash-lite", "seed": false, "pricing": { "input": 0.00000025, "output": 0.000001, "think": 0.000001 } }
-  ],
-  "legacy_models": {
-    "renames": [
-      { "from": "local-model", "to": "local-chat", "capability": "chat" },
-      { "from": "whisper-small-finetuned-tr", "to": "local-stt", "capability": "stt" }
-    ],
-    "deletes": [
-      { "name": "local-model", "capability": "tts" }
-    ]
-  }
+    { "name": "gemini-3.5-transcribe", "provider": "gemini", "capability": "stt" }
+  ]
 }

@@ -33,4 +33,4 @@ def test_database_seed_uses_catalog_without_overwriting_registered_models():
     assert all("ON CONFLICT (name, capability) DO NOTHING" in query for query, _ in inserts)
     local_chat = next(args for _, args in inserts if args[0] == bundled_model("local", "chat")["name"])
     assert json.loads(local_chat[4])["local_sampling"] == LOCAL_SAMPLING_DEFAULTS
-    assert any("NOT (COALESCE(default_config" in query for query, _ in calls)
+    assert len(calls) == len(inserts)

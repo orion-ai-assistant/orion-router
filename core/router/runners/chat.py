@@ -391,12 +391,7 @@ class ChatRunner:
 
                 if route_kwargs.get("temperature") is None and route.temperature is not None:
                     try:
-                        route_temperature = float(route.temperature)
-                        if p_provider == "local" and route_temperature == 0 and (
-                            not isinstance(config, dict) or config.get("local_chat_defaults_version") != 1
-                        ):
-                            route_temperature = LOCAL_TEMPERATURE_DEFAULT
-                        route_kwargs["temperature"] = route_temperature
+                        route_kwargs["temperature"] = float(route.temperature)
                     except (ValueError, TypeError):
                         pass
                 if p_provider == "local" and route_kwargs.get("temperature") is None:
