@@ -100,6 +100,9 @@ function isTruncatableMediaString(
       k === 'audio_base64' ||
       k === 'video_base64' ||
       k === 'image_base64' ||
+      k === 'input_audio' ||
+      k === 'input_video' ||
+      k === 'input_image' ||
       k === 'b64_json' ||
       k === 'audio' ||
       k.endsWith('_base64') ||
@@ -108,13 +111,18 @@ function isTruncatableMediaString(
       return true;
     }
 
-    // 3. Structured media objects (e.g. Gemini inline_data or Anthropic source)
-    if (k === 'data' && parent) {
+    // 3. Structured media objects (e.g. OpenAI input_audio/video { data, format }, Gemini inline_data, Anthropic source)
+    if (k === 'data' || k === 'bytes') {
       if (
-        typeof parent.mime_type === 'string' ||
-        typeof parent.mimeType === 'string' ||
-        typeof parent.media_type === 'string' ||
-        parent.type === 'base64'
+        (parent && (
+          typeof parent.format === 'string' ||
+          typeof parent.mime_type === 'string' ||
+          typeof parent.mimeType === 'string' ||
+          typeof parent.media_type === 'string' ||
+          parent.type === 'base64' ||
+          parent.encoding === 'base64'
+        )) ||
+        /^[A-Za-z0-9+/=\r\n]{150,}$/.test(val.slice(0, 300))
       ) {
         return true;
       }

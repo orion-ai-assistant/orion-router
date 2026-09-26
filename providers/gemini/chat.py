@@ -166,18 +166,42 @@ class GeminiChatProvider(BaseChat):
                                 mime_type=part.get("mime_type", "application/octet-stream"),
                             )
                         )
+                    elif part.get("type") in ("input_audio", "input_video"):
+                        import base64
+                        kind = part["type"]
+                        media = part[kind]
+                        fmt = media.get("format", "").lower()
+                        if not fmt:
+                            raise ValueError(f"{kind} requires a format for Gemini")
+                        family = "audio" if kind == "input_audio" else "video"
+                        mime = {
+                            ("audio", "mp3"): "audio/mpeg",
+                            ("audio", "m4a"): "audio/mp4",
+                            ("video", "mov"): "video/quicktime",
+                        }.get((family, fmt), f"{family}/{fmt}")
+                        if media.get("data"):
+                            parts.append(types.Part.from_bytes(
+                                data=base64.b64decode(media["data"], validate=True), mime_type=mime,
+                            ))
+                        elif media.get("url"):
+                            parts.append(types.Part.from_uri(file_uri=media["url"], mime_type=mime))
+                        else:
+                            raise ValueError(f"{kind} requires data or url")
                     elif part.get("type") == "image_url":
                         image_url_data = part.get("image_url", {}).get("url", "")
                         if image_url_data.startswith("data:"):
-                            try:
-                                import base64
-                                # "data:image/png;base64,iVBOR..."
-                                header, base64_str = image_url_data.split(",", 1)
-                                mime_type = header.split(":")[1].split(";")[0]
-                                image_bytes = base64.b64decode(base64_str)
-                                parts.append(types.Part.from_bytes(data=image_bytes, mime_type=mime_type))
-                            except Exception as e:
-                                logger.error(f"Gemini image_url parse error: {e}")
+                            import base64
+                            header, base64_str = image_url_data.split(",", 1)
+                            mime_type = header.split(":", 1)[1].split(";", 1)[0]
+                            parts.append(types.Part.from_bytes(
+                                data=base64.b64decode(base64_str, validate=True), mime_type=mime_type,
+                            ))
+                        elif image_url_data:
+                            parts.append(types.Part(file_data=types.FileData(file_uri=image_url_data)))
+                        else:
+                            raise ValueError("image_url requires a URL")
+                    else:
+                        raise ValueError(f"Unsupported Gemini content type: {part.get('type')}")
                 contents.append(
                     types.Content(
                         role="user" if role == "user" else "model",

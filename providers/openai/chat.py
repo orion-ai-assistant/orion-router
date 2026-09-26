@@ -160,6 +160,18 @@ class OpenAIChatProvider(BaseChat):
         **kwargs,
     ) -> AsyncGenerator[Any, None]:
 
+        # Audio belongs to Chat Completions; never silently reroute it to Responses.
+        content_parts = [part for msg in messages if isinstance(msg.get("content"), list)
+                         for part in msg["content"]]
+        if any(part.get("type") in ("input_video", "video_url") for part in content_parts):
+            raise ValueError("OpenAI chat does not accept raw video here. Use a video-capable provider.")
+        has_audio = any(part.get("type") == "input_audio" for part in content_parts)
+        for part in content_parts:
+            if part.get("type") == "input_audio":
+                audio = part["input_audio"]
+                if audio.get("format") not in ("wav", "mp3") or not audio.get("data"):
+                    raise ValueError("OpenAI input_audio requires base64 data in wav or mp3 format.")
+
         url = f"{_BASE_URL}/v1/chat/completions"
 
         resolved_key = self._resolve_api_key(
@@ -194,7 +206,7 @@ class OpenAIChatProvider(BaseChat):
                 payload["tool_choice"] = tool_choice
 
         client = get_http_client()
-        if tools and thinking.is_active:
+        if tools and thinking.is_active and not has_audio:
             async for chunk in self._stream_responses(client, headers, self._responses_payload(model, messages, kwargs)):
                 yield chunk
             return
@@ -203,7 +215,7 @@ class OpenAIChatProvider(BaseChat):
             if response.status_code != 200:
                 err = await response.aread()
                 message = err.decode(errors="ignore")
-                if response.status_code == 400 and tools and any(
+                if response.status_code == 400 and tools and not has_audio and any(
                     marker in message.lower() for marker in ("tool", "function call", "responses api", "reasoning_effort")
                 ):
                     async for chunk in self._stream_responses(client, headers, self._responses_payload(model, messages, kwargs)):
