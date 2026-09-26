@@ -75,25 +75,72 @@ function orderKeysForDisplay(obj: unknown): unknown {
   return obj;
 }
 
+function isTruncatableMediaString(
+  val: string,
+  key?: string,
+  parent?: Record<string, unknown>
+): boolean {
+  if (typeof val !== 'string' || val.length <= 200) return false;
+
+  // 1. Any Data URI (video, audio, image, document, etc.)
+  if (
+    val.startsWith('data:image/') ||
+    val.startsWith('data:audio/') ||
+    val.startsWith('data:video/') ||
+    val.startsWith('data:application/') ||
+    val.startsWith('data:')
+  ) {
+    return true;
+  }
+
+  // 2. Specific base64 payload keys
+  if (key) {
+    const k = key.toLowerCase();
+    if (
+      k === 'audio_base64' ||
+      k === 'video_base64' ||
+      k === 'image_base64' ||
+      k === 'b64_json' ||
+      k === 'audio' ||
+      k.endsWith('_base64') ||
+      k.endsWith('_b64')
+    ) {
+      return true;
+    }
+
+    // 3. Structured media objects (e.g. Gemini inline_data or Anthropic source)
+    if (k === 'data' && parent) {
+      if (
+        typeof parent.mime_type === 'string' ||
+        typeof parent.mimeType === 'string' ||
+        typeof parent.media_type === 'string' ||
+        parent.type === 'base64'
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 function sanitizeForDisplay(obj: unknown): unknown {
   if (obj === null || obj === undefined) return obj;
+  if (typeof obj === 'string') {
+    if (isTruncatableMediaString(obj)) {
+      return `${obj.substring(0, 50)}... [truncated base64, length: ${obj.length}]`;
+    }
+    return obj;
+  }
   if (Array.isArray(obj)) {
     return obj.map(sanitizeForDisplay);
   }
   if (typeof obj === 'object') {
+    const record = obj as Record<string, unknown>;
     const result: Record<string, unknown> = {};
-    for (const key of Object.keys(obj as object)) {
-      const val = (obj as Record<string, unknown>)[key];
-      if (
-        typeof val === 'string' &&
-        val.length > 200 &&
-        (key === 'audio_base64' ||
-          key === 'b64_json' ||
-          key === 'audio' ||
-          key.endsWith('_base64') ||
-          val.startsWith('data:image/') ||
-          val.startsWith('data:audio/'))
-      ) {
+    for (const key of Object.keys(record)) {
+      const val = record[key];
+      if (typeof val === 'string' && isTruncatableMediaString(val, key, record)) {
         result[key] = `${val.substring(0, 50)}... [truncated base64, length: ${val.length}]`;
       } else {
         result[key] = sanitizeForDisplay(val);

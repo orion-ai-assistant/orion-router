@@ -166,6 +166,18 @@ class GeminiChatProvider(BaseChat):
                                 mime_type=part.get("mime_type", "application/octet-stream"),
                             )
                         )
+                    elif part.get("type") == "image_url":
+                        image_url_data = part.get("image_url", {}).get("url", "")
+                        if image_url_data.startswith("data:"):
+                            try:
+                                import base64
+                                # "data:image/png;base64,iVBOR..."
+                                header, base64_str = image_url_data.split(",", 1)
+                                mime_type = header.split(":")[1].split(";")[0]
+                                image_bytes = base64.b64decode(base64_str)
+                                parts.append(types.Part.from_bytes(data=image_bytes, mime_type=mime_type))
+                            except Exception as e:
+                                logger.error(f"Gemini image_url parse error: {e}")
                 contents.append(
                     types.Content(
                         role="user" if role == "user" else "model",

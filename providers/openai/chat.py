@@ -50,7 +50,34 @@ class OpenAIChatProvider(BaseChat):
                         "arguments": fn.get("arguments", "{}"),
                     })
             else:
-                items.append({"role": role, "content": message.get("content", "")})
+                content = message.get("content", "")
+                if isinstance(content, list):
+                    new_content = []
+                    for part in content:
+                        if part.get("type") == "text":
+                            new_content.append({"type": "input_text", "text": part.get("text", "")})
+                        elif part.get("type") in ("image_url", "input_image"):
+                            img_val = part.get("image_url")
+                            url = ""
+                            if isinstance(img_val, dict):
+                                url = img_val.get("url", "")
+                            elif isinstance(img_val, str):
+                                url = img_val
+                            
+                            if url.startswith("data:audio/"):
+                                try:
+                                    header, b64 = url.split(",", 1)
+                                    fmt = header.split(";")[0].split("/")[-1]
+                                    new_content.append({"type": "input_audio", "input_audio": {"data": b64, "format": fmt}})
+                                except Exception:
+                                    pass
+                            elif url:
+                                new_content.append({"type": "input_image", "image_url": url})
+                        else:
+                            new_content.append(part)
+                    items.append({"role": role, "content": new_content})
+                else:
+                    items.append({"role": role, "content": content})
         return items
 
     def _responses_payload(self, model: str, messages: list[dict[str, Any]], kwargs: dict) -> dict[str, Any]:
