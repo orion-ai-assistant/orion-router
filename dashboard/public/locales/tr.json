@@ -95,6 +95,7 @@
   "keys.createdModalDesc": "Bu ham anahtar yalnızca bir kez gösterilir. Lütfen kopyalayıp güvenli bir şekilde saklayın.",
   "keys.copyClose": "Kopyala ve Kapat",
   "logs.title": "Loglar",
+  "logs.group": "Grup",
   "logs.description": "Son yönlendirilen çağrılar.",
   "logs.refresh": "Yenile",
   "logs.table.model": "Model",

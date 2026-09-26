@@ -89,6 +89,9 @@ class TelemetryService:
             else:
                 await db_manager.update_streaming_log(
                     log_id=log_id,
+                    provider=provider,
+                    model=model,
+                    request_json=request_json,
                     response_json=response_json,
                     status="success"
                     if success is True

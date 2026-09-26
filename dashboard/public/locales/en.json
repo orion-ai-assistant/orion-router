@@ -95,6 +95,7 @@
   "keys.createdModalDesc": "This raw key is shown only once. Please copy and store it securely.",
   "keys.copyClose": "Copy & Close",
   "logs.title": "Logs",
+  "logs.group": "Group",
   "logs.description": "Recent routed calls.",
   "logs.refresh": "Refresh",
   "logs.table.model": "Model",

@@ -152,10 +152,12 @@ class ChatRunner:
         if provider != "gemini":
             messages = sanitize_tool_ids_for_non_gemini(messages)
 
+        local_payload = None
         if provider == "local" and hasattr(plugin, "build_payload"):
+            local_payload = plugin.build_payload(model, messages, **kwargs)
             await self.telemetry.update_processing_request(
                 log_id,
-                plugin.build_payload(model, messages, **kwargs),
+                local_payload,
             )
 
         try:
@@ -325,6 +327,8 @@ class ChatRunner:
             for key, value in kwargs.items():
                 if key not in req_data and value is not None:
                     req_data[key] = value
+            if local_payload is not None:
+                req_data = local_payload
 
             if status_val is False:
                 res_data = {

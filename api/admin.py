@@ -208,7 +208,7 @@ async def get_admin_logs():
     try:
         rows = await db_manager.fetch(
             """
-            SELECT l.id, k.name as key_name, l.provider, l.requested_model,
+            SELECT l.id, k.name as key_name, l.provider, l.requested_model, l.resolved_model,
                    l.tokens_used, l.prompt_tokens, l.completion_tokens,
                    COALESCE(
                        NULLIF(l.thoughts_tokens, 0),

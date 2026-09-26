@@ -17,6 +17,7 @@ interface LogItem {
   key_name: string | null;
   provider: string;
   requested_model: string;
+  resolved_model?: string | null;
   tokens_used: number;
   prompt_tokens: number;
   completion_tokens: number;
@@ -231,15 +232,20 @@ export default function LogsPage() {
                   </TableCell>
                   <TableCell
                     className={`py-4 pl-8 font-mono text-white max-w-[240px] truncate ${
-                      log.requested_model.length > 30
+                      (log.resolved_model || log.requested_model).length > 30
                         ? 'text-[10px]'
-                        : log.requested_model.length > 20
+                        : (log.resolved_model || log.requested_model).length > 20
                         ? 'text-xs'
                         : 'text-sm'
                     }`}
-                    title={log.requested_model}
+                    title={log.resolved_model || log.requested_model}
                   >
-                    {log.requested_model}
+                    <div className="truncate">{log.resolved_model || log.requested_model}</div>
+                    {log.resolved_model && log.resolved_model !== log.requested_model && (
+                      <div className="mt-1 truncate text-[10px] text-zinc-500" title={log.requested_model}>
+                        {t('logs.group')}: {log.requested_model}
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell className="py-4 pl-2">
                     <Badge className="bg-blue-500/10 text-blue-300 border border-blue-500/20 text-[10px] font-medium tracking-wide rounded uppercase px-2 py-0.5 capitalize">

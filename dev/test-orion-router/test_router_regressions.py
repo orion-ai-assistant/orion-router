@@ -1,4 +1,6 @@
 """Offline regressions for dashboard keys, OpenRouter credentials and video URLs."""
+import asyncio
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -11,11 +13,87 @@ from api.admin import update_provider_key_pool_item
 from core.router.route_types import ResolvedRoute, RoutePlan
 from core.router.routing_services import ProviderKeyPool
 from core.router.runners.chat import ChatRunner
+from core.router.telemetry import TelemetryService
+from providers.local.chat import LocalChatProvider
 from core.security import decrypt, encrypt
 from providers.openrouter.chat import OpenRouterChatProvider, transform_openrouter_messages
 
 
 class RouterRegressions(unittest.IsolatedAsyncioTestCase):
+    async def test_fallback_logs_actual_model_provider_and_payload(self):
+        async def failed_local(**kwargs):
+            yield 'data: {"error": {"message": "connection refused"}}\n\n'
+
+        async def successful_chat(**kwargs):
+            yield 'data: {"choices": [{"delta": {"content": "hello"}}]}\n\n'
+            yield {"internal_usage": {"prompt_tokens": 12, "completion_tokens": 3}}
+
+        local = LocalChatProvider()
+        local.stream_chat = failed_local
+        resolver = SimpleNamespace(resolve=AsyncMock(return_value=RoutePlan(routes=(
+            ResolvedRoute(provider="local", model="local-chat"),
+            ResolvedRoute(provider="gemini", model="gemini-test", temperature=0.5),
+        ))))
+        runner = ChatRunner(
+            registry=SimpleNamespace(chat_providers={
+                "local": local, "gemini": SimpleNamespace(stream_chat=successful_chat),
+            }),
+            route_resolver=resolver,
+            key_pool=SimpleNamespace(get_keys_for_provider=AsyncMock(return_value=[(None, None)]),
+                                     mark_key_error=AsyncMock()),
+            telemetry=TelemetryService(),
+        )
+        tasks = []
+        create_task = asyncio.create_task
+
+        def track_task(coro):
+            task = create_task(coro)
+            tasks.append(task)
+            return task
+
+        with patch("core.router.telemetry.db_manager.create_streaming_log", AsyncMock(return_value=42)) as create, patch(
+            "core.router.telemetry.db_manager.update_streaming_log", AsyncMock()
+        ) as update, patch("core.router.telemetry.db_manager.update_streaming_request", AsyncMock()), patch(
+            "core.router.runners.chat.asyncio.create_task", side_effect=track_task
+        ):
+            chunks = [chunk async for chunk in runner.run_combo(
+                provider=None, model="sdf", messages=[{"role": "user", "content": "hello"}],
+            )]
+            await asyncio.sleep(0)
+            await asyncio.sleep(0)
+            await asyncio.gather(*tasks)
+            self.assertIn("hello", "".join(chunks))
+            self.assertNotIn("connection refused", "".join(chunks))
+            self.assertEqual(create.await_args.kwargs["model"], "sdf")
+            result = next(call.kwargs for call in update.await_args_list if call.kwargs["success"] is True)
+            self.assertEqual(result["log_id"], 42)
+            self.assertEqual(result["provider"], "gemini")
+            self.assertEqual(result["model"], "gemini-test")
+            payload = json.loads(result["request_json"])
+            self.assertEqual(payload["model"], "gemini-test")
+            self.assertEqual(payload["temperature"], 0.5)
+            self.assertNotIn("repeat_penalty", payload)
+
+    async def test_local_log_keeps_exact_upstream_payload(self):
+        local = LocalChatProvider()
+
+        async def successful_chat(**kwargs):
+            yield 'data: {"choices": [{"delta": {"content": "hello"}}]}\n\n'
+
+        local.stream_chat = successful_chat
+        telemetry = AsyncMock()
+        runner = ChatRunner(None, None, None, telemetry)
+        messages = [{"role": "user", "content": "hello"}]
+        _ = [chunk async for chunk in runner.stream(
+            local, None, "local", "local-chat", messages, None, None,
+            log_id=1, thinking_level="none", temperature=0.5,
+        )]
+        await asyncio.sleep(0)
+        payload = json.loads(telemetry.log_usage.await_args.kwargs["request_json"])
+        self.assertEqual(payload, local.build_payload(
+            "local-chat", messages, thinking_level="none", temperature=0.5,
+        ))
+
     async def test_dashboard_replace_and_toggle_key(self):
         stored = encrypt("old-provider-key")
         existing = dict(provider="openrouter", label="test", api_key=stored,
