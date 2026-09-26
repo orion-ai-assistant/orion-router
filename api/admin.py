@@ -511,7 +511,14 @@ async def list_provider_key_pool():
     keys = []
     for row in rows:
         item = dict(row)
-        item["masked_key"] = _mask_key(decrypt(item.pop("api_key", "")))
+        raw_key = item.pop("api_key", "")
+        decrypted = decrypt(raw_key)
+        if decrypted is None:
+            item["masked_key"] = "[Şifre çözülemiyor; anahtarı yeniden kaydet]"
+            if not item.get("last_error"):
+                item["last_error"] = "Şifre çözülemiyor; anahtarı yeniden kaydet"
+        else:
+            item["masked_key"] = _mask_key(decrypted)
         keys.append(item)
     return {"keys": keys}
 
@@ -554,8 +561,9 @@ async def update_provider_key_pool_item(key_id: str, request: Request):
 
     provider = _require_text(body.get("provider", existing["provider"]), "provider").lower()
     label = _require_text(body.get("label", existing["label"]), "label")
-    new_key = body.get("api_key", None)
-    api_key = existing["api_key"] if new_key in (None, "") else encrypt(_require_text(new_key, "api_key"))
+    new_key = body.get("api_key")
+    has_new_key = new_key not in (None, "")
+    api_key = encrypt(_require_text(new_key, "api_key")) if has_new_key else existing["api_key"]
     priority = int(body.get("priority", existing["priority"]))
     is_active = bool(body.get("is_active", existing["is_active"]))
 
@@ -563,7 +571,10 @@ async def update_provider_key_pool_item(key_id: str, request: Request):
         """
         UPDATE router_provider_key_pool
         SET provider = $2, label = $3, api_key = $4, priority = $5,
-            is_active = $6, updated_at = NOW()
+            is_active = $6,
+            last_error = CASE WHEN $7 THEN NULL ELSE last_error END,
+            last_error_at = CASE WHEN $7 THEN NULL ELSE last_error_at END,
+            updated_at = NOW()
         WHERE id = $1
         RETURNING id, provider, label, priority, is_active, last_error, last_error_at, created_at
         """,
@@ -573,6 +584,7 @@ async def update_provider_key_pool_item(key_id: str, request: Request):
         api_key,
         priority,
         is_active,
+        has_new_key,
     )
     return dict(row)
 
@@ -1030,4 +1042,3 @@ async def get_admin_ui(path: str = ""):
         ),
         status_code=404,
     )
-

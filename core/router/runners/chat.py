@@ -75,6 +75,47 @@ def extract_error_message(error_chunk: str | None) -> str | None:
     return None
 
 
+def is_key_specific_error(error_str: str | None) -> bool:
+    """Return True if the error is likely due to the specific API key (auth, quota, rate limit, provider network).
+    Return False if the error is client-side or model/modality incompatibility that trying another key cannot fix.
+    """
+    if not error_str:
+        return True
+    err = error_str.lower()
+
+    # Non-retryable model/modality/client errors (trying another key won't help):
+    non_retryable_markers = (
+        "does not support",
+        "no endpoints found that support",
+        "modality is not enabled",
+        "modality not supported",
+        "unsupported modality",
+        "context_length_exceeded",
+        "maximum context length",
+        "invalid_request_error",
+        "content policy",
+        "safety filter",
+        "blocked by safety",
+    )
+    if any(marker in err for marker in non_retryable_markers):
+        return False
+
+    # Retryable key/quota/network errors:
+    retryable_markers = (
+        "401", "403", "unauthorized", "authentication", "api key", "api_key",
+        "429", "rate limit", "quota", "credits", "insufficient",
+        "500", "502", "503", "504", "timeout", "connection",
+    )
+    if any(marker in err for marker in retryable_markers):
+        return True
+
+    # Generic 400 or 404 without auth/quota mentions are client/model errors:
+    if "400" in err or "404" in err:
+        return False
+
+    return True
+
+
 class ChatRunner:
     def __init__(self, registry, route_resolver, key_pool, telemetry) -> None:
         self.registry = registry
@@ -444,6 +485,7 @@ class ChatRunner:
                     api_key or auth_header,
                 )
 
+                should_retry_keys = True
                 for key_val, key_pool_id in keys_to_try:
                     logger.info(
                         "Trying route %s/%s using key %s",
@@ -462,23 +504,33 @@ class ChatRunner:
                             model=p_model,
                             messages=route_messages,
                             api_key=key_val,
-                            auth_header=auth_header if not key_val else None,
+                            auth_header=auth_header if not key_val and p_provider != "openrouter" else None,
                             log_id=log_id,
                             **route_kwargs,
                         ):
                             if isinstance(chunk, str) and '"error"' in chunk:
                                 if not yielded_any_this_try:
                                     logger.warning(
-                                        "Route %s/%s failed with error chunk, trying fallback.",
+                                        "Route %s/%s failed with error chunk, evaluating retryability.",
                                         p_provider,
                                         p_model,
                                     )
                                     failed = True
                                     last_error_chunk = chunk
-                                    await self.key_pool.mark_key_error(
-                                        key_pool_id,
-                                        "API returned error chunk",
-                                    )
+                                    err_msg = extract_error_message(chunk) or "API returned error chunk"
+                                    if is_key_specific_error(err_msg):
+                                        await self.key_pool.mark_key_error(
+                                            key_pool_id,
+                                            err_msg,
+                                        )
+                                    else:
+                                        logger.info(
+                                            "Non-retryable model/modality error on %s/%s: %s; stopping key rotation.",
+                                            p_provider,
+                                            p_model,
+                                            err_msg,
+                                        )
+                                        should_retry_keys = False
                                     break
 
                             yielded_any = True
@@ -490,11 +542,24 @@ class ChatRunner:
                             break
                     except Exception as exc:
                         logger.error("Route %s/%s failed: %s", p_provider, p_model, exc)
-                        await self.key_pool.mark_key_error(key_pool_id, str(exc))
+                        err_str = str(exc)
+                        if is_key_specific_error(err_str):
+                            await self.key_pool.mark_key_error(key_pool_id, err_str)
+                        else:
+                            logger.info(
+                                "Non-retryable model/modality error on %s/%s: %s; stopping key rotation.",
+                                p_provider,
+                                p_model,
+                                err_str,
+                            )
+                            should_retry_keys = False
                         failed = True
                         last_error_chunk = (
-                            f"data: {json.dumps({'error': {'message': str(exc), 'type': 'api_error'}}, ensure_ascii=False)}\n\n"
+                            f"data: {json.dumps({'error': {'message': err_str, 'type': 'api_error'}}, ensure_ascii=False)}\n\n"
                         )
+
+                    if not should_retry_keys:
+                        break
 
                     if failed and yielded_any_this_try:
                         success = True
@@ -549,8 +614,8 @@ class ChatRunner:
             provider,
             model,
             route_messages,
-            db_key or api_key,
-            auth_header,
+            db_key if provider == "openrouter" else db_key or api_key,
+            None if provider == "openrouter" else auth_header,
             log_id=log_id,
             **kwargs,
         ):

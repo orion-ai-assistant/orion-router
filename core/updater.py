@@ -162,7 +162,7 @@ def _perform_update_worker():
         if _is_git_repository():
             fetch_res = _run_cmd("git fetch origin main")
             if fetch_res.returncode != 0:
-                raise RuntimeError(f"git fetch başarısız oldu: {fetch_res.stderr}")
+                raise RuntimeError(f"git fetch failed: {fetch_res.stderr}")
 
             # Değişiklikleri entegre et
             pull_res = _run_cmd("git pull --ff-only origin main")
@@ -170,7 +170,7 @@ def _perform_update_worker():
                 _append_log("ff-only başarısız, reset denetleniyor...")
                 reset_res = _run_cmd("git reset --hard origin/main")
                 if reset_res.returncode != 0:
-                    raise RuntimeError(f"git reset başarısız oldu: {reset_res.stderr}")
+                    raise RuntimeError(f"git reset failed: {reset_res.stderr}")
             _append_log("Kodlar başarıyla güncellendi.")
         else:
             _append_log("Git reposu bulunamadı, mevcut dosyalar korunuyor.")
@@ -204,7 +204,7 @@ def _perform_update_worker():
         build_env = {"NEXT_PUBLIC_ROUTER_PORT": router_port}
         build_res = _run_cmd("npm run build", cwd=DASHBOARD_DIR, env=build_env)
         if build_res.returncode != 0:
-            raise RuntimeError(f"Dashboard build başarısız oldu: {build_res.stderr}")
+            raise RuntimeError(f"Dashboard build failed: {build_res.stderr}")
         _append_log("Dashboard başarıyla derlendi.")
 
         # 4. Adım: Tamamlanma ve Yeniden Başlatma Sinyali

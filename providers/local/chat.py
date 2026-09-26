@@ -173,11 +173,8 @@ class LocalChatProvider(BaseChat):
                     if delta.get("tool_calls"):
                         yield f'data: {{"choices":[{{"delta":{{"tool_calls":{json.dumps(delta["tool_calls"], ensure_ascii=False)}}}}}]}}\n\n'
         except httpx.ConnectError:
-            raise RuntimeError(
-                f"Yerel LLM servisine ({LLM_HOST}:{LLM_PORT}) bağlanılamadı. "
-                f"Lütfen yerel model sunucusunun (llama.cpp vb.) açık olduğundan emin olun."
-            )
+            raise RuntimeError(f"Could not connect to local LLM service ({LLM_HOST}:{LLM_PORT}).")
         except httpx.TimeoutException:
-            raise RuntimeError(f"Yerel LLM servisi ({LLM_HOST}:{LLM_PORT}) zaman aşımına uğradı.")
+            raise RuntimeError(f"Local LLM service ({LLM_HOST}:{LLM_PORT}) timed out.")
         except httpx.RequestError as e:
-            raise RuntimeError(f"Yerel LLM servisine bağlanırken ağ hatası oluştu: {e}")
+            raise RuntimeError(f"Network error connecting to local LLM service: {e}")

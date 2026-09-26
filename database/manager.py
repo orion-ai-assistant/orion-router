@@ -1,5 +1,6 @@
 import os
 import logging
+import asyncio
 import asyncpg
 from typing import Optional
 import json
@@ -482,7 +483,13 @@ class DatabaseManager:
         keys = []
         for r in rows:
             d = dict(r)
-            d["api_key"] = decrypt(d["api_key"])
+            decrypted = decrypt(d["api_key"])
+            if decrypted is None:
+                err_msg = "Şifre çözülemiyor; anahtarı yeniden kaydet"
+                logger.warning("Provider key %s (%s) cannot be decrypted; skipping and deactivating.", d["id"], d["label"])
+                asyncio.create_task(self.mark_provider_key_error(d["id"], err_msg))
+                continue
+            d["api_key"] = decrypted
             keys.append(d)
         return keys
 
@@ -492,7 +499,7 @@ class DatabaseManager:
         err_text = error[:1000]
         deactivate = any(
             marker in err_text
-            for marker in ("API_KEY_INVALID", "API key not valid")
+            for marker in ("API_KEY_INVALID", "API key not valid", "Şifre çözülemiyor")
         )
         if deactivate:
             await self.execute(

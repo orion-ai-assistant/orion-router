@@ -64,6 +64,6 @@ class LocalEmbedProvider(BaseEmbed):
                 raise RuntimeError(message)
             return resp.json()
         except httpx.ConnectError:
-            raise RuntimeError(f"Yerel Embeddings servisine ({EMBED_HOST}:{EMBED_PORT}) bağlanılamadı. Servisin açık olduğundan emin olun.")
+            raise RuntimeError(f"Could not connect to local Embeddings service ({EMBED_HOST}:{EMBED_PORT}).")
         except httpx.RequestError as e:
-            raise RuntimeError(f"Yerel Embeddings servisine bağlanırken ağ hatası oluştu: {e}")
+            raise RuntimeError(f"Network error connecting to local Embeddings service: {e}")

@@ -43,8 +43,12 @@ def encrypt(text: str) -> str:
     cipher = _get_cipher()
     return cipher.encrypt(text.encode('utf-8')).decode('utf-8')
 
-def decrypt(encrypted_text: str) -> str:
-    """Decrypts a string using Fernet symmetric encryption."""
+def decrypt(encrypted_text: str) -> str | None:
+    """Decrypts a string using Fernet symmetric encryption.
+    Returns decrypted plaintext if valid.
+    Returns the string as-is if it's plaintext (not a Fernet token).
+    Returns None if it is a Fernet token (starts with gAAAAA) but cannot be decrypted.
+    """
     if not encrypted_text:
         return encrypted_text
     
@@ -52,10 +56,10 @@ def decrypt(encrypted_text: str) -> str:
     if not encrypted_text.startswith('gAAAAA'):
         return encrypted_text # Probably plaintext
 
-    cipher = _get_cipher()
     try:
+        cipher = _get_cipher()
         return cipher.decrypt(encrypted_text.encode('utf-8')).decode('utf-8')
-    except InvalidToken:
-        # If decryption fails, it might be plaintext that coincidentally starts with gAAAAA
-        # or the encryption key changed. Return as is for graceful failure/fallback.
-        return encrypted_text
+    except (InvalidToken, Exception):
+        # Decryption failed (encryption key mismatch or corrupted ciphertext).
+        # Return None so callers know this key cannot be decrypted.
+        return None

@@ -5,6 +5,7 @@ OpenAI API streaming chat provider.
 reasoning_effort (thinking_level) desteklidir.
 """
 import json
+import re
 import httpx
 from typing import AsyncGenerator, Any
 
@@ -12,8 +13,15 @@ from providers.base import BaseChat
 
 from core.thinking import ThinkingConfig
 from core.http_client import get_http_client
+from core.video import prepare_openai_videos
 
 _BASE_URL = "https://api.openai.com"
+
+# Chat Completions audio models and their dated snapshots. Other models must
+# not receive audio blocks, even when the attachment is in conversation history.
+_AUDIO_MODEL = re.compile(
+    r"(?:gpt-audio(?:-mini|-1\.5)?|gpt-4o(?:-mini)?-audio-preview)(?:-\d{4}-\d{2}-\d{2})?"
+)
 
 
 class OpenAIChatProvider(BaseChat):
@@ -163,14 +171,16 @@ class OpenAIChatProvider(BaseChat):
         # Audio belongs to Chat Completions; never silently reroute it to Responses.
         content_parts = [part for msg in messages if isinstance(msg.get("content"), list)
                          for part in msg["content"]]
-        if any(part.get("type") in ("input_video", "video_url") for part in content_parts):
-            raise ValueError("OpenAI chat does not accept raw video here. Use a video-capable provider.")
         has_audio = any(part.get("type") == "input_audio" for part in content_parts)
+        if has_audio and not _AUDIO_MODEL.fullmatch(model):
+            raise ValueError(f"OpenAI adapter does not support audio input for model '{model}'.")
         for part in content_parts:
             if part.get("type") == "input_audio":
                 audio = part["input_audio"]
                 if audio.get("format") not in ("wav", "mp3") or not audio.get("data"):
                     raise ValueError("OpenAI input_audio requires base64 data in wav or mp3 format.")
+
+        messages = await prepare_openai_videos(messages)
 
         url = f"{_BASE_URL}/v1/chat/completions"
 

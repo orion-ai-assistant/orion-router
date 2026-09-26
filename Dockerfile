@@ -21,6 +21,10 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
+# Local video frame extraction for vision-capable OpenAI models.
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install package manager uv
 RUN pip install --no-cache-dir uv
 

@@ -77,6 +77,9 @@ class ProviderKeyPool:
             db_key = self.get_db_key(provider)
             if db_key:
                 keys.append((db_key, None))
+            elif provider == "openrouter":
+                # Router credentials are never OpenRouter credentials.
+                keys.append((None, None))
             else:
                 clean_client_key = client_key
                 if clean_client_key and clean_client_key.startswith("Bearer "):

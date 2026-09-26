@@ -179,6 +179,9 @@ ROUTER_PORT = os.getenv("ROUTER_PORT")
 LLM_HOST = os.getenv("LLM_HOST", "127.0.0.1")
 LLM_PORT = os.getenv("LLM_PORT", "8085")
 
+# Local video decoding for OpenAI; empty means search PATH.
+FFMPEG_DIR = os.getenv("FFMPEG_DIR", "")
+
 EMBED_HOST = os.getenv("EMBED_HOST", "127.0.0.1")
 EMBED_PORT = os.getenv("EMBED_PORT", "8086")
 
