@@ -46,6 +46,8 @@ const KEY_PRIORITY: Record<string, number> = {
   content: 92,
   reasoning_content: 93,
   tool_calls: 94,
+  tool_call_id: 95,
+  tool_use_id: 96,
   usage: 100,
   metrics: 110,
   error: 120,
@@ -132,6 +134,67 @@ function isTruncatableMediaString(
   return false;
 }
 
+function isTruncatableToolString(
+  val: string,
+  key?: string,
+  parent?: Record<string, unknown>
+): boolean {
+  if (typeof val !== 'string' || val.length <= 300) return false;
+  if (!parent || !key) return false;
+
+  const k = key.toLowerCase();
+
+  // 1. Tool message content (OpenAI role: "tool", legacy "function", Anthropic "tool_result", etc.)
+  if (k === 'content') {
+    const role = typeof parent.role === 'string' ? parent.role.toLowerCase() : '';
+    if (role === 'tool' || role === 'function') {
+      return true;
+    }
+    if (typeof parent.tool_call_id === 'string' || typeof parent.tool_use_id === 'string') {
+      return true;
+    }
+    const type = typeof parent.type === 'string' ? parent.type.toLowerCase() : '';
+    if (type === 'tool_result') {
+      return true;
+    }
+  }
+
+  // 2. Output field in function/tool results (e.g. OpenAI Responses API function_call_output)
+  if (k === 'output') {
+    const type = typeof parent.type === 'string' ? parent.type.toLowerCase() : '';
+    if (type === 'function_call_output') {
+      return true;
+    }
+    if (typeof parent.call_id === 'string' || typeof parent.tool_call_id === 'string') {
+      return true;
+    }
+  }
+
+  // 3. Tool call arguments if excessively long
+  if (k === 'arguments') {
+    if (
+      typeof parent.name === 'string' ||
+      parent.type === 'function' ||
+      typeof parent.call_id === 'string'
+    ) {
+      return true;
+    }
+  }
+
+  // 4. Gemini functionResponse / function_response response or result field
+  if (k === 'response' || k === 'result') {
+    if (
+      typeof parent.name === 'string' ||
+      parent.functionResponse !== undefined ||
+      parent.function_response !== undefined
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function sanitizeForDisplay(obj: unknown): unknown {
   if (obj === null || obj === undefined) return obj;
   if (typeof obj === 'string') {
@@ -150,6 +213,9 @@ function sanitizeForDisplay(obj: unknown): unknown {
       const val = record[key];
       if (typeof val === 'string' && isTruncatableMediaString(val, key, record)) {
         result[key] = `${val.substring(0, 50)}... [truncated base64, length: ${val.length}]`;
+      } else if (typeof val === 'string' && isTruncatableToolString(val, key, record)) {
+        const label = key.toLowerCase() === 'arguments' ? 'tool arguments' : 'tool output';
+        result[key] = `${val.substring(0, 150)}... [truncated ${label}, length: ${val.length}]`;
       } else {
         result[key] = sanitizeForDisplay(val);
       }
