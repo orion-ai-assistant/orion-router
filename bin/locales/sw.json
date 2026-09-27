@@ -5,7 +5,7 @@
     "cmd_dev_desc": "Inaanzisha mazingira ya Maendeleo (hot-reload inafanya kazi).",
     "cmd_prod_desc": "Inajenga na kuanzisha mazingira ya Uzalishaji ndani ya nchi.",
     "cmd_stop_desc": "Inafuta huduma zote za nyuma zinazofanya kazi na bandari.",
-    "cmd_example": "Mfano: python orion.py prod",
+    "cmd_example": "Mfano: python cli.py prod",
     "err_file_not_found": "Hitilafu: Faili '{name}' haikupatikana chini ya {dir}!",
     "err_unknown_command": "Hitilafu: Amri isiyojulikana '{cmd}'",
     "stop_title": "Orion Router - Acha",
@@ -54,6 +54,6 @@
     "pg_failed_checking_integrity": "PostgreSQL haikuweza kuanza. Inakagua uadilifu wa faili...",
     "npm_installing_deps": "Inaweka utegemezi wa dashibodi...",
     "npm_install_failed": "Uwekaji wa utegemezi wa dashibodi umeshindwa",
-    "cmd_usage_format": "    python orion.py <command>\n",
+    "cmd_usage_format": "    python cli.py <command>\n",
     "api_err_localhost_not_allowed": "Onyo la Utendaji: Matumizi ya 'localhost' yamezuiliwa na Orion Router. Ili kuepuka ucheleweshaji wa sekunde 2 wa azimio la DNS/IPv6 (timeout) katika maktaba za Python, tafadhali badilisha URL yako ya muunganisho kuwa '127.0.0.1' katika msimbo wako wa mteja."
 }

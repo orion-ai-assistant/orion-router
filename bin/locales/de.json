@@ -5,7 +5,7 @@
     "cmd_dev_desc": "Startet die Entwicklungsumgebung (Hot-Reload ist aktiv).",
     "cmd_prod_desc": "Erstellt und startet die Produktionsumgebung lokal.",
     "cmd_stop_desc": "Bereinigt alle im Hintergrund laufenden Dienste und Ports.",
-    "cmd_example": "Beispiel: python orion.py prod",
+    "cmd_example": "Beispiel: python cli.py prod",
     "err_file_not_found": "Fehler: Datei '{name}' unter {dir} nicht gefunden!",
     "err_unknown_command": "Error: Unbekannter Befehl '{cmd}'",
     "stop_title": "Orion Router - Stopp",
@@ -54,6 +54,6 @@
     "pg_failed_checking_integrity": "PostgreSQL konnte nicht gestartet werden. Dateiintegrität wird überprüft...",
     "npm_installing_deps": "Dashboard-Abhängigkeiten werden installiert...",
     "npm_install_failed": "Installation der Dashboard-Abhängigkeiten fehlgeschlagen",
-    "cmd_usage_format": "    python orion.py <command>\n",
+    "cmd_usage_format": "    python cli.py <command>\n",
     "api_err_localhost_not_allowed": "Leistungswarnung: Die Verwendung von 'localhost' ist durch Orion Router eingeschränkt. Um eine 2-sekündige DNS/IPv6-Auflösungsverzögerung (Timeout) in Python-Bibliotheken zu vermeiden, ändern Sie bitte Ihre Verbindungs-URL in Ihrem Client-Code auf '127.0.0.1'."
 }

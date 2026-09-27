@@ -63,13 +63,13 @@ print(response.choices[0].message.content)
 
 A basic guide for developers who want to customize the system or add new features.
 
-### CLI Tools (`orion.py`)
+### CLI Tools (`cli.py`)
 
-You can use the `orion.py` file in the root directory to manage the development process:
+You can use the `cli.py` file in the root directory to manage the development process:
 
-* `python orion.py dev` : Starts the hot-reload active development environment (PostgreSQL: `POSTGRES_DEV_PORT`, API: `ROUTER_DEV_PORT`, UI: 3001).
-* `python orion.py prod` : Builds the production version and runs it on a single port.
-* `python orion.py stop` : Cleans up all background hanging ports and services.
+* `python cli.py dev` : Starts the hot-reload active development environment (PostgreSQL: `POSTGRES_DEV_PORT`, API: `ROUTER_DEV_PORT`, UI: 3001).
+* `python cli.py prod` : Builds the production version and runs it on a single port.
+* `python cli.py stop` : Cleans up all background hanging ports and services.
 
 ### 🔌 Adding a New Provider
 

@@ -64,7 +64,7 @@
   "settings.system.completed": "Update Completed Successfully!",
   "settings.system.reloading": "Reloading page...",
   "settings.system.failed": "Update Failed",
-  "settings.system.cliHint": "To update from terminal: python orion.py update",
+  "settings.system.cliHint": "To update from terminal: python cli.py update",
   "nav.updateAvailable": "New Version",
   "overview.title": "Overview",
   "overview.description": "Overall usage statistics and system health.",

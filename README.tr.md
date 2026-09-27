@@ -63,13 +63,13 @@ print(response.choices[0].message.content)
 
 Sistemi özelleştirmek veya yeni özellikler eklemek isteyen geliştiriciler için temel rehber.
 
-### CLI Araçları (`orion.py`)
+### CLI Araçları (`cli.py`)
 
-Geliştirme sürecini yönetmek için kök dizindeki `orion.py` dosyasını kullanabilirsiniz:
+Geliştirme sürecini yönetmek için kök dizindeki `cli.py` dosyasını kullanabilirsiniz:
 
-* `python orion.py dev` : Hot-reload aktif geliştirme ortamını başlatır (PostgreSQL: `POSTGRES_DEV_PORT`, API: `ROUTER_DEV_PORT`, UI: 3001).
-* `python orion.py prod` : Üretim sürümünü derler ve tek portta çalıştırır.
-* `python orion.py stop` : Arka planda asılı kalan tüm portları ve servisleri temizler.
+* `python cli.py dev` : Hot-reload aktif geliştirme ortamını başlatır (PostgreSQL: `POSTGRES_DEV_PORT`, API: `ROUTER_DEV_PORT`, UI: 3001).
+* `python cli.py prod` : Üretim sürümünü derler ve tek portta çalıştırır.
+* `python cli.py stop` : Arka planda asılı kalan tüm portları ve servisleri temizler.
 
 ### 🔌 Yeni Bir Sağlayıcı (Provider) Eklemek
 

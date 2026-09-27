@@ -64,7 +64,7 @@
   "settings.system.completed": "Güncelleme Başarıyla Tamamlandı!",
   "settings.system.reloading": "Sayfa yenileniyor...",
   "settings.system.failed": "Güncelleme Başarısız Oldu",
-  "settings.system.cliHint": "Terminalden güncellemek için: python orion.py update",
+  "settings.system.cliHint": "Terminalden güncellemek için: python cli.py update",
   "nav.updateAvailable": "Yeni Sürüm",
   "overview.title": "Genel Bakış",
   "overview.description": "Genel kullanım istatistikleri ve sistem durumu.",

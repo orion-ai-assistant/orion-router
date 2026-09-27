@@ -5,7 +5,7 @@
     "cmd_dev_desc": "Geliştirme (Development) ortamını başlatır (hot-reload aktiftir).",
     "cmd_prod_desc": "Üretim (Production) ortamını derler ve yerel olarak başlatır.",
     "cmd_stop_desc": "Çalışan tüm arka plan servislerini ve portları temizler.",
-    "cmd_example": "Örnek: python orion.py prod",
+    "cmd_example": "Örnek: python cli.py prod",
     "err_prefix": "Hata:",
     "err_file_not_found": "'{name}' dosyası {dir} altında bulunamadı!",
     "err_unknown_command": "Bilinmeyen komut '{cmd}'",
@@ -59,6 +59,6 @@
     "pg_failed_checking_integrity": "PostgreSQL başlatılamadı. Dosya bütünlüğü kontrol ediliyor...",
     "npm_installing_deps": "Dashboard bağımlılıkları kuruluyor...",
     "npm_install_failed": "Dashboard bağımlılıkları kurulamadı!",
-    "cmd_usage_format": "    python orion.py <komut>\n",
+    "cmd_usage_format": "    python cli.py <komut>\n",
     "api_err_localhost_not_allowed": "Performans Uyarısı: 'localhost' kullanımı Orion Router tarafından yasaklanmıştır. Python kütüphanelerinde 2 saniyelik DNS/IPv6 gecikmesi (timeout) yaşamamak için lütfen istemci kodundaki bağlantı URL'nizi '127.0.0.1' olarak değiştirin."
 }

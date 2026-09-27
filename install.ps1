@@ -207,7 +207,7 @@ if ($Mode -eq "local") {
     $lines.Add('    }')
     $lines.Add('    Write-Host "Starting Orion Router locally..." -ForegroundColor Cyan')
     $lines.Add('    Set-Location $ProjectPath')
-    $lines.Add('    $p = Start-Process -FilePath "python" -ArgumentList "orion.py","prod" -RedirectStandardOutput $LogFile -RedirectStandardError $ErrFile -PassThru -WindowStyle Hidden')
+    $lines.Add('    $p = Start-Process -FilePath "python" -ArgumentList "cli.py","prod" -RedirectStandardOutput $LogFile -RedirectStandardError $ErrFile -PassThru -WindowStyle Hidden')
     $lines.Add('    $p.Id | Out-File -FilePath $PidFile')
     $lines.Add('    if ($Options -contains "--silent" -or $Options -contains "-silent" -or $Options -contains "silent") {')
     $lines.Add('        Write-Host "Orion Router started in the background (Silent)." -ForegroundColor Green')

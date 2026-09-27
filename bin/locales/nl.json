@@ -5,7 +5,7 @@
     "cmd_dev_desc": "Start de ontwikkelingsomgeving (hot-reload is actief).",
     "cmd_prod_desc": "Bouwt en start de productieomgeving lokaal.",
     "cmd_stop_desc": "Sluit alle actieve achtergronddiensten en poorten.",
-    "cmd_example": "Voorbeeld: python orion.py prod",
+    "cmd_example": "Voorbeeld: python cli.py prod",
     "err_file_not_found": "Fout: Bestand '{name}' niet gevonden onder {dir}!",
     "err_unknown_command": "Fout: Onbekende opdracht '{cmd}'",
     "stop_title": "Orion Router - Stoppen",
@@ -54,6 +54,6 @@
     "pg_failed_checking_integrity": "PostgreSQL kon niet worden gestart. Bestandsintegriteit controleren...",
     "npm_installing_deps": "Dashboard-afhankelijkheden installeren...",
     "npm_install_failed": "Installatie van dashboard-afhankelijkheden mislukt",
-    "cmd_usage_format": "    python orion.py <command>\n",
+    "cmd_usage_format": "    python cli.py <command>\n",
     "api_err_localhost_not_allowed": "Prestatiewaarschuwing: Het gebruik van 'localhost' is beperkt door Orion Router. Om een DNS/IPv6-vertragingsresolutie van 2 seconden (timeout) in Python-bibliotheken te voorkomen, dient u de verbindings-URL in uw clientcode te wijzigen in '127.0.0.1'."
 }

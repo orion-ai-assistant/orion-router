@@ -5,7 +5,7 @@
     "cmd_dev_desc": "Käynnistää kehitysympäristön (hot-reload on käytössä).",
     "cmd_prod_desc": "Rakentaa ja käynnistää tuotantoympäristön paikallisesti.",
     "cmd_stop_desc": "Tyhjentää kaikki käynnissä olevat taustapalvelut ja portit.",
-    "cmd_example": "Esimerkki: python orion.py prod",
+    "cmd_example": "Esimerkki: python cli.py prod",
     "err_file_not_found": "Virhe: Tiedostoa '{name}' ei löytynyt kansiosta {dir}!",
     "err_unknown_command": "Virhe: Tuntematon komento '{cmd}'",
     "stop_title": "Orion Router - Pysäytys",
@@ -54,6 +54,6 @@
     "pg_failed_checking_integrity": "PostgreSQL ei käynnistynyt. Tarkistetaan tiedostojen eheyttä...",
     "npm_installing_deps": "Asennetaan hallintapaneelin riippuvuuksia...",
     "npm_install_failed": "Hallintapaneelin riippuvuuksien asennus epäonnistui",
-    "cmd_usage_format": "    python orion.py <command>\n",
+    "cmd_usage_format": "    python cli.py <command>\n",
     "api_err_localhost_not_allowed": "Suorituskykyvaroitus: Orion Router rajoittaa 'localhostin' käyttöä. Välttääksesi 2 sekunnin DNS/IPv6-selvitysviiveen (aikakatkaisun) Python-kirjastoissa, muuta yhteysosoitteesi muotoon '127.0.0.1' asiakaskoodissasi."
 }

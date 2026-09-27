@@ -5,7 +5,7 @@
     "cmd_dev_desc": "डेवलपमेंट वातावरण शुरू करता है (हॉट-रीलोड सक्रिय है)।",
     "cmd_prod_desc": "स्थानीय स्तर पर प्रोडक्शन वातावरण बनाता और शुरू करता है।",
     "cmd_stop_desc": "सभी चल रही पृष्ठभूमि सेवाओं और पोर्ट को साफ़ करता है।",
-    "cmd_example": "उदाहरण: python orion.py prod",
+    "cmd_example": "उदाहरण: python cli.py prod",
     "err_file_not_found": "त्रुटि: '{name}' फ़ाइल {dir} के अंतर्गत नहीं मिली!",
     "err_unknown_command": "त्रुटि: अज्ञात कमांड '{cmd}'",
     "stop_title": "Orion Router - रोकें",
@@ -54,6 +54,6 @@
     "pg_failed_checking_integrity": "PostgreSQL प्रारंभ नहीं हो सका। फ़ाइल अखंडता जाँची जा रही है...",
     "npm_installing_deps": "डैशबोर्ड निर्भरताएँ इंस्टॉल की जा रही हैं...",
     "npm_install_failed": "डैशबोर्ड निर्भरताएँ इंस्टॉल करने में विफल",
-    "cmd_usage_format": "    python orion.py <command>\n",
+    "cmd_usage_format": "    python cli.py <command>\n",
     "api_err_localhost_not_allowed": "प्रदर्शन चेतावनी: Orion Router द्वारा 'localhost' के उपयोग पर प्रतिबंध लगा दिया गया है। पायथन पुस्तकालयों में 2-सेकंड की DNS/IPv6 रिज़ॉल्यूशन देरी (टाइमआउट) से बचने के लिए, कृपया अपने क्लाइंट कोड में कनेक्शन URL को '127.0.0.1' में बदलें।"
 }

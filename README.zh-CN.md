@@ -63,13 +63,13 @@ print(response.choices[0].message.content)
 
 面向希望自定义系统或添加新功能的开发者的基本指南。
 
-### CLI 工具 (`orion.py`)
+### CLI 工具 (`cli.py`)
 
-您可以使用根目录中的 `orion.py` 文件来管理开发过程：
+您可以使用根目录中的 `cli.py` 文件来管理开发过程：
 
-* `python orion.py dev` : 启动热重载 (hot-reload) 活跃开发环境（PostgreSQL: `POSTGRES_DEV_PORT`，API: `ROUTER_DEV_PORT`，UI: 3001）。
-* `python orion.py prod` : 构建生产版本并在单一端口上运行。
-* `python orion.py stop` : 清理所有在后台挂起的端口和服务。
+* `python cli.py dev` : 启动热重载 (hot-reload) 活跃开发环境（PostgreSQL: `POSTGRES_DEV_PORT`，API: `ROUTER_DEV_PORT`，UI: 3001）。
+* `python cli.py prod` : 构建生产版本并在单一端口上运行。
+* `python cli.py stop` : 清理所有在后台挂起的端口和服务。
 
 ### 🔌 添加新的提供商
 

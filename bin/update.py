@@ -5,7 +5,7 @@ update.py — Orion Router | CLI Updater
 Orion Router'ı en güncel sürüme günceller.
 
 Kullanım:
-    python orion.py update
+    python cli.py update
 """
 
 import os
@@ -94,7 +94,7 @@ def main():
 
     print()
     ok(f"{BOLD}✔ Orion Router başarıyla güncellendi!{RESET}")
-    dim("Çalışan servis varsa yeniden başlatmak için `python orion.py stop` ve `python orion.py prod` çalıştırabilirsiniz.")
+    dim("Çalışan servis varsa yeniden başlatmak için `python cli.py stop` ve `python cli.py prod` çalıştırabilirsiniz.")
 
 if __name__ == "__main__":
     main()

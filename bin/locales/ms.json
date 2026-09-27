@@ -5,7 +5,7 @@
     "cmd_dev_desc": "Memulakan persekitaran Pembangunan (hot-reload aktif).",
     "cmd_prod_desc": "Membina dan memulakan persekitaran Pengeluaran secara tempatan.",
     "cmd_stop_desc": "Membersihkan semua perkhidmatan latar belakang dan port yang sedang berjalan.",
-    "cmd_example": "Contoh: python orion.py prod",
+    "cmd_example": "Contoh: python cli.py prod",
     "err_file_not_found": "Ralat: Fail '{name}' tidak ditemui di bawah {dir}!",
     "err_unknown_command": "Ralat: Arahan tidak dikenali '{cmd}'",
     "stop_title": "Orion Router - Henti",
@@ -54,6 +54,6 @@
     "pg_failed_checking_integrity": "PostgreSQL gagal dimulakan. Memeriksa integriti fail...",
     "npm_installing_deps": "Memasang kebergantungan papan pemuka...",
     "npm_install_failed": "Pemasangan kebergantungan papan pemuka gagal",
-    "cmd_usage_format": "    python orion.py <command>\n",
+    "cmd_usage_format": "    python cli.py <command>\n",
     "api_err_localhost_not_allowed": "Amaran Prestasi: Penggunaan 'localhost' disekat oleh Orion Router. Untuk mengelakkan kelewatan resolusi DNS/IPv6 selama 2 saat (timeout) dalam perpustakaan Python, sila tukar URL sambungan anda kepada '127.0.0.1' dalam kod klien anda."
 }

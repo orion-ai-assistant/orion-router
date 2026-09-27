@@ -5,7 +5,7 @@
     "cmd_dev_desc": "Pokreće razvojno okruženje (hot-reload je aktivan).",
     "cmd_prod_desc": "Gradi i pokreće produkciono okruženje lokalno.",
     "cmd_stop_desc": "Briše sve pokrenute pozadinske usluge i portove.",
-    "cmd_example": "Primer: python orion.py prod",
+    "cmd_example": "Primer: python cli.py prod",
     "err_file_not_found": "Greška: Datoteka '{name}' nije pronađena pod {dir}!",
     "err_unknown_command": "Greška: Nepoznata komanda '{cmd}'",
     "stop_title": "Orion Router - Zaustavljanje",
@@ -54,6 +54,6 @@
     "pg_failed_checking_integrity": "PostgreSQL se nije pokrenuo. Provjera integriteta fajlova...",
     "npm_installing_deps": "Instalacija zavisnosti kontrolne table...",
     "npm_install_failed": "Instalacija zavisnosti kontrolne table nije uspjela",
-    "cmd_usage_format": "    python orion.py <command>\n",
+    "cmd_usage_format": "    python cli.py <command>\n",
     "api_err_localhost_not_allowed": "Upozorenje o performansama: Korišćenje 'localhost' je ograničeno od strane Orion Router-a. Da biste izbegli kašnjenje od 2 sekunde u DNS/IPv6 rezoluciji (timeout) u Python bibliotekama, promenite URL vezu na '127.0.0.1' u svom klijentskom kodu."
 }

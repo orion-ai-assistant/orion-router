@@ -5,7 +5,7 @@
     "cmd_dev_desc": "Pornește mediul de dezvoltare (hot-reload este activ).",
     "cmd_prod_desc": "Compilează și pornește mediul de producție local.",
     "cmd_stop_desc": "Oprește toate serviciile din fundal și eliberează porturile.",
-    "cmd_example": "Exemplu: python orion.py prod",
+    "cmd_example": "Exemplu: python cli.py prod",
     "err_file_not_found": "Eroare: Fișierul '{name}' nu a fost găsit în {dir}!",
     "err_unknown_command": "Eroare: Comandă necunoscută '{cmd}'",
     "stop_title": "Orion Router - Oprire",
@@ -54,6 +54,6 @@
     "pg_failed_checking_integrity": "PostgreSQL nu a pornit. Se verifică integritatea fișierelor...",
     "npm_installing_deps": "Se instalează dependențele dashboard-ului...",
     "npm_install_failed": "Instalarea dependențelor dashboard-ului a eșuat",
-    "cmd_usage_format": "    python orion.py <command>\n",
+    "cmd_usage_format": "    python cli.py <command>\n",
     "api_err_localhost_not_allowed": "Avertisment de performanță: Utilizarea 'localhost' este restricționată de Orion Router. Pentru a evita o întârziere de 2 secunde în rezoluția DNS/IPv6 (timeout) în bibliotecile Python, vă rugăm să schimbați adresa URL de conexiune în '127.0.0.1' în codul clientului."
 }

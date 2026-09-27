@@ -5,7 +5,7 @@
     "cmd_dev_desc": "డెవలప్‌మెంట్ వాతావరణాన్ని ప్రారంభిస్తుంది (హాట్-రీలోడ్ యాక్టివ్‌గా ఉంది).",
     "cmd_prod_desc": "ప్రొడక్షన్ వాతావరణాన్ని లోకల్‌గా బిల్డ్ చేసి ప్రారంభిస్తుంది.",
     "cmd_stop_desc": "నడుస్తున్న అన్ని బ్యాక్‌గ్రౌండ్ సేవలను మరియు పోర్ట్‌లను క్లియర్ చేస్తుంది.",
-    "cmd_example": "ఉదాహరణ: python orion.py prod",
+    "cmd_example": "ఉదాహరణ: python cli.py prod",
     "err_file_not_found": "లోపం: '{name}' ఫైల్ {dir} కింద కనుగొనబడలేదు!",
     "err_unknown_command": "లోపం: తెలియని ఆదేశం '{cmd}'",
     "stop_title": "Orion Router - ఆపు",
@@ -54,6 +54,6 @@
     "pg_failed_checking_integrity": "PostgreSQL ప్రారంభించలేకపోయింది. ఫైల్ సమగ్రతను తనిఖీ చేస్తోంది...",
     "npm_installing_deps": "డాష్‌బోర్డ్ డిపెండెన్సీలు ఇన్‌స్టాల్ చేస్తోంది...",
     "npm_install_failed": "డాష్‌బోర్డ్ డిపెండెన్సీల ఇన్‌స్టాలేషన్ విఫలమైంది",
-    "cmd_usage_format": "    python orion.py <command>\n",
+    "cmd_usage_format": "    python cli.py <command>\n",
     "api_err_localhost_not_allowed": "పనితీరు హెచ్చరిక: Orion Router ద్వారా 'localhost' వినియోగం పరిమితం చేయబడింది. పైథాన్ లైబ్రరీలలో 2 సెకన్ల DNS/IPv6 రిజల్యూషన్ ఆలస్యాన్ని (టైమౌట్) నివారించడానికి, దయచేసి మీ క్లయింట్ కోడ్‌లో కనెక్షన్ URLని '127.0.0.1'కి మార్చండి."
 }

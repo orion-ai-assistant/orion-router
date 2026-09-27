@@ -5,7 +5,7 @@
     "cmd_dev_desc": "開発環境を起動します（ホットリロード有効）。",
     "cmd_prod_desc": "本番環境をローカルでビルドして起動します。",
     "cmd_stop_desc": "実行中のすべてのバックグラウンドサービスとポートをクリーンアップします。",
-    "cmd_example": "例: python orion.py prod",
+    "cmd_example": "例: python cli.py prod",
     "err_file_not_found": "エラー: '{name}' が {dir} の下に見つかりませんでした！",
     "err_unknown_command": "エラー: 未知のコマンド '{cmd}'",
     "stop_title": "Orion Router - 停止",
@@ -54,6 +54,6 @@
     "pg_failed_checking_integrity": "PostgreSQL が起動できませんでした。ファイルの整合性を確認しています...",
     "npm_installing_deps": "ダッシュボードの依存関係をインストールしています...",
     "npm_install_failed": "ダッシュボードの依存関係のインストールに失敗しました",
-    "cmd_usage_format": "    python orion.py <command>\n",
+    "cmd_usage_format": "    python cli.py <command>\n",
     "api_err_localhost_not_allowed": "パフォーマンス警告: Orion Routerでは「localhost」の使用は禁止されています。Pythonライブラリでの2秒のDNS/IPv6解決遅延（タイムアウト）を避けるため、クライアントコードの接続URLを「127.0.0.1」に変更してください。"
 }

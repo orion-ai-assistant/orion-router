@@ -5,7 +5,7 @@
     "cmd_dev_desc": "ڈویلپمنٹ ماحول شروع کرتا ہے (ہوٹ ری لوڈ فعال ہے)۔",
     "cmd_prod_desc": "لوکل طور پر پروڈکشن ماحول بناتا اور شروع کرتا ہے۔",
     "cmd_stop_desc": "چلنے والی تمام پس منظر کی خدمات اور پورٹس کو صاف کرتا ہے۔",
-    "cmd_example": "مثال: python orion.py prod",
+    "cmd_example": "مثال: python cli.py prod",
     "err_file_not_found": "غلطی: فائل '{name}' اس ڈائریکٹری میں نہیں ملی {dir}!",
     "err_unknown_command": "غلطی: نامعلوم کمانڈ '{cmd}'",
     "stop_title": "Orion Router - روکنا",
@@ -54,6 +54,6 @@
     "pg_failed_checking_integrity": "PostgreSQL شروع نہیں ہو سکا۔ فائل سالمیت جانچی جا رہی ہے...",
     "npm_installing_deps": "ڈیش بورڈ انحصار انسٹال کیے جا رہے ہیں...",
     "npm_install_failed": "ڈیش بورڈ انحصار انسٹال کرنا ناکام ہو گیا",
-    "cmd_usage_format": "    python orion.py <command>\n",
+    "cmd_usage_format": "    python cli.py <command>\n",
     "api_err_localhost_not_allowed": "کارکردگی کی تنبیہ: 'localhost' کا استعمال Orion Router کی طرف سے ممنوع ہے۔ ازگر (Python) لائبریریوں میں 2 سیکنڈ کی DNS/IPv6 ریزولوشن تاخیر (ٹائم آؤٹ) سے بچنے کے لیے، براہ کرم اپنے کلائنٹ کوڈ میں کنکشن URL کو '127.0.0.1' سے تبدیل کریں۔"
 }

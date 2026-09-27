@@ -5,7 +5,7 @@
     "cmd_dev_desc": "启动开发环境 (热重载已启用)。",
     "cmd_prod_desc": "在本地构建并启动生产环境。",
     "cmd_stop_desc": "清除所有运行中的后台服务和端口。",
-    "cmd_example": "示例: python orion.py prod",
+    "cmd_example": "示例: python cli.py prod",
     "err_file_not_found": "错误: 在 {dir} 下未找到文件 '{name}'！",
     "err_unknown_command": "错误: 未知命令 '{cmd}'",
     "stop_title": "Orion Router - 停止",
@@ -54,6 +54,6 @@
     "pg_failed_checking_integrity": "PostgreSQL 无法启动。正在检查文件完整性...",
     "npm_installing_deps": "正在安装控制面板依赖项...",
     "npm_install_failed": "安装控制面板依赖项失败",
-    "cmd_usage_format": "    python orion.py <command>\n",
+    "cmd_usage_format": "    python cli.py <command>\n",
     "api_err_localhost_not_allowed": "性能警告：Orion Router 禁用 'localhost'。为避免 Python 库中 2 秒的 DNS/IPv6 解析延迟（超时），请将客户端代码中的连接 URL 更改为 '127.0.0.1'。"
 }

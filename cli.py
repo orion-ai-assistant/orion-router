@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-orion.py — Orion Router | CLI Entrypoint
+cli.py — Orion Router | CLI Entrypoint
 ========================================
 Merkezi komut yoneticisi. dev, prod ve stop komutlarini yonlendirir.
 
 Kullanim:
-    python orion.py [dev | prod | stop]
+    python cli.py [dev | prod | stop]
 """
 
 import os

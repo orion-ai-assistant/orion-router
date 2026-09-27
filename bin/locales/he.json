@@ -5,7 +5,7 @@
     "cmd_dev_desc": "מפעיל את סביבת הפיתוח (הטעינה מחדש פעילה).",
     "cmd_prod_desc": "בונה ומפעיל את סביבת הייצור באופן מקומי.",
     "cmd_stop_desc": "מנקה את כל שירותי הרקע והפורטים הפעילים.",
-    "cmd_example": "דוגמה: python orion.py prod",
+    "cmd_example": "דוגמה: python cli.py prod",
     "err_file_not_found": "שגיאה: הקובץ '{name}' לא נמצא תחת {dir}!",
     "err_unknown_command": "שגיאה: פקודה לא מוכרת '{cmd}'",
     "stop_title": "Orion Router - עצירה",
@@ -54,6 +54,6 @@
     "pg_failed_checking_integrity": "PostgreSQL לא הצליח להתחיל. בודק את שלמות הקבצים...",
     "npm_installing_deps": "מתקין תלויות לוח הבקרה...",
     "npm_install_failed": "התקנת תלויות לוח הבקרה נכשלה",
-    "cmd_usage_format": "    python orion.py <command>\n",
+    "cmd_usage_format": "    python cli.py <command>\n",
     "api_err_localhost_not_allowed": "אזהרת ביצועים: השימוש ב-'localhost' חסום על ידי Orion Router. כדי למנוע עיכوب של 2 שניות ברזולוציית DNS/IPv6 (פסק זמן) בספריות פייתון, אנא שנו את כתובת ה-URL לקישור ל-'127.0.0.1' בקוד הלקוח שלכם."
 }

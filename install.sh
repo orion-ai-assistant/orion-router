@@ -275,7 +275,7 @@ elif [ "$ACTION" = "start" ]; then
 
     echo "Starting Orion Router locally..."
     cd "$PROJECT_DIR"
-    nohup python3 orion.py prod > "$LOG_FILE" 2> "$ERROR_LOG_FILE" &
+    nohup python3 cli.py prod > "$LOG_FILE" 2> "$ERROR_LOG_FILE" &
     PID=$!
     echo $PID > "$PID_FILE"
     

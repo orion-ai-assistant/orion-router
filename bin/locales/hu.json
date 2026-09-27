@@ -5,7 +5,7 @@
     "cmd_dev_desc": "Elindítja a fejlesztői környezetet (a hot-reload aktív).",
     "cmd_prod_desc": "Létrehozza és helyben elindítja a produkciós környezetet.",
     "cmd_stop_desc": "Leállítja az összes futó háttérszolgáltatást és portot.",
-    "cmd_example": "Példa: python orion.py prod",
+    "cmd_example": "Példa: python cli.py prod",
     "err_file_not_found": "Hiba: A '{name}' fájl nem található a {dir} könyvtárban!",
     "err_unknown_command": "Hiba: Ismeretlen parancs '{cmd}'",
     "stop_title": "Orion Router - Leállítás",
@@ -54,6 +54,6 @@
     "pg_failed_checking_integrity": "A PostgreSQL nem indult el. Fájlintegritás ellenőrzése...",
     "npm_installing_deps": "Vezérlőpult-függőségek telepítése...",
     "npm_install_failed": "A vezérlőpult-függőségek telepítése sikertelen",
-    "cmd_usage_format": "    python orion.py <command>\n",
+    "cmd_usage_format": "    python cli.py <command>\n",
     "api_err_localhost_not_allowed": "Teljesítmény-figyelmeztetés: A 'localhost' használatát az Orion Router korlátozza. A Python könyvtárakban előforduló 2 másodperces DNS/IPv6 feloldási késleltetés (időtúllépés) elkerülése érdekében kérjük, változtassa meg a kapcsolati URL-t '127.0.0.1'-re az ügyfélkódban."
 }
