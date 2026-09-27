@@ -1,5 +1,5 @@
-const MAX_DISPLAY_LINES = 400;
-const MAX_DISPLAY_CHARS = 32_000;
+const MAX_DISPLAY_LINES = 2_500;
+const MAX_DISPLAY_CHARS = 250_000;
 
 const KEY_PRIORITY: Record<string, number> = {
   // 1. Identifiers & Targets
@@ -139,7 +139,7 @@ function isTruncatableToolString(
   key?: string,
   parent?: Record<string, unknown>
 ): boolean {
-  if (typeof val !== 'string' || val.length <= 300) return false;
+  if (typeof val !== 'string' || val.length <= 2_500) return false;
   if (!parent || !key) return false;
 
   const k = key.toLowerCase();
@@ -170,18 +170,7 @@ function isTruncatableToolString(
     }
   }
 
-  // 3. Tool call arguments if excessively long
-  if (k === 'arguments') {
-    if (
-      typeof parent.name === 'string' ||
-      parent.type === 'function' ||
-      typeof parent.call_id === 'string'
-    ) {
-      return true;
-    }
-  }
-
-  // 4. Gemini functionResponse / function_response response or result field
+  // 3. Gemini functionResponse / function_response response or result field
   if (k === 'response' || k === 'result') {
     if (
       typeof parent.name === 'string' ||
@@ -214,8 +203,7 @@ function sanitizeForDisplay(obj: unknown): unknown {
       if (typeof val === 'string' && isTruncatableMediaString(val, key, record)) {
         result[key] = `${val.substring(0, 50)}... [truncated base64, length: ${val.length}]`;
       } else if (typeof val === 'string' && isTruncatableToolString(val, key, record)) {
-        const label = key.toLowerCase() === 'arguments' ? 'tool arguments' : 'tool output';
-        result[key] = `${val.substring(0, 150)}... [truncated ${label}, length: ${val.length}]`;
+        result[key] = `${val.substring(0, 300)}... [truncated tool output, length: ${val.length}]`;
       } else {
         result[key] = sanitizeForDisplay(val);
       }
