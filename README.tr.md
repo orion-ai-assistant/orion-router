@@ -2,7 +2,7 @@
 
 [English](README.md) | **Türkçe** | [中文](README.zh-CN.md)
 
-Orion projesinin **AI Gateway (Router)** katmanı. İstemcilerden ve worker'lardan gelen tüm yapay zeka (LLM, Embedding, TTS, Dosya Yükleme) isteklerini tek bir merkezde toplar, yetkilendirir ve ilgili sağlayıcılara (OpenAI, OpenRouter, Gemini, Local) dinamik olarak yönlendirir.
+Orion projesinin **AI Gateway (Router)** katmanı. İstemcilerden ve worker'lardan gelen tüm yapay zeka (LLM, Embedding, TTS, Dosya Yükleme) isteklerini tek bir merkezde toplar, yetkilendirir ve ilgili sağlayıcılara (OpenAI, OpenRouter, Gemini, DeepSeek, Local) dinamik olarak yönlendirir.
 
 Orion Router'ı sisteminize kurmak ve kullanmaya başlamak için web sitemizi ziyaret edebilirsiniz. *(Not: Web sitemizde çok daha fazla dil seçeneği bulunmaktadır!)*
 
@@ -14,7 +14,7 @@ Orion Router'ı sisteminize kurmak ve kullanmaya başlamak için web sitemizi zi
 
 Orion Router, yapay zeka modelleriyle çalışan uygulamalarınız ve ekipleriniz için **kendi kişisel "OpenAI" ağ geçidinizi** (gateway) kurmanızı sağlar.
 
-* **Tek API, Tüm Modeller:** Uygulamalarınızı sadece Orion Router'a bağlarsınız. Arka planda OpenAI, Anthropic, Gemini, OpenRouter veya kendi sunucunuzdaki yerel modelleri kullanabilirsiniz. Kodunuzu değiştirmeden sağlayıcı değiştirebilir veya çöken API'lardan anında yedeğe geçebilirsiniz (Fallback).
+* **Tek API, Tüm Modeller:** Uygulamalarınızı sadece Orion Router'a bağlarsınız. Arka planda OpenAI, Anthropic, Gemini, DeepSeek, OpenRouter veya kendi sunucunuzdaki yerel modelleri kullanabilirsiniz. Kodunuzu değiştirmeden sağlayıcı değiştirebilir veya çöken API'lardan anında yedeğe geçebilirsiniz (Fallback).
 * **Güvenlik ve Gizlilik:** Gerçek API anahtarlarınız (Upstream Keys) sunucunuzda güvende kalır. İstemcilere ve takım arkadaşlarınıza sadece sizin belirlediğiniz **Sanal Anahtarları (Virtual Keys)** verirsiniz.
 * **Maliyet Yönetimi:** Hangi kullanıcının veya projenin ne kadar harcadığını takip edebilir, bütçe limitleri koyabilirsiniz.
 * **Hazır Dashboard:** İstekleri, maliyetleri, logları takip edebileceğiniz ve modelleri test edebileceğiniz modern bir arayüz ile gelir.

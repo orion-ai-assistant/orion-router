@@ -508,7 +508,7 @@ class ChatRunner:
                             model=p_model,
                             messages=route_messages,
                             api_key=key_val,
-                            auth_header=auth_header if not key_val and p_provider != "openrouter" else None,
+                            auth_header=auth_header if not key_val and p_provider not in ("openrouter", "deepseek") else None,
                             log_id=log_id,
                             **route_kwargs,
                         ):
@@ -618,8 +618,8 @@ class ChatRunner:
             provider,
             model,
             route_messages,
-            db_key if provider == "openrouter" else db_key or api_key,
-            None if provider == "openrouter" else auth_header,
+            db_key if provider in ("openrouter", "deepseek") else db_key or api_key,
+            None if provider in ("openrouter", "deepseek") else auth_header,
             log_id=log_id,
             **kwargs,
         ):

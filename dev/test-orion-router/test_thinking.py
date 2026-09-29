@@ -22,6 +22,7 @@ from providers.local.chat import LocalChatProvider
 from providers.gemini.chat import GeminiChatProvider
 from providers.openai.chat import OpenAIChatProvider
 from providers.openrouter.chat import OpenRouterChatProvider
+from providers.deepseek.chat import DeepSeekChatProvider
 
 
 def test_thinking_config_normalization():
@@ -193,6 +194,37 @@ def test_openai_and_openrouter_providers():
     assert payload_or_xhigh.get("reasoning_effort") == "xhigh"
     assert payload_or_xhigh.get("reasoning", {}).get("effort") == "xhigh"
     print("  [PASS] OpenRouter provider passes 'xhigh' directly through as native effort='xhigh'")
+
+    # DeepSeek tests
+    deepseek_prov = DeepSeekChatProvider()
+
+    # DeepSeek off -> thinking={"type": "disabled"}
+    payload_ds_off = {}
+    deepseek_prov.apply_thinking(payload_ds_off, deepseek_prov.extract_thinking_config({"thinking_level": "off"}))
+    assert payload_ds_off.get("thinking") == {"type": "disabled"}
+    assert "reasoning_effort" not in payload_ds_off
+    print("  [PASS] DeepSeek provider disables thinking mode with thinking={'type': 'disabled'}")
+
+    # DeepSeek low -> thinking={"type": "enabled"}, reasoning_effort="low"
+    payload_ds_low = {}
+    deepseek_prov.apply_thinking(payload_ds_low, deepseek_prov.extract_thinking_config({"thinking_level": "low"}))
+    assert payload_ds_low.get("thinking") == {"type": "enabled"}
+    assert payload_ds_low.get("reasoning_effort") == "low"
+    print("  [PASS] DeepSeek provider sets thinking={'type': 'enabled'}, reasoning_effort='low'")
+
+    # DeepSeek xhigh -> mapped to high per official docs
+    payload_ds_xhigh = {}
+    deepseek_prov.apply_thinking(payload_ds_xhigh, deepseek_prov.extract_thinking_config({"thinking_level": "xhigh"}))
+    assert payload_ds_xhigh.get("thinking") == {"type": "enabled"}
+    assert payload_ds_xhigh.get("reasoning_effort") == "high"
+    print("  [PASS] DeepSeek provider maps 'xhigh' to 'high' reasoning_effort")
+
+    # DeepSeek unspecified -> leaves payload empty (preserves model default)
+    payload_ds_unspec = {}
+    deepseek_prov.apply_thinking(payload_ds_unspec, deepseek_prov.extract_thinking_config({}))
+    assert "thinking" not in payload_ds_unspec
+    assert "reasoning_effort" not in payload_ds_unspec
+    print("  [PASS] DeepSeek provider leaves payload untouched when thinking is unspecified")
 
 
 def test_live_local_llama_cpp():

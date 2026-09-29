@@ -2,7 +2,7 @@
 
 **English** | [Türkçe](README.tr.md) | [中文](README.zh-CN.md)
 
-Orion project's **AI Gateway (Router)** layer. It centrally collects, authorizes, and dynamically routes all AI requests (LLM, Embedding, TTS, File Upload) from clients and workers to the relevant providers (OpenAI, OpenRouter, Gemini, Local).
+Orion project's **AI Gateway (Router)** layer. It centrally collects, authorizes, and dynamically routes all AI requests (LLM, Embedding, TTS, File Upload) from clients and workers to the relevant providers (OpenAI, OpenRouter, Gemini, DeepSeek, Local).
 
 To install and start using Orion Router on your system, please visit our website. *(Note: Our website offers documentation in multiple languages!)*
 
@@ -14,7 +14,7 @@ To install and start using Orion Router on your system, please visit our website
 
 Orion Router allows you to build **your own personal "OpenAI" gateway** for your AI-powered applications and teams.
 
-* **Single API, All Models:** Connect your applications only to Orion Router. In the background, you can use OpenAI, Anthropic, Gemini, OpenRouter, or your own local server models. You can switch providers without changing your code or instantly fallback from crashed APIs.
+* **Single API, All Models:** Connect your applications only to Orion Router. In the background, you can use OpenAI, Anthropic, Gemini, DeepSeek, OpenRouter, or your own local server models. You can switch providers without changing your code or instantly fallback from crashed APIs.
 * **Security and Privacy:** Your actual API keys (Upstream Keys) remain secure on your server. You only provide **Virtual Keys** that you define to your clients and teammates.
 * **Cost Management:** You can track how much each user or project spends and set budget limits.
 * **Built-in Dashboard:** It comes with a modern interface where you can track requests, costs, logs, and test models.

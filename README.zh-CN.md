@@ -2,7 +2,7 @@
 
 [English](README.md) | [Türkçe](README.tr.md) | **中文**
 
-Orion 项目的 **AI 网关 (Router)** 层。它将来自客户端和 worker 的所有 AI 请求（LLM、嵌入、TTS、文件上传）集中收集、授权并动态路由到相关的提供商（OpenAI、OpenRouter、Gemini、Local）。
+Orion 项目的 **AI 网关 (Router)** 层。它将来自客户端和 worker 的所有 AI 请求（LLM、嵌入、TTS、文件上传）集中收集、授权并动态路由到相关的提供商（OpenAI、OpenRouter、Gemini、DeepSeek、Local）。
 
 要安装并开始在您的系统上使用 Orion Router，请访问我们的网站。 *(注意：我们的网站提供更多语言的文档！)*
 
@@ -14,7 +14,7 @@ Orion 项目的 **AI 网关 (Router)** 层。它将来自客户端和 worker 的
 
 Orion Router 允许您为基于 AI 的应用程序和团队建立**您个人的“OpenAI”网关**。
 
-* **单一 API，所有模型：** 仅将您的应用程序连接到 Orion Router。在后台，您可以使用 OpenAI、Anthropic、Gemini、OpenRouter 或您自己的本地服务器模型。您可以更改提供商而无需更改代码，或者从崩溃的 API 即时回退到备份 (Fallback)。
+* **单一 API，所有模型：** 仅将您的应用程序连接到 Orion Router。在后台，您可以使用 OpenAI、Anthropic、Gemini、DeepSeek、OpenRouter 或您自己的本地服务器模型。您可以更改提供商而无需更改代码，或者从崩溃的 API 即时回退到备份 (Fallback)。
 * **安全与隐私：** 您的实际 API 密钥 (Upstream Keys) 在您的服务器上保持安全。您仅向客户端和队友提供您定义的**虚拟密钥 (Virtual Keys)**。
 * **成本管理：** 您可以跟踪每个用户或项目的支出，并设置预算限制。
 * **内置仪表板：** 它提供了一个现代化的界面，您可以在其中跟踪请求、成本、日志并测试模型。

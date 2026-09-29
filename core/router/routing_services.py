@@ -77,8 +77,8 @@ class ProviderKeyPool:
             db_key = self.get_db_key(provider)
             if db_key:
                 keys.append((db_key, None))
-            elif provider == "openrouter":
-                # Router credentials are never OpenRouter credentials.
+            elif provider in ("openrouter", "deepseek"):
+                # Router credentials are never OpenRouter or DeepSeek credentials.
                 keys.append((None, None))
             else:
                 clean_client_key = client_key

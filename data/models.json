@@ -9,6 +9,8 @@
     {"name": "gemini-3.1-flash-lite", "provider": "gemini", "capability": "chat", "temperature": 0.7},
     {"name": "gemini-3.1-flash-tts-preview", "provider": "gemini", "capability": "tts", "pricing": {"input": 1, "output": 20, "think": 0}},
     {"name": "tts-1", "provider": "openai", "capability": "tts", "pricing": {"input": 15, "output": 0, "think": 0}, "pricing_unit": "per_million_characters"},
-    {"name": "gemini-3.5-transcribe", "provider": "gemini", "capability": "stt"}
+    {"name": "gemini-3.5-transcribe", "provider": "gemini", "capability": "stt"},
+    {"name": "deepseek-flash", "provider": "deepseek", "capability": "chat", "temperature": 1.0, "pricing": {"input": 0.15, "output": 0.6, "think": 0.6}},
+    {"name": "deepseek-v4-pro", "provider": "deepseek", "capability": "chat", "temperature": 1.0, "pricing": {"input": 0.66, "output": 1.98, "think": 1.98}}
   ]
 }

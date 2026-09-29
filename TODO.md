@@ -1,3 +1,4 @@
 # TODO List
 
 - [ ] **Veritabanı Log Rotasyonu ve Otomatik Temizleme (Retention Policy):** Veritabanındaki `router_request_logs` tablosunun aşırı büyümesini (GB'larca boyuta ulaşmasını) engellemek amacıyla otomatik temizleme, rotasyon veya satır limitleme (örneğin son 100,000 istek haricindekileri silme) mekanizması eklenmesi.
+- [ ] **OpenRouter ve Sağlayıcılar İçin `max_tokens` Desteği ve Varsayılan Üst Sınır:** İstemciden `max_tokens` gelmediğinde OpenRouter'ın modelin tüm bağlam limitini (131k token vb.) baz alarak bakiye provizyonu hatası (HTTP 402 - "requires more credits, or fewer max_tokens") vermesini önlemek amacıyla; gelen `max_tokens` / `max_completion_tokens` parametrelerinin OpenRouter ve diğer sağlayıcı payload'larına iletilmesi ve belirtilmediğinde devreye girecek yapılandırılabilir makul bir varsayılan üst sınır (örn. 4096 / 8192) tanımlanması.
