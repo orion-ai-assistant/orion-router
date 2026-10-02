@@ -28,7 +28,7 @@ export default function PlaygroundPage() {
 
   const loadModels = async () => {
     try {
-      const res = await adminFetch('/dashboard/api/models');
+      const res = await adminFetch(`/dashboard/api/models?t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
         setModels(data.models || []);
@@ -40,7 +40,7 @@ export default function PlaygroundPage() {
 
   const loadGroups = async () => {
     try {
-      const res = await adminFetch('/dashboard/api/model-groups');
+      const res = await adminFetch(`/dashboard/api/model-groups?t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
         setGroups(data.groups || []);

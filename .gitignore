@@ -47,3 +47,6 @@ dashboard/.npm_lockfile_hash
 
 # Docker persistent volume mount
 persistent/
+
+# Scratch files
+scratch/

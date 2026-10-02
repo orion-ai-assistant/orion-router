@@ -40,14 +40,16 @@ response = client.chat.completions.create(
     temperature=0.7, 
     tools=[], 
     extra_body={
-        "thinking_level": "high" # e.g. "low" | 1024
+        "thinking": 2048 # Budget: 2048 | -1 (Auto) | 0 (Off) or Level: "high" | "low"
     }
 )
 
 print(response.choices[0].message.content)
 ```
 
-> **🧠 Advanced Parameter Translation:** Orion Router universally supports features like `temperature`, `tools` (Function Calling), and `thinking_level` (Thinking Budget). You just send the request in standard format, and Orion Router automatically adapts these parameters in the background to the correct structure understood by the target provider (e.g., *reasoning_effort*, *thinking_budget*)!
+> **🧠 Advanced Parameter Translation & Thinking:** Orion Router universally supports `temperature`, `tools`, and a unified **`thinking`** parameter (`"thinking": 2048` or `"thinking": "high"`). It automatically translates thinking to the upstream provider's native format (`thinking_budget`, `reasoning_effort`, etc.).
+> 
+> **⚡ Bypass Router Defaults:** If you want to bypass dashboard-configured model defaults and send raw requests directly to providers, pass `"bypass_defaults": true` in the body or use the `X-Orion-Bypass-Defaults: true` HTTP header. See [API Usage Guide](docs/api-usage.md) for full details and examples.
 
 ## ✨ Key Features
 

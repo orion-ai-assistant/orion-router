@@ -35,7 +35,7 @@ class ThinkingConfig:
 
         if isinstance(val, (int, float)):
             int_val = int(val)
-            if int_val <= 0:
+            if int_val == 0:
                 return cls(raw_value=val, is_disabled=True, budget=0)
             return cls(raw_value=val, budget=int_val)
 
@@ -47,9 +47,14 @@ class ThinkingConfig:
         if s_val.lower() in _DISABLED_VALUES:
             return cls(raw_value=val, is_disabled=True, budget=0)
 
-        # 2. Sayısal token bütçesi ("1024", "4096")
-        if s_val.isdigit():
-            return cls(raw_value=val, budget=int(s_val))
+        # 2. Sayısal token bütçesi ("1024", "4096", "-1")
+        try:
+            int_val = int(s_val)
+            if int_val == 0:
+                return cls(raw_value=val, is_disabled=True, budget=0)
+            return cls(raw_value=val, budget=int_val)
+        except ValueError:
+            pass
 
         # 3. Seviye / String ("low", "medium", "high", "xhigh", "minimal" vb.)
         # Kullanıcının verdiği string doğrudan korunur, yapay alias dönüşümü yapılmaz, harf büyüklüğü bile değiştirilmez

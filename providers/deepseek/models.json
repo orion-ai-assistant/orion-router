@@ -1,0 +1,40 @@
+{
+  "models": [
+    {
+      "name": "deepseek-flash",
+      "provider": "deepseek",
+      "capability": "chat",
+      "temperature": 1.0,
+      "pricing": {
+        "input": 0.15,
+        "output": 0.6,
+        "think": 0.6
+      },
+      "thinking": {
+        "type": "level",
+        "options": [
+          "low",
+          "high"
+        ]
+      }
+    },
+    {
+      "name": "deepseek-v4-pro",
+      "provider": "deepseek",
+      "capability": "chat",
+      "temperature": 1.0,
+      "pricing": {
+        "input": 0.66,
+        "output": 1.98,
+        "think": 1.98
+      },
+      "thinking": {
+        "type": "level",
+        "options": [
+          "low",
+          "high"
+        ]
+      }
+    }
+  ]
+}

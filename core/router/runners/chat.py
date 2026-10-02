@@ -155,10 +155,11 @@ class ChatRunner:
         local_payload = None
         if provider == "local" and hasattr(plugin, "build_payload"):
             local_payload = plugin.build_payload(model, messages, **kwargs)
-            await self.telemetry.update_processing_request(
-                log_id,
-                local_payload,
-            )
+            if not (kwargs.get("bypass_defaults") or kwargs.get("is_playground")):
+                await self.telemetry.update_processing_request(
+                    log_id,
+                    local_payload,
+                )
 
         try:
             async for chunk in plugin.stream_chat(
@@ -393,10 +394,26 @@ class ChatRunner:
         key_id: str | None = None,
         **kwargs,
     ) -> AsyncGenerator[str, None]:
+        # Standardize thinking key to "thinking" in req_data (which is saved as request_json)
+        think_val = next(
+            (
+                kwargs[k]
+                for k in ("thinking", "thinking_level", "reasoning_effort", "thinking_budget")
+                if kwargs.get(k) not in (None, "")
+            ),
+            None,
+        )
+        filtered_kwargs = {
+            k: v for k, v in kwargs.items()
+            if v is not None and k not in ("thinking", "thinking_level", "reasoning_effort", "thinking_budget", "is_playground", "bypass_defaults")
+        }
+        if think_val not in (None, "", "api_default"):
+            filtered_kwargs["thinking"] = think_val
+
         req_data = {
             "model": model,
             "messages": messages,
-            **{key: value for key, value in kwargs.items() if value is not None},
+            **filtered_kwargs,
         }
         route_plan = None
         route_resolution_error = None
@@ -452,28 +469,39 @@ class ChatRunner:
                             configured = sampling.get(key) if isinstance(sampling, dict) else None
                             route_kwargs[key] = default if configured is None else configured
 
-                if route_kwargs.get("temperature") is None and route.temperature is not None:
-                    try:
-                        route_kwargs["temperature"] = float(route.temperature)
-                    except (ValueError, TypeError):
-                        pass
-                if p_provider == "local" and route_kwargs.get("temperature") is None:
-                    route_kwargs["temperature"] = LOCAL_TEMPERATURE_DEFAULT
+                bypass_defaults = (
+                    kwargs.get("bypass_defaults", False)
+                    or kwargs.get("is_playground", False)
+                    or route_kwargs.pop("bypass_defaults", False)
+                    or route_kwargs.pop("is_playground", False)
+                )
+
+                if not bypass_defaults:
+                    if route_kwargs.get("temperature") is None and route.temperature is not None:
+                        try:
+                            route_kwargs["temperature"] = float(route.temperature)
+                        except (ValueError, TypeError):
+                            pass
+                    if p_provider == "local" and route_kwargs.get("temperature") is None:
+                        route_kwargs["temperature"] = LOCAL_TEMPERATURE_DEFAULT
+
+                    if not route_kwargs.get("system_prompt") and route.system_prompt:
+                        route_kwargs["system_prompt"] = route.system_prompt
 
                 incoming_think = next(
                     (
                         route_kwargs[key]
-                        for key in ("thinking_level", "reasoning_effort", "thinking_budget")
+                        for key in ("thinking", "thinking_level", "reasoning_effort", "thinking_budget")
                         if route_kwargs.get(key) not in (None, "")
                     ),
                     None,
                 )
-                route_kwargs["thinking_level"] = (
-                    incoming_think if incoming_think not in (None, "") else route.thinking_level
-                )
-
-                if not route_kwargs.get("system_prompt") and route.system_prompt:
-                    route_kwargs["system_prompt"] = route.system_prompt
+                if incoming_think == "api_default" or (bypass_defaults and not incoming_think):
+                    route_kwargs["thinking"] = None
+                else:
+                    route_kwargs["thinking"] = (
+                        incoming_think if incoming_think not in (None, "") else route.thinking_level
+                    )
 
                 plugin = self.registry.chat_providers.get(p_provider)
                 if not plugin:

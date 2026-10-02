@@ -63,6 +63,7 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
   const initialChatModelRef = useRef<string | null>(savedChatModel);
   const [chatTemp, setChatTemp] = useState(getSavedState('pg_chatTemp', ''));
   const [chatThinking, setChatThinking] = useState(getSavedState('pg_chatThinking', ''));
+  const [isManualThinking, setIsManualThinking] = useState(false);
   const [chatSystemPrompt, setChatSystemPrompt] = useState(getSavedState('pg_chatSystemPrompt', ''));
   const initialSamplingSavedRef = useRef(typeof window !== 'undefined' && localStorage.getItem('pg_chatSampling') !== null);
   const [chatSampling, setChatSampling] = useState<Record<SamplingKey, string>>(() => {
@@ -99,50 +100,57 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
   useEffect(() => {
     if (!chatModel || (models.length === 0 && groups.length === 0)) return;
 
-    const isInitialLoadForSavedModel = initialChatModelRef.current === chatModel;
+    const group = groups.find((g) => g.name === chatModel && g.capability === 'chat');
+    const modelName = group?.items?.[0]?.name || chatModel;
+    const model = models.find((m) => m.name === modelName && m.capability === 'chat');
 
+    let defaults: any = { temperature: null, thinking_level: null, system_prompt: null };
+    if (group) {
+      const primaryItem = group.items?.[0];
+      if (primaryItem) {
+        const modelDetail = models.find((m) => m.name === primaryItem.name && m.capability === 'chat');
+        defaults = {
+          temperature: primaryItem.temperature !== null && primaryItem.temperature !== undefined ? primaryItem.temperature : modelTemperature(modelDetail),
+          thinking_level: primaryItem.thinking_level || modelDetail?.thinking_level || null,
+          system_prompt: primaryItem.system_prompt || modelDetail?.system_prompt || null,
+        };
+      }
+    } else if (model) {
+      defaults = {
+        temperature: modelTemperature(model),
+        thinking_level: model.thinking_level || null,
+        system_prompt: model.system_prompt || null,
+      };
+    }
+
+    const defaultTempStr = defaults.temperature !== null && defaults.temperature !== undefined ? String(defaults.temperature) : '';
+    const defaultThinkStr = defaults.thinking_level !== null && defaults.thinking_level !== undefined && defaults.thinking_level !== ''
+      ? String(defaults.thinking_level)
+      : 'api_default';
+    const defaultSysStr = defaults.system_prompt !== null && defaults.system_prompt !== undefined ? String(defaults.system_prompt) : '';
+
+    const isInitialLoadForSavedModel = initialChatModelRef.current === chatModel;
     if (isInitialLoadForSavedModel) {
       initialChatModelRef.current = null;
-      const group = groups.find((g) => g.name === chatModel && g.capability === 'chat');
-      const modelName = group?.items?.[0]?.name || chatModel;
-      const model = models.find((m) => m.name === modelName && m.capability === 'chat');
       if (chatTemp === '0' && model?.provider === 'local' && modelTemperature(model) === localTemperatureDefault &&
           Number(model.temperature) === 0 && model.default_config?.local_chat_defaults_version !== 1) {
         setChatTemp(String(localTemperatureDefault));
+      } else if (!chatTemp && defaultTempStr) {
+        setChatTemp(defaultTempStr);
+      }
+      
+      if (!chatThinking || chatThinking === 'api_default') {
+        setChatThinking(defaultThinkStr);
+      }
+      if (!chatSystemPrompt && defaultSysStr) {
+        setChatSystemPrompt(defaultSysStr);
       }
     } else {
-      // Apply defaults
-      const group = groups.find((g) => g.name === chatModel && g.capability === 'chat');
-      let defaults: any = {};
-      if (group) {
-        const primaryItem = group.items?.[0];
-        if (primaryItem) {
-          const modelDetail = models.find((m) => m.name === primaryItem.name && m.capability === 'chat');
-          defaults = {
-            temperature: modelTemperature(modelDetail),
-            thinking_level: primaryItem.thinking_level || modelDetail?.thinking_level || null,
-            system_prompt: primaryItem.system_prompt || modelDetail?.system_prompt || null,
-          };
-        }
-      } else {
-        const model = models.find((m) => m.name === chatModel && m.capability === 'chat');
-        if (model) {
-          defaults = {
-            temperature: modelTemperature(model),
-            thinking_level: model.thinking_level || null,
-            system_prompt: model.system_prompt || null,
-          };
-        }
-      }
-
-      setChatTemp(defaults.temperature !== undefined && defaults.temperature !== null ? String(defaults.temperature) : '');
-      setChatThinking(defaults.thinking_level !== undefined && defaults.thinking_level !== null ? String(defaults.thinking_level) : '');
-      setChatSystemPrompt(defaults.system_prompt !== undefined && defaults.system_prompt !== null ? String(defaults.system_prompt) : '');
+      setChatTemp(defaultTempStr);
+      setChatThinking(defaultThinkStr);
+      setChatSystemPrompt(defaultSysStr);
     }
     if (!isInitialLoadForSavedModel || !initialSamplingSavedRef.current) {
-      const group = groups.find((g) => g.name === chatModel && g.capability === 'chat');
-      const modelName = group?.items?.[0]?.name || chatModel;
-      const model = models.find((m) => m.name === modelName && m.capability === 'chat');
       setChatSampling(readSampling(model?.default_config));
     }
   }, [chatModel, groups, models]);
@@ -206,7 +214,12 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
       defVal = String(val);
     }
 
-    let isOverridden = userValue !== defVal;
+    let isOverridden = false;
+    if (defVal) {
+      isOverridden = userValue === '' || userValue === 'api_default' || userValue !== defVal;
+    } else {
+      isOverridden = userValue !== '' && userValue !== 'api_default';
+    }
 
     let displayVal = defVal;
     if (!defVal) {
@@ -313,8 +326,8 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
     }
 
     const trimmedThinking = chatThinking.trim();
-    if (trimmedThinking) {
-      payload.thinking_level = trimmedThinking;
+    if (trimmedThinking && trimmedThinking !== 'api_default') {
+      payload.thinking = trimmedThinking;
     }
 
     const trimmedSystemPrompt = chatSystemPrompt.trim();
@@ -344,6 +357,8 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${adminKey}`,
           'Accept-Language': locale,
+          'X-Orion-Source': 'playground',
+          'X-Orion-Bypass-Defaults': 'true',
         },
         body: JSON.stringify(payload),
         signal: abortControllerRef.current.signal,
@@ -644,7 +659,7 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
             value={chatTemp}
             onChange={(e) => setChatTemp(e.target.value)}
             placeholder={t('playground.optionalTemp')}
-            className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs placeholder:text-zinc-600"
+            className="bg-[#18181b] border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs placeholder:text-zinc-600"
           />
         </div>
         <div className="flex flex-col gap-1">
@@ -683,12 +698,77 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
               renderDefaultIndicator('thinking_level', chatThinking, true)
             )}
           </div>
-          <Input
-            value={chatThinking}
-            onChange={(e) => setChatThinking(e.target.value)}
-            placeholder={t('playground.optionalThinking')}
-            className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs placeholder:text-zinc-600"
-          />
+          {(() => {
+            const group = groups.find((g) => g.name === chatModel && g.capability === 'chat');
+            const modelName = group?.items?.[0]?.name || chatModel;
+            const model = models.find((m) => m.name === modelName && m.capability === 'chat');
+            const groupItem = group?.items?.[0];
+            const defaultThinking = groupItem?.thinking_level || model?.thinking_level || null;
+            const thinkingSchema = model?.builtin_thinking || (model?.thinking && model.thinking.type !== 'none' ? model.thinking : null);
+            
+            if (thinkingSchema?.type === 'level') {
+              return (
+                <select
+                  value={chatThinking}
+                  onChange={(e) => setChatThinking(e.target.value)}
+                  className="bg-[#18181b] border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+                >
+                  <option value="api_default">API Default</option>
+                  {thinkingSchema.options?.map((opt: string) => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              );
+            }
+            
+            if (thinkingSchema?.type === 'budget') {
+              const isApiDefault = chatThinking === 'api_default';
+              const defaultVal = defaultThinking !== null && defaultThinking !== undefined && defaultThinking !== ''
+                ? String(defaultThinking)
+                : (thinkingSchema.auto_value !== undefined ? String(thinkingSchema.auto_value) : '');
+
+              return (
+                <div className="flex gap-2">
+                  <select
+                    value={isApiDefault ? 'api_default' : 'manual'}
+                    onChange={(e) => {
+                      if (e.target.value === 'api_default') {
+                        setChatThinking('api_default');
+                      } else {
+                        setChatThinking(defaultVal && defaultVal !== 'api_default' ? defaultVal : (thinkingSchema.auto_value !== undefined ? String(thinkingSchema.auto_value) : '-1'));
+                      }
+                    }}
+                    className="bg-[#18181b] border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs flex-1 focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+                  >
+                    <option value="api_default">API Default</option>
+                    <option value="manual">Manual</option>
+                  </select>
+                  {!isApiDefault && (
+                    <Input
+                      type="number"
+                      min={thinkingSchema.auto_value === -1 ? -1 : (thinkingSchema.min ?? -1)}
+                      max={thinkingSchema.max}
+                      value={chatThinking}
+                      onChange={(e) => setChatThinking(e.target.value)}
+                      placeholder=""
+                      className="bg-[#18181b] border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs placeholder:text-zinc-500 w-24"
+                    />
+                  )}
+                </div>
+              );
+            }
+
+            return (
+              <select
+                value="api_default"
+                disabled
+                className="bg-[#18181b] border border-zinc-850 text-zinc-500 rounded px-2.5 py-1.5 text-xs focus:outline-none cursor-not-allowed opacity-50"
+                onChange={() => {}}
+              >
+                <option value="api_default">API Default</option>
+              </select>
+            );
+          })()}
         </div>
         <div className="flex flex-col gap-1">
           <div className="flex justify-between items-center mb-1 relative group">
@@ -746,7 +826,7 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
             value={chatSystemPrompt}
             onChange={(e) => setChatSystemPrompt(e.target.value)}
             placeholder={t('playground.systemPromptPlaceholder')}
-            className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs h-24 min-h-24 resize-none custom-scrollbar overflow-y-auto no-field-sizing placeholder:text-zinc-600"
+            className="bg-[#18181b] border border-zinc-850 text-white rounded px-2.5 py-1.5 text-xs h-24 min-h-24 resize-none custom-scrollbar overflow-y-auto no-field-sizing placeholder:text-zinc-600"
           />
         </div>
         {isLocalChat && (
@@ -767,7 +847,7 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
                       step={key === 'top_k' ? '1' : '0.01'}
                       value={chatSampling[key]}
                       onChange={(e) => setChatSampling((current) => ({ ...current, [key]: e.target.value }))}
-                      className="bg-black/40 border border-zinc-850 text-white rounded px-2 py-1 text-xs"
+                      className="bg-[#18181b] border border-zinc-850 text-white rounded px-2 py-1 text-xs"
                     />
                   </label>
                 ))}
@@ -829,7 +909,7 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
               }
             }}
             placeholder={t('playground.chatPlaceholder')}
-            className="flex-1 bg-black/40 border border-zinc-850 text-white rounded p-2.5 text-xs h-10 min-h-10 resize-none custom-scrollbar"
+            className="flex-1 bg-[#18181b] border border-zinc-850 text-white rounded p-2.5 text-xs h-10 min-h-10 resize-none custom-scrollbar"
           />
           <Button
             onClick={() => setChatMessages([])}

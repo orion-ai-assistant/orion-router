@@ -1,0 +1,44 @@
+{
+  "models": [
+    {
+      "name": "gpt-4o-mini",
+      "provider": "openai",
+      "capability": "chat",
+      "temperature": 0.7,
+      "pricing": {
+        "input": 0.15,
+        "output": 0.6,
+        "think": 0.6
+      }
+    },
+    {
+      "name": "tts-1",
+      "provider": "openai",
+      "capability": "tts",
+      "pricing": {
+        "input": 15,
+        "output": 0,
+        "think": 0
+      }
+    },
+    {
+      "name": "o3-mini",
+      "provider": "openai",
+      "capability": "chat",
+      "temperature": 1.0,
+      "pricing": {
+        "input": 1.1,
+        "output": 4.4,
+        "think": 4.4
+      },
+      "thinking": {
+        "type": "level",
+        "options": [
+          "low",
+          "medium",
+          "high"
+        ]
+      }
+    }
+  ]
+}

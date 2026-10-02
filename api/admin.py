@@ -601,6 +601,9 @@ async def delete_provider_key_pool_item(key_id: str):
 
 @router.get("/api/models", dependencies=[Depends(verify_admin)])
 async def list_models():
+    from core.model_catalog import load_model_catalog
+    catalog_models = {m["name"]: m for m in load_model_catalog().get("models", [])}
+
     rows = await db_manager.fetch(
         """
         SELECT m.id, m.name, m.provider, m.capability, m.temperature, m.is_active, m.created_at, m.thinking_level, m.system_prompt,
@@ -619,6 +622,24 @@ async def list_models():
         item["output_price"] = _optional_price(item["output_price"])
         item["think_price"] = _optional_price(item["think_price"])
         item["default_config"] = _parse_default_config(item.get("default_config"))
+        
+        # Inject thinking schema from JSON catalog if exists, else from default_config
+        db_schema = item["default_config"].get("thinking_schema") if item["default_config"] else None
+        c_model = catalog_models.get(item["name"])
+        builtin_schema = c_model.get("thinking") if c_model else None
+        item["builtin_thinking"] = builtin_schema
+        item["is_builtin_thinking"] = builtin_schema is not None
+
+        if db_schema and db_schema.get("type") == "none":
+            # Explicitly disabled in DB
+            item["thinking"] = None
+        elif builtin_schema:
+            item["thinking"] = builtin_schema
+        elif db_schema:
+            item["thinking"] = db_schema
+        else:
+            item["thinking"] = None
+            
         models.append(item)
     return {"models": models}
 
@@ -784,7 +805,7 @@ async def list_model_groups():
     for group in groups:
         rows = await db_manager.fetch(
             """
-            SELECT i.id, i.model_id, i.priority, i.thinking_level, i.system_prompt, i.temperature, m.name, m.provider, m.capability
+            SELECT i.id, i.model_id, i.priority, i.thinking_level, i.system_prompt, i.temperature, i.default_config, m.name, m.provider, m.capability
             FROM router_model_group_items i
             JOIN router_models m ON m.id = i.model_id
             WHERE i.group_id = $1
@@ -796,6 +817,7 @@ async def list_model_groups():
         for r in rows:
             d = dict(r)
             d["temperature"] = float(d["temperature"]) if d.get("temperature") is not None else None
+            d["default_config"] = _parse_default_config(d.get("default_config"))
             items.append(d)
         group["items"] = items
     return {"groups": groups}
@@ -873,6 +895,10 @@ async def add_model_group_item(group_id: str, request: Request):
     system_prompt = str(system_prompt).strip() if system_prompt not in (None, "") else None
     temperature = body.get("temperature")
     temperature = float(temperature) if temperature not in (None, "") else None
+    
+    import json as _json
+    default_config_val = body.get("default_config")
+    default_config_json = _json.dumps(_parse_default_config(default_config_val)) if default_config_val is not None else None
 
     group = await db_manager.fetchrow("SELECT capability FROM router_model_groups WHERE id = $1", group_id)
     model = await db_manager.fetchrow("SELECT capability FROM router_models WHERE id = $1", model_id)
@@ -883,9 +909,9 @@ async def add_model_group_item(group_id: str, request: Request):
 
     row = await db_manager.fetchrow(
         """
-        INSERT INTO router_model_group_items (group_id, model_id, priority, thinking_level, system_prompt, temperature)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING id, group_id, model_id, priority, thinking_level, system_prompt, temperature, created_at
+        INSERT INTO router_model_group_items (group_id, model_id, priority, thinking_level, system_prompt, temperature, default_config)
+        VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
+        RETURNING id, group_id, model_id, priority, thinking_level, system_prompt, temperature, default_config, created_at
         """,
         group_id,
         model_id,
@@ -893,9 +919,11 @@ async def add_model_group_item(group_id: str, request: Request):
         thinking_level,
         system_prompt,
         temperature,
+        default_config_json,
     )
     item = dict(row)
     item["temperature"] = float(item["temperature"]) if item.get("temperature") is not None else None
+    item["default_config"] = _parse_default_config(item.get("default_config"))
     return item
 
 
@@ -904,7 +932,7 @@ async def update_model_group_item(group_id: str, item_id: str, request: Request)
     body = await request.json()
     priority = int(body.get("priority", 100))
     
-    existing = await db_manager.fetchrow("SELECT thinking_level, system_prompt, temperature FROM router_model_group_items WHERE id = $1 AND group_id = $2", item_id, group_id)
+    existing = await db_manager.fetchrow("SELECT thinking_level, system_prompt, temperature, default_config FROM router_model_group_items WHERE id = $1 AND group_id = $2", item_id, group_id)
     if not existing:
         raise HTTPException(status_code=404, detail="Group item not found")
 
@@ -915,12 +943,20 @@ async def update_model_group_item(group_id: str, item_id: str, request: Request)
     new_temperature = body.get("temperature", existing["temperature"])
     temperature = float(new_temperature) if new_temperature not in (None, "") else None
 
+    import json as _json
+    if "default_config" in body:
+        new_default_config = body["default_config"]
+        default_config_json = _json.dumps(_parse_default_config(new_default_config)) if new_default_config is not None else None
+    else:
+        existing_cfg = existing["default_config"]
+        default_config_json = _json.dumps(_parse_default_config(existing_cfg)) if existing_cfg else None
+
     row = await db_manager.fetchrow(
         """
         UPDATE router_model_group_items
-        SET priority = $3, thinking_level = $4, system_prompt = $5, temperature = $6
+        SET priority = $3, thinking_level = $4, system_prompt = $5, temperature = $6, default_config = $7::jsonb
         WHERE id = $1 AND group_id = $2
-        RETURNING id, group_id, model_id, priority, thinking_level, system_prompt, temperature, created_at
+        RETURNING id, group_id, model_id, priority, thinking_level, system_prompt, temperature, default_config, created_at
         """,
         item_id,
         group_id,
@@ -928,11 +964,13 @@ async def update_model_group_item(group_id: str, item_id: str, request: Request)
         thinking_level,
         system_prompt,
         temperature,
+        default_config_json,
     )
     if not row:
         raise HTTPException(status_code=404, detail="Group item not found")
     item = dict(row)
     item["temperature"] = float(item["temperature"]) if item.get("temperature") is not None else None
+    item["default_config"] = _parse_default_config(item.get("default_config"))
     return item
 
 

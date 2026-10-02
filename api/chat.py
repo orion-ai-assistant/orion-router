@@ -42,29 +42,39 @@ async def chat_completions(
     model = (raw_model or "").strip()
     if not model:
         raise HTTPException(status_code=400, detail="'model' field is required. Please specify a model name explicitly.")
-    thinking_keys = ("thinking_level", "reasoning_effort", "thinking_budget")
-    thinking_level = next((body[k] for k in thinking_keys if body.get(k) is not None), None)
+    thinking_keys = ("thinking", "thinking_level", "reasoning_effort", "thinking_budget")
+    thinking = next((body[k] for k in thinking_keys if body.get(k) is not None), None)
 
     system_prompt = body.get("system_prompt")
     tools = body.get("tools")
     tool_choice = body.get("tool_choice")
 
+    bypass_hdr = request.headers.get("x-orion-bypass-defaults", "").strip().lower()
+    source_hdr = request.headers.get("x-orion-source", "").strip().lower()
+    bypass_defaults = (
+        bypass_hdr in ("true", "1")
+        or source_hdr == "playground"
+        or bool(body.get("bypass_defaults"))
+        or bool(body.get("is_playground"))
+    )
+
     # Pass remaining keys to dynamic router
     kwargs = {
         k: v for k, v in body.items()
         if v is not None and k not in (
-            "stream", "messages", "model", "thinking_level",
+            "stream", "messages", "model", "thinking", "thinking_level",
             "reasoning_effort", "thinking_budget",
-            "system_prompt", "tools", "tool_choice"
+            "system_prompt", "tools", "tool_choice", "is_playground", "bypass_defaults"
         )
     }
 
     dynamic_router: DynamicLLMRouter = request.app.state.dynamic_router
     optional_args = {
-        "thinking_level": thinking_level,
+        "thinking": thinking,
         "system_prompt": system_prompt,
         "tools": tools,
         "tool_choice": tool_choice,
+        "bypass_defaults": bypass_defaults,
     }
     combo_generator = dynamic_router.run_combo(
         provider=provider,

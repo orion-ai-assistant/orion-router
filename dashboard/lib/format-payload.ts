@@ -26,6 +26,8 @@ const KEY_PRIORITY: Record<string, number> = {
   stop: 50,
 
   // 4. Thinking & Reasoning Parameters
+  thinking: 60,
+  thinking_level: 60,
   reasoning_effort: 60,
   thinking_budget_tokens: 61,
   chat_template_kwargs: 62,

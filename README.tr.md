@@ -40,14 +40,16 @@ response = client.chat.completions.create(
     temperature=0.7, 
     tools=[], 
     extra_body={
-        "thinking_level": "high" # e.g. "low" | 1024
+        "thinking": 2048 # Bütçe: 2048 | -1 (Oto) | 0 (Kapalı) veya Seviye: "high" | "low"
     }
 )
 
 print(response.choices[0].message.content)
 ```
 
-> **🧠 Gelişmiş Parametre Çevirisi:** Orion Router; `temperature`, `tools` (Fonksiyon çağırma/Function Calling) ve `thinking_level` (Düşünme Bütçesi) gibi özellikleri evrensel olarak destekler. Siz sadece standart formatta isteği gönderirsiniz, Orion Router arka planda bu parametreleri hedeflenen sağlayıcının (OpenAI, Gemini, Anthropic vb.) anlayacağı doğru yapıya (örn. *reasoning_effort*, *thinking_budget*) otomatik olarak adapte eder!
+> **🧠 Gelişmiş Parametre Çevirisi & Düşünme (Thinking):** Orion Router; `temperature`, `tools` ve birleşik tekil **`thinking`** parametresini (`"thinking": 2048` veya `"thinking": "high"`) evrensel olarak destekler. Arka planda hedef sağlayıcının beklediği formata (*thinking_budget*, *reasoning_effort* vb.) otomatik çevirir.
+> 
+> **⚡ Varsayılanları Atla (Bypass Defaults):** Dashboard panelinde modele tanımladığınız varsayılan ayarların (sıcaklık, düşünme vb.) otomatik doldurulmasını istemiyorsanız, isteğe `"bypass_defaults": true` gövde parametresi veya `X-Orion-Bypass-Defaults: true` HTTP başlığı ekleyebilirsiniz. Detaylı rehber ve örnekler için: [API Kullanım Kılavuzu](docs/api-usage.md).
 
 ## ✨ Öne Çıkan Özellikler
 

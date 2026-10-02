@@ -27,6 +27,9 @@ interface ModelItem {
   thinking_level?: string | null;
   system_prompt?: string | null;
   default_config?: Record<string, any>;
+  builtin_thinking?: any;
+  thinking?: any;
+  is_builtin_thinking?: boolean;
   _original?: {
     name: string;
     provider: string;
@@ -39,6 +42,9 @@ interface ModelItem {
     thinking_level?: string | null;
     system_prompt?: string | null;
     default_config?: Record<string, any>;
+    builtin_thinking?: any;
+    thinking?: any;
+    is_builtin_thinking?: boolean;
   };
 }
 
@@ -286,7 +292,7 @@ export default function ModelsPage() {
 
   const loadModels = async () => {
     try {
-      const res = await adminFetch('/dashboard/api/models');
+      const res = await adminFetch(`/dashboard/api/models?t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
         const loadedModels = (data.models || []).map((model: any) => {
@@ -300,6 +306,9 @@ export default function ModelsPage() {
           const think_price = model.think_price ?? null;
           const thinking_level = model.thinking_level || null;
           const system_prompt = model.system_prompt || null;
+          const is_builtin_thinking = !!model.is_builtin_thinking;
+          const builtin_thinking = model.builtin_thinking || (is_builtin_thinking ? model.thinking : null);
+          const thinking = model.thinking || null;
           const default_config = capability === 'tts'
             ? TTSDefaultConfig.fromObject(model.default_config).toObject()
             : parseModelConfig(model.default_config);
@@ -316,6 +325,9 @@ export default function ModelsPage() {
             think_price,
             thinking_level,
             system_prompt,
+            is_builtin_thinking,
+            builtin_thinking,
+            thinking,
             default_config,
             _original: {
               name,
@@ -328,6 +340,9 @@ export default function ModelsPage() {
               think_price,
               thinking_level,
               system_prompt,
+              is_builtin_thinking,
+              builtin_thinking,
+              thinking,
               default_config,
             },
           };
@@ -441,6 +456,68 @@ export default function ModelsPage() {
     });
   };
 
+
+  const [showEditThinking, setShowEditThinking] = useState(false);
+  const [showAddThinking, setShowAddThinking] = useState(false);
+
+  const validateThinking = (model: any) => {
+    if (model.capability !== 'chat') return true;
+    
+    const isBuiltIn = !!model._original?.is_builtin_thinking || !!model.is_builtin_thinking;
+    const dbSchema = model.default_config?.thinking_schema;
+    const builtInSchema = isBuiltIn ? (model._original?.thinking || model.thinking) : null;
+    
+    let type = 'none';
+    if (isBuiltIn) {
+      if (dbSchema?.type === 'none') type = 'none';
+      else type = builtInSchema?.type || 'none';
+    } else {
+      type = dbSchema?.type || 'none';
+    }
+
+    const schema = isBuiltIn ? builtInSchema : dbSchema;
+
+    if (type === 'budget') {
+      const val = parseInt(model.thinking_level);
+      if (isNaN(val)) {
+         showToast("Bütçe (Budget) için Default değeri bir sayı olmalıdır", "error");
+         return false;
+      }
+      if (val !== -1 && (val < (schema?.min || 1) || val > (schema?.max || 8192))) {
+         showToast(`Bütçe (Budget) için Default değeri -1 (Auto) veya ${schema?.min || 1} ile ${schema?.max || 8192} arasında olmalıdır`, "error");
+         return false;
+      }
+      
+      // Enforce min/max rules
+      if (!isBuiltIn) {
+          if (schema?.min === undefined || schema?.min === '' || isNaN(parseInt(schema.min as any))) {
+             showToast("Min Limit boş olamaz", "error");
+             return false;
+          }
+          if (schema?.max === undefined || schema?.max === '' || isNaN(parseInt(schema.max as any))) {
+             showToast("Max Limit boş olamaz", "error");
+             return false;
+          }
+          const schemaMin = parseInt(schema.min as any);
+          const schemaMax = parseInt(schema.max as any);
+          if (schemaMin < 0) {
+             showToast("Min Limit 0'dan küçük olamaz", "error");
+             return false;
+          }
+          if (schemaMin > schemaMax) {
+             showToast("Min Limit, Max Limit'ten küçük veya eşit olmalıdır", "error");
+             return false;
+          }
+      }
+    } else if (type === 'level') {
+      if (!schema?.options?.includes(model.thinking_level)) {
+         showToast(`Level modu için geçerli bir varsayılan değer seçmelisiniz. Geçerli seçenekler: ${(schema?.options || []).join(', ')}`, "error");
+         return false;
+      }
+    }
+    return true;
+  };
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     const name = addForm.name.trim();
@@ -461,9 +538,11 @@ export default function ModelsPage() {
       showToast(t('models.toast.invalidLocalSampling'), 'error');
       return;
     }
+    if (!validateThinking(addForm)) return;
 
     try {
-      let configObj = {};
+      let configObj = { ...(addForm.default_config || {}) };
+      if (configObj.thinking_schema && configObj.thinking_schema._raw_options !== undefined) delete configObj.thinking_schema._raw_options;
       if (capability === 'tts') {
         const config = TTSDefaultConfig.fromObject(addForm.default_config);
         if (!config.voice && provider !== 'local') {
@@ -512,6 +591,7 @@ export default function ModelsPage() {
         });
         setShowAddModal(false);
         setShowAddLocalSampling(false);
+        setShowAddThinking(false);
         showToast(t('models.toast.addSuccess'));
         await loadModels();
       } else {
@@ -543,9 +623,12 @@ export default function ModelsPage() {
       showToast(t('models.toast.invalidLocalSampling'), 'error');
       return;
     }
+    if (!validateThinking(editingModel)) return;
+    if (!validateThinking(editingModel)) return;
 
     try {
-      let configObj = {};
+      let configObj = { ...(editingModel.default_config || {}) };
+      if (configObj.thinking_schema && configObj.thinking_schema._raw_options !== undefined) delete configObj.thinking_schema._raw_options;
       if (editingModel.capability === 'tts') {
         const config = TTSDefaultConfig.fromObject(editingModel.default_config);
         if (!config.voice && provider !== 'local') {
@@ -647,6 +730,7 @@ export default function ModelsPage() {
     });
     setShowEditTtsDefaults(false);
     setShowEditLocalSampling(false);
+    setShowEditThinking(false);
     setShowEditModal(true);
   };
 
@@ -740,7 +824,8 @@ export default function ModelsPage() {
       languages = getAvailableLanguages(formState.provider);
       showLangSelect = languages.length > 0;
     }
-    const hasPersona = !!formState.default_config?.voice &&
+
+    const hasPersona = !!formState.default_config?.voice &&
                        formState.default_config.voice !== '' &&
                        formState.default_config.voice.toLowerCase() !== 'none';
 
@@ -1019,6 +1104,182 @@ export default function ModelsPage() {
   };
 
 
+
+  const renderThinkingBuilder = (
+    formState: any,
+    setFormState: any,
+    expanded: boolean,
+    setExpanded: (val: boolean) => void
+  ) => {
+    if (formState.capability !== 'chat') return null;
+    
+    // Check if the model originally had a built-in schema
+    const isBuiltIn = !!formState._original?.is_builtin_thinking || !!formState.is_builtin_thinking;
+    const builtInSchema = formState.builtin_thinking || formState._original?.builtin_thinking || (isBuiltIn ? (formState._original?.thinking || formState.thinking) : null);
+    
+    const dbSchema = formState.default_config?.thinking_schema;
+    
+    let type = 'none';
+    if (dbSchema?.type === 'none') {
+      type = 'none';
+    } else if (dbSchema?.type) {
+      type = dbSchema.type;
+    } else if (isBuiltIn && builtInSchema) {
+      type = builtInSchema.type;
+    }
+
+    const schema = dbSchema && dbSchema.type !== 'none' ? dbSchema : builtInSchema;
+    const allowedType = builtInSchema?.type || schema?.type;
+
+    return (
+      <div className="flex flex-col gap-3 bg-zinc-900/60 p-3 rounded-lg border border-zinc-800/80 mb-3">
+        <div 
+          className="flex justify-between items-center cursor-pointer select-none"
+          onClick={() => setExpanded(!expanded)}
+        >
+          <label className="text-zinc-400 text-sm font-medium cursor-pointer">
+            {t('playground.thinking')} 
+            <span className="text-[10px] text-zinc-500 font-normal ml-2 uppercase">Schema & Default</span>
+          </label>
+          <div className={`transform transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-400">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </div>
+        </div>
+        
+        {expanded && (
+          <div className="flex flex-col gap-3 mt-1 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="flex flex-col gap-1">
+              <label className="text-zinc-500 text-[10px] uppercase">Mode</label>
+              <div className="custom-select-wrapper select-wrapper w-full">
+                <select
+                  value={type}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === 'none') {
+                      setFormState({ 
+                        ...formState, 
+                        default_config: { ...formState.default_config, thinking_schema: { type: 'none' } }, 
+                        thinking_level: '' 
+                      });
+                    } else if (val === 'budget') {
+                      const newMin = builtInSchema?.type === 'budget' && builtInSchema?.min !== undefined ? builtInSchema.min : 1;
+                      const newMax = builtInSchema?.type === 'budget' && builtInSchema?.max !== undefined ? builtInSchema.max : 8192;
+                      setFormState({
+                        ...formState,
+                        default_config: { ...formState.default_config, thinking_schema: { type: 'budget', min: newMin, max: newMax, auto_value: -1 } },
+                        thinking_level: '-1'
+                      });
+                    } else if (val === 'level') {
+                      const newOpts = builtInSchema?.type === 'level' && builtInSchema?.options ? builtInSchema.options : ['low', 'medium', 'high'];
+                      setFormState({
+                        ...formState,
+                        default_config: { ...formState.default_config, thinking_schema: { type: 'level', options: newOpts } },
+                        thinking_level: newOpts[0] || 'low'
+                      });
+                    }
+                  }}
+                  className="orion-native-select orion-native-select-sm"
+                >
+                  <option value="none">API Default</option>
+                  {(!allowedType || allowedType === 'budget') && (
+                    <option value="budget">Budget</option>
+                  )}
+                  {(!allowedType || allowedType === 'level') && (
+                    <option value="level">Level</option>
+                  )}
+                </select>
+              </div>
+            </div>
+
+            {type === 'budget' && (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-col gap-1">
+                  <label className="text-zinc-500 text-[10px]">Min Limit</label>
+                  <Input
+                    type="number"
+                    value={schema?.min === undefined ? '' : schema.min}
+                    onChange={(e) => {
+                      const val = e.target.value === '' ? '' : parseInt(e.target.value);
+                      setFormState({
+                        ...formState,
+                        default_config: { ...formState.default_config, thinking_schema: { ...schema, min: val, auto_value: -1 } }
+                      });
+                    }}
+                    className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-1 text-xs"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-zinc-500 text-[10px]">Max Limit</label>
+                  <Input
+                    type="number"
+                    value={schema?.max === undefined ? '' : schema.max}
+                    onChange={(e) => {
+                      const val = e.target.value === '' ? '' : parseInt(e.target.value);
+                      setFormState({
+                        ...formState,
+                        default_config: { ...formState.default_config, thinking_schema: { ...schema, max: val, auto_value: -1 } }
+                      });
+                    }}
+                    className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-1 text-xs"
+                  />
+                </div>
+              </div>
+            )}
+
+            {type === 'level' && (
+              <div className="flex flex-col gap-1">
+                <label className="text-zinc-500 text-[10px]">Options (Comma separated)</label>
+                <Input
+                  value={schema?._raw_options !== undefined ? schema._raw_options : (schema?.options || []).join(', ')}
+                  onChange={(e) => {
+                    const rawVal = e.target.value;
+                    const opts = rawVal.split(',').map((s: string) => s.trim()).filter(Boolean);
+                    setFormState({
+                      ...formState,
+                      default_config: { ...formState.default_config, thinking_schema: { ...schema, options: opts, _raw_options: rawVal } },
+                      thinking_level: opts[0] || ''
+                    });
+                  }}
+                  className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-1 text-xs"
+                  placeholder="low, medium, high"
+                />
+              </div>
+            )}
+
+            {type !== 'none' && (
+              <div className="flex flex-col gap-1 pt-2 border-t border-zinc-800/50 mt-1">
+                <label className="text-zinc-500 text-[10px] uppercase">Default</label>
+                {type === 'budget' ? (
+                  <Input
+                    type="number"
+                    value={formState.thinking_level || ''}
+                    onChange={(e) => setFormState({ ...formState, thinking_level: e.target.value })}
+                    className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs"
+                    placeholder="-1 (Auto/Infinite) veya sayı"
+                  />
+                ) : (
+                  <div className="custom-select-wrapper select-wrapper w-full">
+                    <select
+                      value={formState.thinking_level || (schema?.options?.[0] || '')}
+                      onChange={(e) => setFormState({ ...formState, thinking_level: e.target.value })}
+                      className="orion-native-select orion-native-select-sm"
+                    >
+                      {(schema?.options || []).map((opt: string) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <section id="models" className="tab-content active block pt-8">
       <header className="flex justify-between items-end mb-8 pb-6 border-b border-border">
@@ -1197,17 +1458,7 @@ export default function ModelsPage() {
 
             {((addForm.capability === 'chat') || (addForm.capability === 'tts')) && (
               <div className="flex gap-3">
-                {addForm.capability === 'chat' && (
-                  <div className="flex-1 flex flex-col gap-2">
-                    <label className="text-zinc-400 text-sm font-medium">{t('models.thinkingLevel')}</label>
-                    <Input
-                      value={addForm.thinking_level}
-                      onChange={(e) => setAddForm({ ...addForm, thinking_level: e.target.value })}
-                      placeholder={t('models.thinkingLevelPlaceholder')}
-                      className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs"
-                    />
-                  </div>
-                )}
+
 
                 {(addForm.capability === 'chat' || addForm.capability === 'tts') && (
                   <div className="flex-1 flex flex-col gap-2">
@@ -1227,7 +1478,9 @@ export default function ModelsPage() {
               </div>
             )}
 
-            {renderLocalSampling(addForm, setAddForm, showAddLocalSampling, setShowAddLocalSampling)}
+            
+            {renderThinkingBuilder(addForm, setAddForm, showAddThinking, setShowAddThinking)}
+
 
             {(addForm.capability === 'chat') && (
               <div className="flex flex-col gap-2">
@@ -1290,6 +1543,8 @@ export default function ModelsPage() {
                 )}
               </div>
             </div>
+
+            {renderLocalSampling(addForm, setAddForm, showAddLocalSampling, setShowAddLocalSampling)}
 
             {renderTtsDefaults(addForm, setAddForm, showAddTtsDefaults, setShowAddTtsDefaults)}
 
@@ -1376,17 +1631,7 @@ export default function ModelsPage() {
 
             {((editingModel.capability === 'chat') || (editingModel.capability === 'tts')) && (
               <div className="flex gap-3">
-                {editingModel.capability === 'chat' && (
-                  <div className="flex-1 flex flex-col gap-2">
-                    <label className="text-zinc-400 text-sm font-medium">{t('models.thinkingLevel')}</label>
-                    <Input
-                      value={editingModel.thinking_level || ''}
-                      onChange={(e) => setEditingModel({ ...editingModel, thinking_level: e.target.value })}
-                      placeholder={t('models.thinkingLevelPlaceholder')}
-                      className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs"
-                    />
-                  </div>
-                )}
+
 
                 {(editingModel.capability === 'chat' || editingModel.capability === 'tts') && (
                   <div className="flex-1 flex flex-col gap-2">
@@ -1406,7 +1651,9 @@ export default function ModelsPage() {
               </div>
             )}
 
-            {renderLocalSampling(editingModel, setEditingModel, showEditLocalSampling, setShowEditLocalSampling)}
+            
+            {renderThinkingBuilder(editingModel, setEditingModel, showEditThinking, setShowEditThinking)}
+
 
             {(editingModel.capability === 'chat') && (
               <div className="flex flex-col gap-2">
@@ -1469,6 +1716,8 @@ export default function ModelsPage() {
                 )}
               </div>
             </div>
+
+            {renderLocalSampling(editingModel, setEditingModel, showEditLocalSampling, setShowEditLocalSampling)}
 
             {renderTtsDefaults(editingModel, setEditingModel, showEditTtsDefaults, setShowEditTtsDefaults)}
 

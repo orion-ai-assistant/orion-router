@@ -193,6 +193,7 @@ class DatabaseManager:
         await conn.execute("ALTER TABLE router_model_group_items ADD COLUMN IF NOT EXISTS thinking_level TEXT;")
         await conn.execute("ALTER TABLE router_model_group_items ADD COLUMN IF NOT EXISTS system_prompt TEXT;")
         await conn.execute("ALTER TABLE router_model_group_items ADD COLUMN IF NOT EXISTS temperature NUMERIC(5, 2);")
+        await conn.execute("ALTER TABLE router_model_group_items ADD COLUMN IF NOT EXISTS default_config JSONB;")
 
         await self._migrate_legacy_provider_keys(conn)
         await self._seed_default_models(conn)
@@ -556,7 +557,10 @@ class DatabaseManager:
                        g.name AS requested_name, i.priority,
                        COALESCE(i.thinking_level, m.thinking_level) AS thinking_level,
                        COALESCE(i.system_prompt, m.system_prompt) AS system_prompt,
-                       m.default_config
+                       CASE 
+                           WHEN i.default_config IS NOT NULL AND m.default_config IS NOT NULL THEN m.default_config || i.default_config
+                           ELSE COALESCE(i.default_config, m.default_config)
+                       END AS default_config
                 FROM router_model_group_items i
                 JOIN router_models m ON m.id = i.model_id
                 JOIN router_model_groups g ON g.id = i.group_id

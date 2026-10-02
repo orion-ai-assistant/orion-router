@@ -8,14 +8,20 @@ from pathlib import Path
 from typing import Any
 
 
-MODEL_CATALOG_PATH = Path(__file__).resolve().parent.parent / "data" / "models.json"
-
+PROVIDERS_DIR = Path(__file__).resolve().parent.parent / "providers"
 
 @lru_cache(maxsize=1)
 def load_model_catalog() -> dict[str, Any]:
-    catalog = json.loads(MODEL_CATALOG_PATH.read_text(encoding="utf-8"))
-    if catalog.get("pricing_unit") != "per_million_tokens":
-        raise ValueError("models.json pricing_unit must be per_million_tokens")
+    catalog = {"pricing_unit": "per_million_tokens", "models": []}
+    
+    for models_file in PROVIDERS_DIR.glob("*/models.json"):
+        try:
+            provider_catalog = json.loads(models_file.read_text(encoding="utf-8"))
+            if "models" in provider_catalog and isinstance(provider_catalog["models"], list):
+                catalog["models"].extend(provider_catalog["models"])
+        except json.JSONDecodeError:
+            continue
+
     models = catalog.get("models")
     if not isinstance(models, list):
         raise ValueError("models.json must contain a models list")
@@ -25,7 +31,10 @@ def load_model_catalog() -> dict[str, Any]:
     for model in models:
         if model.get("seed", True) and (not model.get("provider") or not model.get("capability")):
             raise ValueError(f"Seed model {model['name']} needs provider and capability")
-        unit = model.get("pricing_unit", catalog["pricing_unit"])
+        if not model.get("pricing_unit"):
+            model["pricing_unit"] = "per_million_characters" if model.get("capability") == "tts" else "per_million_tokens"
+        
+        unit = model["pricing_unit"]
         if unit not in ("per_million_tokens", "per_million_characters"):
             raise ValueError(f"Unsupported pricing unit for {model['name']}: {unit}")
         if unit == "per_million_characters" and model.get("capability") != "tts":

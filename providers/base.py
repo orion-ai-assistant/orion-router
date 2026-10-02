@@ -64,7 +64,9 @@ class BaseChat(_ProviderMixin, ABC):
     @staticmethod
     def extract_thinking_config(kwargs: dict[str, Any]) -> ThinkingConfig:
         """kwargs içinden thinking_level / reasoning_effort / thinking_budget okur ve normalize ThinkingConfig döner."""
-        val = kwargs.get("thinking_level")
+        val = kwargs.get("thinking")
+        if val is None:
+            val = kwargs.get("thinking_level")
         if val is None:
             val = kwargs.get("reasoning_effort")
         if val is None:

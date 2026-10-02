@@ -22,6 +22,7 @@ interface GroupItem {
   thinking_level?: string | null;
   system_prompt?: string | null;
   temperature?: number | null;
+  default_config?: Record<string, any>;
 }
 
 interface ModelGroup {
@@ -39,7 +40,64 @@ interface ModelItem {
   provider: string;
   capability: 'chat' | 'tts' | 'embed' | 'stt';
   is_active: boolean;
+  temperature?: number | null;
+  thinking_level?: string | null;
+  system_prompt?: string | null;
+  default_config?: Record<string, any>;
+  thinking?: any;
+  builtin_thinking?: any;
+  is_builtin_thinking?: boolean;
 }
+
+interface EditingGroupItemState {
+  groupId: string;
+  itemId: string;
+  model_id: string;
+  name: string;
+  provider: string;
+  priority: number;
+  thinking_level: string;
+  system_prompt: string;
+  temperature: string;
+  default_config: Record<string, any>;
+  targetModel?: ModelItem;
+}
+
+type LocalSamplingKey = 'top_p' | 'top_k' | 'min_p' | 'repeat_penalty';
+
+const localSamplingDefaults: Record<LocalSamplingKey, string> = {
+  top_p: '0.9',
+  top_k: '40',
+  min_p: '0.05',
+  repeat_penalty: '1.05',
+};
+
+const localSamplingConfig = (config: Record<string, any> | undefined): Record<LocalSamplingKey, string> => {
+  const current = config?.local_sampling || {};
+  return {
+    top_p: current.top_p !== undefined && current.top_p !== null ? String(current.top_p) : localSamplingDefaults.top_p,
+    top_k: current.top_k !== undefined && current.top_k !== null ? String(current.top_k) : localSamplingDefaults.top_k,
+    min_p: current.min_p !== undefined && current.min_p !== null ? String(current.min_p) : localSamplingDefaults.min_p,
+    repeat_penalty:
+      current.repeat_penalty !== undefined && current.repeat_penalty !== null
+        ? String(current.repeat_penalty)
+        : localSamplingDefaults.repeat_penalty,
+  };
+};
+
+const validateLocalSampling = (config: Record<string, any> | undefined) => {
+  const sampling = localSamplingConfig(config);
+  const topP = parseFloat(sampling.top_p);
+  const topK = parseInt(sampling.top_k, 10);
+  const minP = parseFloat(sampling.min_p);
+  const repeatPenalty = parseFloat(sampling.repeat_penalty);
+
+  if (isNaN(topP) || topP < 0 || topP > 1) return false;
+  if (isNaN(topK) || topK < 0) return false;
+  if (isNaN(minP) || minP < 0 || minP > 1) return false;
+  if (isNaN(repeatPenalty) || repeatPenalty < 0) return false;
+  return true;
+};
 
 function reorderGroupItemsInState(
   groups: ModelGroup[],
@@ -119,11 +177,24 @@ export default function GroupsPage() {
   });
   
   const [activeGroupForItems, setActiveGroupForItems] = useState<ModelGroup | null>(null);
-  const [selectedModelId, setSelectedModelId] = useState<string>('');
-  const [selectedThinkingLevel, setSelectedThinkingLevel] = useState<string>('');
-  const [selectedSystemPrompt, setSelectedSystemPrompt] = useState<string>('');
-  const [selectedTemperature, setSelectedTemperature] = useState<string>('');
-  const [editingGroupItem, setEditingGroupItem] = useState<{groupId: string, itemId: string, name: string, provider: string, priority: number, thinking_level: string, system_prompt: string, temperature: string} | null>(null);
+  const [addItemForm, setAddItemForm] = useState<{
+    model_id: string;
+    thinking_level: string;
+    temperature: string;
+    system_prompt: string;
+    default_config: Record<string, any>;
+  }>({
+    model_id: '',
+    thinking_level: '',
+    temperature: '',
+    system_prompt: '',
+    default_config: {},
+  });
+  const [showAddItemThinking, setShowAddItemThinking] = useState<boolean>(false);
+  const [showAddItemLocalSampling, setShowAddItemLocalSampling] = useState<boolean>(false);
+  const [editingGroupItem, setEditingGroupItem] = useState<EditingGroupItemState | null>(null);
+  const [showEditItemThinking, setShowEditItemThinking] = useState<boolean>(false);
+  const [showEditItemLocalSampling, setShowEditItemLocalSampling] = useState<boolean>(false);
   
   // Drag and Drop state
   const [draggedItem, setDraggedItem] = useState<{
@@ -353,37 +424,92 @@ export default function GroupsPage() {
 
   const openAddGroupItem = (group: ModelGroup) => {
     setActiveGroupForItems(group);
-    setSelectedModelId('');
-    setSelectedThinkingLevel('');
-    setSelectedSystemPrompt('');
-    setSelectedTemperature('');
+    setAddItemForm({
+      model_id: '',
+      thinking_level: '',
+      temperature: '',
+      system_prompt: '',
+      default_config: {},
+    });
+    setShowAddItemThinking(false);
+    setShowAddItemLocalSampling(false);
     setShowAddGroupItemModal(true);
+  };
+
+  const handleSelectModelInAddModal = (modelId: string) => {
+    const selectedModel = models.find((m) => m.id === modelId);
+    if (!selectedModel) {
+      setAddItemForm({
+        model_id: '',
+        thinking_level: '',
+        temperature: '',
+        system_prompt: '',
+        default_config: {},
+      });
+      return;
+    }
+
+    setAddItemForm({
+      model_id: selectedModel.id,
+      thinking_level: selectedModel.thinking_level || '',
+      temperature: selectedModel.temperature !== undefined && selectedModel.temperature !== null ? String(selectedModel.temperature) : '',
+      system_prompt: selectedModel.system_prompt || '',
+      default_config: { ...(selectedModel.default_config || {}) },
+    });
+    setShowAddItemThinking(false);
+    setShowAddItemLocalSampling(false);
   };
 
   const handleAddGroupItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeGroupForItems) return;
-    if (!selectedModelId) {
+    if (!addItemForm.model_id) {
       showToast(t('groups.toast.selectModel'), 'error');
       return;
     }
+    const selectedModel = models.find((m) => m.id === addItemForm.model_id);
     const priority = activeGroupForItems.items.length + 1;
 
-    const tempVal = selectedTemperature === '' ? null : parseFloat(selectedTemperature);
+    const tempVal = addItemForm.temperature === '' ? null : parseFloat(addItemForm.temperature);
     if (tempVal !== null && (tempVal < 0 || tempVal > 2)) {
       showToast(t('models.toast.invalidTemperature'), 'error');
       return;
+    }
+
+    if (selectedModel?.provider === 'local' && activeGroupForItems.capability === 'chat' && !validateLocalSampling(addItemForm.default_config)) {
+      showToast(t('models.toast.invalidLocalSampling'), 'error');
+      return;
+    }
+
+    const isBuiltIn = !!selectedModel?.is_builtin_thinking;
+    const builtInSchema = selectedModel?.builtin_thinking || (isBuiltIn ? selectedModel?.thinking : null);
+    const dbSchema = addItemForm.default_config?.thinking_schema || selectedModel?.default_config?.thinking_schema;
+    const schema = dbSchema && dbSchema.type !== 'none' ? dbSchema : builtInSchema;
+
+    if (!validateThinking(addItemForm, schema, isBuiltIn)) return;
+
+    let configObj = { ...(addItemForm.default_config || {}) };
+    if (configObj.thinking_schema && configObj.thinking_schema._raw_options !== undefined) {
+      delete configObj.thinking_schema._raw_options;
+    }
+    if (selectedModel?.provider === 'local' && activeGroupForItems.capability === 'chat') {
+      configObj = {
+        ...configObj,
+        local_chat_defaults_version: 1,
+        local_sampling: localSamplingConfig(configObj),
+      };
     }
 
     try {
       const res = await adminFetch(`/dashboard/api/model-groups/${activeGroupForItems.id}/items`, {
         method: 'POST',
         body: JSON.stringify({ 
-          model_id: selectedModelId, 
+          model_id: addItemForm.model_id, 
           priority, 
-          thinking_level: selectedThinkingLevel || null,
-          system_prompt: selectedSystemPrompt || null,
-          temperature: tempVal
+          thinking_level: addItemForm.thinking_level || null,
+          system_prompt: addItemForm.system_prompt || null,
+          temperature: tempVal,
+          default_config: configObj,
         }),
       });
       if (res.ok) {
@@ -400,17 +526,83 @@ export default function GroupsPage() {
     }
   };
 
+  const validateThinking = (itemState: { thinking_level?: string | null; default_config?: Record<string, any> }, schema: any, isBuiltIn: boolean) => {
+    const dbSchema = itemState.default_config?.thinking_schema;
+    let type = 'none';
+    if (dbSchema?.type === 'none') {
+      type = 'none';
+    } else if (dbSchema?.type) {
+      type = dbSchema.type;
+    } else if (isBuiltIn && schema) {
+      type = schema.type;
+    }
+
+    if (type === 'none') {
+      return true;
+    }
+
+    if (type === 'budget') {
+      const val = parseInt(itemState.thinking_level || '');
+      if (isNaN(val)) {
+        showToast("Bütçe (Budget) için Default değeri bir sayı olmalıdır", "error");
+        return false;
+      }
+      if (val !== -1 && (val < (schema?.min || 1) || val > (schema?.max || 8192))) {
+        showToast(`Bütçe (Budget) için Default değeri -1 (Auto) veya ${schema?.min || 1} ile ${schema?.max || 8192} arasında olmalıdır`, "error");
+        return false;
+      }
+      
+      if (!isBuiltIn) {
+        if (schema?.min === undefined || schema?.min === '' || isNaN(parseInt(schema.min as any))) {
+          showToast("Min Limit boş olamaz", "error");
+          return false;
+        }
+        if (schema?.max === undefined || schema?.max === '' || isNaN(parseInt(schema.max as any))) {
+          showToast("Max Limit boş olamaz", "error");
+          return false;
+        }
+        const schemaMin = parseInt(schema.min as any);
+        const schemaMax = parseInt(schema.max as any);
+        if (schemaMin < 0) {
+          showToast("Min Limit 0'dan küçük olamaz", "error");
+          return false;
+        }
+        if (schemaMin > schemaMax) {
+          showToast("Min Limit, Max Limit'ten küçük veya eşit olmalıdır", "error");
+          return false;
+        }
+      }
+    } else if (type === 'level') {
+      if (!schema?.options?.includes(itemState.thinking_level)) {
+        showToast(`Level modu için geçerli bir varsayılan değer seçmelisiniz. Geçerli seçenekler: ${(schema?.options || []).join(', ')}`, "error");
+        return false;
+      }
+    }
+    return true;
+  };
+
   const openEditGroupItem = (group: ModelGroup, item: GroupItem) => {
+    const targetModel = models.find((m) => m.id === item.model_id || m.name === item.name);
+    const itemConfig = { ...(targetModel?.default_config || {}), ...(item.default_config || {}) };
+    const initialThinking = item.thinking_level !== undefined && item.thinking_level !== null 
+      ? item.thinking_level 
+      : (targetModel?.thinking_level || '');
+
     setEditingGroupItem({
       groupId: group.id,
       itemId: item.id,
+      model_id: item.model_id,
       name: item.name,
       provider: item.provider,
       priority: item.priority,
-      thinking_level: item.thinking_level || '',
-      system_prompt: item.system_prompt || '',
-      temperature: item.temperature !== undefined && item.temperature !== null ? item.temperature.toString() : '',
+      thinking_level: initialThinking,
+      system_prompt: item.system_prompt !== undefined && item.system_prompt !== null ? item.system_prompt : (targetModel?.system_prompt || ''),
+      temperature: item.temperature !== undefined && item.temperature !== null ? item.temperature.toString() : (targetModel?.temperature !== undefined && targetModel?.temperature !== null ? targetModel.temperature.toString() : ''),
+      default_config: itemConfig,
+      targetModel: targetModel,
     });
+    setShowEditItemThinking(false);
+    setShowEditItemLocalSampling(false);
     setShowEditGroupItemModal(true);
   };
 
@@ -418,10 +610,36 @@ export default function GroupsPage() {
     e.preventDefault();
     if (!editingGroupItem) return;
 
+    const group = groups.find((g) => g.id === editingGroupItem.groupId);
     const tempVal = editingGroupItem.temperature === '' ? null : parseFloat(editingGroupItem.temperature);
     if (tempVal !== null && (tempVal < 0 || tempVal > 2)) {
       showToast(t('models.toast.invalidTemperature'), 'error');
       return;
+    }
+
+    if (editingGroupItem.provider === 'local' && group?.capability === 'chat' && !validateLocalSampling(editingGroupItem.default_config)) {
+      showToast(t('models.toast.invalidLocalSampling'), 'error');
+      return;
+    }
+
+    const targetModel = editingGroupItem.targetModel || models.find((m) => m.id === editingGroupItem.model_id || m.name === editingGroupItem.name);
+    const isBuiltIn = !!targetModel?.is_builtin_thinking;
+    const builtInSchema = targetModel?.builtin_thinking || (isBuiltIn ? targetModel?.thinking : null);
+    const dbSchema = editingGroupItem.default_config?.thinking_schema || targetModel?.default_config?.thinking_schema;
+    const schema = dbSchema && dbSchema.type !== 'none' ? dbSchema : builtInSchema;
+
+    if (!validateThinking(editingGroupItem, schema, isBuiltIn)) return;
+
+    let configObj = { ...(editingGroupItem.default_config || {}) };
+    if (configObj.thinking_schema && configObj.thinking_schema._raw_options !== undefined) {
+      delete configObj.thinking_schema._raw_options;
+    }
+    if (editingGroupItem.provider === 'local' && group?.capability === 'chat') {
+      configObj = {
+        ...configObj,
+        local_chat_defaults_version: 1,
+        local_sampling: localSamplingConfig(configObj),
+      };
     }
 
     try {
@@ -431,7 +649,8 @@ export default function GroupsPage() {
           priority: editingGroupItem.priority, 
           thinking_level: editingGroupItem.thinking_level || null,
           system_prompt: editingGroupItem.system_prompt || null,
-          temperature: tempVal
+          temperature: tempVal,
+          default_config: configObj,
         }),
       });
       if (res.ok) {
@@ -446,6 +665,238 @@ export default function GroupsPage() {
       console.error(err);
       showToast(t('groups.toast.updateItemFailed'), 'error');
     }
+  };
+
+  const renderItemThinkingBuilder = (
+    formState: any,
+    setFormState: any,
+    targetModel: ModelItem | undefined,
+    capability: string,
+    expanded: boolean,
+    setExpanded: (val: boolean) => void
+  ) => {
+    if (capability !== 'chat') return null;
+
+    const isBuiltIn = !!targetModel?.is_builtin_thinking;
+    const builtInSchema = targetModel?.builtin_thinking || (isBuiltIn ? targetModel?.thinking : null);
+    const dbSchema = formState.default_config?.thinking_schema || targetModel?.default_config?.thinking_schema;
+
+    let type = 'none';
+    if (dbSchema?.type === 'none') {
+      type = 'none';
+    } else if (dbSchema?.type) {
+      type = dbSchema.type;
+    } else if (isBuiltIn && builtInSchema) {
+      type = builtInSchema.type;
+    } else if (formState.thinking_level) {
+      if (formState.thinking_level === '-1' || !isNaN(Number(formState.thinking_level))) {
+        type = 'budget';
+      } else {
+        type = 'level';
+      }
+    }
+
+    const schema = dbSchema && dbSchema.type !== 'none' ? dbSchema : builtInSchema;
+    const allowedType = builtInSchema?.type || schema?.type;
+
+    return (
+      <div className="flex flex-col gap-3 bg-zinc-900/60 p-3 rounded-lg border border-zinc-800/80 mb-1">
+        <div 
+          className="flex justify-between items-center cursor-pointer select-none"
+          onClick={() => setExpanded(!expanded)}
+        >
+          <label className="text-zinc-400 text-sm font-medium cursor-pointer">
+            {t('playground.thinking')} 
+            <span className="text-[10px] text-zinc-500 font-normal ml-2 uppercase">Schema & Default</span>
+          </label>
+          <div className={`transform transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-400">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </div>
+        </div>
+        
+        {expanded && (
+          <div className="flex flex-col gap-3 mt-1 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="flex flex-col gap-1">
+              <label className="text-zinc-500 text-[10px] uppercase">Mode</label>
+              <div className="custom-select-wrapper select-wrapper w-full">
+                <select
+                  value={type}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === 'none') {
+                      setFormState({ 
+                        ...formState, 
+                        default_config: { ...formState.default_config, thinking_schema: { type: 'none' } }, 
+                        thinking_level: '' 
+                      });
+                    } else if (val === 'budget') {
+                      const newMin = builtInSchema?.type === 'budget' && builtInSchema?.min !== undefined ? builtInSchema.min : 1;
+                      const newMax = builtInSchema?.type === 'budget' && builtInSchema?.max !== undefined ? builtInSchema.max : 8192;
+                      setFormState({
+                        ...formState,
+                        default_config: { ...formState.default_config, thinking_schema: { type: 'budget', min: newMin, max: newMax, auto_value: -1 } },
+                        thinking_level: '-1'
+                      });
+                    } else if (val === 'level') {
+                      const newOpts = builtInSchema?.type === 'level' && builtInSchema?.options ? builtInSchema.options : ['low', 'medium', 'high'];
+                      setFormState({
+                        ...formState,
+                        default_config: { ...formState.default_config, thinking_schema: { type: 'level', options: newOpts } },
+                        thinking_level: newOpts[0] || 'low'
+                      });
+                    }
+                  }}
+                  className="orion-native-select orion-native-select-sm"
+                >
+                  <option value="none">API Default</option>
+                  {(!allowedType || allowedType === 'budget') && (
+                    <option value="budget">Budget</option>
+                  )}
+                  {(!allowedType || allowedType === 'level') && (
+                    <option value="level">Level</option>
+                  )}
+                </select>
+              </div>
+            </div>
+
+            {type === 'budget' && (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-col gap-1">
+                  <label className="text-zinc-500 text-[10px]">Min Limit</label>
+                  <Input
+                    type="number"
+                    value={schema?.min === undefined ? '' : schema.min}
+                    onChange={(e) => {
+                      const val = e.target.value === '' ? '' : parseInt(e.target.value);
+                      setFormState({
+                        ...formState,
+                        default_config: { ...formState.default_config, thinking_schema: { ...schema, min: val, auto_value: -1 } }
+                      });
+                    }}
+                    className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-1 text-xs"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-zinc-500 text-[10px]">Max Limit</label>
+                  <Input
+                    type="number"
+                    value={schema?.max === undefined ? '' : schema.max}
+                    onChange={(e) => {
+                      const val = e.target.value === '' ? '' : parseInt(e.target.value);
+                      setFormState({
+                        ...formState,
+                        default_config: { ...formState.default_config, thinking_schema: { ...schema, max: val, auto_value: -1 } }
+                      });
+                    }}
+                    className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-1 text-xs"
+                  />
+                </div>
+              </div>
+            )}
+
+            {type === 'level' && (
+              <div className="flex flex-col gap-1">
+                <label className="text-zinc-500 text-[10px]">Options (Comma separated)</label>
+                <Input
+                  value={schema?._raw_options !== undefined ? schema._raw_options : (schema?.options || []).join(', ')}
+                  onChange={(e) => {
+                    const rawVal = e.target.value;
+                    const opts = rawVal.split(',').map((s: string) => s.trim()).filter(Boolean);
+                    setFormState({
+                      ...formState,
+                      default_config: { ...formState.default_config, thinking_schema: { ...schema, options: opts, _raw_options: rawVal } },
+                      thinking_level: opts[0] || ''
+                    });
+                  }}
+                  className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-1 text-xs"
+                  placeholder="low, medium, high"
+                />
+              </div>
+            )}
+
+            {type !== 'none' && (
+              <div className="flex flex-col gap-1 pt-2 border-t border-zinc-800/50 mt-1">
+                <label className="text-zinc-500 text-[10px] uppercase">Default</label>
+                {type === 'budget' ? (
+                  <Input
+                    type="number"
+                    value={formState.thinking_level || ''}
+                    onChange={(e) => setFormState({ ...formState, thinking_level: e.target.value })}
+                    className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs"
+                    placeholder="-1 (Auto/Infinite) veya sayı"
+                  />
+                ) : (
+                  <div className="custom-select-wrapper select-wrapper w-full">
+                    <select
+                      value={formState.thinking_level || (schema?.options?.[0] || '')}
+                      onChange={(e) => setFormState({ ...formState, thinking_level: e.target.value })}
+                      className="orion-native-select orion-native-select-sm"
+                    >
+                      {(schema?.options || []).map((opt: string) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderItemLocalSampling = (
+    formState: any,
+    setFormState: any,
+    provider: string,
+    capability: string,
+    expanded: boolean,
+    setExpanded: (value: boolean) => void,
+  ) => {
+    if (provider !== 'local' || capability !== 'chat') return null;
+    const config = formState.default_config || {};
+    const sampling = localSamplingConfig(config);
+    const updateSampling = (key: string, value: boolean | string) => {
+      setFormState({
+        ...formState,
+        default_config: { ...config, local_sampling: { ...sampling, [key]: value } },
+      });
+    };
+
+    return (
+      <div className="flex flex-col gap-2">
+        <button 
+          type="button" 
+          onClick={() => setExpanded(!expanded)} 
+          aria-expanded={expanded} 
+          className="self-start flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+        >
+          <span>{t('models.localSampling')}</span>
+          <span aria-hidden="true" className="text-[11px]">{expanded ? '▾' : '▸'}</span>
+        </button>
+        {expanded && (
+          <div className="grid grid-cols-2 gap-2 pl-1 animate-in fade-in slide-in-from-top-1 duration-150">
+            {(Object.keys(localSamplingDefaults) as LocalSamplingKey[]).map((key) => (
+              <label key={key} className="flex flex-col gap-1 text-xs text-zinc-400 font-medium">
+                {key.toUpperCase().replace('_', ' ')}
+                <Input
+                  type="number"
+                  min="0"
+                  max={key === 'top_p' || key === 'min_p' ? '1' : undefined}
+                  step={key === 'top_k' ? '1' : '0.01'}
+                  value={sampling[key]}
+                  onChange={(e) => updateSampling(key, e.target.value)}
+                  className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm"
+                />
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+    );
   };
 
   const handleDeleteGroupItem = async (group: ModelGroup, itemId: string, confirmed = false) => {
@@ -883,7 +1334,7 @@ export default function GroupsPage() {
 
       {/* Add Model to Group Dialog */}
       <Dialog open={showAddGroupItemModal} onOpenChange={setShowAddGroupItemModal}>
-        <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
+        <DialogContent className="max-w-[420px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl overflow-y-auto max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="text-xl font-heading font-semibold text-white">{t('groups.addItemModalTitle')}</DialogTitle>
           </DialogHeader>
@@ -902,8 +1353,8 @@ export default function GroupsPage() {
               ) : (
                 <div className="custom-select-wrapper select-wrapper w-full">
                   <select
-                    value={selectedModelId}
-                    onChange={(e) => setSelectedModelId(e.target.value)}
+                    value={addItemForm.model_id}
+                    onChange={(e) => handleSelectModelInAddModal(e.target.value)}
                     required
                     className="orion-native-select"
                   >
@@ -922,44 +1373,54 @@ export default function GroupsPage() {
               )}
             </div>
 
-            {activeGroupForItems?.capability === 'chat' && (
-              <div className="flex flex-col gap-2">
-                <label className="text-zinc-400 text-sm font-medium">{t('models.thinkingLevel')}</label>
-                <Input
-                  value={selectedThinkingLevel}
-                  onChange={(e) => setSelectedThinkingLevel(e.target.value)}
-                  placeholder={t('models.thinkingLevelPlaceholder')}
-                  className="bg-black/40 border border-zinc-855 text-white rounded px-3 py-2 text-xs"
-                />
-              </div>
-            )}
+            {addItemForm.model_id && (
+              <>
+                {renderItemThinkingBuilder(
+                  addItemForm,
+                  setAddItemForm,
+                  models.find((m) => m.id === addItemForm.model_id),
+                  activeGroupForItems?.capability || 'chat',
+                  showAddItemThinking,
+                  setShowAddItemThinking
+                )}
 
-            {activeGroupForItems && (activeGroupForItems.capability === 'chat' || activeGroupForItems.capability === 'tts') && (
-              <div className="flex flex-col gap-2">
-                <label className="text-zinc-400 text-sm font-medium">{t('models.temperature')}</label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="2"
-                  step="0.1"
-                  value={selectedTemperature}
-                  onChange={(e) => setSelectedTemperature(e.target.value)}
-                  placeholder={t('groups.temperaturePlaceholder')}
-                  className="bg-black/40 border border-zinc-855 text-white rounded px-3 py-2 text-xs"
-                />
-              </div>
-            )}
+                {(activeGroupForItems?.capability === 'chat' || activeGroupForItems?.capability === 'tts') && (
+                  <div className="flex flex-col gap-2">
+                    <label className="text-zinc-400 text-sm font-medium">{t('models.temperature')}</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      value={addItemForm.temperature}
+                      onChange={(e) => setAddItemForm({ ...addItemForm, temperature: e.target.value })}
+                      placeholder={t('groups.temperaturePlaceholder')}
+                      className="bg-black/40 border border-zinc-855 text-white rounded px-3 py-2 text-xs"
+                    />
+                  </div>
+                )}
 
-            {activeGroupForItems?.capability === 'chat' && (
-              <div className="flex flex-col gap-2">
-                <label className="text-zinc-400 text-sm font-medium">{t('models.systemPrompt')}</label>
-                <Textarea
-                  value={selectedSystemPrompt}
-                  onChange={(e) => setSelectedSystemPrompt(e.target.value)}
-                  placeholder={t('models.systemPromptPlaceholder')}
-                  className="bg-black/40 border border-zinc-850 text-white rounded px-3 py-2 text-xs h-14 resize-none custom-scrollbar overflow-y-auto no-field-sizing"
-                />
-              </div>
+                {activeGroupForItems?.capability === 'chat' && (
+                  <div className="flex flex-col gap-2">
+                    <label className="text-zinc-400 text-sm font-medium">{t('models.systemPrompt')}</label>
+                    <Textarea
+                      value={addItemForm.system_prompt}
+                      onChange={(e) => setAddItemForm({ ...addItemForm, system_prompt: e.target.value })}
+                      placeholder={t('models.systemPromptPlaceholder')}
+                      className="bg-black/40 border border-zinc-850 text-white rounded px-3 py-2 text-xs h-14 resize-none custom-scrollbar overflow-y-auto no-field-sizing"
+                    />
+                  </div>
+                )}
+
+                {renderItemLocalSampling(
+                  addItemForm,
+                  setAddItemForm,
+                  models.find((m) => m.id === addItemForm.model_id)?.provider || '',
+                  activeGroupForItems?.capability || 'chat',
+                  showAddItemLocalSampling,
+                  setShowAddItemLocalSampling
+                )}
+              </>
             )}
 
             <DialogFooter className="mt-4 flex gap-3 justify-end">
@@ -975,6 +1436,7 @@ export default function GroupsPage() {
                 type="submit"
                 disabled={
                   !activeGroupForItems ||
+                  !addItemForm.model_id ||
                   getModelsByCapability(
                     activeGroupForItems.capability,
                     activeGroupForItems.items.map((i) => i.model_id)
@@ -991,7 +1453,7 @@ export default function GroupsPage() {
 
       {/* Edit Group Item Dialog */}
       <Dialog open={showEditGroupItemModal} onOpenChange={setShowEditGroupItemModal}>
-        <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
+        <DialogContent className="max-w-[420px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl overflow-y-auto max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="text-xl font-heading font-semibold text-white">{t('groups.editItemModalTitle')}</DialogTitle>
           </DialogHeader>
@@ -1005,16 +1467,13 @@ export default function GroupsPage() {
                 </div>
               </div>
 
-              {groups.find((g) => g.id === editingGroupItem.groupId)?.capability === 'chat' && (
-                <div className="flex flex-col gap-2">
-                  <label className="text-zinc-400 text-sm font-medium">{t('models.thinkingLevel')}</label>
-                  <Input
-                    value={editingGroupItem.thinking_level}
-                    onChange={(e) => setEditingGroupItem({ ...editingGroupItem, thinking_level: e.target.value })}
-                    placeholder={t('models.thinkingLevelPlaceholder')}
-                    className="bg-black/40 border border-zinc-850 text-white rounded px-3 py-2 text-xs"
-                  />
-                </div>
+              {renderItemThinkingBuilder(
+                editingGroupItem,
+                setEditingGroupItem,
+                editingGroupItem.targetModel || models.find((m) => m.id === editingGroupItem.model_id || m.name === editingGroupItem.name),
+                groups.find((g) => g.id === editingGroupItem.groupId)?.capability || 'chat',
+                showEditItemThinking,
+                setShowEditItemThinking
               )}
 
               {(() => {
@@ -1046,6 +1505,15 @@ export default function GroupsPage() {
                     className="bg-black/40 border border-zinc-850 text-white rounded px-3 py-2 text-xs h-14 resize-none custom-scrollbar overflow-y-auto no-field-sizing"
                   />
                 </div>
+              )}
+
+              {renderItemLocalSampling(
+                editingGroupItem,
+                setEditingGroupItem,
+                editingGroupItem.provider,
+                groups.find((g) => g.id === editingGroupItem.groupId)?.capability || 'chat',
+                showEditItemLocalSampling,
+                setShowEditItemLocalSampling
               )}
 
               <DialogFooter className="mt-4 flex justify-between w-full gap-3">

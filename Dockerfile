@@ -8,7 +8,7 @@ RUN npm ci
 
 # Copy sources and compile static export
 COPY dashboard/ ./
-COPY data/models.json /build/data/models.json
+COPY providers/ /build/providers/
 RUN npm run build
 
 # --- Stage 2: Final FastAPI/Python Production Image ---

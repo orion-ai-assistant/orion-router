@@ -17,7 +17,7 @@ def test_catalog_has_one_source_for_models_and_local_defaults():
     assert LOCAL_SAMPLING_DEFAULTS == {
         "top_p": 0.95, "top_k": 64, "min_p": 0.05, "repeat_penalty": 1,
     }
-    assert len([model for model in catalog["models"] if model.get("seed", True)]) == 11
+    assert len([model for model in catalog["models"] if model.get("seed", True)]) == 12
     assert all(model.get("seed") is False for model in catalog["models"] if "provider" not in model)
     assert "pricing" not in bundled_model("gemini", "chat")
     assert bundled_model("deepseek", "chat")["name"] == "deepseek-flash"
@@ -33,7 +33,7 @@ def test_database_seed_uses_catalog_without_overwriting_registered_models():
 
     asyncio.run(DatabaseManager()._seed_default_models(FakeConnection()))
     inserts = [(query, args) for query, args in calls if "INSERT INTO router_models" in query]
-    assert len(inserts) == 11
+    assert len(inserts) == 12
     assert all("ON CONFLICT (name, capability) DO NOTHING" in query for query, _ in inserts)
     local_chat = next(args for _, args in inserts if args[0] == bundled_model("local", "chat")["name"])
     assert json.loads(local_chat[4])["local_sampling"] == LOCAL_SAMPLING_DEFAULTS

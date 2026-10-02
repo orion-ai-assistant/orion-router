@@ -1,4 +1,4 @@
-import catalog from '../../data/models.json';
+import catalog from '../../providers/local/models.json';
 
 const defaults = catalog.models.find((model) => model.provider === 'local' && model.capability === 'chat');
 if (!defaults?.settings?.local_sampling || defaults.temperature === undefined) {

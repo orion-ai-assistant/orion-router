@@ -1,0 +1,59 @@
+{
+  "models": [
+    {
+      "name": "local-chat",
+      "provider": "local",
+      "capability": "chat",
+      "temperature": 1,
+      "settings": {
+        "local_sampling": {
+          "top_p": 0.95,
+          "top_k": 64,
+          "min_p": 0.05,
+          "repeat_penalty": 1
+        }
+      },
+      "pricing": {
+        "input": 0,
+        "output": 0,
+        "think": 0
+      },
+      "thinking": {
+        "type": "budget",
+        "auto_value": -1,
+        "min": 1,
+        "max": 8192
+      }
+    },
+    {
+      "name": "local-embed",
+      "provider": "local",
+      "capability": "embed",
+      "pricing": {
+        "input": 0,
+        "output": 0,
+        "think": 0
+      }
+    },
+    {
+      "name": "local-tts",
+      "provider": "local",
+      "capability": "tts",
+      "pricing": {
+        "input": 0,
+        "output": 0,
+        "think": 0
+      }
+    },
+    {
+      "name": "local-stt",
+      "provider": "local",
+      "capability": "stt",
+      "pricing": {
+        "input": 0,
+        "output": 0,
+        "think": 0
+      }
+    }
+  ]
+}

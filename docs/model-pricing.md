@@ -1,6 +1,6 @@
 # Model catalog pricing
 
-`data/models.json` stores USD prices per **one million tokens** by default:
+`providers/*/models.json` stores USD prices per **one million tokens** by default:
 
 ```json
 {"name": "example-chat", "provider": "example", "capability": "chat", "pricing": {"input": 0.15, "output": 0.6, "think": 0.6}}
