@@ -1126,10 +1126,16 @@ export default function ModelsPage() {
       type = dbSchema.type;
     } else if (isBuiltIn && builtInSchema) {
       type = builtInSchema.type;
+    } else if (formState.thinking_level) {
+      if (formState.thinking_level === '-1' || !isNaN(Number(formState.thinking_level))) {
+        type = 'budget';
+      } else {
+        type = 'level';
+      }
     }
 
     const schema = dbSchema && dbSchema.type !== 'none' ? dbSchema : builtInSchema;
-    const allowedType = builtInSchema?.type || schema?.type;
+    const allowedType = isBuiltIn && builtInSchema?.type ? builtInSchema.type : null;
 
     return (
       <div className="flex flex-col gap-3 bg-zinc-900/60 p-3 rounded-lg border border-zinc-800/80 mb-3">
