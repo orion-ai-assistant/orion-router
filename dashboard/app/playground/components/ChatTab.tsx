@@ -697,12 +697,9 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
           {(() => {
             if (selectedChatGroup) {
               return (
-                <div className="bg-[#18181b]/70 border border-zinc-850/80 rounded px-2.5 py-1.5 text-xs text-zinc-400 flex items-center justify-between cursor-default">
-                  <span className="text-zinc-500 text-[11px] truncate">
+                <div className="bg-[#18181b]/70 border border-zinc-850/80 rounded px-2.5 py-1.5 text-xs cursor-default">
+                  <span className="text-zinc-500 text-[11px]">
                     {locale === 'tr' ? 'Grup modellerinden yönetilir' : 'Configured per model in group'}
-                  </span>
-                  <span className="text-[10px] text-purple-400 font-mono font-medium shrink-0 ml-2">
-                    {locale === 'tr' ? 'Grup Ayarlı' : 'Per-Model'}
                   </span>
                 </div>
               );
