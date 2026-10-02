@@ -572,7 +572,7 @@ class DatabaseManager:
             )
             if not rows:
                 raise ValueError(f"Model group '{group['name']}' exists but has no active models.")
-            return [dict(r) for r in rows]
+            return [{"is_group": True, **dict(r)} for r in rows]
 
         row = await self.fetchrow(
             """

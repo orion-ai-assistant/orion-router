@@ -35,11 +35,12 @@ class RoutePlan:
 
     routes: tuple[ResolvedRoute, ...]
     requested_provider: str | None = None
+    is_group: bool = False
 
     @classmethod
     def direct(cls, model: str, provider: str | None) -> "RoutePlan":
         routes = (ResolvedRoute(provider=provider, model=model),) if provider else ()
-        return cls(routes=routes, requested_provider=provider)
+        return cls(routes=routes, requested_provider=provider, is_group=False)
 
     @property
     def primary_provider(self) -> str | None:

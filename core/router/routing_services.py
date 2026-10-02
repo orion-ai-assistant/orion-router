@@ -25,16 +25,19 @@ class RouteResolver:
     async def resolve(self, capability: str, model: str, provider: str | None) -> RoutePlan:
         records = await db_manager.resolve_model_route(capability, model)
         if records:
+            is_group = any(bool(r.get("is_group")) for r in records)
             return RoutePlan(
                 routes=tuple(ResolvedRoute.from_record(record) for record in records),
                 requested_provider=provider,
+                is_group=is_group,
             )
         if provider:
             return RoutePlan(
                 routes=(ResolvedRoute(provider=provider, model=model),),
                 requested_provider=provider,
+                is_group=False,
             )
-        return RoutePlan(routes=(), requested_provider=None)
+        return RoutePlan(routes=(), requested_provider=None, is_group=False)
 
 
 class ProviderKeyPool:

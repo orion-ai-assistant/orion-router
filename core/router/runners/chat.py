@@ -429,6 +429,12 @@ class ChatRunner:
 
             route_plan = RoutePlan.direct(model, provider)
 
+        if not route_resolution_error and route_plan.is_group and think_val not in (None, "", "api_default"):
+            route_resolution_error = (
+                f"Thinking cannot be specified when requesting model group '{model}'. "
+                "Thinking settings must be configured per model in group settings."
+            )
+
         log_id = await self.telemetry.create_processing_log(
             key_id,
             route_plan.primary_provider or provider or "unknown",

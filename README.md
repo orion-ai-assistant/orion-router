@@ -49,6 +49,8 @@ print(response.choices[0].message.content)
 
 > **🧠 Advanced Parameter Translation & Thinking:** Orion Router universally supports `temperature`, `tools`, and a unified **`thinking`** parameter (`"thinking": 2048` or `"thinking": "high"`). It automatically translates thinking to the upstream provider's native format (`thinking_budget`, `reasoning_effort`, etc.).
 > 
+> **🛡️ Thinking in Model Groups:** When calling a model group (`model="group-name"`), runtime `thinking` cannot be specified at the request level because models within the group may feature heterogeneous reasoning architectures. Thinking configurations are set per model in the Group settings and applied automatically during fallback execution.
+> 
 > **⚡ Bypass Router Defaults:** If you want to bypass dashboard-configured model defaults and send raw requests directly to providers, pass `"bypass_defaults": true` in the body or use the `X-Orion-Bypass-Defaults: true` HTTP header. See [API Usage Guide](docs/api-usage.md) for full details and examples.
 
 ## ✨ Key Features

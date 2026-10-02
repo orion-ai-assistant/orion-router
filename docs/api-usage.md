@@ -164,3 +164,35 @@ Yerel (`local`) modellerle çalışırken aşağıdaki standart sampling paramet
   "repeat_penalty": 1.1
 }
 ```
+
+---
+
+## 6. Model Grupları (Model Groups) ve Thinking Kuralı
+
+Orion Router'da bir Model Grubu (`model: "grup-adi"`) birden fazla modeli öncelik sırasına göre fallback zincirinde barındırır.
+
+> [!IMPORTANT]
+> **Model gruplarına istek atarken istek seviyesinde `thinking` parametresi belirtilemez.**
+
+### Neden?
+Bir grupta örneğin:
+1. `gemini-3.8-flash` (düşünme kapalı/API varsayılanı)
+2. `gemini-2.5-flash-lite` (bütçe: 4096 token)
+3. `o3-mini` (seviye: `"high"`)
+
+gibi farklı sağlayıcı ve farklı mimarilere sahip modeller bulunabilir. İstek sırasında tek bir global `thinking` parametresi zorlanamaz; aksi halde zincirdeki modeller arasında uyumsuzluk veya hata oluşur.
+
+### Nasıl Yapılandırılır?
+- Düşünme ayarları, Dashboard üzerindeki **Grup Yönetimi** (Groups) ekranında her modele özel olarak ayarlanır.
+- Grup çağrıldığında gruptaki aktif model, kendi grup içi ayarını otomatik uygular.
+- Eğer bir model grubuna API veya Playground üzerinden runtime `thinking` değeri gönderilirse router isteği reddeder:
+  ```json
+  {
+    "error": {
+      "message": "Thinking cannot be specified when requesting model group 'grup-adi'. Thinking settings must be configured per model in group settings.",
+      "type": "invalid_request_error"
+    }
+  }
+  ```
+- **Not:** `temperature` ve `system_prompt` parametreleri tüm modeller için ortak olduğundan, gruplara istek atarken bu parametreleri dilediğiniz gibi geçebilirsiniz.
+

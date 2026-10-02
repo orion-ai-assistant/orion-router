@@ -49,6 +49,8 @@ print(response.choices[0].message.content)
 
 > **🧠 Gelişmiş Parametre Çevirisi & Düşünme (Thinking):** Orion Router; `temperature`, `tools` ve birleşik tekil **`thinking`** parametresini (`"thinking": 2048` veya `"thinking": "high"`) evrensel olarak destekler. Arka planda hedef sağlayıcının beklediği formata (*thinking_budget*, *reasoning_effort* vb.) otomatik çevirir.
 > 
+> **🛡️ Model Gruplarında Thinking:** Model gruplarına çağrı yaparken (`model="grup-adi"`), gruptaki modeller farklı düşünme yapılarına (bütçe, seviye veya thinking desteği olmaması) sahip olabileceğinden istek seviyesinde runtime `thinking` parametresi belirtilemez. Düşünme ayarları grup ayarlarında model bazında tanımlanır ve fallback sırasında her model kendi yapılandırmasını otomatik kullanır.
+> 
 > **⚡ Varsayılanları Atla (Bypass Defaults):** Dashboard panelinde modele tanımladığınız varsayılan ayarların (sıcaklık, düşünme vb.) otomatik doldurulmasını istemiyorsanız, isteğe `"bypass_defaults": true` gövde parametresi veya `X-Orion-Bypass-Defaults: true` HTTP başlığı ekleyebilirsiniz. Detaylı rehber ve örnekler için: [API Kullanım Kılavuzu](docs/api-usage.md).
 
 ## ✨ Öne Çıkan Özellikler

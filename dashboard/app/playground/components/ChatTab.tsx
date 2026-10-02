@@ -326,7 +326,7 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
     }
 
     const trimmedThinking = chatThinking.trim();
-    if (trimmedThinking && trimmedThinking !== 'api_default') {
+    if (!selectedChatGroup && trimmedThinking && trimmedThinking !== 'api_default') {
       payload.thinking = trimmedThinking;
     }
 
@@ -589,7 +589,6 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
     : models.some((model) => model.name === chatModel && model.capability === 'chat' && model.provider === 'local');
   const resolvedDefaults = getResolvedDefaults();
   const hasTempOverride = chatTemp !== '';
-  const hasThinkingOverride = chatThinking !== '';
   const hasSystemPromptOverride = chatSystemPrompt !== '';
 
   return (
@@ -667,10 +666,7 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
             <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('playground.thinking')}</label>
             {selectedChatGroup ? (
               <>
-                <span className={`text-[9px] font-medium px-1 py-0.5 rounded border transition-all cursor-help ${hasThinkingOverride
-                  ? 'text-zinc-600 border-zinc-800/40 line-through opacity-50'
-                  : 'text-purple-400 bg-purple-950/20 border-purple-500/10'
-                  }`}>
+                <span className="text-[9px] font-medium px-1 py-0.5 rounded border transition-all cursor-help text-purple-400 bg-purple-950/20 border-purple-500/10">
                   {t('playground.defaultGroup')}
                 </span>
                 <div className="absolute top-full right-0 mt-1 hidden group-hover:block z-50 bg-[#242427]/98 border border-zinc-700/60 text-zinc-200 text-[10px] p-2.5 rounded shadow-xl whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar pointer-events-none min-w-[220px]">
@@ -699,11 +695,21 @@ export default function ChatTab({ models, groups }: ChatTabProps) {
             )}
           </div>
           {(() => {
-            const group = groups.find((g) => g.name === chatModel && g.capability === 'chat');
-            const modelName = group?.items?.[0]?.name || chatModel;
-            const model = models.find((m) => m.name === modelName && m.capability === 'chat');
-            const groupItem = group?.items?.[0];
-            const defaultThinking = groupItem?.thinking_level || model?.thinking_level || null;
+            if (selectedChatGroup) {
+              return (
+                <div className="bg-[#18181b]/70 border border-zinc-850/80 rounded px-2.5 py-1.5 text-xs text-zinc-400 flex items-center justify-between cursor-default">
+                  <span className="text-zinc-500 text-[11px] truncate">
+                    {locale === 'tr' ? 'Grup modellerinden yönetilir' : 'Configured per model in group'}
+                  </span>
+                  <span className="text-[10px] text-purple-400 font-mono font-medium shrink-0 ml-2">
+                    {locale === 'tr' ? 'Grup Ayarlı' : 'Per-Model'}
+                  </span>
+                </div>
+              );
+            }
+
+            const model = models.find((m) => m.name === chatModel && m.capability === 'chat');
+            const defaultThinking = model?.thinking_level || null;
             const thinkingSchema = model?.builtin_thinking || (model?.thinking && model.thinking.type !== 'none' ? model.thinking : null);
             
             if (thinkingSchema?.type === 'level') {
