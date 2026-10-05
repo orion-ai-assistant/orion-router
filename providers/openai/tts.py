@@ -8,6 +8,7 @@ import logging
 
 from providers.base import BaseTTS
 from core.http_client import get_http_client
+from core.audio_container import finalize_buffered_wav
 
 _BASE_URL = "https://api.openai.com"
 
@@ -70,6 +71,9 @@ class OpenAITTSProvider(BaseTTS):
 
         content_type = response.headers.get("content-type", "audio/mpeg")
         audio_bytes = response.content
+        if audio_bytes[:4] == b'RIFF' and audio_bytes[8:12] == b'WAVE':
+            audio_bytes = finalize_buffered_wav(audio_bytes)
+            content_type = 'audio/wav'
 
         # OpenAI TTS sadece girdi karakter sayısı üzerinden faturalandırır,
         # çıktı (ses) için ayrı ücret yoktur.

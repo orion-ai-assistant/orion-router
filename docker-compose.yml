@@ -7,7 +7,7 @@ services:
     container_name: router
     restart: unless-stopped
     ports:
-      - "${ROUTER_PORT}:${ROUTER_PORT}"
+      - "${ORION_ROUTER_TLS_PORT:-9443}:${ORION_ROUTER_TLS_PORT:-9443}"
     environment:
       - POSTGRES_HOST=router-db
       - POSTGRES_PORT=5432

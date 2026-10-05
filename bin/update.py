@@ -84,7 +84,7 @@ def main():
         if r_npm.returncode == 0:
             record_npm_install(DASHBOARD)
     
-    router_port = os.getenv("ROUTER_PORT", "20128")
+    router_port = os.getenv("ORION_ROUTER_TLS_PORT", "9443")
     env = {**os.environ, "NEXT_PUBLIC_ROUTER_PORT": router_port}
     r_build = run("npm run build", cwd=DASHBOARD, shell=True, env=env)
     if r_build.returncode != 0:

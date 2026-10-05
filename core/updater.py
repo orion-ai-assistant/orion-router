@@ -200,7 +200,7 @@ def _perform_update_worker():
                 _append_log("npm install uyarısı alındı, build işlemine devam ediliyor.")
 
         # npm run build
-        router_port = os.getenv("ROUTER_PORT", "20128")
+        router_port = os.getenv("ORION_ROUTER_TLS_PORT", "9443")
         build_env = {"NEXT_PUBLIC_ROUTER_PORT": router_port}
         build_res = _run_cmd("npm run build", cwd=DASHBOARD_DIR, env=build_env)
         if build_res.returncode != 0:

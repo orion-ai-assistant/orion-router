@@ -26,7 +26,7 @@
   "auth.title": "Orion Dashboard",
   "auth.description": "Panele erişmek için yönetici şifrenizi girin.",
   "auth.passwordPlaceholder": "Yönetici şifresi",
-  "auth.unlock": "Kilidi Aç",
+  "auth.unlock": "Giriş Yap",
   "auth.invalidKey": "Şifre yanlış",
   "auth.failed": "Kimlik doğrulama başarısız",
   "auth.defaultPasswordInfo": "Şifrenizi daha sonra ayarlardan değiştirebilirsiniz. Varsayılan şifre:",

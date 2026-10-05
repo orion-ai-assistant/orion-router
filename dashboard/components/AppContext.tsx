@@ -5,6 +5,8 @@ import { getAdminKey, setAdminKey, UNAUTHORIZED_EVENT, adminFetch } from '@/lib/
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { copyText } from '@/lib/clipboard';
+import RouterDirectory from '@/components/RouterDirectory';
 import { AlertCircle, CheckCircle, AlertTriangle, X, Sparkles, CheckCircle2 } from 'lucide-react';
 import { 
   detectLocale, 
@@ -138,8 +140,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isDefaultPassword, setIsDefaultPassword] = useState<boolean>(false);
   const [defaultPasswordValue, setDefaultPasswordValue] = useState<string>('');
   const [showLogin, setShowLogin] = useState<boolean>(false);
+  const [routerSelectionReady, setRouterSelectionReady] = useState(false);
   const [adminKeyInput, setAdminKeyInput] = useState<string>('');
   const [loginError, setLoginError] = useState<string>('');
+  const [loggingIn, setLoggingIn] = useState(false);
+  const loginInFlight = React.useRef(false);
 
   // Banner State
   const [activeBannerId, setActiveBannerId] = useState<string>('default');
@@ -375,17 +380,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const login = async () => {
+    if (!routerSelectionReady) return;
     const key = adminKeyInput.trim();
-    if (!key) return;
+    if (!key || loginInFlight.current) return;
+    loginInFlight.current = true;
+    setLoggingIn(true);
     setLoginError('');
 
     try {
-      // Temporarily set it in session to test if it's correct
-      setAdminKey(key);
-      const res = await fetch('/dashboard/api/stats', {
+      const res = await fetch('/dashboard/api/auth/login', {
+        method: 'POST',
         headers: { 'X-Admin-Key': encodeURIComponent(key) }
       });
       if (res.ok) {
+        setAdminKey(key);
         setAdminKeyState(key);
         setIsAuthenticated(true);
         setShowLogin(false);
@@ -399,6 +407,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       setLoginError(t('auth.failed'));
       setAdminKey('');
+    } finally {
+      loginInFlight.current = false;
+      setLoggingIn(false);
     }
   };
 
@@ -490,7 +501,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       <Dialog open={showLogin} onOpenChange={() => {}} modal>
         <DialogContent
           showCloseButton={false}
-          className="max-w-[500px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl"
+          className="max-w-[560px] max-h-[90vh] overflow-y-auto border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl"
         >
           <DialogHeader>
             <DialogTitle className="text-xl font-heading font-semibold text-white">{t('auth.title')}</DialogTitle>
@@ -498,6 +509,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               {t('auth.description')}
             </DialogDescription>
           </DialogHeader>
+
 
           <div className="my-4">
             <Input
@@ -521,17 +533,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                   style={{ fontSize: 'clamp(8px, 2.6cqw, 11px)' }}
                 >
                   <span>{t('auth.defaultPasswordInfo')}</span>
-                  <code 
+                  <button type="button"
                     className="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-white font-mono cursor-pointer hover:bg-zinc-800 hover:border-zinc-700 transition-colors active:scale-95 duration-100 inline-block align-middle" 
                     style={{ fontSize: 'clamp(8px, 2.6cqw, 11px)' }}
                     title={t('common.copy')} 
-                    onClick={() => { 
-                      navigator.clipboard.writeText(defaultPasswordValue); 
-                      showToast(t('common.copied'), 'success'); 
+                    onClick={async () => {
+                      if (await copyText(defaultPasswordValue)) {
+                        showToast(t('common.copied'), 'success');
+                      } else {
+                        showToast(locale.startsWith('tr') ? 'Şifre kopyalanamadı.' : 'Could not copy the password.', 'error');
+                      }
                     }}
                   >
                     {defaultPasswordValue}
-                  </code>
+                  </button>
                 </div>
               </div>
             )}
@@ -540,11 +555,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           <DialogFooter className="mt-4">
             <Button
               onClick={login}
+              disabled={loggingIn || !routerSelectionReady}
+              aria-busy={loggingIn}
               className="w-full bg-white text-black hover:bg-zinc-200 font-medium py-3 rounded-md transition-all shadow-lg hover:shadow-xl"
             >
-              {t('auth.unlock')}
+              {loggingIn ? (locale.startsWith('tr') ? 'Giriş yapılıyor…' : 'Signing in…') : t('auth.unlock')}
             </Button>
           </DialogFooter>
+          {showLogin && <RouterDirectory locale={locale} onCurrentSelection={setRouterSelectionReady} />}
         </DialogContent>
       </Dialog>
 

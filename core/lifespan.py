@@ -51,7 +51,7 @@ def print_active_services_banner(
     GRAY   = "\033[90m"
     RESET  = "\033[0m"
 
-    port = router_port or "20128"
+    port = router_port or str(__import__('core.config', fromlist=['TLS_PORT']).TLS_PORT)
     is_docker = os.path.exists("/.dockerenv")
 
     # Try to resolve IP
@@ -62,21 +62,23 @@ def print_active_services_banner(
         else:
             local_ip = get_local_ip()
 
-    public_port = dashboard_port or port
-    dashboard_url = f"http://127.0.0.1:{public_port}"
-    local_url = f"http://{local_ip}:{public_port}"
+    from core import config
+    dashboard_url = f"http://localhost:{config.LOCAL_HTTP_PORT}/dashboard"
+    local_url = f"https://{local_ip}:{port}/dashboard"
 
     try:
         from bin.i18n import t
-        local_net_label = t("banner_local_network")
+        local_net_label = t("banner_other_devices_https")
+        local_pc_label = t("banner_this_pc_http")
         cmds_hint = t("banner_commands_hint")
     except Exception:
-        local_net_label = "Local Network"
+        local_net_label = "Other devices (HTTPS)"
+        local_pc_label = "This PC (HTTP)"
         cmds_hint = "Commands: orionrouter start | stop | logs | help"
 
     border_line = f"{GRAY}────────────────────────────────────────────────{RESET}"
     title_colored = f"{BLUE}{BOLD}ORION ROUTER{RESET}"
-    dash_colored  = f"{BLUE}➜{RESET}  {BOLD}Dashboard:{RESET}   {CYAN}{UNDERLINE}{dashboard_url}{RESET}"
+    dash_colored  = f"{BLUE}➜{RESET}  {BOLD}{local_pc_label}:{RESET}   {CYAN}{UNDERLINE}{dashboard_url}{RESET}"
     ip_colored    = f"{BLUE}➜{RESET}  {BOLD}{local_net_label}:{RESET}    {CYAN}{UNDERLINE}{local_url}{RESET}"
 
     # Print the banner block with clean newlines to separate from surrounding logs
@@ -165,6 +167,16 @@ async def lifespan(app: FastAPI):
     #  STARTUP                                                             #
     # ------------------------------------------------------------------ #
     logger.info("Starting up Orion Custom Service Router")
+    from core import config
+    from core.mdns import router_id
+    from core.tls_identity import load_identity
+    app.state.tls_identity = load_identity(config.TLS_DIRECTORY, router_id(config.MDNS_ID_FILE))
+    logger.info("Router TLS identity id=%s SPKI SHA-256=%s", app.state.tls_identity.id, app.state.tls_identity.fp)
+    try:
+        from core.local_installation import refresh_managed_installation
+        refresh_managed_installation(config._ROOT, app.state.tls_identity, config.MDNS_ID_FILE, config.TLS_PORT)
+    except (OSError, ValueError, RuntimeError) as exc:
+        logger.warning('Local Router registration unavailable (%s); TLS identity retained', type(exc).__name__)
 
     # PostgreSQL tam hazır olmadan önce FastAPI başlayabilir; retry ile bekle
     max_retries = 3
@@ -223,11 +235,23 @@ async def lifespan(app: FastAPI):
             # Uvicorn'un 'Application startup complete.' logunu basması için
             # çok kısa (50ms), bloklamayan bir arka plan beklemesi yaparız.
             await asyncio.sleep(0.05)
-            print_active_services_banner(ROUTER_PORT)
+            print_active_services_banner(str(config.TLS_PORT))
 
         asyncio.create_task(_show_banner_after_startup())
 
-    yield
+    from core.mdns import Advertiser
+    from core.tls_server import LocalHTTPListener
+    local_http_listener = LocalHTTPListener(app)
+    await local_http_listener.start()
+    app.state.local_http_listener = local_http_listener
+    advertiser = Advertiser()
+    app.state.mdns_advertiser = advertiser
+    advertiser.start()
+    try:
+        yield
+    finally:
+        await advertiser.close()
+        await local_http_listener.close()
 
     # ------------------------------------------------------------------ #
     #  SHUTDOWN                                                            #

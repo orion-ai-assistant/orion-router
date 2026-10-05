@@ -54,6 +54,48 @@ def _optional_price(value) -> float | None:
 
 
 
+@router.post("/api/auth/login", dependencies=[Depends(verify_admin)])
+async def admin_login():
+    """Validate the admin key without calculating dashboard statistics."""
+    return Response(status_code=204, headers={"Cache-Control": "no-store"})
+
+@router.get("/api/tls/identity", dependencies=[Depends(verify_admin)])
+async def tls_identity(request: Request):
+    """Fingerprint for deliberate trust establishment via the local admin panel."""
+    from core.mdns import display_name, lan_addresses, container
+    from core import config
+    addresses = () if container() and not config.MDNS_CONTAINER_HOST_NETWORK else lan_addresses(config.MDNS_INTERFACES, config.TLS_HOST)
+    return {**request.app.state.tls_identity.payload(display_name()), "port": config.TLS_PORT,
+            "local_dashboard_url": f'http://localhost:{config.LOCAL_HTTP_PORT}/dashboard',
+            "lan_dashboard_urls": [f'https://{address}:{config.TLS_PORT}/dashboard' for address in addresses]}
+
+
+@router.get("/api/routers/discover", dependencies=[Depends(verify_admin)])
+async def router_directory(request: Request):
+    from core.router_directory import directory_cache
+    return {'routers': await directory_cache.get(request.app.state.tls_identity.id)}
+
+
+@router.get('/api/routers/browse')
+async def browse_router_directory(request: Request):
+    """Login-only navigation hints; no credentials or trust enrollment."""
+    import ipaddress
+    from core.mdns import LAN_NETWORKS
+    from core.router_directory import directory_cache
+    try:
+        peer = ipaddress.ip_address(request.client.host)
+        allowed = (request.scope.get('orion_loopback_listener') and peer.is_loopback) or (
+            request.scope.get('orion_tls_listener') and request.scope.get('scheme') == 'https'
+            and (peer.is_loopback or any(peer in network for network in LAN_NETWORKS)))
+    except (ValueError, AttributeError):
+        allowed = False
+    if not allowed:
+        raise HTTPException(status_code=403, detail='local_network_required')
+    from core.mdns import display_name
+    return {'routers': await directory_cache.get(request.app.state.tls_identity.id),
+            'current': {'id': request.app.state.tls_identity.id, 'name': display_name()}}
+
+
 @router.get("/api/settings/is-default-password")
 async def is_default_password():
     from core.security import verify_secret
@@ -1038,7 +1080,7 @@ async def get_admin_ui(path: str = ""):
     # Dev mode: Next.js dev server'a (3001) otomatik yönlendir
     if os.environ.get("UVICORN_RELOAD") == "1":
         # path boşsa direkt 3001/dashboard, doluysa 3001/dashboard/path
-        target_url = f"http://127.0.0.1:3001/dashboard/{path}" if path else "http://127.0.0.1:3001/dashboard"
+        target_url = f"https://127.0.0.1:3001/dashboard/{path}" if path else "https://127.0.0.1:3001/dashboard"
         return RedirectResponse(url=target_url)
 
     from core.config import DASHBOARD_OUT_DIR
@@ -1076,7 +1118,7 @@ async def get_admin_ui(path: str = ""):
     return Response(
         content=(
             "Admin UI not found. Please build the Next.js project. "
-            "Dev mode: use http://127.0.0.1:3001/dashboard for the UI."
+            "Dev mode: use https://127.0.0.1:3001/dashboard for the UI."
         ),
         status_code=404,
     )

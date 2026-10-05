@@ -1,0 +1,12 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const ts = require('../../dashboard/node_modules/typescript');
+const source = fs.readFileSync(path.join(__dirname, '../../dashboard/lib/router-navigation.ts'), 'utf8');
+const compiled = ts.transpileModule(source, {compilerOptions: {module: ts.ModuleKind.CommonJS}}).outputText;
+const exported = {};
+new Function('exports', compiled)(exported);
+const safe = exported.safeRouterDashboard;
+for (const url of ['https://192.168.1.20:9443/dashboard', 'https://10.0.0.2:8443/dashboard', 'http://localhost:20128/dashboard', 'http://127.0.0.1:20128/dashboard']) assert.equal(safe(url), url);
+for (const url of ['http://192.168.1.20:20128/dashboard', 'http://localhost:8910/dashboard', 'https://evil.example/dashboard', 'https://8.8.8.8/dashboard', 'https://user:secret@192.168.1.20/dashboard', 'javascript:alert(1)', 'https://192.168.1.20/dashboard?token=secret', 'https://192.168.1.20/dashboard#token', 'https://192.168.1.20/evil']) assert.equal(safe(url), null, url);
+console.log('Router navigation URLs: LAN HTTPS and exact local HTTP accepted; unsafe targets rejected.');

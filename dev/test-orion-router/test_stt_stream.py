@@ -3,7 +3,7 @@ import json
 import unittest
 from unittest.mock import patch, AsyncMock
 from fastapi.testclient import TestClient
-from main import app
+from main import app, tls_app
 from core.dependencies import authenticate_websocket
 
 class MockBackendWS:
@@ -39,9 +39,9 @@ class TestSTTStreaming(unittest.TestCase):
     def test_websocket_stream_unauthorized(self):
         """Token olmadan veya geçersiz tokenla bağlanıldığında bağlantı reddedilmeli."""
         app.dependency_overrides.pop(authenticate_websocket, None)
-        client = TestClient(app)
+        client = TestClient(tls_app, base_url='https://localhost')
         try:
-            with client.websocket_connect("/v1/audio/transcriptions/stream") as ws:
+            with client.websocket_connect("wss://localhost/v1/audio/transcriptions/stream") as ws:
                 self.fail("Bağlantı token olmadan kabul edilmemeliydi.")
         except Exception:
             pass  # Beklenen davranış: WebSocketDisconnect / 1008
@@ -58,8 +58,8 @@ class TestSTTStreaming(unittest.TestCase):
         mock_backend.queue.put_nowait(json.dumps({"type": "final", "text": "merhaba nasılsın"}))
 
         with patch("api.transcriptions.websockets.connect", side_effect=lambda url: MockConnectCM(mock_backend)):
-            client = TestClient(app)
-            with client.websocket_connect("/v1/audio/transcriptions/stream?token=test") as ws:
+            client = TestClient(tls_app, base_url='https://localhost')
+            with client.websocket_connect("wss://localhost/v1/audio/transcriptions/stream?token=test") as ws:
                 # 1. Backend'den live mesajı al
                 msg1 = ws.receive_json()
                 self.assertEqual(msg1["type"], "live")
@@ -106,8 +106,8 @@ class TestSTTStreaming(unittest.TestCase):
              patch("api.transcriptions.db_manager.update_streaming_log", side_effect=mock_update), \
              patch("api.transcriptions.websockets.connect", side_effect=lambda url: MockConnectCM(mock_backend)):
 
-            client = TestClient(app)
-            with client.websocket_connect("/v1/audio/transcriptions/stream?token=test") as ws:
+            client = TestClient(tls_app, base_url='https://localhost')
+            with client.websocket_connect("wss://localhost/v1/audio/transcriptions/stream?token=test") as ws:
                 _ = ws.receive_json()  # live
                 ws.send_bytes(b"\x00" * 3200)
                 _ = ws.receive_json()  # final

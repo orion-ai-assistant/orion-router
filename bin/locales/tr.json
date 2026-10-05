@@ -53,6 +53,8 @@
     "config_key_created": "[orion-router] Yeni ENCRYPTION_KEY oluşturuldu ve .env dosyasına eklendi.",
     "config_key_failed": "[orion-router] ENCRYPTION_KEY oluşturulamadı: {e}",
     "banner_local_network": "Yerel Ağ",
+    "banner_this_pc_http": "Bu PC (HTTP)",
+    "banner_other_devices_https": "Diğer cihazlar (HTTPS)",
     "banner_commands_hint": "Komutlar: orionrouter start | stop | logs | help",
     "pg_checking_integrity": "PostgreSQL bütünlüğü kontrol ediliyor...",
     "pg_corrupted_rebuilding": "PostgreSQL dosyaları bozulmuş! Siliniyor ve yeniden kuruluyor...",

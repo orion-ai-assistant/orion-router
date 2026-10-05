@@ -20,7 +20,7 @@ from providers.base import BaseSTT
 from providers.local.stt import LocalSTTProvider
 from providers.gemini.stt import GeminiSTTProvider
 from dynamic_router import DynamicLLMRouter
-from main import app
+from main import app, tls_app
 
 
 class TestWhisperSTTIntegration(unittest.TestCase):
@@ -105,7 +105,7 @@ class TestWhisperSTTIntegration(unittest.TestCase):
         app.state.dynamic_router = mock_router
 
         try:
-            client = TestClient(app)
+            client = TestClient(tls_app, base_url='https://localhost')
             dummy_audio = io.BytesIO(b"FAKE_AUDIO_DATA_FOR_UNIT_TESTING")
 
             response = client.post(

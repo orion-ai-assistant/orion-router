@@ -44,7 +44,8 @@ if (isDev) {
   nextConfig.rewrites = async () => {
     const backendUrl =
       process.env.BACKEND_URL ||
-      `http://127.0.0.1:${process.env.ROUTER_PORT || "20128"}`;
+      `https://127.0.0.1:${process.env.ORION_ROUTER_TLS_PORT || "9443"}`;
+    if (!backendUrl.startsWith('https://')) throw new Error('Router backend requires HTTPS');
     return [
       {
         source: "/v1/:path*",

@@ -13,7 +13,7 @@ import logging
 import os
 import sys
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -139,7 +139,24 @@ class LocalhostWarningMiddleware(BaseHTTPMiddleware):
 #  Uygulama
 # ---------------------------------------------------------------------------
 app = FastAPI(title="Orion Router", lifespan=lifespan)
-app.add_middleware(LocalhostWarningMiddleware)
+from core.tls_server import _TLSApplication
+tls_app = _TLSApplication(app)
+
+class RequireTLS:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        secure = scope.get('orion_tls_listener') and scope.get('scheme') in ('https', 'wss')
+        local = scope.get('orion_loopback_listener') and scope.get('scheme') in ('http', 'ws')
+        if scope['type'] in ('http', 'websocket') and not (secure or local):
+            if scope['type'] == 'websocket':
+                await send({'type': 'websocket.close', 'code': 1008})
+            else:
+                await JSONResponse({'detail': 'tls_required'}, status_code=403)(scope, receive, send)
+            return
+        await self.app(scope, receive, send)
+
 
 # CORS ayarları: frontend geliştirme sunucusunun (localhost:3001) API'ye doğrudan erişebilmesi için
 app.add_middleware(
@@ -149,6 +166,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(RequireTLS)
 
 # Dashboard UI statik dosyaları
 from core.config import DASHBOARD_OUT_DIR
@@ -193,6 +211,14 @@ app.include_router(files.router)
 async def health():
     return {"status": "ok"}
 
+@app.get("/api/v1/tls/identity", tags=["TLS"])
+async def tls_identity(request: Request):
+    # This secondary listener disables proxy headers; forwarded scheme is no proof.
+    if not request.scope.get("orion_tls_listener") or request.scope.get("scheme") != "https":
+        raise HTTPException(status_code=403, detail="tls_required")
+    from core.mdns import display_name
+    return request.app.state.tls_identity.payload(display_name())
+
 @app.get("/", include_in_schema=False)
 async def root():
     return RedirectResponse(url="/dashboard")
@@ -204,13 +230,19 @@ async def root():
 if __name__ == "__main__":
     import uvicorn
 
-    from core.config import ROUTER_HOST, ROUTER_PORT
+    from core import config
+    from core.mdns import router_id
+    from core.tls_identity import load_identity
+    identity = load_identity(config.TLS_DIRECTORY, router_id(config.MDNS_ID_FILE))
 
     reload = os.getenv("UVICORN_RELOAD", "").lower() in ("1", "true", "yes")
     uvicorn.run(
-        "main:app",
-        host=ROUTER_HOST,
-        port=int(ROUTER_PORT),
+        "main:tls_app",
+        host=config.TLS_HOST,
+        port=config.TLS_PORT,
+        ssl_keyfile=str(identity.key_path),
+        ssl_certfile=str(identity.certificate_path),
+        proxy_headers=False,
         log_level=os.getenv("UVICORN_LOG_LEVEL", "info"),
         reload=reload,
         reload_dirs=["providers", "api", "core", "database"] if reload else None,

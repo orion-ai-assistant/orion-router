@@ -300,20 +300,20 @@ export default function SttTab({ models, groups }: SttTabProps) {
 
   const getApiBaseUrl = () => {
     if (process.env.NODE_ENV === 'development') {
-      const port = process.env.NEXT_PUBLIC_ROUTER_PORT || '20129';
+      const port = process.env.NEXT_PUBLIC_ROUTER_PORT || '9444';
       if (typeof window !== 'undefined') {
-        return `http://${window.location.hostname}:${port}`;
+        return `https://${window.location.hostname}:${port}`;
       }
-      return `http://127.0.0.1:${port}`;
+      return `https://127.0.0.1:${port}`;
     }
     return '';
   };
 
   const getWsBaseUrl = () => {
     if (typeof window === 'undefined') return '';
-    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const proto = window.location.protocol === 'http:' ? 'ws:' : 'wss:';
     if (process.env.NODE_ENV === 'development') {
-      const port = process.env.NEXT_PUBLIC_ROUTER_PORT || '20129';
+      const port = process.env.NEXT_PUBLIC_ROUTER_PORT || '9444';
       return `${proto}//${window.location.hostname}:${port}`;
     }
     return `${proto}//${window.location.host}`;

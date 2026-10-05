@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { ChevronDown, Check, RefreshCw, Sparkles, CheckCircle2, AlertCircle, Terminal, ExternalLink } from 'lucide-react';
 import { SUPPORTED_LOCALES, LOCALE_NAMES, Locale } from '@/lib/i18n';
+import { copyText } from '@/lib/clipboard';
 
 export default function SettingsPage() {
   const { 
@@ -38,6 +39,23 @@ export default function SettingsPage() {
 
   // System Update states
   const [checkingUpdate, setCheckingUpdate] = useState<boolean>(false);
+  const [tlsIdentity, setTlsIdentity] = useState<{id: string; name: string; fp: string; port: number;
+    local_dashboard_url: string; lan_dashboard_urls: string[]} | null>(null);
+  const [tlsError, setTlsError] = useState(false);
+  const copyConnectionAddress = async (url: string) => {
+    if (await copyText(url)) showToast(locale === 'tr' ? 'Kopyalandı' : 'Copied', 'success');
+    else showToast(t('common.error'), 'error');
+  };
+  const loadTlsIdentity = async () => {
+    setTlsError(false);
+    try {
+      const response = await adminFetch('/dashboard/api/tls/identity');
+      if (!response.ok) throw new Error('TLS identity unavailable');
+      setTlsIdentity(await response.json());
+    } catch {
+      setTlsError(true);
+    }
+  };
 
   const handleCheckUpdate = async () => {
     setCheckingUpdate(true);
@@ -304,6 +322,44 @@ export default function SettingsPage() {
           <p className="text-zinc-400 text-sm mt-1">{t('settings.description')}</p>
         </div>
       </header>
+
+      <div className="glass-panel p-6 mb-8 bg-[#18181b] border border-zinc-800 rounded-md max-w-6xl">
+        <h2 className="font-heading text-lg font-semibold mb-2">{locale === 'tr' ? 'Hub ile güvenli bağlantı' : 'Secure connection to Hub'}</h2>
+        <p className="text-zinc-400 text-sm mb-4">{locale === 'tr'
+          ? 'Aynı bilgisayarda kurulan Hub, Router kimliğini otomatik doğrular. Başka bilgisayardaki Hub için aşağıdaki kimliği ve SPKI parmak izini bir kez Hub bağlantı ekranına aktarın.'
+          : 'A Hub installed on this computer verifies this Router automatically. For a Hub on another computer, transfer the identity and SPKI fingerprint below to its connection screen once.'}</p>
+        <Button variant="outline" onClick={loadTlsIdentity}>{locale === 'tr' ? 'Bağlantı adreslerini ve kimliği göster' : 'Show connection addresses and identity'}</Button>
+        {tlsError && <p className="text-red-400 mt-3" role="alert">{t('common.error')}</p>}
+        {tlsIdentity && <div className="mt-4 space-y-2 text-sm">
+          <div className="pb-4 mb-4 border-b border-zinc-800 space-y-3">
+            <div>
+              <p className="font-medium">{locale === 'tr' ? 'Bu PC (HTTP)' : 'This PC (HTTP)'}</p>
+              <div className="flex items-center gap-3 flex-wrap">
+                <a className="text-indigo-300 underline break-all" href={tlsIdentity.local_dashboard_url} target="_blank" rel="noopener noreferrer">{tlsIdentity.local_dashboard_url}</a>
+                <Button variant="outline" onClick={() => copyConnectionAddress(tlsIdentity.local_dashboard_url)}>{t('common.copy')}</Button>
+              </div>
+            </div>
+            <div>
+              <p className="font-medium">{locale === 'tr' ? 'Diğer cihazlar (HTTPS)' : 'Other devices (HTTPS)'}</p>
+              {(tlsIdentity.lan_dashboard_urls || []).map(url => <div key={url} className="flex items-center gap-3 flex-wrap">
+                <a className="text-indigo-300 underline break-all" href={url} target="_blank" rel="noopener noreferrer">{url}</a>
+                <Button variant="outline" onClick={() => copyConnectionAddress(url)}>{t('common.copy')}</Button>
+              </div>)}
+              {!tlsIdentity.lan_dashboard_urls?.length && <p className="text-zinc-400 text-xs">{locale === 'tr' ? 'Ağ adresi bulunamadı.' : 'No LAN address available.'}</p>}
+            </div>
+            <p className="text-zinc-400 text-xs">{locale === 'tr'
+              ? 'Bu PC adresi yalnız Router bilgisayarında kullanılır. Başka cihazlar için HTTPS adresini kopyalayın; localhost yerine elle IP yazmayın.'
+              : 'The local address works on the Router computer. Copy the HTTPS address for other devices; do not manually replace localhost with an IP.'}</p>
+          </div>
+          <p>{tlsIdentity.name} · HTTPS :{tlsIdentity.port}</p>
+          <p className="font-mono break-all">ID: {tlsIdentity.id}</p>
+          <p className="font-mono break-all select-all">SPKI SHA-256: {tlsIdentity.fp}</p>
+          <Button variant="outline" onClick={async () => {
+            try { await copyText(tlsIdentity.fp); showToast(locale === 'tr' ? 'Kopyalandı' : 'Copied', 'success'); }
+            catch { showToast(t('common.error'), 'error'); }
+          }}>{locale === 'tr' ? 'Parmak izini kopyala' : 'Copy fingerprint'}</Button>
+        </div>}
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start max-w-6xl">
         {/* Left Column: Language & Admin Auth */}

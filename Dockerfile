@@ -38,6 +38,6 @@ ENV DASHBOARD_OUT_DIR=/dashboard_out
 # 3. Install backend packages and dependencies
 RUN uv pip install --system --no-cache-dir .
 
-ENV ROUTER_PORT=20128
+ENV ORION_ROUTER_TLS_PORT=9443
 
 CMD ["python", "main.py"]

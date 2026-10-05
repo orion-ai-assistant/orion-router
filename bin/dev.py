@@ -31,6 +31,7 @@ from bin.common import (
 )
 
 from core.lifespan import print_active_services_banner
+from core.tls_local import open_health
 from bin.npm_integrity import npm_needs_install, record_npm_install
 from bin.i18n import t
 
@@ -67,13 +68,13 @@ def launch(router_port: str) -> list[tuple[str, subprocess.Popen]]:
     # Wait for FastAPI backend to be ready before launching Next.js dev server
     # to prevent ECONNREFUSED error on startup proxying
     info(t("waiting_for_backend"))
-    backend_url = f"http://127.0.0.1:{router_port}/health"
+    backend_url = f"https://127.0.0.1:{router_port}/health"
     start_time = time.time()
     while time.time() - start_time < 30:
         if backend.poll() is not None:
             break
         try:
-            with urllib.request.urlopen(backend_url, timeout=1.0) as resp:
+            with open_health(backend_url, timeout=1.0) as resp:
                 if resp.status == 200:
                     break
         except Exception:
@@ -90,7 +91,9 @@ def launch(router_port: str) -> list[tuple[str, subprocess.Popen]]:
         record_npm_install(DASHBOARD)
 
     frontend = subprocess.Popen(
-        f"npm run dev -- -p {UI_PORT} -H 0.0.0.0",
+        f'npm run dev -- -p {UI_PORT} -H 0.0.0.0 --experimental-https '
+        f'--experimental-https-key "{sys.modules["os"].environ["ORION_TLS_KEY"]}" '
+        f'--experimental-https-cert "{sys.modules["os"].environ["ORION_TLS_CERT"]}"',
         cwd=DASHBOARD,
         shell=True,
     )
@@ -143,7 +146,7 @@ def main() -> None:
         banner()
 
         run_silent([sys.executable, "-c", "import core.config"], cwd=ROOT)
-        router_port = read_env("ROUTER_DEV_PORT", "20129")
+        router_port = read_env("ORION_ROUTER_TLS_DEV_PORT", "9444")
         reuse_postgres = postgres_is_ready(PG_DATA, PG_PORT, PG_USER)
 
         ports_to_clean = [UI_PORT, int(router_port)] if reuse_postgres else [UI_PORT, int(router_port), PG_PORT]
@@ -165,14 +168,14 @@ def main() -> None:
         procs.extend(launch(router_port))
 
         def wait_for_server_and_print_banner(port: str) -> None:
-            backend_url = f"http://127.0.0.1:{port}/health"
+            backend_url = f"https://127.0.0.1:{port}/health"
             backend_ready = False
             frontend_ready = False
             start_time = time.time()
             while time.time() - start_time < 30:
                 if not backend_ready:
                     try:
-                        with urllib.request.urlopen(backend_url, timeout=1.0) as resp:
+                        with open_health(backend_url, timeout=1.0) as resp:
                             if resp.status == 200:
                                 backend_ready = True
                     except Exception:

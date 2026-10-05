@@ -35,6 +35,7 @@ from bin.common import (
 )
 
 from core.lifespan import print_active_services_banner
+from core.tls_local import open_health
 from bin.npm_integrity import npm_needs_install, record_npm_install
 from bin.i18n import t
 
@@ -133,7 +134,7 @@ def main() -> None:
         banner()
 
         run_silent([sys.executable, "-c", "import core.config"], cwd=ROOT)
-        router_port = read_env("ROUTER_PORT", "20128")
+        router_port = read_env("ORION_ROUTER_TLS_PORT", "9443")
         reuse_postgres = postgres_is_ready(PG_DATA, PG_PORT, PG_USER)
 
         ports_to_clean = [int(router_port)] if reuse_postgres else [int(router_port), PG_PORT]
@@ -159,11 +160,11 @@ def main() -> None:
 
         # ── Print Banner when server is ready ───────
         def wait_for_server_and_print_banner(port: str) -> None:
-            url = f"http://127.0.0.1:{port}/health"
+            url = f"https://127.0.0.1:{port}/health"
             start_time = time.time()
             while time.time() - start_time < DEFAULT_TIMEOUT:
                 try:
-                    with urllib.request.urlopen(url, timeout=1.0) as resp:
+                    with open_health(url, timeout=1.0) as resp:
                         if resp.status == 200:
                             time.sleep(2.0)
                             print_active_services_banner(port)

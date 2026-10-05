@@ -72,11 +72,11 @@ export default function EmbedTab({ models, groups }: EmbedTabProps) {
 
   const getApiBaseUrl = () => {
     if (process.env.NODE_ENV === 'development') {
-      const port = process.env.NEXT_PUBLIC_ROUTER_PORT || '20129';
+      const port = process.env.NEXT_PUBLIC_ROUTER_PORT || '9444';
       if (typeof window !== 'undefined') {
-        return `http://${window.location.hostname}:${port}`;
+        return `https://${window.location.hostname}:${port}`;
       }
-      return `http://127.0.0.1:${port}`;
+      return `https://127.0.0.1:${port}`;
     }
     return '';
   };

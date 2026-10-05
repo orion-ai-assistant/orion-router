@@ -174,6 +174,22 @@ _ensure_encryption_key()
 # --- Router (bu servis) ---
 ROUTER_HOST = os.getenv("ROUTER_HOST")
 ROUTER_PORT = os.getenv("ROUTER_PORT")
+TLS_HOST = os.getenv("ORION_ROUTER_TLS_HOST", ROUTER_HOST or "0.0.0.0")
+TLS_PORT = int(os.getenv("ORION_ROUTER_TLS_PORT", "9443"))
+LOCAL_HTTP_PORT = int(os.getenv("ORION_ROUTER_LOCAL_HTTP_PORT", "20128"))
+TLS_DIRECTORY = pathlib.Path(os.getenv("ORION_ROUTER_TLS_DIRECTORY", str(_PERSISTENT_DIR / "tls")))
+if not TLS_DIRECTORY.is_absolute():
+    TLS_DIRECTORY = _ROOT / TLS_DIRECTORY
+
+# Native LAN discovery. Container bridge addresses must never be advertised.
+MDNS_ENABLED = os.getenv("ORION_ROUTER_MDNS", "0" if _is_docker() else "1").lower() in ("1", "true", "yes")
+MDNS_HOSTNAME = os.getenv("ORION_ROUTER_MDNS_HOSTNAME", "")
+MDNS_NAME = os.getenv("ORION_ROUTER_MDNS_NAME", "")
+MDNS_INTERFACES = tuple(v.strip() for v in os.getenv("ORION_ROUTER_MDNS_INTERFACES", "").split(",") if v.strip())
+MDNS_ID_FILE = pathlib.Path(os.getenv("ORION_ROUTER_MDNS_ID_FILE", str(_PERSISTENT_DIR / "mdns-id")))
+if not MDNS_ID_FILE.is_absolute():
+    MDNS_ID_FILE = _ROOT / MDNS_ID_FILE
+MDNS_CONTAINER_HOST_NETWORK = os.getenv("ORION_ROUTER_MDNS_CONTAINER_HOST_NETWORK", "0") == "1"
 
 # --- Yerel Servis Adresleri ---
 LLM_HOST = os.getenv("LLM_HOST", "127.0.0.1")

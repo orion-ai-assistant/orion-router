@@ -16,6 +16,8 @@ dependencies = [
   "google-genai",
   "python-multipart>=0.0.9",
   "cryptography>=41.0.0",
+  "zeroconf>=0.148.0,<1",
+  "psutil>=6.0,<8",
 ]
 
 [tool.hatch.build.targets.wheel]

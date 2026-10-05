@@ -759,9 +759,17 @@ def set_env(router_port: str, pg_port: int, pg_db: str, pg_user: str, pg_pass: s
     os.environ["POSTGRES_DB"]             = pg_db
     os.environ["POSTGRES_USER"]           = pg_user
     os.environ["POSTGRES_PASSWORD"]       = pg_pass
-    os.environ["BACKEND_URL"]             = f"http://127.0.0.1:{router_port}"
+    os.environ["BACKEND_URL"]             = f"https://127.0.0.1:{router_port}"
     os.environ["NEXT_PUBLIC_ROUTER_PORT"] = router_port
     os.environ["UVICORN_RELOAD"]          = uvicorn_reload
     os.environ["ROUTER_PORT"]             = router_port
+    os.environ["ORION_ROUTER_TLS_PORT"]   = router_port
     os.environ["ROUTER_HOST"]             = "0.0.0.0"
     os.environ["ORION_NO_BANNER"]         = "1"
+    from core import config
+    from core.mdns import router_id
+    from core.tls_identity import load_identity
+    identity = load_identity(config.TLS_DIRECTORY, router_id(config.MDNS_ID_FILE))
+    os.environ["NODE_EXTRA_CA_CERTS"] = str(identity.certificate_path)
+    os.environ["ORION_TLS_CERT"] = str(identity.certificate_path)
+    os.environ["ORION_TLS_KEY"] = str(identity.key_path)

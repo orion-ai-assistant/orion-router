@@ -197,6 +197,7 @@ if [ "$MODE" = "local" ]; then
     else
       python3 -m pip install -e . || echo "WARNING: pip install failed. Continuing..."
     fi
+    python3 -m core.local_installation register || { echo "ERROR: Local Router identity registration failed."; exit 1; }
     echo -e "\n[4/5] Installing Dashboard dependencies (NPM)..."
     if [ -d "dashboard" ]; then
         (cd dashboard && npm install || echo "WARNING: npm install failed. Continuing...")
@@ -302,14 +303,19 @@ elif [ "$ACTION" = "stop" ]; then
     fi
     echo "[OK] Orion Router stopped."
 elif [ "$ACTION" = "logs" ]; then
-    PORT="20128"
+    PORT="9443"
     if [ -f "$PROJECT_DIR/.env" ]; then
-        ENV_PORT=$(grep -E "^ROUTER_PORT=" "$PROJECT_DIR/.env" | cut -d'=' -f2 | tr -d '\r\n ' || true)
+        ENV_PORT=$(grep -E "^ORION_ROUTER_TLS_PORT=" "$PROJECT_DIR/.env" | cut -d'=' -f2 | tr -d '\r\n ' || true)
         if [ -n "$ENV_PORT" ]; then
             PORT="$ENV_PORT"
         fi
     fi
-    URL="http://127.0.0.1:$PORT"
+    BROWSER_PORT="20128"
+    if [ -f "$PROJECT_DIR/.env" ]; then
+        LOCAL_ENV_PORT=$(grep -E "^ORION_ROUTER_LOCAL_HTTP_PORT=" "$PROJECT_DIR/.env" | cut -d'=' -f2 | tr -d '\r\n ' || true)
+        if [ -n "$LOCAL_ENV_PORT" ]; then BROWSER_PORT="$LOCAL_ENV_PORT"; fi
+    fi
+    URL="http://localhost:$BROWSER_PORT/dashboard"
 
     if command -v ipconfig >/dev/null 2>&1; then
         LOCAL_IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || echo "127.0.0.1")
@@ -318,7 +324,7 @@ elif [ "$ACTION" = "logs" ]; then
     else
         LOCAL_IP="127.0.0.1"
     fi
-    LOCAL_URL="http://${LOCAL_IP}:${PORT}"
+    LOCAL_URL="https://${LOCAL_IP}:${PORT}"
 
     echo -e "\n\033[90m────────────────────────────────────────────────\033[0m"
     echo -e "\033[94m\033[1mORION ROUTER\033[0m\n"
@@ -409,7 +415,7 @@ elif [ "$ACTION" = "start" ]; then
     else
         LOCAL_IP="127.0.0.1"
     fi
-    LOCAL_URL="http://${LOCAL_IP}:${PORT}"
+    LOCAL_URL="https://${LOCAL_IP}:${PORT}"
 
     echo -e "\n\033[90m────────────────────────────────────────────────\033[0m"
     echo -e "\033[94m\033[1mORION ROUTER\033[0m\n"
@@ -426,14 +432,19 @@ elif [ "$ACTION" = "stop" ]; then
     docker compose -f "$COMPOSE_FILE" -p orion-router stop
     echo "[OK] Container stopped successfully."
 elif [ "$ACTION" = "logs" ]; then
-    PORT="20128"
+    PORT="9443"
     if [ -f "$PROJECT_DIR/.env" ]; then
-        ENV_PORT=$(grep -E "^ROUTER_PORT=" "$PROJECT_DIR/.env" | cut -d'=' -f2 | tr -d '\r\n ' || true)
+        ENV_PORT=$(grep -E "^ORION_ROUTER_TLS_PORT=" "$PROJECT_DIR/.env" | cut -d'=' -f2 | tr -d '\r\n ' || true)
         if [ -n "$ENV_PORT" ]; then
             PORT="$ENV_PORT"
         fi
     fi
-    URL="http://127.0.0.1:$PORT"
+    BROWSER_PORT="20128"
+    if [ -f "$PROJECT_DIR/.env" ]; then
+        LOCAL_ENV_PORT=$(grep -E "^ORION_ROUTER_LOCAL_HTTP_PORT=" "$PROJECT_DIR/.env" | cut -d'=' -f2 | tr -d '\r\n ' || true)
+        if [ -n "$LOCAL_ENV_PORT" ]; then BROWSER_PORT="$LOCAL_ENV_PORT"; fi
+    fi
+    URL="http://localhost:$BROWSER_PORT/dashboard"
 
     if command -v ipconfig >/dev/null 2>&1; then
         LOCAL_IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || echo "127.0.0.1")
@@ -442,7 +453,7 @@ elif [ "$ACTION" = "logs" ]; then
     else
         LOCAL_IP="127.0.0.1"
     fi
-    LOCAL_URL="http://${LOCAL_IP}:${PORT}"
+    LOCAL_URL="https://${LOCAL_IP}:${PORT}"
 
     echo -e "\n\033[90m────────────────────────────────────────────────\033[0m"
     echo -e "\033[94m\033[1mORION ROUTER\033[0m\n"

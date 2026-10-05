@@ -43,11 +43,12 @@ DEV_PORT  = int(read_env("POSTGRES_DEV_PORT", ""))
 PROD_DATA = ROOT / ".pgdata-prod"
 PROD_PORT = int(read_env("POSTGRES_PORT", ""))
 
-ROUTER_PORT = int(os.environ.get("ROUTER_PORT") or read_env("ROUTER_PORT", "20128"))
-ROUTER_DEV_PORT = int(os.environ.get("ROUTER_DEV_PORT") or read_env("ROUTER_DEV_PORT", "20129"))
+ROUTER_PORT = int(os.environ.get("ORION_ROUTER_TLS_PORT") or read_env("ORION_ROUTER_TLS_PORT", "9443"))
+ROUTER_DEV_PORT = int(os.environ.get("ORION_ROUTER_TLS_DEV_PORT") or read_env("ORION_ROUTER_TLS_DEV_PORT", "9444"))
 UI_PORT = 3001  # Next.js dev server varsayılan portu
 
-ROUTER_PORTS = [ROUTER_PORT, ROUTER_DEV_PORT, UI_PORT]  # prod/dev router ve next.js portları
+LOCAL_HTTP_PORT = int(os.environ.get("ORION_ROUTER_LOCAL_HTTP_PORT") or read_env("ORION_ROUTER_LOCAL_HTTP_PORT", "20128"))
+ROUTER_PORTS = [ROUTER_PORT, ROUTER_DEV_PORT, LOCAL_HTTP_PORT, UI_PORT]
 
 QUIET_MODE = "--quiet" in sys.argv
 GRACEFUL_TIMEOUT = 5  # saniye

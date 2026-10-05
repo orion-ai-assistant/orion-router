@@ -160,6 +160,12 @@ Write-Host ""
 if ($Mode -eq "local") {
     Write-Host "[3/5] Installing Python packages (pip)..."
     python -m pip install -e .
+    if ($LASTEXITCODE -ne 0) { throw 'Router Python dependency installation failed.' }
+    python -m core.local_installation register
+    if ($LASTEXITCODE -ne 0) { throw 'Local Router public identity registration failed.' }
+    Write-Host '[TLS] Preparing the local Router HTTPS identity (Windows trust store unchanged)...' -ForegroundColor Yellow
+    python -m core.tls_local
+    if ($LASTEXITCODE -ne 0) { throw 'Router HTTPS identity setup failed.' }
     Write-Host "`n[4/5] Installing Dashboard dependencies (NPM)..."
     if (Test-Path "dashboard") { Set-Location -Path "dashboard"; npm install; Set-Location -Path ".." }
     Write-Host ""

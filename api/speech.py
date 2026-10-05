@@ -57,11 +57,16 @@ async def audio_speech(
                 **extra_kwargs,
             )
         )
+        extension = {
+            'audio/wav': 'wav', 'audio/x-wav': 'wav', 'audio/mpeg': 'mp3',
+            'audio/mp3': 'mp3', 'audio/ogg': 'ogg', 'audio/aac': 'aac',
+            'audio/flac': 'flac', 'audio/pcm': 'pcm',
+        }.get(content_type.split(';', 1)[0].strip().lower(), 'audio')
         return Response(
             content=audio_bytes,
             media_type=content_type,
             headers={
-                "Content-Disposition": "inline; filename=\"speech.wav\"",
+                "Content-Disposition": f'inline; filename="speech.{extension}"',
                 "X-Orion-Metrics": json.dumps(metrics),
             },
         )

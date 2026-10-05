@@ -2,6 +2,17 @@
 
 **English** | [Türkçe](README.tr.md) | [中文](README.zh-CN.md)
 
+Each native installation advertises its persistent UUID and actual HTTPS API port via `_orion-router-tls._tcp.local.` DNS-SD. Open the local dashboard at `https://localhost:9443/dashboard` (or your configured TLS port); see [Router TLS settings](docs/secure-router-tls.md).
+
+On the Router PC, `http://localhost:20128/dashboard` is a guarded loopback-only
+browser entry. Network connections and Hub traffic use pinned HTTPS on 9443.
+
+Router runs independently of Hub on its own port. Clients discover installations by UUID; there is no shared browser alias or Router-owned port-80 entry service.
+
+Secure Hub connections use the HTTPS listener (default port `9443`) and
+`_orion-router-tls._tcp.local.` discovery. The local dashboard Settings page shows
+the persistent SPKI fingerprint for pairing; see [Router TLS setup](docs/secure-router-tls.md).
+
 Orion project's **AI Gateway (Router)** layer. It centrally collects, authorizes, and dynamically routes all AI requests (LLM, Embedding, TTS, File Upload) from clients and workers to the relevant providers (OpenAI, OpenRouter, Gemini, DeepSeek, Local).
 
 To install and start using Orion Router on your system, please visit our website. *(Note: Our website offers documentation in multiple languages!)*
@@ -30,7 +41,7 @@ import openai
 
 # Routing the OpenAI client to Orion Router
 client = openai.OpenAI(
-    base_url="http://127.0.0.1:20128/v1", # Your Orion Router server address
+    base_url="https://127.0.0.1:9443/v1", # Trust the Router certificate explicitly in your HTTP client
     api_key="your-orion-virtual-key"      # The virtual key you generated via Dashboard
 )
 

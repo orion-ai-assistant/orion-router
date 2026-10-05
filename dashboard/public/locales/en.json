@@ -26,7 +26,7 @@
   "auth.title": "Orion Dashboard",
   "auth.description": "Enter your admin password to unlock the dashboard.",
   "auth.passwordPlaceholder": "Admin password",
-  "auth.unlock": "Unlock",
+  "auth.unlock": "Sign In",
   "auth.invalidKey": "Incorrect password",
   "auth.failed": "Authentication failed",
   "auth.defaultPasswordInfo": "You can change it later in settings. Default password:",
