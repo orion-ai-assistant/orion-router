@@ -10,6 +10,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 
+from core.audio_container import finalize_buffered_wav
 from core.dependencies import authenticate_request
 from core.utils import run_with_disconnect_check
 from dynamic_router import DynamicLLMRouter
@@ -57,6 +58,7 @@ async def audio_speech(
                 **extra_kwargs,
             )
         )
+        audio_bytes = finalize_buffered_wav(audio_bytes)
         extension = {
             'audio/wav': 'wav', 'audio/x-wav': 'wav', 'audio/mpeg': 'mp3',
             'audio/mp3': 'mp3', 'audio/ogg': 'ogg', 'audio/aac': 'aac',

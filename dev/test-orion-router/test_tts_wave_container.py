@@ -1,8 +1,10 @@
 import struct
 import unittest
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import httpx
+from api.speech import audio_speech
 from core.audio_container import finalize_buffered_wav
 from providers.gemini.tts import _pcm_to_wav
 from providers.openai.tts import OpenAITTSProvider
@@ -50,3 +52,37 @@ class ProviderTests(unittest.IsolatedAsyncioTestCase):
             result, mime, _ = await OpenAITTSProvider().generate_speech('tts-1', 'hello', api_key='test-key', response_format='wav')
         self.assertEqual(result, original)
         self.assertEqual(mime, 'audio/wav')
+
+
+class SpeechEndpointTests(unittest.IsolatedAsyncioTestCase):
+    async def test_endpoint_finalizes_streamed_wav_for_every_provider_and_mime(self):
+        original = _pcm_to_wav(b'\x00\x00' * 16)
+        streamed = bytearray(original)
+        struct.pack_into('<I', streamed, 4, 0xFFFFFFFF)
+        struct.pack_into('<I', streamed, 40, 0xFFFFFFFF)
+        for provider in ('local', 'gemini', 'openai'):
+            for mime in ('audio/wav', 'audio/x-wav', 'application/octet-stream'):
+                with self.subTest(provider=provider, mime=mime):
+                    response = await self._speech_response(provider, bytes(streamed), mime)
+                    self.assertEqual(response.body, original)
+                    self.assertEqual(response.headers['content-length'], str(len(original)))
+                    self.assertEqual(response.headers['content-type'], mime)
+                    self.assertEqual(response.headers['x-orion-metrics'], '{"latency": 1}')
+
+    async def test_endpoint_preserves_valid_wav_and_non_wav_audio(self):
+        for audio, mime in ((_pcm_to_wav(b'\x00\x00' * 16), 'audio/wav'),
+                            (b'ID3some mp3 bytes', 'audio/mpeg')):
+            with self.subTest(mime=mime):
+                response = await self._speech_response('local', audio, mime)
+                self.assertEqual(response.body, audio)
+
+    async def _speech_response(self, provider, audio, mime):
+        request = SimpleNamespace(
+            headers={'x-orion-provider': provider},
+            json=AsyncMock(return_value={'input': 'hello'}),
+            is_disconnected=AsyncMock(return_value=False),
+            app=SimpleNamespace(state=SimpleNamespace(dynamic_router=SimpleNamespace(
+                run_speech=AsyncMock(return_value=(audio, mime, {'latency': 1})),
+            ))),
+        )
+        return await audio_speech(request, auth={})
