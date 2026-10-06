@@ -11,7 +11,7 @@ Kullanim:
     python prod.py
 """
 
-import os
+import argparse
 import sys
 import time
 import subprocess
@@ -36,7 +36,7 @@ from bin.common import (
 
 from core.lifespan import print_active_services_banner
 from core.tls_local import open_health
-from bin.npm_integrity import npm_needs_install, record_npm_install
+from bin.dashboard_build import ensure_dashboard
 from bin.i18n import t
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -54,30 +54,6 @@ PG_DB     = "orion_router"
 # ─────────────────────────────────────────────────────────────────────────────
 # Prod-Specific Setup, Launch, & Shutdown
 # ─────────────────────────────────────────────────────────────────────────────
-
-def build_dashboard(router_port: str) -> None:
-    info(t("db_build_dashboard"))
-    
-    if npm_needs_install(DASHBOARD):
-        dim(t("npm_installing_deps"))
-        result_npm = run("npm install", cwd=DASHBOARD, shell=True)
-        if result_npm.returncode != 0:
-            err(t("npm_install_failed"))
-            sys.exit(1)
-        record_npm_install(DASHBOARD)
-
-    env = {**os.environ, "NEXT_PUBLIC_ROUTER_PORT": router_port}
-    result = run(
-        "npm run build",
-        cwd=DASHBOARD,
-        shell=True,
-        env=env,
-    )
-    if result.returncode != 0:
-        err(t("err_dashboard_build_failed"))
-        sys.exit(1)
-    ok(t("dashboard_build_complete"))
-
 
 def launch(router_port: str) -> list[tuple[str, subprocess.Popen]]:
     procs = []
@@ -123,7 +99,7 @@ def banner() -> None:
     print(f"{CYAN}{BOLD}║{t('prod_title'):^55}║{RESET}")
     print(f"{CYAN}{BOLD}╚{line}╝{RESET}\n")
 
-def main() -> None:
+def main(force_build: bool = False) -> None:
     if not acquire_lock(".orion.prod.lock"):
         err(t("err_lock_fail"))
         sys.exit(1)
@@ -152,7 +128,7 @@ def main() -> None:
         setup_db_and_user(PG_USER, PG_PASS, PG_PORT, PG_DB)
         print()
 
-        build_dashboard(router_port)
+        ensure_dashboard(force=force_build)
         print()
 
         set_env(router_port, PG_PORT, PG_DB, PG_USER, PG_PASS, "0")
@@ -193,6 +169,9 @@ def main() -> None:
                 warn(t("service_crashed_single"))
                 break
             time.sleep(1)
+    except RuntimeError as exc:
+        err(str(exc))
+        sys.exit(1)
     except KeyboardInterrupt:
         pass
     finally:
@@ -200,4 +179,7 @@ def main() -> None:
         release_lock(".orion.prod.lock")
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--build", "--force-build", dest="force_build",
+                        action="store_true", help="Force a dashboard rebuild")
+    main(force_build=parser.parse_args().force_build)

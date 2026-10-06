@@ -166,8 +166,9 @@ if ($Mode -eq "local") {
     Write-Host '[TLS] Preparing the local Router HTTPS identity (Windows trust store unchanged)...' -ForegroundColor Yellow
     python -m core.tls_local
     if ($LASTEXITCODE -ne 0) { throw 'Router HTTPS identity setup failed.' }
-    Write-Host "`n[4/5] Installing Dashboard dependencies (NPM)..."
-    if (Test-Path "dashboard") { Set-Location -Path "dashboard"; npm install; Set-Location -Path ".." }
+    Write-Host "`n[4/5] Preparing Dashboard..."
+    python -m bin.dashboard_build
+    if ($LASTEXITCODE -ne 0) { throw 'Dashboard preparation failed.' }
     Write-Host ""
 } else {
     Write-Host "[3/5] and [4/5] Steps Skipped..." -ForegroundColor DarkGray
@@ -360,7 +361,7 @@ Set-Content -Path $PROFILE -Value $CurrentProfile.Trim()
 Write-Host ""
 if ($Mode -eq "local") {
     Write-Host "[*] Pre-fetching resources (PostgreSQL) to display live progress..." -ForegroundColor Cyan
-    python -c "import sys; sys.path.insert(0, '.'); from bin.prod import download_postgres; download_postgres(); from bin.npm_integrity import record_npm_install; from pathlib import Path; record_npm_install(Path('dashboard'))"
+    python -c "import sys; sys.path.insert(0, '.'); from bin.common import download_postgres; download_postgres()"
 }
 Write-Host ""
 Write-Host "[OK] Installation complete." -ForegroundColor Green

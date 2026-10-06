@@ -83,8 +83,11 @@ A basic guide for developers who want to customize the system or add new feature
 You can use the `cli.py` file in the root directory to manage the development process:
 
 * `python cli.py dev` : Starts the hot-reload active development environment (PostgreSQL: `POSTGRES_DEV_PORT`, API: `ROUTER_DEV_PORT`, UI: 3001).
-* `python cli.py prod` : Builds the production version and runs it on a single port.
+* `python cli.py prod` : Runs production on a single port; rebuilds the dashboard only when its sources change or its output is missing.
+* `python cli.py prod --build` (alias: `--force-build`) : Forces a dashboard rebuild before starting.
 * `python cli.py stop` : Cleans up all background hanging ports and services.
+
+Local installers and both update paths prepare the dashboard with the same source hash check. Unchanged dashboards skip npm entirely. A failed build preserves the previous output; its new hash is never recorded.
 
 ### 🔌 Adding a New Provider
 

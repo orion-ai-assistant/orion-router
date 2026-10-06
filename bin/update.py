@@ -8,9 +8,7 @@ Kullanım:
     python cli.py update
 """
 
-import os
 import sys
-import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent.resolve()
@@ -18,12 +16,12 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from bin.common import (
-    ROOT, DASHBOARD,
+    ROOT,
     RESET, BOLD, CYAN, GREEN, YELLOW, RED, GRAY,
     ok, info, warn, err, dim, run
 )
 from core.updater import check_for_updates, APP_VERSION
-from bin.npm_integrity import npm_needs_install, record_npm_install
+from bin.dashboard_build import ensure_dashboard
 from bin.i18n import t
 
 def banner():
@@ -77,20 +75,12 @@ def main():
     ok("Python paketleri kontrol edildi.")
 
     print()
-    info("[3/3] Dashboard derleniyor (npm run build)...")
-    if npm_needs_install(DASHBOARD):
-        dim("npm bağımlılıkları yükleniyor...")
-        r_npm = run("npm install", cwd=DASHBOARD, shell=True)
-        if r_npm.returncode == 0:
-            record_npm_install(DASHBOARD)
-    
-    router_port = os.getenv("ORION_ROUTER_TLS_PORT", "9443")
-    env = {**os.environ, "NEXT_PUBLIC_ROUTER_PORT": router_port}
-    r_build = run("npm run build", cwd=DASHBOARD, shell=True, env=env)
-    if r_build.returncode != 0:
-        err("Dashboard build başarısız oldu!")
+    info("[3/3] Dashboard denetleniyor...")
+    try:
+        ensure_dashboard()
+    except Exception as exc:
+        err(f"Kod güncellendi ancak dashboard hazırlanamadı: {exc}")
         sys.exit(1)
-    ok("Dashboard başarıyla derlendi.")
 
     print()
     ok(f"{BOLD}✔ Orion Router başarıyla güncellendi!{RESET}")

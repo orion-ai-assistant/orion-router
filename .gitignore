@@ -44,6 +44,7 @@ tools/
 
 # Dashboard generated
 dashboard/.npm_lockfile_hash
+.orion-dashboard-*/
 
 # Docker persistent volume mount
 persistent/

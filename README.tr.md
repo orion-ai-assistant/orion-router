@@ -72,8 +72,11 @@ Sistemi özelleştirmek veya yeni özellikler eklemek isteyen geliştiriciler i�
 Geliştirme sürecini yönetmek için kök dizindeki `cli.py` dosyasını kullanabilirsiniz:
 
 * `python cli.py dev` : Hot-reload aktif geliştirme ortamını başlatır (PostgreSQL: `POSTGRES_DEV_PORT`, API: `ROUTER_DEV_PORT`, UI: 3001).
-* `python cli.py prod` : Üretim sürümünü derler ve tek portta çalıştırır.
+* `python cli.py prod` : Üretim sürümünü tek portta çalıştırır; dashboard yalnızca kaynakları değiştiğinde veya çıktısı eksik olduğunda derlenir.
+* `python cli.py prod --build` (alternatif: `--force-build`) : Başlangıçtan önce dashboard derlemesini zorlar.
 * `python cli.py stop` : Arka planda asılı kalan tüm portları ve servisleri temizler.
+
+Yerel kurulum ve iki güncelleme yolu aynı kaynak hash kontrolünü kullanır. Dashboard güncelse npm hiç çalıştırılmaz. Derleme başarısız olursa önceki çıktı korunur ve yeni hash kaydedilmez.
 
 ### 🔌 Yeni Bir Sağlayıcı (Provider) Eklemek
 

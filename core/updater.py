@@ -20,7 +20,6 @@ from core.config import APP_VERSION, GITHUB_REPO
 logger = logging.getLogger("service-router.updater")
 
 ROOT = Path(__file__).parent.parent.resolve()
-DASHBOARD_DIR = ROOT / "dashboard"
 
 _CACHE: Dict[str, Any] = {
     "data": None,
@@ -187,25 +186,13 @@ def _perform_update_worker():
 
         # 3. Adım: Dashboard Bağımlılıkları & Build
         _set_step("build_dashboard", 70)
-        _append_log("[3/4] Dashboard Next.js derlemesi başlatılıyor...")
-        
-        # npm paket kontrolü
-        from bin.npm_integrity import npm_needs_install, record_npm_install
-        if npm_needs_install(DASHBOARD_DIR):
-            _append_log("Yeni npm paketleri tespit edildi, npm install çalıştırılıyor...")
-            npm_i_res = _run_cmd("npm install", cwd=DASHBOARD_DIR)
-            if npm_i_res.returncode == 0:
-                record_npm_install(DASHBOARD_DIR)
-            else:
-                _append_log("npm install uyarısı alındı, build işlemine devam ediliyor.")
-
-        # npm run build
-        router_port = os.getenv("ORION_ROUTER_TLS_PORT", "9443")
-        build_env = {"NEXT_PUBLIC_ROUTER_PORT": router_port}
-        build_res = _run_cmd("npm run build", cwd=DASHBOARD_DIR, env=build_env)
-        if build_res.returncode != 0:
-            raise RuntimeError(f"Dashboard build failed: {build_res.stderr}")
-        _append_log("Dashboard başarıyla derlendi.")
+        _append_log("[3/4] Dashboard denetleniyor...")
+        from bin.dashboard_build import ensure_dashboard
+        try:
+            ensure_dashboard(log=_append_log)
+        except Exception as exc:
+            raise RuntimeError(f"Kod güncellendi ancak dashboard hazırlanamadı: {exc}") from exc
+        _append_log("Dashboard hazır.")
 
         # 4. Adım: Tamamlanma ve Yeniden Başlatma Sinyali
         _set_step("restarting", 95)

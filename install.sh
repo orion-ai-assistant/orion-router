@@ -198,10 +198,8 @@ if [ "$MODE" = "local" ]; then
       python3 -m pip install -e . || echo "WARNING: pip install failed. Continuing..."
     fi
     python3 -m core.local_installation register || { echo "ERROR: Local Router identity registration failed."; exit 1; }
-    echo -e "\n[4/5] Installing Dashboard dependencies (NPM)..."
-    if [ -d "dashboard" ]; then
-        (cd dashboard && npm install || echo "WARNING: npm install failed. Continuing...")
-    fi
+    echo -e "\n[4/5] Preparing Dashboard..."
+    python3 -m bin.dashboard_build || { echo "ERROR: Dashboard preparation failed."; exit 1; }
 else
     echo -e "\n[3/5] and [4/5] Steps Skipped..."
     echo "Docker mode selected; local dependencies will not be installed. Only GHCR images will be pulled."
@@ -503,7 +501,7 @@ export PATH="$INSTALL_DIR:$PATH"
 
 if [ "$MODE" = "local" ]; then
     echo -e "\n[*] Pre-fetching resources (PostgreSQL) to display live progress..."
-    python3 -c "import sys; sys.path.insert(0, '.'); from bin.prod import download_postgres; download_postgres(); from bin.npm_integrity import record_npm_install; from pathlib import Path; record_npm_install(Path('dashboard'))"
+    python3 -c "import sys; sys.path.insert(0, '.'); from bin.common import download_postgres; download_postgres()"
 fi
 
 echo ""

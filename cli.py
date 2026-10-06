@@ -49,6 +49,7 @@ def print_usage():
     print(f"    {GREEN}{BOLD}prod{RESET}  : {t('cmd_prod_desc')}")
     print(f"    {CYAN}{BOLD}update{RESET}: Orion Router'ı en güncel sürüme günceller")
     print(f"    {RED}{BOLD}stop{RESET}  : {t('cmd_stop_desc')}\n")
+    print("    python cli.py prod --build (alias: --force-build)")
     print(f"{GRAY}{t('cmd_example')}{RESET}\n")
 
 def main():
@@ -73,7 +74,7 @@ def main():
         
         try:
             # İlgili scripti doğrudan çalıştır
-            args = [sys.executable, str(script_path)]
+            args = [sys.executable, str(script_path), *sys.argv[2:]]
             result = subprocess.run(args, cwd=ROOT)
             sys.exit(result.returncode)
         except KeyboardInterrupt:
