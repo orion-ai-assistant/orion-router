@@ -521,6 +521,7 @@ class ChatRunner:
                 keys_to_try = await self.key_pool.get_keys_for_provider(
                     p_provider,
                     api_key or auth_header,
+                    key_id=key_id,
                 )
 
                 should_retry_keys = True
@@ -643,7 +644,8 @@ class ChatRunner:
             yield f"data: {json.dumps({'error': {'message': err_msg, 'type': 'api_error'}}, ensure_ascii=False)}\n\n"
             return
 
-        db_key = self.key_pool.get_db_key(provider)
+        keys = await self.key_pool.get_keys_for_provider(provider, api_key or auth_header, key_id=key_id)
+        db_key = keys[0][0]
         route_messages = inject_system_prompt(messages, kwargs.pop("system_prompt", None))
 
         async for chunk in self.stream(
@@ -652,8 +654,8 @@ class ChatRunner:
             provider,
             model,
             route_messages,
-            db_key if provider in ("openrouter", "deepseek") else db_key or api_key,
-            None if provider in ("openrouter", "deepseek") else auth_header,
+            db_key,
+            None,
             log_id=log_id,
             **kwargs,
         ):

@@ -99,6 +99,7 @@ async def upload_file(
             file_bytes=file_bytes,
             mime_type=mime_type,
             display_name=name,
+            key_id=auth.get('key_id'),
         )
         return result
     except Exception as e:

@@ -19,7 +19,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from core.lifespan import lifespan
-from api import admin, chat, embeddings, files, speech, transcriptions
+from api import admin, chat, embeddings, files, speech, transcriptions, hubs
 
 # ---------------------------------------------------------------------------
 #  Logging
@@ -199,6 +199,7 @@ if _next_dir:
 # ---------------------------------------------------------------------------
 app.include_router(chat.router)
 app.include_router(admin.router)
+app.include_router(hubs.router)
 app.include_router(embeddings.router)
 app.include_router(speech.router)
 app.include_router(transcriptions.router)

@@ -42,6 +42,21 @@ class DatabaseManager:
         )
         await conn.execute("ALTER TABLE router_virtual_keys ADD COLUMN IF NOT EXISTS name TEXT DEFAULT 'New Key';")
         await conn.execute("ALTER TABLE router_virtual_keys ALTER COLUMN id SET DEFAULT gen_random_uuid()::text;")
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS router_hubs (
+                id TEXT PRIMARY KEY, name TEXT NOT NULL,
+                token_hash TEXT UNIQUE NOT NULL, is_active BOOLEAN NOT NULL DEFAULT true,
+                user_budget NUMERIC(10,4) NOT NULL DEFAULT 0 CHECK (user_budget >= 0)
+            );
+            ALTER TABLE router_virtual_keys ADD COLUMN IF NOT EXISTS hub_id TEXT REFERENCES router_hubs(id);
+            ALTER TABLE router_virtual_keys ADD COLUMN IF NOT EXISTS subject_id TEXT;
+            CREATE UNIQUE INDEX IF NOT EXISTS router_hub_subject ON router_virtual_keys(hub_id, subject_id);
+            CREATE TABLE IF NOT EXISTS router_user_provider_keys (
+                key_id TEXT NOT NULL REFERENCES router_virtual_keys(id) ON DELETE CASCADE,
+                provider TEXT NOT NULL, api_key TEXT NOT NULL,
+                PRIMARY KEY (key_id, provider)
+            );
+        """)
         
         # 2. Combo Routes (Dynamic provider/fallback logic)
         await conn.execute(

@@ -68,6 +68,7 @@ class STTRunner:
                 keys_to_try = await self.key_pool.get_keys_for_provider(
                     p_provider,
                     api_key or auth_header,
+                    key_id=key_id,
                 )
 
                 for key_val, key_pool_id in keys_to_try:

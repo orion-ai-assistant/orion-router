@@ -24,7 +24,7 @@ logger = logging.getLogger("service-router.deps")
 #  key_hash → {"id": ..., "name": ..., "is_active": ..., "budget": ...,
 #               "used_amount": ..., "_ts": monotonic_timestamp}
 # ---------------------------------------------------------------------------
-_VKEY_CACHE_TTL = float('inf')  # Sınırsız (Dashboard'dan güncellenene kadar RAM'de kalır)
+_VKEY_CACHE_TTL = 5.0  # Usage and revocation must not stay stale indefinitely.
 _vkey_cache: dict = {}
 
 def invalidate_vkey_cache(key_hash: str | None = None) -> None:
@@ -40,7 +40,7 @@ async def prewarm_vkey_cache() -> None:
     import time
     try:
         rows = await db_manager.fetch(
-            "SELECT id, name, is_active, budget, used_amount, api_key_hash FROM router_virtual_keys WHERE is_active = true"
+            "SELECT id, name, is_active, budget, used_amount, api_key_hash, hub_id FROM router_virtual_keys WHERE is_active = true"
         )
         for r in rows:
             r_dict = dict(r)
@@ -76,7 +76,7 @@ async def verify_token_string(token: str) -> dict:
         if row is None:
             try:
                 row = await db_manager.fetchrow(
-                    "SELECT id, name, is_active, budget, used_amount FROM router_virtual_keys WHERE api_key_hash = $1",
+                    "SELECT id, name, is_active, budget, used_amount, hub_id FROM router_virtual_keys WHERE api_key_hash = $1",
                     key_hash,
                 )
             except Exception as e:
@@ -90,6 +90,10 @@ async def verify_token_string(token: str) -> dict:
             raise HTTPException(status_code=401, detail="Invalid API key")
         if not row["is_active"]:
             raise HTTPException(status_code=403, detail="API key is inactive")
+        if row.get('hub_id'):
+            hub = await db_manager.fetchrow('SELECT is_active FROM router_hubs WHERE id=$1', row['hub_id'])
+            if not hub or not hub['is_active']:
+                raise HTTPException(403, 'Hub access is inactive')
         if row["budget"] > 0 and row["used_amount"] >= row["budget"]:
             raise HTTPException(status_code=402, detail="API key budget exceeded")
 

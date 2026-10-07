@@ -53,7 +53,21 @@ class ProviderKeyPool:
         self,
         provider: str,
         client_key: str | None = None,
+        key_id: str | None = None,
     ) -> list[tuple[str | None, str | None]]:
+        if key_id:
+            # Personal credentials never enter the shared pool or fall back to
+            # shared billing when the user's saved credential cannot be read.
+            from core.security import decrypt
+            from fastapi import HTTPException
+            row = await db_manager.fetchrow(
+                'SELECT api_key FROM router_user_provider_keys WHERE key_id=$1 AND provider=$2',
+                key_id, provider)
+            if row:
+                key = decrypt(row['api_key'])
+                if not key:
+                    raise HTTPException(503, 'Kişisel sağlayıcı anahtarı okunamadı; yeniden kaydedin.')
+                return [(key, None)]
         keys = []
         try:
             pool_keys = await db_manager.get_active_provider_keys(provider)

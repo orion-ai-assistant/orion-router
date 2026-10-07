@@ -221,18 +221,20 @@ class DynamicLLMRouter:
         mime_type: str,
         display_name: str,
         api_key: str | None = None,
+        key_id: str | None = None,
     ) -> dict:
         plugin = self.file_providers.get(provider)
         if not plugin:
             raise ValueError(f"File upload provider not available: {provider}")
 
-        db_key = self._get_db_key(provider)
+        keys = await self.key_pool.get_keys_for_provider(provider, api_key, key_id=key_id)
+        db_key = keys[0][0]
         logger.info("Routing file upload to %s: %s (%s)", provider, display_name, mime_type)
         return await plugin.upload_file(
             file_bytes=file_bytes,
             mime_type=mime_type,
             display_name=display_name,
-            api_key=db_key or api_key,
+            api_key=db_key,
         )
 
     def get_capabilities(self) -> dict:
