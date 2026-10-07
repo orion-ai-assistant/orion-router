@@ -55,22 +55,31 @@ class ProviderKeyPool:
         client_key: str | None = None,
         key_id: str | None = None,
     ) -> list[tuple[str | None, str | None]]:
+        if provider == 'local':
+            return [(None, None)]  # Local engines do not consume provider credentials.
+        permitted = None
         if key_id:
+            from core.key_policy import eligible_ids
+            permitted = await eligible_ids(key_id, provider)
             # Personal credentials never enter the shared pool or fall back to
             # shared billing when the user's saved credential cannot be read.
             from core.security import decrypt
             from fastapi import HTTPException
             row = await db_manager.fetchrow(
-                'SELECT api_key FROM router_user_provider_keys WHERE key_id=$1 AND provider=$2',
+                'SELECT id, api_key, is_active FROM router_user_provider_keys WHERE key_id=$1 AND provider=$2',
                 key_id, provider)
             if row:
+                if row['id'] not in permitted:
+                    return []  # A saved personal record forbids silent shared fallback.
                 key = decrypt(row['api_key'])
                 if not key:
                     raise HTTPException(503, 'Kişisel sağlayıcı anahtarı okunamadı; yeniden kaydedin.')
-                return [(key, None)]
+                return [(key, row['id'])]
         keys = []
         try:
             pool_keys = await db_manager.get_active_provider_keys(provider)
+            if permitted is not None:
+                pool_keys = [pk for pk in pool_keys if pk['id'] in permitted]
             usable_keys = [pk for pk in pool_keys if not pool_key_on_quota_cooldown(pk)]
             skipped = len(pool_keys) - len(usable_keys)
             if skipped:
@@ -88,9 +97,13 @@ class ProviderKeyPool:
             for pk in usable_keys:
                 keys.append((pk["api_key"], pk["id"]))
         except Exception as exc:
+            if key_id:
+                raise  # A policy/storage failure must fail closed.
             logger.error("Failed to fetch keys from pool for %s: %s", provider, exc)
 
         if not keys:
+            if key_id:
+                return []  # Global/config/environment credentials are system-only.
             db_key = self.get_db_key(provider)
             if db_key:
                 keys.append((db_key, None))
@@ -98,14 +111,8 @@ class ProviderKeyPool:
                 # Router credentials are never OpenRouter or DeepSeek credentials.
                 keys.append((None, None))
             else:
-                clean_client_key = client_key
-                if clean_client_key and clean_client_key.startswith("Bearer "):
-                    clean_client_key = clean_client_key.removeprefix("Bearer ").strip()
-
-                if clean_client_key and not clean_client_key.startswith("sk-orion-"):
-                    keys.append((clean_client_key, None))
-                else:
-                    keys.append((None, None))
+                # Router authentication secrets must never become upstream keys.
+                keys.append((None, None))
         return keys
 
     async def mark_key_error(self, key_pool_id: str | None, error: str) -> None:

@@ -228,14 +228,31 @@ class DynamicLLMRouter:
             raise ValueError(f"File upload provider not available: {provider}")
 
         keys = await self.key_pool.get_keys_for_provider(provider, api_key, key_id=key_id)
+        from core.key_policy import authorize_attempt, ACCESS_MESSAGE
+        from fastapi import HTTPException
+        if not keys:
+            raise HTTPException(403, ACCESS_MESSAGE)
+        await authorize_attempt(key_id, provider, keys[0][1], keys[0][0])
         db_key = keys[0][0]
         logger.info("Routing file upload to %s: %s (%s)", provider, display_name, mime_type)
-        return await plugin.upload_file(
-            file_bytes=file_bytes,
-            mime_type=mime_type,
-            display_name=display_name,
-            api_key=db_key,
-        )
+        from core.secret_guard import redact
+        import json
+        try:
+            result = redact(await plugin.upload_file(
+                file_bytes=file_bytes,
+                mime_type=mime_type,
+                display_name=display_name,
+                api_key=db_key,
+            ))
+        except Exception as error:
+            safe_error = redact(str(error))
+            await self.telemetry.log_usage(key_id, provider, 'file-upload', None,
+                                           response_json=json.dumps({'error': safe_error}),
+                                           success=False, capability='file')
+            raise RuntimeError(safe_error) from None
+        await self.telemetry.log_usage(key_id, provider, 'file-upload', None,
+                                       success=True, capability='file')
+        return result
 
     def get_capabilities(self) -> dict:
         return self.registry.get_capabilities()

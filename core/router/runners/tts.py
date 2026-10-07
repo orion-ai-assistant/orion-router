@@ -1,3 +1,6 @@
+from core.secret_guard import redact
+from core.key_policy import authorize_attempt, ACCESS_MESSAGE
+from fastapi import HTTPException
 import asyncio
 import base64
 import json
@@ -110,6 +113,13 @@ class TTSRunner:
                 )
 
                 for key_val, key_pool_id in keys_to_try:
+                    try:
+                        await authorize_attempt(key_id, p_provider, key_pool_id, key_val)
+                    except HTTPException as denied:
+                        if denied.status_code != 403:
+                            raise
+                        last_err = denied
+                        continue
                     logger.info(
                         "Routing TTS to %s (model=%s, voice=%s) using key %s, kwargs=%s",
                         p_provider,
@@ -124,15 +134,15 @@ class TTSRunner:
                             input_text=input_text,
                             voice=target_voice,
                             api_key=key_val,
-                            auth_header=auth_header if not key_val else None,
+                            auth_header=None,
                             **route_kwargs,
                         )
 
                         duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
                         audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
-                        prompt_tokens = usage_meta.get("prompt_tokens", 0)
-                        completion_tokens = usage_meta.get("completion_tokens", 0)
-                        usage = {
+                        prompt_tokens = usage_meta.get("prompt_tokens")
+                        completion_tokens = usage_meta.get("completion_tokens")
+                        usage = None if prompt_tokens is None and completion_tokens is None else {
                             "prompt_tokens": prompt_tokens,
                             "completion_tokens": completion_tokens,
                             "thoughts_tokens": 0,
@@ -141,7 +151,7 @@ class TTSRunner:
                             "detail": "Audio generation successful",
                             "content_type": content_type,
                             "size_bytes": len(audio_bytes),
-                            "estimated_duration_seconds": completion_tokens / 25.0,
+                            "estimated_duration_seconds": completion_tokens / 25.0 if completion_tokens is not None else None,
                             "audio_base64": audio_b64,
                             "metrics": {"total_duration_ms": duration_ms},
                         }
@@ -164,6 +174,7 @@ class TTSRunner:
                         }
                         return audio_bytes, content_type, response_metadata
                     except Exception as exc:
+                        exc = RuntimeError(redact(str(exc)))
                         logger.error("TTS route %s/%s failed: %s", p_provider, p_model, exc)
                         await self.key_pool.mark_key_error(key_pool_id, str(exc))
                         last_err = exc
@@ -184,6 +195,6 @@ class TTSRunner:
             )
             raise
 
-        final_error = last_err or ValueError(f"Could not resolve TTS route for model: {model}")
+        final_error = last_err or (HTTPException(403, ACCESS_MESSAGE) if key_id else ValueError(f"Could not resolve TTS route for model: {model}"))
         await self.telemetry.finish_processing_log(log_id, {"error": str(final_error)}, "failed", False)
         raise final_error

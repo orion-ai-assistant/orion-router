@@ -1,3 +1,6 @@
+from core.secret_guard import redact
+from core.key_policy import authorize_attempt, ACCESS_MESSAGE
+from fastapi import HTTPException
 import asyncio
 import json
 import logging
@@ -169,6 +172,7 @@ class ChatRunner:
                 auth_header=auth_header,
                 **kwargs,
             ):
+                chunk = redact(chunk)
                 if isinstance(chunk, dict) and "internal_usage" in chunk:
                     usage = chunk["internal_usage"]
                 else:
@@ -271,7 +275,7 @@ class ChatRunner:
             else:
                 logger.error("[%s] Stream Exception: %s", provider, exc, exc_info=True)
 
-            err_msg = str(exc)
+            err_msg = redact(str(exc))
             error_details = err_msg
             yield f"data: {json.dumps({'error': {'message': err_msg, 'type': 'api_error'}}, ensure_ascii=False)}\n\n"
         finally:
@@ -526,6 +530,13 @@ class ChatRunner:
 
                 should_retry_keys = True
                 for key_val, key_pool_id in keys_to_try:
+                    try:
+                        await authorize_attempt(key_id, p_provider, key_pool_id, key_val)
+                    except HTTPException as denied:
+                        if denied.status_code != 403:
+                            raise
+                        last_error_chunk = "data: " + json.dumps({"error": {"message": ACCESS_MESSAGE}}) + "\n\n"
+                        continue
                     logger.info(
                         "Trying route %s/%s using key %s",
                         p_provider,
@@ -543,7 +554,7 @@ class ChatRunner:
                             model=p_model,
                             messages=route_messages,
                             api_key=key_val,
-                            auth_header=auth_header if not key_val and p_provider not in ("openrouter", "deepseek") else None,
+                            auth_header=None,
                             log_id=log_id,
                             **route_kwargs,
                         ):
@@ -580,8 +591,9 @@ class ChatRunner:
                             success = True
                             break
                     except Exception as exc:
+                        exc = RuntimeError(redact(str(exc)))
                         logger.error("Route %s/%s failed: %s", p_provider, p_model, exc)
-                        err_str = str(exc)
+                        err_str = redact(str(exc))
                         if is_key_specific_error(err_str):
                             await self.key_pool.mark_key_error(key_pool_id, err_str)
                         else:
@@ -609,7 +621,7 @@ class ChatRunner:
 
             if not success and not yielded_any:
                 error_message = extract_error_message(last_error_chunk)
-                final_error = error_message or "All routes and fallbacks failed."
+                final_error = error_message or (ACCESS_MESSAGE if key_id else "All routes and fallbacks failed.")
                 await self.telemetry.finish_processing_log(
                     log_id,
                     {"error": final_error},
@@ -645,6 +657,9 @@ class ChatRunner:
             return
 
         keys = await self.key_pool.get_keys_for_provider(provider, api_key or auth_header, key_id=key_id)
+        if not keys:
+            raise HTTPException(403, ACCESS_MESSAGE)
+        await authorize_attempt(key_id, provider, keys[0][1], keys[0][0])
         db_key = keys[0][0]
         route_messages = inject_system_prompt(messages, kwargs.pop("system_prompt", None))
 

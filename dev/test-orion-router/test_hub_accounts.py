@@ -20,10 +20,13 @@ from database import db_manager
 
 
 class PersonalKeyTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        policy = patch("core.key_policy.eligible_ids", AsyncMock(return_value={"personal-id"}))
+        policy.start(); self.addCleanup(policy.stop)
     async def test_personal_provider_key_does_not_enter_shared_pool(self):
-        with patch.object(db_manager, 'fetchrow', AsyncMock(return_value={'api_key': 'personal'})), patch.object(
+        with patch.object(db_manager, 'fetchrow', AsyncMock(return_value={'id':'personal-id','api_key': 'personal', 'is_active':True})), patch.object(
             db_manager, 'get_active_provider_keys', AsyncMock()) as shared:
-            self.assertEqual(await ProviderKeyPool().get_keys_for_provider('openrouter', 'sk-orion-user', key_id='user'), [('personal', None)])
+            self.assertEqual(await ProviderKeyPool().get_keys_for_provider('openrouter', 'sk-orion-user', key_id='user'), [('personal', 'personal-id')])
         shared.assert_not_awaited()
 
     async def test_other_user_without_personal_key_uses_only_shared_credentials(self):
@@ -31,11 +34,11 @@ class PersonalKeyTests(unittest.IsolatedAsyncioTestCase):
             db_manager, 'get_active_provider_keys', AsyncMock(return_value=[])):
             result = await ProviderKeyPool(SimpleNamespace(provider_keys={'openrouter': 'shared'})).get_keys_for_provider(
                 'openrouter', 'sk-orion-other', key_id='other')
-        self.assertEqual(result, [('shared', None)])
+        self.assertEqual(result, [])
         self.assertEqual(lookup.await_args.args[1:], ('other', 'openrouter'))
 
     async def test_unreadable_personal_key_never_falls_back_to_shared_billing(self):
-        with patch.object(db_manager, 'fetchrow', AsyncMock(return_value={'api_key': 'gAAAAA-broken'})), patch.object(
+        with patch.object(db_manager, 'fetchrow', AsyncMock(return_value={'id':'personal-id','api_key': 'gAAAAA-broken','is_active':True})), patch.object(
             db_manager, 'get_active_provider_keys', AsyncMock()) as shared:
             with self.assertRaises(HTTPException):
                 await ProviderKeyPool().get_keys_for_provider('openrouter', key_id='user')
@@ -136,8 +139,8 @@ class PostgreSQLHubTests(unittest.IsolatedAsyncioTestCase):
         other = await self.client.get('/api/v1/hubs/providers', headers={'Authorization': 'Bearer sk-orion-' + 'c' * 43})
         self.assertEqual(mine.json()['configured'], ['openrouter']); self.assertEqual(other.json()['configured'], [])
         pool = ProviderKeyPool(SimpleNamespace(provider_keys={'openrouter': 'shared'}))
-        self.assertEqual(await pool.get_keys_for_provider('openrouter', key_id=first.json()['id']), [('provider-private', None)])
-        self.assertEqual(await pool.get_keys_for_provider('openrouter', key_id=second.json()['id']), [('shared', None)])
+        self.assertEqual(await pool.get_keys_for_provider('openrouter', key_id=first.json()['id']), [('provider-private', await self.conn.fetchval('SELECT id FROM router_user_provider_keys WHERE key_id=$1', first.json()['id']))])
+        self.assertEqual(await pool.get_keys_for_provider('openrouter', key_id=second.json()['id']), [])
 
     async def test_shared_router_keeps_two_hubs_distinct_and_respects_revocation(self):
         first = await self.create_account()

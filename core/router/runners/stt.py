@@ -1,3 +1,6 @@
+from core.secret_guard import redact
+from core.key_policy import authorize_attempt, ACCESS_MESSAGE
+from fastapi import HTTPException
 import asyncio
 import json
 import logging
@@ -72,6 +75,13 @@ class STTRunner:
                 )
 
                 for key_val, key_pool_id in keys_to_try:
+                    try:
+                        await authorize_attempt(key_id, p_provider, key_pool_id, key_val)
+                    except HTTPException as denied:
+                        if denied.status_code != 403:
+                            raise
+                        last_err = denied
+                        continue
                     logger.info(
                         "Routing STT to %s (model=%s, filename=%s) using key %s",
                         p_provider,
@@ -89,10 +99,11 @@ class STTRunner:
                             response_format=response_format,
                             temperature=temperature,
                             api_key=key_val,
-                            auth_header=auth_header if not key_val else None,
+                            auth_header=None,
                             **kwargs,
                         )
 
+                        result = redact(result)
                         duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
                         duration = result.get("duration", 0) or 0
                         text_res = result.get("text", "")
@@ -103,12 +114,10 @@ class STTRunner:
                                 "completion_tokens": reported_usage.get("completion_tokens"),
                                 "thoughts_tokens": reported_usage.get("thoughts_tokens", 0),
                             }
+                            if reported_usage.get("prompt_tokens") is None and reported_usage.get("completion_tokens") is None:
+                                usage = None
                         else:
-                            usage = {
-                                "prompt_tokens": int(float(duration) * 25) if duration else max(1, len(file_bytes) // 3200),
-                                "completion_tokens": len(text_res.split()),
-                                "thoughts_tokens": 0,
-                            }
+                            usage = None
                         if isinstance(result, dict) and "metrics" not in result:
                             result["metrics"] = {"total_duration_ms": duration_ms}
 
@@ -122,12 +131,15 @@ class STTRunner:
                                 response_json=json.dumps(result, ensure_ascii=False),
                                 success=True,
                                 capability="stt",
+                                usage_unit="token" if reported_usage else "second",
+                                usage_amount=duration if duration else None,
                                 duration_ms=duration_ms,
                                 log_id=log_id,
                             )
                         )
                         return result
                     except Exception as exc:
+                        exc = RuntimeError(redact(str(exc)))
                         logger.error("STT route %s/%s failed: %s", p_provider, p_model, exc)
                         await self.key_pool.mark_key_error(key_pool_id, str(exc))
                         last_err = exc
@@ -148,6 +160,6 @@ class STTRunner:
             )
             raise
 
-        final_error = last_err or ValueError(f"Could not resolve STT route for model: {model}")
+        final_error = last_err or (HTTPException(403, ACCESS_MESSAGE) if key_id else ValueError(f"Could not resolve STT route for model: {model}"))
         await self.telemetry.finish_processing_log(log_id, {"error": str(final_error)}, "failed", False)
         raise final_error

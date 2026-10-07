@@ -1,3 +1,6 @@
+from core.secret_guard import redact
+from core.key_policy import authorize_attempt, ACCESS_MESSAGE
+from fastapi import HTTPException
 import asyncio
 import json
 import logging
@@ -60,6 +63,13 @@ class EmbeddingsRunner:
                 )
 
                 for key_val, key_pool_id in keys_to_try:
+                    try:
+                        await authorize_attempt(key_id, p_provider, key_pool_id, key_val)
+                    except HTTPException as denied:
+                        if denied.status_code != 403:
+                            raise
+                        last_err = denied
+                        continue
                     logger.info(
                         "Routing embeddings to %s (model=%s) using key %s",
                         p_provider,
@@ -71,18 +81,19 @@ class EmbeddingsRunner:
                             model=p_model,
                             input_text=input_text,
                             api_key=key_val,
-                            auth_header=auth_header if not key_val else None,
+                            auth_header=None,
                         )
 
+                        result = redact(result)
                         duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
-                        p_tokens = 0
+                        p_tokens = None
                         if isinstance(result, dict):
                             if "usage" in result:
-                                p_tokens = result["usage"].get("prompt_tokens", 0)
+                                p_tokens = result["usage"].get("prompt_tokens")
                             if "metrics" not in result:
                                 result["metrics"] = {"total_duration_ms": duration_ms}
 
-                        usage = {
+                        usage = None if p_tokens is None else {
                             "prompt_tokens": p_tokens,
                             "completion_tokens": 0,
                             "thoughts_tokens": 0,
@@ -103,6 +114,7 @@ class EmbeddingsRunner:
                         )
                         return result
                     except Exception as exc:
+                        exc = RuntimeError(redact(str(exc)))
                         logger.error("Embed route %s/%s failed: %s", p_provider, p_model, exc)
                         await self.key_pool.mark_key_error(key_pool_id, str(exc))
                         last_err = exc
@@ -123,6 +135,6 @@ class EmbeddingsRunner:
             )
             raise
 
-        final_error = last_err or ValueError(f"Could not resolve embed route for model: {model}")
+        final_error = last_err or (HTTPException(403, ACCESS_MESSAGE) if key_id else ValueError(f"Could not resolve embed route for model: {model}"))
         await self.telemetry.finish_processing_log(log_id, {"error": str(final_error)}, "failed", False)
         raise final_error

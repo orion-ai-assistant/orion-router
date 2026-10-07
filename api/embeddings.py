@@ -56,6 +56,8 @@ async def embeddings(
             )
         )
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception(f"Embedding error ({provider})")
         raise HTTPException(status_code=500, detail=str(e))

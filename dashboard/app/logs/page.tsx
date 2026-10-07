@@ -15,6 +15,8 @@ import { RefreshCw } from 'lucide-react';
 interface LogItem {
   id: number;
   key_name: string | null;
+  hub_id?: string;
+  hub_name?: string;
   provider: string;
   requested_model: string;
   resolved_model?: string | null;
@@ -47,6 +49,7 @@ export default function LogsPage() {
   const [payloadDialogOpen, setPayloadDialogOpen] = useState(false);
   const [activeLogDetails, setActiveLogDetails] = useState<LogDetails | null>(null);
   const fetchSequence = useRef(0);
+  const [offset,setOffset] = useState(0);
 
   // Copies tracking
   const [copiedReq, setCopiedReq] = useState(false);
@@ -58,14 +61,14 @@ export default function LogsPage() {
       setLoading(true);
     }
     try {
-      const res = await adminFetch('/dashboard/api/logs');
+      const res = await adminFetch(`/dashboard/api/logs?limit=100&offset=${offset}`);
       if (res.ok) {
         const data = await res.json();
         if (sequence !== fetchSequence.current) {
           return;
         }
         const incoming: LogItem[] = data.logs || [];
-        if (mode === 'poll') {
+        if (mode === 'poll' && offset === 0) {
           setLogs((prev) => {
             const incomingMap = new Map(incoming.map((l) => [l.id, l]));
             let changed = false;
@@ -124,7 +127,7 @@ export default function LogsPage() {
       window.clearInterval(pollId);
       window.removeEventListener('orion-authenticated', handleAuth);
     };
-  }, []);
+  }, [offset]);
 
   const handleShowDetails = async (logId: number) => {
     setPayloadDialogOpen(true);
@@ -194,6 +197,7 @@ export default function LogsPage() {
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> {t('logs.refresh')}
         </Button>
       </header>
+      <div className="flex gap-3 items-center mb-3"><Button disabled={offset===0 || loading} onClick={()=>setOffset(Math.max(0,offset-100))}>Önceki</Button><span>{offset+1}–{offset+logs.length} · İstek listesi, toplam kullanım değildir</span><Button disabled={logs.length<100 || loading} onClick={()=>setOffset(offset+100)}>Sonraki</Button></div>
 
       {/* Table List */}
       <div className="table-container glass-panel bg-[#18181b] border border-zinc-800 rounded-md overflow-hidden shadow-xl">
@@ -228,7 +232,7 @@ export default function LogsPage() {
               logs.map((log) => (
                 <TableRow key={log.id} className="border-b border-zinc-900 hover:bg-white/[0.015] transition-colors">
                   <TableCell className="font-medium text-sm py-4 pl-6 text-zinc-300">
-                    {log.key_name || 'Admin'}
+                    {log.hub_name ? `${log.hub_name} [${log.hub_id?.slice(0,8)}] · ${log.key_name}` : log.key_name || 'Admin'}
                   </TableCell>
                   <TableCell
                     className={`py-4 pl-8 font-mono text-white max-w-[240px] truncate ${

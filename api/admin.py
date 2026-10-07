@@ -26,7 +26,7 @@ _DASHBOARD_DIR = os.path.join(os.path.dirname(__file__), "..", "dashboard")
 def _mask_key(key: str) -> str:
     if not key:
         return ""
-    return key[:4] + "*" * 10 + key[-4:] if len(key) > 8 else "***"
+    return "••••" + key[-4:] if len(key) > 8 else "••••"
 
 
 def _require_text(value, field_name: str) -> str:
@@ -150,8 +150,8 @@ async def get_admin_keys():
     """Tüm sanal API anahtarlarını listeler."""
     try:
         rows = await db_manager.fetch(
-            "SELECT id, name, is_active, budget, used_amount, created_at "
-            "FROM router_virtual_keys ORDER BY created_at DESC"
+            "SELECT v.id, v.name, v.is_active, v.budget, v.used_amount, v.created_at, v.hub_id, h.name AS hub_name "
+            "FROM router_virtual_keys v LEFT JOIN router_hubs h ON h.id=v.hub_id ORDER BY v.created_at DESC"
         )
         return {"keys": [dict(r) for r in rows]}
     except Exception as e:
@@ -160,13 +160,15 @@ async def get_admin_keys():
 
 @router.post("/api/keys", dependencies=[Depends(verify_admin)])
 async def create_admin_key(request: Request):
-    """Yeni bir sanal API anahtarı oluşturur. Oluşturulan raw key yalnızca bir kez döner."""
+    """Register a caller-supplied credential without ever echoing it."""
     try:
         body = await request.json()
         name = body.get("name", "New Key")
         budget = float(body.get("budget", 0))
 
-        raw_key = f"sk-orion-{secrets.token_urlsafe(32)}"
+        raw_key = body.get("api_key", "")
+        if not isinstance(raw_key, str) or not raw_key.startswith("sk-orion-") or len(raw_key) < 40 or len(raw_key) > 256:
+            raise HTTPException(422, "Önceden oluşturduğunuz sanal anahtarı girin (sk-orion-…).")
         key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
 
         row = await db_manager.fetchrow(
@@ -178,8 +180,9 @@ async def create_admin_key(request: Request):
             budget,
         )
         data = dict(row)
-        data["raw_key"] = raw_key  # Önemli: raw key yalnızca bir kez gönderilir!
         return data
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -245,12 +248,14 @@ async def delete_admin_key(key_id: str):
 # ---------------------------------------------------------------------------
 
 @router.get("/api/logs", dependencies=[Depends(verify_admin)])
-async def get_admin_logs():
+async def get_admin_logs(limit: int = 100, offset: int = 0):
+    if limit < 1 or limit > 500 or offset < 0:
+        raise HTTPException(422, "Geçersiz sayfalama.")
     """Son 100 istek kaydını key adıyla birlikte döner."""
     try:
         rows = await db_manager.fetch(
             """
-            SELECT l.id, k.name as key_name, l.provider, l.requested_model, l.resolved_model,
+            SELECT l.id, k.name as key_name, k.hub_id, h.name AS hub_name, l.upstream_key_id, l.upstream_key_source, l.provider, l.requested_model, l.resolved_model,
                    l.tokens_used, l.prompt_tokens, l.completion_tokens,
                    COALESCE(
                        NULLIF(l.thoughts_tokens, 0),
@@ -264,11 +269,12 @@ async def get_admin_logs():
                    COALESCE(l.status, CASE WHEN l.success = true THEN 'success' WHEN l.success = false THEN 'failed' ELSE 'interrupted' END) as status
             FROM router_request_logs l
             LEFT JOIN router_virtual_keys k ON l.key_id = k.id
+            LEFT JOIN router_hubs h ON k.hub_id=h.id
             ORDER BY l.created_at DESC
-            LIMIT 100
-            """
+            LIMIT $1 OFFSET $2
+            """, limit, offset
         )
-        return {"logs": [dict(r) for r in rows]}
+        return {"logs": [dict(r) for r in rows], "limit": limit, "offset": offset}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -282,9 +288,10 @@ async def get_admin_log_details(log_id: int):
         )
         if not row:
             raise HTTPException(status_code=404, detail="Log not found")
+        from core.secret_guard import redact_json
         return {
-            "request_json": row["request_json"],
-            "response_json": row["response_json"],
+            "request_json": redact_json(row["request_json"]),
+            "response_json": redact_json(row["response_json"]),
             "capability": row["capability"]
         }
     except HTTPException:
@@ -331,6 +338,7 @@ async def get_admin_stats():
                 SUM(completion_tokens) as completion,
                 SUM(thoughts_tokens) as thoughts
             FROM router_request_logs
+            WHERE capability IN ('chat','embed')
             """
         )
         total_keys = await db_manager.fetchval(
@@ -395,7 +403,7 @@ async def get_provider_keys():
         masked_keys = {}
         for provider, key in raw_keys.items():
             if key:
-                masked_keys[provider] = key[:4] + "*" * 10 + key[-4:] if len(key) > 8 else "***"
+                masked_keys[provider] = _mask_key(key)
             else:
                 masked_keys[provider] = ""
         return {"keys": masked_keys}
@@ -561,6 +569,8 @@ async def list_provider_key_pool():
                 item["last_error"] = "Şifre çözülemiyor; anahtarı yeniden kaydet"
         else:
             item["masked_key"] = _mask_key(decrypted)
+        if decrypted and item.get("last_error"):
+            item["last_error"] = item["last_error"].replace(decrypted, "[REDACTED]")
         keys.append(item)
     return {"keys": keys}
 
@@ -1061,6 +1071,10 @@ async def get_update_progress():
 # ---------------------------------------------------------------------------
 #  UI (Fallback for SPA Routing)
 # ---------------------------------------------------------------------------
+
+from api.key_management import router as key_management_router
+router.include_router(key_management_router)
+
 
 @router.get("", include_in_schema=False)
 @router.head("", include_in_schema=False)

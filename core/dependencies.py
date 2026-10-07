@@ -55,6 +55,10 @@ async def prewarm_vkey_cache() -> None:
 
 async def verify_token_string(token: str) -> dict:
     """Verilen ham API anahtarını veya admin secret'ını doğrular."""
+    from core.secret_guard import remember
+    from core.key_policy import selected_upstream
+    selected_upstream.set((None, None))
+    remember(token)
     if not token:
         raise HTTPException(status_code=401, detail="API key is required.")
 

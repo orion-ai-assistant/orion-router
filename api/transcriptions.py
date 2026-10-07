@@ -90,10 +90,10 @@ async def audio_transcriptions(
 
         return JSONResponse(content=result)
 
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
     except HTTPException:
         raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         err_str = str(e)
         status_code = 500

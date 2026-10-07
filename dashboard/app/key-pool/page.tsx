@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { KeyAccess, PersonalKeyManagement } from '@/components/KeyAccess';
 import { adminFetch } from '@/lib/api';
 import { runFlipUpdate } from '@/lib/list-flip';
 import { useApp } from '@/components/AppContext';
@@ -52,6 +53,11 @@ export default function KeyPoolPage() {
   const [keyPool, setKeyPool] = useState<ProviderKey[]>([]);
   const [providers, setProviders] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+
+  const { adminKey } = useApp();
+  useEffect(() => {
+    setShowAddModal(false); setShowEditModal(false); setAddForm(prev=>({...prev,api_key:''})); setEditingKey(prev=>({...prev,api_key:''}));
+  }, [adminKey]);
 
   // Modals visibility
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
@@ -276,6 +282,7 @@ export default function KeyPoolPage() {
       return;
     }
 
+    setAddForm({...addForm,api_key:''});
     // Auto-calculate priority: bottom of the list
     const pKeys = groupedKeys[provider] || [];
     const priority = pKeys.length + 1;
@@ -309,13 +316,15 @@ export default function KeyPoolPage() {
       return;
     }
 
+    const submittedKey = editingKey.api_key;
+    setEditingKey({...editingKey,api_key:''});
     try {
       const res = await adminFetch(`/dashboard/api/provider-key-pool/${editingKey.id}`, {
         method: 'PUT',
         body: JSON.stringify({
           provider: editingKey.provider, // keep original
           label,
-          api_key: editingKey.api_key || '', // blank keeps original
+          api_key: submittedKey || '', // blank keeps original
           priority: editingKey.priority, // keep original
           is_active: !!editingKey.is_active,
         }),
@@ -531,7 +540,7 @@ export default function KeyPoolPage() {
                             </span>
                           </div>
 
-                          <div className="font-semibold text-sm text-white font-mono truncate select-all" title={key.label}>
+                          <div className="font-semibold text-sm text-white font-mono truncate select-all" title={key.label} id={key.id}>
                             {key.label}
                           </div>
 
@@ -601,8 +610,9 @@ export default function KeyPoolPage() {
         )}
       </div>
 
+      <PersonalKeyManagement />
       {/* Add Upstream Key Dialog */}
-      <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
+      <Dialog open={showAddModal} onOpenChange={open=>{setShowAddModal(open);if(!open)setAddForm({...addForm,api_key:''});}}>
         <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-heading font-semibold text-white">{t('keyPool.addModalTitle')}</DialogTitle>
@@ -671,12 +681,13 @@ export default function KeyPoolPage() {
       </Dialog>
 
       {/* Edit Upstream Key Dialog */}
-      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+      <Dialog open={showEditModal} onOpenChange={open=>{setShowEditModal(open);if(!open)setEditingKey({...editingKey,api_key:''});}}>
         <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-heading font-semibold text-white">{t('keyPool.editModalTitle')}</DialogTitle>
           </DialogHeader>
 
+          <KeyAccess key={editingKey.id} id={editingKey.id} kind="provider" />
           <form onSubmit={handleUpdate} className="flex flex-col gap-4 my-2">
             <div className="flex flex-col gap-2">
               <label className="text-zinc-400 text-sm font-medium">{t('keyPool.label')}</label>

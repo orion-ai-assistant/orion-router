@@ -72,6 +72,8 @@ async def audio_speech(
                 "X-Orion-Metrics": json.dumps(metrics),
             },
         )
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:

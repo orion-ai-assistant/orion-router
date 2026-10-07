@@ -8,9 +8,10 @@ from pydantic import BaseModel, Field
 
 from core.dependencies import authenticate_request, verify_admin
 from core.security import encrypt
+from core.secret_guard import SecretRoute
 from database import db_manager
 
-router = APIRouter(prefix='/api/v1/hubs', tags=['Hub'])
+router = APIRouter(prefix='/api/v1/hubs', tags=['Hub'], route_class=SecretRoute)
 
 
 def require_tls(request: Request):
@@ -95,11 +96,58 @@ async def current_account(request: Request):
     return auth
 
 
+@router.get('/account-catalog/{section}')
+async def account_catalog(section: str, request: Request, auth: dict = Depends(current_account)):
+    from api import admin
+    from core.key_policy import candidates, allowed
+    usable = {'local'} | {r['provider'] for r in await candidates(auth['key_id']) if allowed(r)}
+    # A saved personal key blocks shared credentials even when it is disabled.
+    private = await db_manager.fetch('SELECT id,provider FROM router_user_provider_keys WHERE key_id=$1', auth['key_id'])
+    eligible = {r['id'] for r in await candidates(auth['key_id']) if allowed(r)}
+    usable -= {r['provider'] for r in private if r['id'] not in eligible}
+    if section == 'models':
+        data = await admin.list_models()
+        return {'models': [m for m in data['models'] if m['is_active'] and m['provider'] in usable]}
+    if section == 'model-groups':
+        data = await admin.list_model_groups()
+        groups = []
+        for g in data['groups']:
+            if not g['is_active']:
+                continue
+            g['items'] = [m for m in g['items'] if m['provider'] in usable]
+            if g['items']:
+                groups.append(g)
+        return {'groups': groups}
+    if section == 'voices':
+        data = await admin.get_admin_voices(request)
+        return {'voices': {p:v for p,v in data['voices'].items() if p in usable}}
+    raise HTTPException(404, 'Unknown catalog section')
+
+
 @router.get('/providers')
 async def providers(request: Request, auth: dict = Depends(current_account)):
-    rows = await db_manager.fetch('SELECT provider FROM router_user_provider_keys WHERE key_id=$1', auth['key_id'])
+    from core.key_policy import candidates, allowed
+    rows = await db_manager.fetch('SELECT provider,label,is_active,admin_updated FROM router_user_provider_keys WHERE key_id=$1', auth['key_id'])
     capabilities = request.app.state.dynamic_router.get_capabilities()
-    return {'providers': sorted(capabilities), 'configured': [r['provider'] for r in rows]}
+    summary = {}
+    for row in await candidates(auth['key_id']):
+        if not allowed(row):
+            continue
+        counts = summary.setdefault(row['provider'], {'provider': row['provider'], 'shared': 0, 'private': 0})
+        exclusive = row['source'] == 'personal'
+        if not exclusive and row['scope'] == 'selected':
+            population = await db_manager.fetchval(
+                'SELECT count(*) FROM router_provider_key_access WHERE provider_key_id=$1', row['id'])
+            exclusive = population == 1
+        counts['private' if exclusive else 'shared'] += 1
+    from core.mdns import lan_addresses, container
+    from core import config
+    addresses = () if container() and not config.MDNS_CONTAINER_HOST_NETWORK else lan_addresses(config.MDNS_INTERFACES, config.TLS_HOST)
+    host = next(iter(addresses), '127.0.0.1')
+    return {'providers': sorted(capabilities), 'configured': [r['provider'] for r in rows],
+            'personal_keys': [dict(r) for r in rows], 'summary': list(summary.values()),
+            'active_keys': sum(r['shared'] + r['private'] for r in summary.values()),
+            'dashboard_url': f'https://{host}:{config.TLS_PORT}/dashboard'}
 
 
 class ProviderCredential(BaseModel):
@@ -116,13 +164,16 @@ async def save_provider(provider: str, payload: ProviderCredential, request: Req
         raise HTTPException(400, 'Sağlayıcının kendi API anahtarını girin.')
     await db_manager.execute('''
         INSERT INTO router_user_provider_keys(key_id,provider,api_key) VALUES ($1,$2,$3)
-        ON CONFLICT(key_id,provider) DO UPDATE SET api_key=excluded.api_key
+        ON CONFLICT(key_id,provider) DO UPDATE SET api_key=excluded.api_key,admin_updated=false
     ''', auth['key_id'], provider, encrypt(key))
     return {'saved': True}
 
 
 @router.delete('/providers/{provider}')
 async def remove_provider(provider: str, auth: dict = Depends(current_account)):
+    row = await db_manager.fetchrow('SELECT is_active FROM router_user_provider_keys WHERE key_id=$1 AND provider=$2', auth['key_id'], provider)
+    if row and not row['is_active']:
+        raise HTTPException(403, 'Yönetici tarafından kapatılan anahtar için Router yöneticisine başvurun.')
     await db_manager.execute('DELETE FROM router_user_provider_keys WHERE key_id=$1 AND provider=$2',
                              auth['key_id'], provider)
     return {'removed': True}

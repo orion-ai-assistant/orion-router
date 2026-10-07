@@ -160,6 +160,35 @@ class DatabaseManager:
             """
         )
 
+        await conn.execute('''
+            ALTER TABLE router_provider_key_pool ADD COLUMN IF NOT EXISTS scope TEXT NOT NULL DEFAULT 'all' CHECK (scope IN ('all','selected'));
+            ALTER TABLE router_provider_key_pool DROP CONSTRAINT IF EXISTS router_provider_key_pool_provider_label_key;
+            ALTER TABLE router_virtual_keys ADD COLUMN IF NOT EXISTS provider_key_mode TEXT NOT NULL DEFAULT 'unrestricted' CHECK (provider_key_mode IN ('unrestricted','only_selected'));
+            ALTER TABLE router_user_provider_keys ADD COLUMN IF NOT EXISTS id TEXT NOT NULL DEFAULT gen_random_uuid()::text;
+            CREATE UNIQUE INDEX IF NOT EXISTS router_personal_provider_id ON router_user_provider_keys(id);
+            ALTER TABLE router_user_provider_keys ADD COLUMN IF NOT EXISTS label TEXT NOT NULL DEFAULT 'Kişisel';
+            ALTER TABLE router_user_provider_keys ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
+            ALTER TABLE router_user_provider_keys ADD COLUMN IF NOT EXISTS admin_updated BOOLEAN NOT NULL DEFAULT false;
+            CREATE TABLE IF NOT EXISTS router_provider_key_access (
+                provider_key_id TEXT REFERENCES router_provider_key_pool(id) ON DELETE CASCADE,
+                virtual_key_id TEXT REFERENCES router_virtual_keys(id) ON DELETE CASCADE,
+                PRIMARY KEY(provider_key_id,virtual_key_id)
+            );
+            CREATE TABLE IF NOT EXISTS router_virtual_key_access (
+                virtual_key_id TEXT REFERENCES router_virtual_keys(id) ON DELETE CASCADE,
+                provider_key_id TEXT NOT NULL,
+                PRIMARY KEY(virtual_key_id,provider_key_id)
+            );
+            ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS upstream_key_source TEXT;
+            ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS recorded_key_id TEXT;
+            ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS recorded_hub_id TEXT;
+            ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS usage_unit TEXT;
+            ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS usage_amount NUMERIC;
+            UPDATE router_request_logs l SET recorded_key_id=v.id,recorded_hub_id=v.hub_id
+              FROM router_virtual_keys v WHERE l.key_id=v.id AND l.recorded_key_id IS NULL;
+            CREATE INDEX IF NOT EXISTS router_logs_key_time ON router_request_logs(key_id,created_at);
+        ''')
+
         # 7. Model registry and model groups.
         await conn.execute(
             """
@@ -247,6 +276,8 @@ class DatabaseManager:
 
     async def _migrate_legacy_provider_keys(self, conn: asyncpg.Connection) -> None:
         """Move existing provider_api_keys config entries into the new key pool once."""
+        if await conn.fetchval("SELECT config_value FROM router_configs WHERE config_key='provider_api_keys_migrated'"):
+            return
         raw = await conn.fetchval(
             "SELECT config_value FROM router_configs WHERE config_key = 'provider_api_keys'"
         )
@@ -263,16 +294,20 @@ class DatabaseManager:
         for provider, api_key in legacy_keys.items():
             if not provider or not api_key:
                 continue
+            # Existing records may have been renamed/disabled by an admin.
+            # Reimporting a config secret must never undo that decision.
+            if await conn.fetchval('SELECT EXISTS(SELECT 1 FROM router_provider_key_pool WHERE provider=$1)', str(provider).strip().lower()):
+                continue
             await conn.execute(
                 """
                 INSERT INTO router_provider_key_pool (provider, label, api_key, priority, is_active)
                 VALUES ($1, $2, $3, 100, true)
-                ON CONFLICT (provider, label) DO NOTHING
                 """,
                 str(provider).strip().lower(),
                 f"Migrated {str(provider).strip().lower()} key",
                 encrypt(str(api_key).strip()),
             )
+        await conn.execute("INSERT INTO router_configs(config_key,config_value) VALUES('provider_api_keys_migrated','true'::jsonb) ON CONFLICT(config_key) DO NOTHING")
 
     async def _seed_default_models(self, conn: asyncpg.Connection) -> None:
         catalog = load_model_catalog()
@@ -304,7 +339,9 @@ class DatabaseManager:
             )
             if self.pool:
                 async with self.pool.acquire() as conn:
-                    await self._ensure_tables(conn)
+                    async with conn.transaction():
+                        await conn.execute("SELECT pg_advisory_xact_lock(724109850)")
+                        await self._ensure_tables(conn)
                 logger.info("Successfully connected to Postgres and initialized pool.")
             else:
                 logger.error("Failed to create asyncpg pool.")
@@ -377,7 +414,12 @@ class DatabaseManager:
                 return json.loads(val)
             return None
 
-    async def log_request(self, key_id, provider, model, tokens_used, prompt_tokens, completion_tokens, thoughts_tokens, cost, request_json=None, response_json=None, upstream_key_id=None, success=True, capability='chat', prompt_cost=0.0, completion_cost=0.0, thoughts_cost=0.0, status=None, ttft_ms=None, duration_ms=None):
+    async def log_request(self, key_id, provider, model, tokens_used, prompt_tokens, completion_tokens, thoughts_tokens, cost, request_json=None, response_json=None, upstream_key_id=None, success=True, capability='chat', prompt_cost=0.0, completion_cost=0.0, thoughts_cost=0.0, status=None, ttft_ms=None, duration_ms=None, usage_unit=None, usage_amount=None):
+        from core.key_policy import selected_upstream
+        selected_id, selected_source = selected_upstream.get()
+        upstream_key_id = upstream_key_id or selected_id
+        from core.secret_guard import redact_json
+        request_json, response_json = redact_json(request_json), redact_json(response_json)
         pool = await self.get_db_pool()
         if status is None:
             status = "success" if success is True else ("failed" if success is False else "interrupted")
@@ -387,10 +429,10 @@ class DatabaseManager:
                     """
                     INSERT INTO router_request_logs
                         (key_id, provider, requested_model, tokens_used,
-                         prompt_tokens, completion_tokens, thoughts_tokens, cost, success, request_json, response_json, upstream_key_id, capability, prompt_cost, completion_cost, thoughts_cost, status, ttft_ms, duration_ms)
-                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13,$14,$15,$16,$17,$18,$19)
+                         prompt_tokens, completion_tokens, thoughts_tokens, cost, success, request_json, response_json, upstream_key_id, capability, prompt_cost, completion_cost, thoughts_cost, status, ttft_ms, duration_ms, upstream_key_source, recorded_key_id, recorded_hub_id, usage_unit, usage_amount)
+                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13,$14,$15,$16,$17,$18,$19,$20,$1,(SELECT hub_id FROM router_virtual_keys WHERE id=$1),$21,$22)
                     """,
-                    key_id, provider, model, tokens_used, prompt_tokens, completion_tokens, thoughts_tokens, cost, success, request_json, response_json, upstream_key_id, capability, prompt_cost, completion_cost, thoughts_cost, status, ttft_ms, duration_ms
+                    key_id, provider, model, tokens_used, prompt_tokens, completion_tokens, thoughts_tokens, cost, success, request_json, response_json, upstream_key_id, capability, prompt_cost, completion_cost, thoughts_cost, status, ttft_ms, duration_ms, selected_source, usage_unit, usage_amount
                 )
                 if key_id and cost is not None and (success or cost > 0):
                     await conn.execute(
@@ -417,8 +459,8 @@ class DatabaseManager:
                     INSERT INTO router_request_logs
                         (key_id, provider, requested_model, tokens_used,
                          prompt_tokens, completion_tokens, thoughts_tokens, cost, success,
-                         request_json, response_json, capability, status)
-                    VALUES ($1, $2, $3, NULL, NULL, NULL, NULL, 0.0, NULL, $4::jsonb, $5::jsonb, $6, $7)
+                         request_json, response_json, capability, status, recorded_key_id, recorded_hub_id)
+                    VALUES ($1, $2, $3, NULL, NULL, NULL, NULL, NULL, NULL, $4::jsonb, $5::jsonb, $6, $7, $1, (SELECT hub_id FROM router_virtual_keys WHERE id=$1))
                     RETURNING id
                     """,
                     key_id, provider, model, request_json, response_json, capability, status,
@@ -445,8 +487,14 @@ class DatabaseManager:
         provider: str | None = None,
         model: str | None = None,
         request_json: str | None = None,
+        usage_unit: str | None = None,
+        usage_amount: float | None = None,
     ) -> None:
         """Canlı streaming oturumunun ara veya nihai sonucunu günceller."""
+        from core.key_policy import selected_upstream
+        upstream_id, upstream_source = selected_upstream.get()
+        from core.secret_guard import redact_json
+        request_json, response_json = redact_json(request_json), redact_json(response_json)
         pool = await self.get_db_pool()
         async with pool.acquire() as conn:
             async with conn.transaction():
@@ -460,7 +508,7 @@ class DatabaseManager:
                         prompt_tokens = COALESCE($6, prompt_tokens),
                         completion_tokens = COALESCE($7, completion_tokens),
                         thoughts_tokens = COALESCE($8, thoughts_tokens),
-                        cost = COALESCE($9, cost),
+                        cost = CASE WHEN $3 IN ('success','failed','interrupted') THEN $9 ELSE COALESCE($9,cost) END,
                                                 prompt_cost = COALESCE($10, prompt_cost),
                                                 completion_cost = COALESCE($11, completion_cost),
                                                 thoughts_cost = COALESCE($12, thoughts_cost),
@@ -468,13 +516,17 @@ class DatabaseManager:
                                                 ttft_ms = COALESCE($14, ttft_ms),
                         provider = COALESCE($15, provider),
                         resolved_model = COALESCE($16, resolved_model),
-                        request_json = COALESCE($17::jsonb, request_json)
+                        request_json = COALESCE($17::jsonb, request_json),
+                        upstream_key_id = COALESCE($18, upstream_key_id),
+                        upstream_key_source = COALESCE($19, upstream_key_source),
+                        usage_unit = COALESCE($20, usage_unit),
+                        usage_amount = COALESCE($21, usage_amount)
                                         WHERE id = $1
                                             AND ($3 = 'success' OR status NOT IN ('success', 'failed', 'interrupted'))
                     """,
                     log_id, response_json, status, success, tokens_used, prompt_tokens,
                                         completion_tokens, thoughts_tokens, cost, prompt_cost, completion_cost,
-                                        thoughts_cost, duration_ms, ttft_ms, provider, model, request_json
+                                        thoughts_cost, duration_ms, ttft_ms, provider, model, request_json, upstream_id, upstream_source, usage_unit, usage_amount
                 )
                 if key_id and cost is not None and cost > 0:
                     await conn.execute(

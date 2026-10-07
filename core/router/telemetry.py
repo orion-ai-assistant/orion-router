@@ -24,6 +24,8 @@ class TelemetryService:
         ttft_ms: float | None = None,
         duration_ms: float | None = None,
         log_id: int | None = None,
+        usage_unit: str | None = None,
+        usage_amount: float | None = None,
     ) -> None:
         try:
             if usage is None:
@@ -33,8 +35,9 @@ class TelemetryService:
                 p = usage.get("prompt_tokens")
                 c = usage.get("completion_tokens")
                 t = usage.get("thoughts_tokens")
-                tokens_used = (p or 0) + (c or 0) + (t or 0)
+                tokens_used = None if all(x is None for x in (p,c,t)) else (p or 0) + (c or 0) + (t or 0)
 
+            usage_unit = usage_unit or ('character' if capability == 'tts' and provider == 'openai' else 'token')
             cost = None
             p_cost, c_cost, t_cost = 0.0, 0.0, 0.0
 
@@ -62,7 +65,7 @@ class TelemetryService:
                     )):
                         cost = p_cost + c_cost + t_cost
             else:
-                cost = 0.0
+                cost = 0.0 if success is False else None
                 p, c, t = None, None, None
                 tokens_used = None
 
@@ -85,6 +88,8 @@ class TelemetryService:
                     thoughts_cost=t_cost,
                     ttft_ms=ttft_ms,
                     duration_ms=duration_ms,
+                    usage_unit=usage_unit,
+                    usage_amount=usage_amount,
                 )
             else:
                 await db_manager.update_streaming_log(
@@ -107,6 +112,8 @@ class TelemetryService:
                     thoughts_cost=t_cost,
                     key_id=key_id,
                     duration_ms=duration_ms,
+                    usage_unit=usage_unit,
+                    usage_amount=usage_amount,
                     ttft_ms=ttft_ms,
                 )
             logger.info(

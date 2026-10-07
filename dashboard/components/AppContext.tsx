@@ -414,6 +414,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
+    window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
     setAdminKey('');
     setAdminKeyState('');
     setIsAuthenticated(false);

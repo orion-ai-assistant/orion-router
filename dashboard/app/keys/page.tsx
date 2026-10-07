@@ -7,14 +7,17 @@ import { useApp } from '@/components/AppContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Copy, Check, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
+import { KeyAccess, KeyUsage, HubManagement, ownerLabel } from '@/components/KeyAccess';
 
 interface VirtualKey {
   id: string;
   name: string;
+  hub_id?: string;
+  hub_name?: string;
   is_active: boolean;
   budget: number;
   used_amount: number | null;
@@ -26,15 +29,16 @@ export default function VirtualKeysPage() {
   const [virtualKeys, setVirtualKeys] = useState<VirtualKey[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
+  const { adminKey } = useApp();
+  useEffect(() => {
+    setShowKeyModal(false); setVirtualKeyForm(prev=>({...prev,api_key:''}));
+  }, [adminKey]);
+
   // Modals visibility
   const [showKeyModal, setShowKeyModal] = useState<boolean>(false);
   const [showEditKeyModal, setShowEditKeyModal] = useState<boolean>(false);
-  const [newRawKey, setNewRawKey] = useState<string>('');
-  const [rawKeyDialogOpen, setRawKeyDialogOpen] = useState<boolean>(false);
-  const [copied, setCopied] = useState<boolean>(false);
-
   // Form states
-  const [virtualKeyForm, setVirtualKeyForm] = useState({ name: '', budget: 0 });
+  const [virtualKeyForm, setVirtualKeyForm] = useState({ name: '', budget: 0, api_key: '' });
   const [editingVirtualKey, setEditingVirtualKey] = useState<VirtualKey>({
     id: '',
     name: '',
@@ -83,17 +87,17 @@ export default function VirtualKeysPage() {
       return;
     }
 
+    const credential = virtualKeyForm.api_key;
+    setVirtualKeyForm({...virtualKeyForm,api_key:''});
     try {
       const res = await adminFetch('/dashboard/api/keys', {
         method: 'POST',
-        body: JSON.stringify({ name, budget }),
+        body: JSON.stringify({ name, budget, api_key: credential }),
       });
       if (res.ok) {
-        const data = await res.json();
+        await res.json();
         setShowKeyModal(false);
-        setNewRawKey(data.raw_key);
-        setRawKeyDialogOpen(true);
-        setVirtualKeyForm({ name: '', budget: 0 });
+        setVirtualKeyForm({ name: '', budget: 0, api_key: '' });
         showToast(t('keys.toast.createSuccess'));
         await loadVirtualKeys();
       } else {
@@ -166,14 +170,6 @@ export default function VirtualKeysPage() {
     }
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    showToast(t('keys.toast.copied'));
-    setRawKeyDialogOpen(false);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   const openEditModal = (key: VirtualKey) => {
     setEditingVirtualKey({ ...key });
     setShowEditKeyModal(true);
@@ -194,6 +190,7 @@ export default function VirtualKeysPage() {
         </Button>
       </header>
 
+      <HubManagement />
       {/* Table List */}
       <div className="table-container glass-panel bg-[#18181b] border border-zinc-800 rounded-md overflow-hidden shadow-xl">
         <Table>
@@ -221,10 +218,10 @@ export default function VirtualKeysPage() {
               </TableRow>
             ) : (
               virtualKeys.map((key) => (
-                <TableRow key={key.id} className="border-b border-zinc-900 hover:bg-white/[0.015] transition-colors">
+                <TableRow key={key.id} id={key.id} className="border-b border-zinc-900 hover:bg-white/[0.015] transition-colors">
                   <TableCell className="font-medium text-sm py-4 pl-6">
                     <div className="flex items-center gap-2">
-                      <span className="truncate max-w-[240px]" title={key.name}>{key.name}</span>
+                      <span className="truncate max-w-[240px]" title={key.name}>{ownerLabel(key)}</span>
                       {!key.is_active && (
                         <Badge className="bg-red-500/10 text-red-500 border border-red-500/20 text-[10px] font-semibold tracking-wide uppercase px-2.5 py-0.5 rounded-full shrink-0">
                           Inactive
@@ -260,13 +257,14 @@ export default function VirtualKeysPage() {
       </div>
 
       {/* Create Key Dialog */}
-      <Dialog open={showKeyModal} onOpenChange={setShowKeyModal}>
-        <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
+      <Dialog open={showKeyModal} onOpenChange={open => {setShowKeyModal(open); if(!open) setVirtualKeyForm({...virtualKeyForm,api_key:''});}}>
+        <DialogContent className="max-w-[700px] max-h-[90vh] overflow-y-auto border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-heading font-semibold text-white">{t('keys.createModalTitle')}</DialogTitle>
           </DialogHeader>
 
           <div className="flex flex-col gap-4 my-4">
+            <label>Sanal anahtar (önceden oluşturulmuş sk-orion-…)<Input type="password" autoComplete="off" value={virtualKeyForm.api_key} onChange={e => setVirtualKeyForm({...virtualKeyForm,api_key:e.target.value})}/></label>
             <div className="flex flex-col gap-2">
               <label className="text-zinc-400 text-sm font-medium">{t('keys.keyName')}</label>
               <Input
@@ -310,7 +308,7 @@ export default function VirtualKeysPage() {
 
       {/* Edit Key Dialog */}
       <Dialog open={showEditKeyModal} onOpenChange={setShowEditKeyModal}>
-        <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
+        <DialogContent className="max-w-[700px] max-h-[90vh] overflow-y-auto border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-heading font-semibold text-white">{t('keys.editModalTitle')}</DialogTitle>
           </DialogHeader>
@@ -355,6 +353,8 @@ export default function VirtualKeysPage() {
             </div>
           </div>
 
+          <KeyAccess key={editingVirtualKey.id} id={editingVirtualKey.id} kind="virtual" />
+          <KeyUsage key={`usage-${editingVirtualKey.id}`} id={editingVirtualKey.id} />
           <DialogFooter className="mt-4 flex justify-between w-full gap-3">
             <Button
               onClick={() => handleDeleteKey(editingVirtualKey.id)}
@@ -381,37 +381,6 @@ export default function VirtualKeysPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Raw Key Success Modal */}
-      <Dialog
-        open={rawKeyDialogOpen}
-        onOpenChange={setRawKeyDialogOpen}
-        onOpenChangeComplete={(open) => {
-          if (!open) setNewRawKey('');
-        }}
-      >
-        <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl text-center">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-heading font-semibold text-white">{t('keys.createdModalTitle')}</DialogTitle>
-            <DialogDescription className="text-zinc-400 text-sm mt-2">
-              {t('keys.createdModalDesc')}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="raw-key-box bg-black/50 border border-dashed border-emerald-500 p-4 rounded text-sm text-emerald-400 font-mono break-all my-5 select-all select-none">
-            {newRawKey}
-          </div>
-
-          <DialogFooter className="justify-center mt-4">
-            <Button
-              onClick={() => copyToClipboard(newRawKey)}
-              className="bg-white text-black hover:bg-zinc-200 font-medium px-6 py-2.5 rounded shadow-lg flex items-center gap-1.5 mx-auto"
-            >
-              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-              {copied ? t('common.copied') : t('keys.copyClose')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </section>
   );
 }

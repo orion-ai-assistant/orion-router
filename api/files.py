@@ -102,6 +102,8 @@ async def upload_file(
             key_id=auth.get('key_id'),
         )
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception(f"File upload error ({provider})")
         raise HTTPException(status_code=500, detail=str(e))
