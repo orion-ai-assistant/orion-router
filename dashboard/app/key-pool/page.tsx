@@ -1,762 +1,142 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { KeyAccess, PersonalKeyManagement } from '@/components/KeyAccess';
+import React, { useEffect, useState } from 'react';
 import { adminFetch } from '@/lib/api';
-import { runFlipUpdate } from '@/lib/list-flip';
 import { useApp } from '@/components/AppContext';
+import { KeyAccess, AccessDraft, ownerLabel } from '@/components/KeyAccess';
+import { ProviderKeyList, ProviderKey } from '@/components/ProviderKeyList';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
-import { Trash2, ChevronUp, ChevronDown, Move } from 'lucide-react';
+import { Trash2, Search } from 'lucide-react';
 
-interface ProviderKey {
-  id: string;
-  provider: string;
-  label: string;
-  priority: number;
-  is_active: boolean;
-  masked_key?: string;
-  api_key?: string;
-  _original?: {
-    provider: string;
-    label: string;
-    priority: number;
-    is_active: boolean;
-  };
+type Account={id:string;name:string;hub_name?:string;hub_id?:string};
+function Choice({value,options,onChange,label}: {value:string;options:{value:string;label:string}[];onChange:(value:string)=>void;label:string}) {
+  return <Select value={value} onValueChange={next=>{if(next)onChange(next);}}>
+    <SelectTrigger aria-label={label} className="h-10 w-full"><SelectValue>{options.find(x=>x.value===value)?.label || label}</SelectValue></SelectTrigger>
+    <SelectContent>{options.map(option=><SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
+  </Select>;
 }
-
-function gapIndexFromPointer(clientY: number, rows: NodeListOf<Element>): number {
-  const count = rows.length;
-  if (count === 0) return 0;
-  for (let i = 0; i < count; i++) {
-    const rect = rows[i].getBoundingClientRect();
-    if (clientY < rect.top + rect.height / 2) {
-      return i;
-    }
-  }
-  return count;
-}
-
-function insertIndexFromGap(sourceIndex: number, gapIndex: number): number {
-  return sourceIndex < gapIndex ? gapIndex - 1 : gapIndex;
-}
-
-function isValidDropGap(sourceIndex: number, gapIndex: number): boolean {
-  return gapIndex !== sourceIndex && gapIndex !== sourceIndex + 1;
-}
-
+const emptyForm={provider:'',label:'',api_key:'',target:'all'};
 export default function KeyPoolPage() {
-  const { showToast, confirmAction, t } = useApp();
-  const [keyPool, setKeyPool] = useState<ProviderKey[]>([]);
-  const [providers, setProviders] = useState<string[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-
-  const { adminKey } = useApp();
-  useEffect(() => {
-    setShowAddModal(false); setShowEditModal(false); setAddForm(prev=>({...prev,api_key:''})); setEditingKey(prev=>({...prev,api_key:''}));
-  }, [adminKey]);
-
-  // Modals visibility
-  const [showAddModal, setShowAddModal] = useState<boolean>(false);
-  const [showEditModal, setShowEditModal] = useState<boolean>(false);
-
-  // Form states
-  const [addForm, setAddForm] = useState({ provider: '', label: '', api_key: '' });
-  const [editingKey, setEditingKey] = useState<ProviderKey>({
-    id: '',
-    provider: '',
-    label: '',
-    priority: 100,
-    is_active: true,
-    api_key: '',
-  });
-
-  // Drag and Drop state
-  const [draggedItem, setDraggedItem] = useState<{
-    provider: string;
-    itemId: string;
-    sourceIndex: number;
-  } | null>(null);
-  const [dragOverGap, setDragOverGap] = useState<{ provider: string; gapIndex: number } | null>(null);
-  const draggedItemRef = useRef(draggedItem);
-  const dragOverGapRef = useRef(dragOverGap);
-  const dropHandledRef = useRef(false);
-
-  useEffect(() => {
-    draggedItemRef.current = draggedItem;
-  }, [draggedItem]);
-
-  useEffect(() => {
-    dragOverGapRef.current = dragOverGap;
-  }, [dragOverGap]);
-
-  const loadProviders = async () => {
+  const {t,adminKey,showToast,confirmAction}=useApp();
+  const [tab,setTab]=useState<'shared'|'personal'>('shared');
+  const [shared,setShared]=useState<ProviderKey[]>([]);
+  const [personal,setPersonal]=useState<ProviderKey[]>([]);
+  const [accounts,setAccounts]=useState<Account[]>([]);
+  const [providers,setProviders]=useState<string[]>([]);
+  const [loading,setLoading]=useState(true);
+  const [search,setSearch]=useState('');
+  const [owner,setOwner]=useState('all');
+  const [adding,setAdding]=useState(false);
+  const [form,setForm]=useState(emptyForm);
+  const [editing,setEditing]=useState<ProviderKey|null>(null);
+  const [addAccess,setAddAccess]=useState<AccessDraft|null>(null);
+  const [editAccess,setEditAccess]=useState<AccessDraft|null>(null);
+  const [busy,setBusy]=useState(false);
+  useEffect(()=>{setAdding(false);setEditing(null);setForm(emptyForm);},[adminKey]);
+  const normalize=(keys:ProviderKey[],source:'shared'|'personal')=>keys.map(k=>({...k,source,priority:Number(k.priority)||100,
+    display_name:source==='personal'?ownerLabel({id:k.key_id || '',name:k.name || '',hub_name:k.hub_name}):k.label,
+    _original:{provider:k.provider,label:k.label,priority:Number(k.priority)||100,is_active:k.is_active}}));
+  async function read(path:string) {const res=await adminFetch(path);if(!res.ok)throw new Error();return res.json();}
+  async function load() {
     try {
-      const res = await adminFetch('/dashboard/api/providers');
-      if (res.ok) {
-        const data = await res.json();
-        const pNames = Object.keys(data.providers || {});
-        setProviders(pNames);
-        if (pNames.length > 0) {
-          setAddForm((prev) => ({ ...prev, provider: pNames[0] }));
-        }
-      }
-    } catch (e) {
-      console.error('Failed to load providers:', e);
+      const [pool,privateKeys,users,providerData]=await Promise.all([read('/dashboard/api/provider-key-pool'),read('/dashboard/api/personal-provider-keys'),read('/dashboard/api/keys'),read('/dashboard/api/providers')]);
+      setShared(normalize(pool.keys,'shared'));setPersonal(normalize(privateKeys.keys,'personal'));setAccounts(users.keys);setProviders(Object.keys(providerData.providers || {}));
+    } catch {showToast(t('access.loadError'),'error');}
+    finally {setLoading(false);}
+  }
+  useEffect(()=>{if(adminKey)void load();else {setShared([]);setPersonal([]);}},[adminKey]);
+  const endpoint=(key:ProviderKey)=>`/dashboard/api/${key.source==='personal'?'personal-provider-keys':'provider-key-pool'}/${key.id}`;
+  async function reorder(visible:ProviderKey[]) {
+    if(!visible.length)return;
+    const full=(visible[0].source==='personal'?personal:shared).filter(k=>k.provider===visible[0].provider).sort((a,b)=>a.priority-b.priority);
+    const ids=new Set(visible.map(k=>k.id));let index=0;
+    const merged=full.map(k=>ids.has(k.id)?visible[index++]:k);
+    for(let i=0;i<merged.length;i++) {
+      const key=merged[i];
+      const res=await adminFetch(endpoint(key),{method:'PUT',body:JSON.stringify({priority:i+1})});
+      if(!res.ok) {await load();throw new Error();}
     }
-  };
-
-  const loadKeyPool = async () => {
+    await load();
+  }
+  function openAdd() {
+    setAddAccess(null);
+    setForm({...emptyForm,provider:providers[0] || '',target:tab==='personal' && owner!=='all'?owner:'all'});
+    setAdding(true);
+  }
+  function openEdit(key:ProviderKey) {setEditAccess(null);setEditing({...key,api_key:''});}
+  async function create(e:React.FormEvent) {
+    e.preventDefault();if(busy || !form.api_key.trim() || (form.target==='all' && !addAccess))return;
+    setBusy(true);const submitted={...form};setForm(prev=>({...prev,api_key:''}));
     try {
-      const res = await adminFetch('/dashboard/api/provider-key-pool');
-      if (res.ok) {
-        const data = await res.json();
-        const keys = (data.keys || []).map((key: any) => ({
-          ...key,
-          provider: key.provider || '',
-          label: key.label || '',
-          priority: Number.isFinite(Number(key.priority)) ? Number(key.priority) : 0,
-          is_active: !!key.is_active,
-          _original: {
-            provider: key.provider || '',
-            label: key.label || '',
-            priority: Number.isFinite(Number(key.priority)) ? Number(key.priority) : 0,
-            is_active: !!key.is_active,
-          },
-        }));
-        setKeyPool(keys);
-      }
-    } catch (err) {
-      console.error('Failed to load key pool:', err);
-      showToast(t('keyPool.toast.loadFailed'), 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    const initData = async () => {
-      await loadProviders();
-      await loadKeyPool();
-    };
-    initData();
-
-    const handleAuth = () => {
-      initData();
-    };
-    window.addEventListener('orion-authenticated', handleAuth);
-    return () => {
-      window.removeEventListener('orion-authenticated', handleAuth);
-    };
-  }, []);
-
-  // Grouped keys by provider, sorted by priority
-  const groupedKeys = useMemo(() => {
-    const groups: Record<string, ProviderKey[]> = {};
-    keyPool.forEach(k => {
-      if (!groups[k.provider]) groups[k.provider] = [];
-      groups[k.provider].push(k);
+      const personalTarget=submitted.target!=='all';
+      const res=await adminFetch(`/dashboard/api/${personalTarget?'personal-provider-keys':'provider-key-pool'}`,{method:'POST',body:JSON.stringify({provider:submitted.provider,label:submitted.label.trim() || 'Kişisel',api_key:submitted.api_key,
+        priority:Math.max(0,...(personalTarget?personal:shared).filter(k=>k.provider===submitted.provider).map(k=>k.priority))+1,
+        ...(personalTarget?{key_id:submitted.target}:{access:addAccess})})});
+      if(!res.ok) {const error=await res.json();throw new Error(error.detail || t('keyPool.toast.addFailed'));}
+      setAdding(false);setTab(personalTarget?'personal':'shared');if(personalTarget)setOwner(submitted.target);
+      showToast(t('keyPool.toast.addSuccess'));await load();
+    } catch(error) {showToast(error instanceof Error?error.message:t('keyPool.toast.addFailed'),'error');}
+    finally {setBusy(false);}
+  }
+  async function update(e:React.FormEvent) {
+    e.preventDefault();if(!editing || busy || (editing.source==='shared' && !editAccess))return;
+    const submitted={...editing};setEditing(prev=>prev?{...prev,api_key:''}:null);setBusy(true);
+    try {
+      const res=await adminFetch(endpoint(submitted),{method:'PUT',body:JSON.stringify({label:submitted.label,api_key:submitted.api_key || '',is_active:submitted.is_active,...(submitted.source==='shared'?{access:editAccess}:{})})});
+      if(!res.ok)throw new Error();setEditing(null);showToast(t('keyPool.toast.updateSuccess'));await load();
+    } catch {showToast(t('keyPool.toast.updateFailed'),'error');}finally {setBusy(false);}
+  }
+  function remove(key:ProviderKey) {
+    confirmAction(t('common.confirm.deleteProviderKey'),async()=>{
+      setBusy(true);
+      try {const res=await adminFetch(endpoint(key),{method:'DELETE'});if(!res.ok)throw new Error();setEditing(null);await load();showToast(t('keyPool.toast.deleteSuccess'));}
+      catch {showToast(t('keyPool.toast.deleteFailed'),'error');}finally {setBusy(false);}
     });
-    // Sort each group by priority
-    Object.keys(groups).forEach(p => {
-      groups[p].sort((a, b) => a.priority - b.priority);
-    });
-    return groups;
-  }, [keyPool]);
-
-  const getGroupItemsContainer = (provider: string) =>
-    document.getElementById(`provider-keys-${provider}`);
-
-  const getGroupRows = (provider: string) => {
-    const container = getGroupItemsContainer(provider);
-    return container?.querySelectorAll('.key-item-row') ?? null;
-  };
-
-  const resolveDropGap = (clientY: number, provider: string): number => {
-    const rows = getGroupRows(provider);
-    if (!rows) return 0;
-    return gapIndexFromPointer(clientY, rows);
-  };
-
-  const persistPriorities = async (keysToUpdate: ProviderKey[]) => {
-    for (const key of keysToUpdate) {
-      const res = await adminFetch(`/dashboard/api/provider-key-pool/${key.id}`, {
-        method: 'PUT',
-        body: JSON.stringify({
-          provider: key.provider,
-          label: key.label,
-          priority: key.priority,
-          is_active: key.is_active,
-        }),
-      });
-      if (!res.ok) {
-        throw new Error('Failed to update priority');
-      }
-    }
-  };
-
-  const applyKeyReorder = async (
-    provider: string,
-    sourceIndex: number,
-    targetIndex: number
-  ) => {
-    if (sourceIndex === targetIndex) return;
-
-    let keysToUpdate: ProviderKey[] = [];
-    const container = getGroupItemsContainer(provider);
-    
-    runFlipUpdate(container, () => {
-      setKeyPool((prev) => {
-        const pKeys = [...(groupedKeys[provider] || [])];
-        const [moved] = pKeys.splice(sourceIndex, 1);
-        pKeys.splice(targetIndex, 0, moved);
-        
-        const reordered = pKeys.map((k, idx) => ({
-          ...k,
-          priority: idx + 1
-        }));
-
-        keysToUpdate = reordered.filter(k => k.priority !== k._original?.priority);
-
-        return prev.map(k => {
-          if (k.provider === provider) {
-            const found = reordered.find(r => r.id === k.id);
-            if (found) {
-              return {
-                ...found,
-                _original: found._original ? {
-                  ...found._original,
-                  priority: found.priority
-                } : undefined
-              };
-            }
-          }
-          return k;
-        });
-      });
-    });
-
-    if (keysToUpdate.length === 0) return;
-
-    try {
-      await persistPriorities(keysToUpdate);
-    } catch (err) {
-      console.error(err);
-      showToast(t('groups.toast.updateOrderFailed'), 'error'); // Shared translation
-      await loadKeyPool();
-    }
-  };
-
-  const finishDragSession = () => {
-    setDraggedItem(null);
-    setDragOverGap(null);
-  };
-
-  useEffect(() => {
-    if (!draggedItem) return;
-    const keepMoveCursor = (e: DragEvent) => {
-      e.preventDefault();
-      if (e.dataTransfer) {
-        e.dataTransfer.dropEffect = 'move';
-      }
-    };
-    document.addEventListener('dragover', keepMoveCursor);
-    document.body.classList.add('group-drag-active');
-    return () => {
-      document.removeEventListener('dragover', keepMoveCursor);
-      document.body.classList.remove('group-drag-active');
-    };
-  }, [draggedItem]);
-
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const provider = addForm.provider.trim();
-    const label = addForm.label.trim();
-    const api_key = addForm.api_key.trim();
-
-    if (!provider || !label || !api_key) {
-      showToast(t('keyPool.toast.fillFields'), 'error');
-      return;
-    }
-
-    setAddForm({...addForm,api_key:''});
-    // Auto-calculate priority: bottom of the list
-    const pKeys = groupedKeys[provider] || [];
-    const priority = pKeys.length + 1;
-
-    try {
-      const res = await adminFetch('/dashboard/api/provider-key-pool', {
-        method: 'POST',
-        body: JSON.stringify({ provider, label, api_key, priority, is_active: true }),
-      });
-      if (res.ok) {
-        setAddForm({ provider: providers[0] || '', label: '', api_key: '' });
-        setShowAddModal(false);
-        showToast(t('keyPool.toast.addSuccess'));
-        await loadKeyPool();
-      } else {
-        const err = await res.json();
-        showToast(t('common.error') + ': ' + (err.detail || t('keyPool.toast.addFailed')), 'error');
-      }
-    } catch (err) {
-      console.error(err);
-      showToast(t('keyPool.toast.addFailed'), 'error');
-    }
-  };
-
-  const handleUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const label = editingKey.label.trim();
-
-    if (!label) {
-      showToast(t('keyPool.toast.labelEmpty'), 'error');
-      return;
-    }
-
-    const submittedKey = editingKey.api_key;
-    setEditingKey({...editingKey,api_key:''});
-    try {
-      const res = await adminFetch(`/dashboard/api/provider-key-pool/${editingKey.id}`, {
-        method: 'PUT',
-        body: JSON.stringify({
-          provider: editingKey.provider, // keep original
-          label,
-          api_key: submittedKey || '', // blank keeps original
-          priority: editingKey.priority, // keep original
-          is_active: !!editingKey.is_active,
-        }),
-      });
-      if (res.ok) {
-        showToast(t('keyPool.toast.updateSuccess'));
-        setShowEditModal(false);
-        await loadKeyPool();
-      } else {
-        const err = await res.json();
-        showToast(t('common.error') + ': ' + (err.detail || t('keyPool.toast.updateFailed')), 'error');
-      }
-    } catch (err) {
-      console.error(err);
-      showToast(t('keyPool.toast.updateFailed'), 'error');
-    }
-  };
-
-  const handleDelete = async (keyId: string, confirmed = false) => {
-    if (!confirmed) {
-      confirmAction(t('common.confirm.deleteProviderKey'), () =>
-        handleDelete(keyId, true)
-      );
-      return;
-    }
-    try {
-      const res = await adminFetch(`/dashboard/api/provider-key-pool/${keyId}`, {
-        method: 'DELETE',
-      });
-      if (res.ok) {
-        setShowEditModal(false);
-        showToast(t('keyPool.toast.deleteSuccess'));
-        await loadKeyPool();
-      } else {
-        const err = await res.json();
-        showToast(t('common.error') + ': ' + (err.detail || t('keyPool.toast.deleteFailed')), 'error');
-      }
-    } catch (err) {
-      console.error(err);
-      showToast(t('keyPool.toast.deleteFailed'), 'error');
-    }
-  };
-
-  const isKeyDirty = (key: ProviderKey) => {
-    if (!key || !key._original) return false;
-    return (
-      key.label !== key._original.label ||
-      !!key.is_active !== key._original.is_active ||
-      !!(key.api_key && key.api_key.trim())
-    );
-  };
-
-  const openEditModal = (key: ProviderKey) => {
-    setEditingKey({
-      ...key,
-      api_key: '', // clear for modal input
-    });
-    setShowEditModal(true);
-  };
-
-  const handleDragStart = (e: React.DragEvent, provider: string, itemIndex: number, keyId: string) => {
-    dropHandledRef.current = false;
-    setDragOverGap(null);
-    setDraggedItem({
-      provider,
-      itemId: keyId,
-      sourceIndex: itemIndex,
-    });
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const updateDropTarget = (e: React.DragEvent, provider: string) => {
-    e.preventDefault();
-    const drag = draggedItemRef.current;
-    if (!drag || drag.provider !== provider) return;
-
-    e.dataTransfer.dropEffect = 'move';
-    const gapIndex = resolveDropGap(e.clientY, provider);
-
-    if (!isValidDropGap(drag.sourceIndex, gapIndex)) {
-      setDragOverGap(null);
-      return;
-    }
-
-    setDragOverGap((prev) =>
-      prev?.provider === provider && prev.gapIndex === gapIndex ? prev : { provider, gapIndex }
-    );
-  };
-
-  const handleDragEnd = async () => {
-    if (!dropHandledRef.current) {
-      const drag = draggedItemRef.current;
-      const over = dragOverGapRef.current;
-      if (
-        drag &&
-        over &&
-        drag.provider === over.provider &&
-        isValidDropGap(drag.sourceIndex, over.gapIndex)
-      ) {
-        dropHandledRef.current = true;
-        await applyKeyReorder(
-          drag.provider,
-          drag.sourceIndex,
-          insertIndexFromGap(drag.sourceIndex, over.gapIndex)
-        );
-      }
-    }
-    dropHandledRef.current = false;
-    finishDragSession();
-  };
-
-  const handleProviderDrop = async (e: React.DragEvent, provider: string) => {
-    e.preventDefault();
-    const drag = draggedItemRef.current;
-    if (!drag || drag.provider !== provider) return;
-
-    const gapIndex = resolveDropGap(e.clientY, provider);
-    if (!isValidDropGap(drag.sourceIndex, gapIndex)) {
-      finishDragSession();
-      return;
-    }
-
-    dropHandledRef.current = true;
-    await applyKeyReorder(
-      provider,
-      drag.sourceIndex,
-      insertIndexFromGap(drag.sourceIndex, gapIndex)
-    );
-    finishDragSession();
-  };
-
-  const handleMoveKey = async (provider: string, index: number, direction: number) => {
-    const pKeys = groupedKeys[provider] || [];
-    const targetIndex = index + direction;
-    if (targetIndex < 0 || targetIndex >= pKeys.length) return;
-    await applyKeyReorder(provider, index, targetIndex);
-  };
-
-  return (
-    <section id="key-pool" className="tab-content active block pt-8">
-      <header className="flex justify-between items-end mb-8 pb-6 border-b border-border">
-        <div className="header-titles">
-          <h1 className="font-heading text-3xl font-semibold tracking-tight">{t('keyPool.title')}</h1>
-          <p className="text-zinc-400 text-sm mt-1">{t('keyPool.description')}</p>
-        </div>
-        <Button
-          onClick={() => setShowAddModal(true)}
-          className="bg-white text-black hover:bg-zinc-200 font-medium px-6 py-2.5 rounded-full transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-1.5"
-        >
-          + {t('keyPool.addKey')}
-        </Button>
-      </header>
-
-      {/* Provider Group List */}
-      <div className="group-list flex flex-col gap-6">
-        {loading ? (
-          <div className="glass-panel p-8 text-center text-zinc-400">{t('keyPool.loading')}</div>
-        ) : Object.keys(groupedKeys).length === 0 ? (
-          <div className="glass-panel p-8 text-center text-zinc-400">
-            {t('keyPool.empty')}
-          </div>
-        ) : (
-          Object.entries(groupedKeys).map(([provider, keys]) => (
-            <div key={provider} className="glass-panel group-card p-6 bg-[#18181b] border border-zinc-800 rounded-md shadow-xl">
-              <div className="group-card-header mb-5">
-                <div className="group-card-title-section flex items-center gap-3 w-full">
-                  <Badge className="bg-blue-500/10 text-blue-300 border border-blue-500/20 text-[10px] font-medium tracking-wide rounded uppercase px-2.5 py-0.5 capitalize">
-                    {provider}
-                  </Badge>
-                  <h3 className="font-heading text-lg font-semibold text-white capitalize">
-                    {t('keyPool.providerKeys', { provider: provider === 'openai' ? 'OpenAI' : provider.charAt(0).toUpperCase() + provider.slice(1) })}
-                  </h3>
-                  <div className="flex gap-2 ml-auto items-center text-xs text-zinc-500">
-                    {keys.length} {keys.length === 1 ? t('keyPool.keyCount') : t('keyPool.keysCount')}
-                  </div>
-                </div>
-              </div>
-
-              <div
-                id={`provider-keys-${provider}`}
-                className={`group-items flex flex-col gap-2 ${draggedItem?.provider === provider ? 'select-none' : ''}`}
-                onDragOver={(e) => updateDropTarget(e, provider)}
-                onDrop={(e) => void handleProviderDrop(e, provider)}
-              >
-                {keys.length === 0 ? (
-                  <div className="text-zinc-500 text-xs py-4 text-center border border-dashed border-zinc-850 rounded bg-black/10">
-                    {t('keyPool.emptyItems')}
-                  </div>
-                ) : (
-                  <>
-                    {draggedItem?.provider === provider &&
-                      dragOverGap?.provider === provider &&
-                      dragOverGap.gapIndex === 0 && (
-                        <div className="group-drop-indicator" aria-hidden="true" />
-                      )}
-                    {keys.map((key, index) => (
-                      <React.Fragment key={key.id}>
-                        <div
-                          data-flip-id={key.id}
-                          className={`key-item-row bg-black/20 border border-zinc-850 rounded px-4 py-3 min-h-[52px] grid grid-cols-[36px_minmax(120px,220px)_minmax(150px,280px)_1fr_auto] gap-4 items-center ${
-                            draggedItem?.provider === provider
-                              ? ''
-                              : 'hover:border-zinc-600 hover:bg-black/35'
-                          } ${
-                            draggedItem?.provider === provider && draggedItem.itemId === key.id
-                              ? 'is-dragging'
-                              : ''
-                          }`}
-                        >
-                          <div className="flex items-center justify-start">
-                            <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] bg-zinc-800 border border-zinc-600 rounded-full text-zinc-300 text-[11px] font-bold">
-                              {index + 1}
-                            </span>
-                          </div>
-
-                          <div className="font-semibold text-sm text-white font-mono truncate select-all" title={key.label} id={key.id}>
-                            {key.label}
-                          </div>
-
-                          <div className="font-mono text-xs text-zinc-500 truncate select-all">
-                            {key.masked_key || '••••••••••••••••'}
-                          </div>
-
-                          <div className="flex items-center">
-                            {!key.is_active && (
-                              <Badge className="bg-red-500/10 text-red-500 border border-red-500/20 text-[9px] font-semibold tracking-wide uppercase px-1.5 py-0 rounded-full">
-                                Inactive
-                              </Badge>
-                            )}
-                          </div>
-
-                          <div className="flex items-center justify-end gap-1.5">
-                            <div
-                              draggable
-                              onDragStart={(e) => handleDragStart(e, provider, index, key.id)}
-                              onDragEnd={handleDragEnd}
-                              className="text-zinc-500 hover:text-zinc-300 cursor-grab active:cursor-grabbing p-1.5 mr-1 hover:bg-zinc-800/50 rounded touch-none"
-                              title="Drag to reorder"
-                            >
-                              <Move className="w-4 h-4 pointer-events-none" />
-                            </div>
-                            <Button
-                              variant="outline"
-                              onClick={() => handleMoveKey(provider, index, -1)}
-                              disabled={index === 0}
-                              className="border-zinc-850 text-zinc-400 hover:bg-zinc-800/50 hover:text-white p-1.5 h-8 w-8 rounded disabled:opacity-30 disabled:cursor-not-allowed"
-                              title="Move Up"
-                            >
-                              <ChevronUp className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              onClick={() => handleMoveKey(provider, index, 1)}
-                              disabled={index === keys.length - 1}
-                              className="border-zinc-850 text-zinc-400 hover:bg-zinc-800/50 hover:text-white p-1.5 h-8 w-8 rounded disabled:opacity-30 disabled:cursor-not-allowed"
-                              title="Move Down"
-                            >
-                              <ChevronDown className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              onClick={() => openEditModal(key)}
-                              className="border-zinc-850 text-white hover:bg-zinc-800/50 hover:text-white text-xs px-3 py-1 h-8 rounded ml-5"
-                              title={t('keyPool.editModalTitle')}
-                            >
-                              {t('common.edit')}
-                            </Button>
-                          </div>
-                        </div>
-
-                        {draggedItem?.provider === provider &&
-                          dragOverGap?.provider === provider &&
-                          dragOverGap.gapIndex === index + 1 && (
-                            <div className="group-drop-indicator" aria-hidden="true" />
-                          )}
-                      </React.Fragment>
-                    ))}
-                  </>
-                )}
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-
-      <PersonalKeyManagement />
-      {/* Add Upstream Key Dialog */}
-      <Dialog open={showAddModal} onOpenChange={open=>{setShowAddModal(open);if(!open)setAddForm({...addForm,api_key:''});}}>
-        <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-heading font-semibold text-white">{t('keyPool.addModalTitle')}</DialogTitle>
-          </DialogHeader>
-
-          <form onSubmit={handleCreate} className="flex flex-col gap-4 my-2">
-            <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">{t('keyPool.provider')}</label>
-              <div className="custom-select-wrapper select-wrapper w-full">
-                <select
-                  value={addForm.provider}
-                  onChange={(e) => setAddForm({ ...addForm, provider: e.target.value })}
-                  required
-                  className="orion-native-select"
-                >
-                  {providers.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">{t('keyPool.label')}</label>
-              <Input
-                value={addForm.label}
-                onChange={(e) => setAddForm({ ...addForm, label: e.target.value })}
-                required
-                placeholder={t('keyPool.labelPlaceholder')}
-                className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">{t('keyPool.apiKey')}</label>
-              <Input
-                type="password"
-                value={addForm.api_key}
-                onChange={(e) => setAddForm({ ...addForm, api_key: e.target.value })}
-                required
-                placeholder={t('keyPool.apiKeyPlaceholder')}
-                className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
-              />
-            </div>
-
-            <DialogFooter className="mt-4 flex gap-3 justify-end">
-              <Button
-                variant="outline"
-                type="button"
-                onClick={() => setShowAddModal(false)}
-                className="border-zinc-800 text-white hover:bg-zinc-900 rounded font-medium"
-              >
-                {t('common.cancel')}
-              </Button>
-              <Button
-                type="submit"
-                className="bg-white text-black hover:bg-zinc-200 rounded font-medium"
-              >
-                {t('common.save')}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Upstream Key Dialog */}
-      <Dialog open={showEditModal} onOpenChange={open=>{setShowEditModal(open);if(!open)setEditingKey({...editingKey,api_key:''});}}>
-        <DialogContent className="max-w-[400px] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-heading font-semibold text-white">{t('keyPool.editModalTitle')}</DialogTitle>
-          </DialogHeader>
-
-          <KeyAccess key={editingKey.id} id={editingKey.id} kind="provider" />
-          <form onSubmit={handleUpdate} className="flex flex-col gap-4 my-2">
-            <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">{t('keyPool.label')}</label>
-              <Input
-                value={editingKey.label}
-                onChange={(e) => setEditingKey({ ...editingKey, label: e.target.value })}
-                required
-                placeholder={t('keyPool.labelPlaceholder')}
-                className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <label className="text-zinc-400 text-sm font-medium">{t('keyPool.apiKey')}</label>
-              <Input
-                type="password"
-                value={editingKey.api_key}
-                onChange={(e) => setEditingKey({ ...editingKey, api_key: e.target.value })}
-                placeholder={t('keyPool.leaveBlankToKeep')}
-                className="bg-black/40 border border-zinc-850 text-white rounded px-4 py-3"
-              />
-            </div>
-
-            <div
-              onClick={() => setEditingKey({ ...editingKey, is_active: !editingKey.is_active })}
-              className={`flex items-center justify-between p-4 rounded-lg cursor-pointer border transition-all duration-200 ${
-                editingKey.is_active
-                  ? 'bg-purple-950/10 border-purple-500/25'
-                  : 'bg-white/3 border-zinc-800'
-              }`}
-            >
-              <div className="flex flex-col gap-0.5">
-                <span className={`font-semibold text-sm ${editingKey.is_active ? 'text-purple-400' : 'text-white'}`}>{t('keys.activeStatus')}</span>
-              </div>
-              <Switch
-                checked={editingKey.is_active}
-                onCheckedChange={(checked) => setEditingKey({ ...editingKey, is_active: checked })}
-              />
-            </div>
-
-            <DialogFooter className="mt-4 flex justify-between w-full gap-3">
-              <Button
-                onClick={() => handleDelete(editingKey.id)}
-                type="button"
-                className="bg-transparent border border-red-500/20 text-red-500 hover:bg-red-500/10 rounded font-medium flex items-center gap-1.5"
-              >
-                <Trash2 className="w-4 h-4" /> {t('common.delete')}
-              </Button>
-              <div className="flex gap-3 justify-end">
-                <Button
-                  variant="outline"
-                  type="button"
-                  onClick={() => setShowEditModal(false)}
-                  className="border-zinc-800 text-white hover:bg-zinc-900 rounded font-medium"
-                >
-                  {t('common.cancel')}
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={!isKeyDirty(editingKey)}
-                  className="bg-white text-black hover:bg-zinc-200 rounded font-medium disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {t('common.save')}
-                </Button>
-              </div>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </section>
-  );
+  }
+  const targetOptions=[{value:'all',label:t('access.everyone')},...accounts.map(k=>({value:k.id,label:ownerLabel(k)}))];
+  const visible=personal.filter(k=>(owner==='all'||k.key_id===owner) && `${k.display_name} ${k.provider}`.toLocaleLowerCase().includes(search.toLocaleLowerCase()));
+  return <section id="key-pool" className="tab-content active block pt-8">
+    <header className="mb-8 flex flex-wrap items-end justify-between gap-4 border-b border-border pb-6">
+      <div><h1 className="font-heading text-3xl font-semibold tracking-tight">{t('keyPool.title')}</h1><p className="mt-1 text-sm text-zinc-400">{t('keyPool.description')}</p></div>
+      <Button onClick={openAdd} className="rounded-full bg-white px-6 py-2.5 font-medium text-black hover:bg-zinc-200">+ {t('keyPool.addKey')}</Button>
+    </header>
+    <div role="tablist" aria-label={t('keyPool.title')} className="mb-6 flex w-fit max-w-full gap-1 rounded-xl border border-zinc-800 bg-zinc-900/60 p-1">
+      {(['shared','personal'] as const).map(value=><Button key={value} role="tab" aria-selected={tab===value} variant="ghost" className={`h-auto whitespace-normal px-5 py-3 ${tab===value?'bg-zinc-800 text-white':'text-zinc-400'}`} onClick={()=>setTab(value)}>{t('access.'+value)}</Button>)}
+    </div>
+    {tab==='personal' && <div className="mb-6 flex flex-wrap items-center gap-3 rounded-xl border border-zinc-800 bg-black/20 p-4">
+      <Search className="size-4 text-zinc-500"/><Input className="min-w-40 flex-1" aria-label={t('access.searchOwner')} placeholder={t('access.searchOwner')} value={search} onChange={e=>setSearch(e.target.value)}/>
+      <div className="w-full sm:w-64"><Choice value={owner} options={[{value:'all',label:t('access.allUsers')},...targetOptions.slice(1)]} onChange={setOwner} label={t('access.user')}/></div>
+    </div>}
+    <ProviderKeyList keys={tab==='shared'?shared:visible} loading={loading} onEdit={openEdit} onReorder={reorder}/>
+    <Dialog open={adding} onOpenChange={open=>{if(busy)return;setAdding(open);if(!open)setForm(prev=>({...prev,api_key:''}));}}>
+      <DialogContent className="max-w-[560px] max-h-[90vh] overflow-y-auto [color-scheme:dark] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
+        <DialogHeader><DialogTitle>{t('keyPool.addModalTitle')}</DialogTitle></DialogHeader>
+        <form onSubmit={create} className="my-2 flex flex-col gap-4">
+          <label className="space-y-2 text-sm text-zinc-400">{t('keyPool.provider')}<Choice label={t('keyPool.provider')} value={form.provider} options={providers.map(value=>({value,label:value}))} onChange={value=>setForm(prev=>({...prev,provider:value}))}/></label>
+          <label className="space-y-2 text-sm text-zinc-400">{t('keyPool.label')}<Input value={form.label} onChange={e=>setForm(prev=>({...prev,label:e.target.value}))} required={form.target==='all'} placeholder={t('keyPool.labelPlaceholder')}/></label>
+          <label className="space-y-2 text-sm text-zinc-400">{t('keyPool.apiKey')}<Input type="password" autoComplete="off" value={form.api_key} onChange={e=>setForm(prev=>({...prev,api_key:e.target.value}))} required/></label>
+          <div className="space-y-2"><label className="text-sm text-zinc-400">{t('access.keyOwner')}</label><Choice value={form.target} options={targetOptions} onChange={value=>setForm(prev=>({...prev,target:value}))} label={t('access.keyOwner')}/></div>
+          {form.target==='all'?<KeyAccess kind="provider" value={addAccess} onChange={setAddAccess}/>:<p className="rounded-xl border border-zinc-800 bg-black/20 p-4 text-xs text-zinc-400">{t('access.personalOwnerOnly')}</p>}
+          <DialogFooter className="mt-4"><Button type="button" variant="outline" disabled={busy} onClick={()=>{setAdding(false);setForm(prev=>({...prev,api_key:''}));}}>{t('common.cancel')}</Button><Button type="submit" disabled={busy || (form.target==='all' && !addAccess)}>{t('common.save')}</Button></DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+    <Dialog open={!!editing} onOpenChange={open=>{if(!busy && !open)setEditing(null);}}>
+      <DialogContent className="max-w-[560px] max-h-[90vh] overflow-y-auto [color-scheme:dark] border border-border bg-zinc-950 p-8 rounded-2xl glass-panel text-white shadow-2xl">
+        <DialogHeader><DialogTitle>{t('keyPool.editModalTitle')}</DialogTitle></DialogHeader>
+        {editing && <form onSubmit={update} className="my-2 flex flex-col gap-4">
+          {editing.source==='personal' && <p className="text-sm text-zinc-400">{editing.display_name}</p>}
+          <label className="space-y-2 text-sm text-zinc-400">{t('keyPool.label')}<Input required value={editing.label} onChange={e=>setEditing({...editing,label:e.target.value})}/></label>
+          <label className="space-y-2 text-sm text-zinc-400">{t('keyPool.apiKey')}<Input type="password" autoComplete="off" value={editing.api_key || ''} placeholder={t('keyPool.leaveBlankToKeep')} onChange={e=>setEditing({...editing,api_key:e.target.value})}/></label>
+          {editing.source==='shared'?<KeyAccess key={editing.id} id={editing.id} kind="provider" value={editAccess} onChange={setEditAccess}/>:<p className="rounded-xl border border-zinc-800 p-4 text-xs text-zinc-400">{t('access.personalOwnerOnly')}</p>}
+          <label className={`flex items-center justify-between rounded-lg border p-4 ${editing.is_active?'border-purple-500/25 bg-purple-950/10':'border-zinc-800 bg-white/3'}`}><span className="text-sm text-purple-400">{t('keys.activeStatus')}</span><Switch checked={editing.is_active} onCheckedChange={active=>setEditing({...editing,is_active:active})}/></label>
+          <DialogFooter className="mt-4 flex justify-between gap-3"><Button type="button" variant="destructive" disabled={busy} onClick={()=>remove(editing)}><Trash2 className="size-4"/>{t('common.delete')}</Button><div className="ml-auto flex gap-3"><Button type="button" variant="outline" disabled={busy} onClick={()=>setEditing(null)}>{t('common.cancel')}</Button><Button type="submit" disabled={busy || (editing.source==='shared' && !editAccess)}>{t('common.save')}</Button></div></DialogFooter>
+        </form>}
+      </DialogContent>
+    </Dialog>
+  </section>;
 }

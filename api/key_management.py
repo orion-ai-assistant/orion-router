@@ -66,30 +66,78 @@ async def save_virtual_access(identifier: str, request: Request):
     return {'saved': True}
 
 
+@router.get('/api/keys/access-options')
+async def new_virtual_access_options():
+    rows = await db_manager.fetch("SELECT id,provider,label,is_active,scope FROM router_provider_key_pool ORDER BY provider,priority,id")
+    return {'mode': 'unrestricted', 'selected': [], 'keys': [dict(r, source='shared', layer_a=r['scope']=='all',
+        layer_b=True, allowed=r['is_active'] and r['scope']=='all',
+        reason=None if r['is_active'] and r['scope']=='all' else 'Yeni sanal anahtara sağlayıcı izni kapalı' if r['is_active'] else 'Pasif') for r in rows]}
+
+
 @router.get('/api/personal-provider-keys')
 async def personal_keys():
-    return {'keys': [dict(r) for r in await db_manager.fetch('''
-        SELECT p.id,p.provider,p.label,p.is_active,p.admin_updated,
+    from core.security import decrypt
+    from api.admin import _mask_key
+    rows = await db_manager.fetch('''
+        SELECT p.id,p.provider,p.label,p.is_active,p.admin_updated,p.priority,p.api_key,
                v.id AS key_id,v.name,h.id AS hub_id,h.name AS hub_name
         FROM router_user_provider_keys p JOIN router_virtual_keys v ON v.id=p.key_id
-        LEFT JOIN router_hubs h ON h.id=v.hub_id ORDER BY h.name,v.name,p.provider
-    ''')]}
+        LEFT JOIN router_hubs h ON h.id=v.hub_id ORDER BY p.provider,p.priority,h.name,v.name,p.id
+    ''')
+    keys = []
+    for row in rows:
+        item = dict(row)
+        secret = decrypt(item.pop('api_key'))
+        item['masked_key'] = _mask_key(secret) if secret else '••••••••'
+        keys.append(item)
+    return {'keys': keys}
+
+
+def personal_fields(body, required=False):
+    secret = body.get('api_key')
+    if secret == '' and not required:
+        secret = None
+    if (required and secret is None) or (secret is not None and (not isinstance(secret, str) or not secret.strip() or len(secret)>8192 or secret.startswith(('sk-orion-', 'hub-orion-')))):
+        raise HTTPException(422, 'Sağlayıcının kendi anahtarını girin.')
+    active = body.get('is_active')
+    if active is not None and not isinstance(active, bool):
+        raise HTTPException(422, 'Geçersiz durum.')
+    label = body.get('label')
+    if label is not None and (not isinstance(label, str) or not label.strip()):
+        raise HTTPException(422, 'Etiket gerekli.')
+    priority = body.get('priority')
+    if priority is not None and (not isinstance(priority, int) or isinstance(priority, bool) or priority < 0):
+        raise HTTPException(422, 'Geçersiz sıra.')
+    return secret, active, label.strip() if label else None, priority
+
+
+@router.post('/api/personal-provider-keys')
+async def create_personal(request: Request):
+    body = await request.json()
+    secret, active, label, priority = personal_fields(body, required=True)
+    provider, owner = body.get('provider'), body.get('key_id')
+    if not isinstance(provider, str) or not provider.strip() or not isinstance(owner, str):
+        raise HTTPException(422, 'Sağlayıcı ve kullanıcı seçin.')
+    if not await db_manager.fetchval('SELECT EXISTS(SELECT 1 FROM router_virtual_keys WHERE id=$1)', owner):
+        raise HTTPException(422, 'Kullanıcı bulunamadı.')
+    row = await db_manager.fetchrow('''INSERT INTO router_user_provider_keys(key_id,provider,api_key,label,is_active,priority,admin_updated)
+            VALUES ($1,$2,$3,$4,$5,$6,true) ON CONFLICT (key_id,provider) DO NOTHING RETURNING id,provider,label,is_active,priority''',
+            owner, provider.strip().lower(), encrypt(secret.strip()), label or 'Kişisel', True if active is None else active, 100 if priority is None else priority)
+    if not row:
+        raise HTTPException(409, 'Bu kullanıcının bu sağlayıcı için zaten kişisel anahtarı var. Mevcut anahtarı düzenleyin.')
+    return dict(row)
 
 
 @router.put('/api/personal-provider-keys/{identifier}')
 async def edit_personal(identifier: str, request: Request):
     body = await request.json()
-    secret = body.get('api_key')
-    if secret is not None and (not isinstance(secret, str) or not secret.strip() or len(secret) > 8192 or secret.startswith(('sk-orion-', 'hub-orion-'))):
-        raise HTTPException(422, 'Sağlayıcının kendi anahtarını girin.')
-    active = body.get('is_active')
-    if active is not None and not isinstance(active, bool):
-        raise HTTPException(422, 'Geçersiz durum.')
+    secret, active, label, priority = personal_fields(body)
     row = await db_manager.fetchrow('''
         UPDATE router_user_provider_keys SET api_key=COALESCE($2,api_key),
-          is_active=COALESCE($3,is_active),admin_updated=admin_updated OR $4
-        WHERE id=$1 RETURNING id,provider,label,is_active,admin_updated
-    ''', identifier, encrypt(secret.strip()) if secret is not None else None, active, secret is not None)
+          is_active=COALESCE($3,is_active),admin_updated=admin_updated OR $4,
+          label=COALESCE($5,label),priority=COALESCE($6,priority)
+        WHERE id=$1 RETURNING id,provider,label,is_active,admin_updated,priority
+    ''', identifier, encrypt(secret.strip()) if secret is not None else None, active, secret is not None, label, priority)
     if not row:
         raise HTTPException(404, 'Anahtar bulunamadı.')
     return dict(row)
@@ -105,7 +153,9 @@ async def delete_personal(identifier: str):
 async def usage(start: datetime | None = None, end: datetime | None = None,
                 hub_id: str | None = None, key_id: str | None = None,
                 provider: str | None = None, model: str | None = None,
-                upstream_key_id: str | None = None):
+                upstream_key_id: str | None = None, timezone: str = "UTC"):
+    if not await db_manager.fetchval("SELECT EXISTS(SELECT 1 FROM pg_timezone_names WHERE name=$1)", timezone):
+        raise HTTPException(422, "Geçersiz saat dilimi.")
     if any(d is not None and d.tzinfo is None for d in (start,end)):
         raise HTTPException(422, "Zaman aralığı saat dilimi içermeli.")
     if start and end and start >= end:
@@ -127,6 +177,6 @@ async def usage(start: datetime | None = None, end: datetime | None = None,
     base = ' FROM router_request_logs l LEFT JOIN router_virtual_keys v ON v.id=l.key_id WHERE ' + filters
     args = (start,end,hub_id,key_id,provider,model,upstream_key_id)
     totals = await db_manager.fetch('SELECT l.capability,l.usage_unit,'+fields+base+' GROUP BY l.capability,l.usage_unit', *args)
-    daily = await db_manager.fetch("SELECT (l.created_at AT TIME ZONE 'UTC')::date AS day,l.capability,l.usage_unit,"+fields+base+" GROUP BY day,l.capability,l.usage_unit ORDER BY day", *args)
-    return {'totals': [dict(r) for r in totals], 'daily': [dict(r) for r in daily], 'timezone': 'UTC',
+    daily = await db_manager.fetch("SELECT (l.created_at AT TIME ZONE $8)::date AS day,l.capability,l.usage_unit,"+fields+base+" GROUP BY day,l.capability,l.usage_unit ORDER BY day", *args, timezone)
+    return {'totals': [dict(r) for r in totals], 'daily': [dict(r) for r in daily], 'timezone': timezone,
             'units': {'chat': 'token', 'embed': 'token', 'tts': 'character', 'stt': 'provider usage'}}

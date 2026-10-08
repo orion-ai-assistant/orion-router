@@ -10,7 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { PayloadViewer } from '@/components/PayloadViewer';
-import { RefreshCw } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface LogItem {
   id: number;
@@ -50,6 +51,11 @@ export default function LogsPage() {
   const [activeLogDetails, setActiveLogDetails] = useState<LogDetails | null>(null);
   const fetchSequence = useRef(0);
   const [offset,setOffset] = useState(0);
+  const [total,setTotal] = useState(0);
+  const [jump,setJump] = useState('');
+  const page = offset / 100 + 1;
+  const pageCount = Math.max(1, Math.ceil(total / 100));
+  const pages = Array.from(new Set([1,pageCount,page-1,page,page+1, ...(page<4?[2,3,4]:[]), ...(page>pageCount-3?[pageCount-3,pageCount-2,pageCount-1]:[])])).filter(n=>n>=1 && n<=pageCount).sort((a,b)=>a-b);
 
   // Copies tracking
   const [copiedReq, setCopiedReq] = useState(false);
@@ -67,6 +73,8 @@ export default function LogsPage() {
         if (sequence !== fetchSequence.current) {
           return;
         }
+        setTotal(data.total || 0);
+        if(offset > 0 && offset >= data.total) {setOffset(Math.max(0, (Math.ceil(data.total / 100)-1)*100));return;}
         const incoming: LogItem[] = data.logs || [];
         if (mode === 'poll' && offset === 0) {
           setLogs((prev) => {
@@ -92,7 +100,7 @@ export default function LogsPage() {
             const prevIds = new Set(prev.map((l) => l.id));
             const newItems = incoming.filter((l) => !prevIds.has(l.id));
             if (newItems.length > 0 || changed) {
-              return [...newItems, ...updated];
+              return [...newItems, ...updated].slice(0,100);
             }
             return prev;
           });
@@ -197,7 +205,7 @@ export default function LogsPage() {
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> {t('logs.refresh')}
         </Button>
       </header>
-      <div className="flex gap-3 items-center mb-3"><Button disabled={offset===0 || loading} onClick={()=>setOffset(Math.max(0,offset-100))}>Önceki</Button><span>{offset+1}–{offset+logs.length} · İstek listesi, toplam kullanım değildir</span><Button disabled={logs.length<100 || loading} onClick={()=>setOffset(offset+100)}>Sonraki</Button></div>
+
 
       {/* Table List */}
       <div className="table-container glass-panel bg-[#18181b] border border-zinc-800 rounded-md overflow-hidden shadow-xl">
@@ -232,7 +240,7 @@ export default function LogsPage() {
               logs.map((log) => (
                 <TableRow key={log.id} className="border-b border-zinc-900 hover:bg-white/[0.015] transition-colors">
                   <TableCell className="font-medium text-sm py-4 pl-6 text-zinc-300">
-                    {log.hub_name ? `${log.hub_name} [${log.hub_id?.slice(0,8)}] · ${log.key_name}` : log.key_name || 'Admin'}
+                    {log.hub_name ? `${log.hub_name} · ${log.key_name}` : log.key_name || 'Admin'}
                   </TableCell>
                   <TableCell
                     className={`py-4 pl-8 font-mono text-white max-w-[240px] truncate ${
@@ -340,6 +348,10 @@ export default function LogsPage() {
         </Table>
       </div>
 
+      <nav aria-label={t('access.pagination')} className="mt-6 flex flex-col items-center gap-3 pb-6">
+        <div className="flex flex-wrap items-center justify-center gap-1.5"><Button variant="outline" size="icon" aria-label={t('access.previous')} disabled={page===1 || loading} onClick={()=>setOffset(offset-100)}><ChevronLeft/></Button>{pages.map((n,index)=><React.Fragment key={n}>{index>0 && n-pages[index-1]>1 && <span className="px-2 text-zinc-500">…</span>}<Button variant={n===page?'secondary':'ghost'} className={n===page?'border border-purple-500/30 bg-purple-500/15 text-purple-300':''} aria-current={n===page?'page':undefined} disabled={loading} onClick={()=>setOffset((n-1)*100)}>{n}</Button></React.Fragment>)}<Button variant="outline" size="icon" aria-label={t('access.next')} disabled={page===pageCount || loading} onClick={()=>setOffset(offset+100)}><ChevronRight/></Button></div>
+        <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-zinc-500"><span>{t('access.logCount',{total,pages:pageCount})}</span><form className="flex items-center gap-2" onSubmit={e=>{e.preventDefault();const target=Number(jump);if(Number.isInteger(target) && target>=1 && target<=pageCount){setOffset((target-1)*100);setJump('');}}}><Input aria-label={t('access.goPage')} className="h-8 w-20" placeholder={t('access.page')} type="number" min={1} max={pageCount} value={jump} onChange={e=>setJump(e.target.value)}/><Button type="submit" size="sm" variant="outline" disabled={loading}>{t('access.go')}</Button></form></div>
+      </nav>
       {/* Payloads Modal */}
       <Dialog
         open={payloadDialogOpen}

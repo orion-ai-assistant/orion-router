@@ -169,6 +169,7 @@ class DatabaseManager:
             ALTER TABLE router_user_provider_keys ADD COLUMN IF NOT EXISTS label TEXT NOT NULL DEFAULT 'Kişisel';
             ALTER TABLE router_user_provider_keys ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
             ALTER TABLE router_user_provider_keys ADD COLUMN IF NOT EXISTS admin_updated BOOLEAN NOT NULL DEFAULT false;
+            ALTER TABLE router_user_provider_keys ADD COLUMN IF NOT EXISTS priority INTEGER NOT NULL DEFAULT 100;
             CREATE TABLE IF NOT EXISTS router_provider_key_access (
                 provider_key_id TEXT REFERENCES router_provider_key_pool(id) ON DELETE CASCADE,
                 virtual_key_id TEXT REFERENCES router_virtual_keys(id) ON DELETE CASCADE,

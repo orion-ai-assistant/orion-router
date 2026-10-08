@@ -3,6 +3,7 @@ api/admin.py
 ------------
 Admin paneli için UI sunumu ve CRUD endpoint'leri.
 """
+from core.key_policy import mutate_with_access
 import hashlib
 import json
 import logging
@@ -171,13 +172,14 @@ async def create_admin_key(request: Request):
             raise HTTPException(422, "Önceden oluşturduğunuz sanal anahtarı girin (sk-orion-…).")
         key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
 
-        row = await db_manager.fetchrow(
+        row = await mutate_with_access(
             "INSERT INTO router_virtual_keys (name, api_key_hash, budget) "
             "VALUES ($1, $2, $3) "
             "RETURNING id, name, is_active, budget, used_amount, created_at",
             name,
             key_hash,
             budget,
+            kind="virtual", access=body.get("access"),
         )
         data = dict(row)
         return data
@@ -203,7 +205,7 @@ async def update_admin_key(key_id: str, request: Request):
         budget = float(body.get("budget", existing["budget"]))
         is_active = bool(body.get("is_active", existing["is_active"]))
 
-        row = await db_manager.fetchrow(
+        row = await mutate_with_access(
             """
             UPDATE router_virtual_keys
             SET name = $2, budget = $3, is_active = $4
@@ -214,6 +216,7 @@ async def update_admin_key(key_id: str, request: Request):
             name,
             budget,
             is_active,
+            kind="virtual", access=body.get("access"),
         )
         # Key deactivated or budget changed → invalidate auth cache
         from core.dependencies import invalidate_vkey_cache
@@ -270,11 +273,12 @@ async def get_admin_logs(limit: int = 100, offset: int = 0):
             FROM router_request_logs l
             LEFT JOIN router_virtual_keys k ON l.key_id = k.id
             LEFT JOIN router_hubs h ON k.hub_id=h.id
-            ORDER BY l.created_at DESC
+            ORDER BY l.created_at DESC, l.id DESC
             LIMIT $1 OFFSET $2
             """, limit, offset
         )
-        return {"logs": [dict(r) for r in rows], "limit": limit, "offset": offset}
+        total = await db_manager.fetchval("SELECT COUNT(*) FROM router_request_logs")
+        return {"logs": [dict(r) for r in rows], "limit": limit, "offset": offset, "total": total}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -585,7 +589,7 @@ async def create_provider_key_pool_item(request: Request):
     priority = int(body.get("priority", 100))
     is_active = bool(body.get("is_active", True))
 
-    row = await db_manager.fetchrow(
+    row = await mutate_with_access(
         """
         INSERT INTO router_provider_key_pool (provider, label, api_key, priority, is_active)
         VALUES ($1, $2, $3, $4, $5)
@@ -596,6 +600,7 @@ async def create_provider_key_pool_item(request: Request):
         api_key,
         priority,
         is_active,
+        kind="provider", access=body.get("access"),
     )
     return dict(row)
 
@@ -619,7 +624,7 @@ async def update_provider_key_pool_item(key_id: str, request: Request):
     priority = int(body.get("priority", existing["priority"]))
     is_active = bool(body.get("is_active", existing["is_active"]))
 
-    row = await db_manager.fetchrow(
+    row = await mutate_with_access(
         """
         UPDATE router_provider_key_pool
         SET provider = $2, label = $3, api_key = $4, priority = $5,
@@ -637,6 +642,7 @@ async def update_provider_key_pool_item(key_id: str, request: Request):
         priority,
         is_active,
         has_new_key,
+        kind="provider", access=body.get("access"),
     )
     return dict(row)
 

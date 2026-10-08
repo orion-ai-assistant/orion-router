@@ -55,7 +55,7 @@ async def authorize_attempt(key_id, provider, upstream_id, secret=None):
     selected_upstream.set((upstream_id, source))
 
 
-async def replace_rule(table, identifier, mode, selected):
+async def replace_rule(table, identifier, mode, selected, connection=None):
     """Atomically replace a rule; foreign keys reject stale virtual IDs."""
     if not isinstance(selected, list) or any(not isinstance(x, str) for x in selected):
         raise HTTPException(422, 'Seçim kimlik listesi olmalı.')
@@ -69,20 +69,41 @@ async def replace_rule(table, identifier, mode, selected):
             'virtual_key_id', 'provider_key_id', ('unrestricted', 'only_selected'))
     if mode not in valid:
         raise HTTPException(422, 'Geçersiz izin kapsamı.')
+    async def apply(conn):
+        row = await conn.fetchrow(f'UPDATE {root} SET {column}=$2 WHERE id=$1 RETURNING id', identifier, mode)
+        if not row:
+            raise HTTPException(404, 'Anahtar bulunamadı.')
+        if table == 'provider' and selected:
+            known = await conn.fetch('SELECT id FROM router_virtual_keys WHERE id=ANY($1::text[])', selected)
+            if set(selected) != {r['id'] for r in known}:
+                raise HTTPException(422, 'Sanal anahtar bulunamadı.')
+        if table != 'provider' and selected:
+            known = await conn.fetch('SELECT id FROM router_provider_key_pool WHERE id=ANY($1::text[]) UNION ALL SELECT id FROM router_user_provider_keys WHERE id=ANY($1::text[]) AND key_id=$2', selected, identifier)
+            if set(selected) != {r['id'] for r in known}:
+                raise HTTPException(422, 'Sağlayıcı anahtarı bulunamadı veya başka kullanıcıya ait.')
+        await conn.execute(f'DELETE FROM {relation} WHERE {owner}=$1', identifier)
+        for target_id in set(selected):
+            await conn.execute(f'INSERT INTO {relation} ({owner},{target}) VALUES ($1,$2)', identifier, target_id)
+    if connection is not None:
+        await apply(connection)
+    else:
+        pool = await db_manager.get_db_pool()
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                await apply(conn)
+
+
+async def mutate_with_access(query, *args, kind, access=None):
+    """Save fields and permissions together; a bad selection rolls back both."""
+    if access is None:
+        return await db_manager.fetchrow(query, *args)
+    if not isinstance(access, dict):
+        raise HTTPException(422, 'Geçersiz izin verisi.')
     pool = await db_manager.get_db_pool()
     async with pool.acquire() as conn:
         async with conn.transaction():
-            row = await conn.fetchrow(f'UPDATE {root} SET {column}=$2 WHERE id=$1 RETURNING id', identifier, mode)
+            row = await conn.fetchrow(query, *args)
             if not row:
                 raise HTTPException(404, 'Anahtar bulunamadı.')
-            if table == 'provider' and selected:
-                known = await conn.fetch('SELECT id FROM router_virtual_keys WHERE id=ANY($1::text[])', selected)
-                if set(selected) != {r['id'] for r in known}:
-                    raise HTTPException(422, 'Sanal anahtar bulunamadı.')
-            if table != 'provider' and selected:
-                known = await conn.fetch('SELECT id FROM router_provider_key_pool WHERE id=ANY($1::text[]) UNION ALL SELECT id FROM router_user_provider_keys WHERE id=ANY($1::text[]) AND key_id=$2', selected, identifier)
-                if set(selected) != {r['id'] for r in known}:
-                    raise HTTPException(422, 'Sağlayıcı anahtarı bulunamadı veya başka kullanıcıya ait.')
-            await conn.execute(f'DELETE FROM {relation} WHERE {owner}=$1', identifier)
-            for target_id in set(selected):
-                await conn.execute(f'INSERT INTO {relation} ({owner},{target}) VALUES ($1,$2)', identifier, target_id)
+            await replace_rule(kind, row['id'], access.get('mode'), access.get('selected', []), connection=conn)
+            return row

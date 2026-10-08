@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { adminFetch } from '@/lib/api';
 import { money, formatNumber } from '@/lib/utils';
 import { useApp } from '@/components/AppContext';
+import { UsageExplorer } from '@/components/UsageExplorer';
 import { Coins, Cpu, Key } from 'lucide-react';
 
 interface Stats {
@@ -175,6 +176,7 @@ export default function OverviewPage() {
           </div>
         </div>
       </div>
+      <UsageExplorer/>
     </section>
   );
 }
