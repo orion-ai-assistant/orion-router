@@ -70,20 +70,20 @@ export default function OverviewPage() {
   }, []);
 
   return (
-    <section id="dashboard" className="tab-content active block pt-8">
-      <div className="dashboard-banner" style={bannerStyle}></div>
+    <section id="dashboard" className="tab-content active flex h-full min-h-0 flex-col pt-5">
+      <div className="dashboard-banner shrink-0 !h-[clamp(70px,13vh,130px)]" style={bannerStyle}></div>
 
-      <header className="flex justify-between items-end mb-8 pb-6 border-b border-border">
+      <header className="flex shrink-0 justify-between items-end mb-5 pb-4 border-b border-border">
         <div className="header-titles">
           <h1 className="font-heading text-3xl font-semibold tracking-tight">{t('overview.title')}</h1>
           <p className="text-zinc-400 text-sm mt-1">{t('overview.description')}</p>
         </div>
       </header>
 
-      <div className="stats-grid grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="shrink-0 stats-grid grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Total Cost Card */}
-        <div className="stat-card glass-panel p-6 pl-10 flex items-center gap-6 bg-[#131315] border border-white/5 rounded-md hover:translate-y-[-2px] hover:bg-[#18181b] hover:border-blue-500/35 hover:shadow-[0_8px_30px_rgba(59,130,246,0.15)] transition-all duration-200">
-          <div className="stat-icon text-blue-400 bg-blue-500/10 border border-blue-500/20 w-14 h-14 flex items-center justify-center rounded-xl">
+        <div className="stat-card glass-panel p-4 pl-6 flex items-center gap-6 bg-[#131315] border border-white/5 rounded-md hover:translate-y-[-2px] hover:bg-[#18181b] hover:border-blue-500/35 hover:shadow-[0_8px_30px_rgba(59,130,246,0.15)] transition-all duration-200">
+          <div className="stat-icon text-blue-400 bg-blue-500/10 border border-blue-500/20 w-11 h-11 flex items-center justify-center rounded-xl">
             <Coins className="w-6 h-6 stroke-[1.8]" />
           </div>
           <div className="stat-details relative group">
@@ -123,8 +123,8 @@ export default function OverviewPage() {
         </div>
 
         {/* Tokens Processed Card */}
-        <div className="stat-card glass-panel p-6 pl-10 flex items-center gap-6 bg-[#131315] border border-white/5 rounded-md hover:translate-y-[-2px] hover:bg-[#18181b] hover:border-sky-500/35 hover:shadow-[0_8px_30px_rgba(14,165,233,0.15)] transition-all duration-200">
-          <div className="stat-icon text-sky-400 bg-sky-500/10 border border-sky-500/20 w-14 h-14 flex items-center justify-center rounded-xl">
+        <div className="stat-card glass-panel p-4 pl-6 flex items-center gap-6 bg-[#131315] border border-white/5 rounded-md hover:translate-y-[-2px] hover:bg-[#18181b] hover:border-sky-500/35 hover:shadow-[0_8px_30px_rgba(14,165,233,0.15)] transition-all duration-200">
+          <div className="stat-icon text-sky-400 bg-sky-500/10 border border-sky-500/20 w-11 h-11 flex items-center justify-center rounded-xl">
             <Cpu className="w-6 h-6 stroke-[1.8]" />
           </div>
           <div className="stat-details relative group">
@@ -164,8 +164,8 @@ export default function OverviewPage() {
         </div>
 
         {/* Virtual Keys Card */}
-        <div className="stat-card glass-panel p-6 pl-10 flex items-center gap-6 bg-[#131315] border border-white/5 rounded-md hover:translate-y-[-2px] hover:bg-[#18181b] hover:border-indigo-500/35 hover:shadow-[0_8px_30px_rgba(99,102,241,0.15)] transition-all duration-200">
-          <div className="stat-icon text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 w-14 h-14 flex items-center justify-center rounded-xl">
+        <div className="stat-card glass-panel p-4 pl-6 flex items-center gap-6 bg-[#131315] border border-white/5 rounded-md hover:translate-y-[-2px] hover:bg-[#18181b] hover:border-indigo-500/35 hover:shadow-[0_8px_30px_rgba(99,102,241,0.15)] transition-all duration-200">
+          <div className="stat-icon text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 w-11 h-11 flex items-center justify-center rounded-xl">
             <Key className="w-6 h-6 stroke-[1.8]" />
           </div>
           <div className="stat-details">

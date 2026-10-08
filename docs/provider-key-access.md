@@ -58,14 +58,17 @@ kayıtlar sayılır. Başka hesapların kayıt kimliği veya metadata'sı dönme
 Birden fazla bağlı Router desteklenir; kişisel form hedef Router'ı seçebilir.
 
 Kullanım istatistikleri Genel Bakış'taki açılır kullanım panelindedir; Hub,
-kullanıcı, sağlayıcı ve tarih aralığı filtreleri burada kullanılır. Sanal anahtar
-düzenleme formundaki kısayol, bu paneli ilgili kullanıcı seçili olarak açar.
+kullanıcı, sağlayıcı ve tarih aralığı filtreleri burada kullanılır. Sanal anahtar düzenleme formunda kullanım bağlantısı bulunmaz.
 Üstteki mevcut genel toplam kartları bu panelin filtrelerinden bağımsızdır.
 İşlem türü başına tek özet kartı gösterilir; birimi boş eski kayıtlar aynı
 işlem türünün istek ve token toplamlarına eklenir. Farklı kullanım birimleri
 ayrı tutulur. Günlük grafikte aynı gün ve işlem türünün istekleri toplanır;
 sohbet mor, TTS mavi, STT yeşil, embedding sarıdır. Sağdaki tür düğmeleri
-serileri gizleyip gösterir; tarihler dikey çubukların altındadır.
+serileri gizleyip gösterir; tarihler dikey çubukların altındadır. Sol eksen
+yatay kaydırmanın dışında sabittir; çubukların üzerinde tarih ve tam sayı
+içeren değer balonu açılır. Kullanım paneli kendi içinde kaydırılır; Genel
+Bakış resmi ve özet kartları yerinde kalır. Ekran okuyucu tablosu boyutu
+sınırlı bir kapsayıcıdadır ve görünmez kaydırma alanı eklemez.
 
 `GET /dashboard/api/usage` yöneticiye tüm geçmiş üzerinden özet ve günlük
 grupları döner. `timezone` varsayılan UTC; dashboard cihazın IANA saat dilimini
@@ -90,3 +93,17 @@ Regresyonlar `dev/test-orion-router/test_key_policy.py`,
 testleri rastgele geçici şema ve transaction rollback kullanır; üretim verisine
 yazmaz. Önceki Hub testlerinden HTTP varsayımlı bağlantı/adres ve eski session
 mock'u kullanan katalog testleri bu değişikliklerden önce de başarısızdır.
+
+Hub/Flutter kişisel kayıt özetleri yalnız `masked_key` değerini döndürür:
+uzun anahtarların son dört karakteri gösterilir, kısa veya çözülemeyen
+anahtarlar tamamen maskelenir. Ham değer ve şifreli kayıt yanıta eklenmez.
+
+8 Ekim ayarları: sanal anahtar izin formu silinen veya başka hesaba
+taşınan kişisel sağlayıcı kimliklerini seçili listeden ayıklar. Kaydetme API’si
+yabancı veya bulunamayan kimlikleri reddetmeye devam eder. Günlük/son 7
+gün/son 30 gün/tümü kısayolları yerel gün sınırlarını kullanır. Tarihler
+değişince 200 ms bekleyerek otomatik rapor alınır; geç gelen yanıtlar yok
+sayılır. Grafiğin yatay başlangıcı son gündür; aynı son gün içindeki
+güncellemeler manuel kaydırmayı sıfırlamaz.
+
+Grafiğin SVG çizim boyutu görünür piksel genişliğiyle eşleşir. Gün sayısı azaldığında tarih/yıl metni ve çubuk kalınlığı esnetilmez; yalnız günler arasındaki boşluk uyarlanır. Bir, yedi ve otuz günlük örneklerde görsel olarak doğrulandı.

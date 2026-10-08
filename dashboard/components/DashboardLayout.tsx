@@ -38,6 +38,7 @@ const TABS: SidebarTab[] = [
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const overview = pathname === '/' || pathname === '';
   const { isAuthenticated, logout, t, versionInfo, startSystemUpdate } = useApp();
 
   // Normalize path because pathname might have trailing slash or not
@@ -120,8 +121,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
 
       {/* Main Content Area */}
-      <main className="content-area flex-1 overflow-y-auto overflow-x-hidden h-full custom-scrollbar pr-4">
-        <div className="animate-in fade-in slide-in-from-bottom-3 duration-300 pb-10">
+      <main className={`content-area min-w-0 flex-1 overflow-x-hidden h-full custom-scrollbar pr-4 ${overview?'overflow-hidden':'overflow-y-auto'}`}>
+        <div className={`animate-in fade-in duration-300 ${overview?'h-full min-h-0 pb-3':'slide-in-from-bottom-3 pb-10'}`}>
           {children}
         </div>
       </main>

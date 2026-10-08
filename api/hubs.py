@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from core.dependencies import authenticate_request, verify_admin
-from core.security import encrypt
+from core.security import encrypt, decrypt
 from core.secret_guard import SecretRoute
 from database import db_manager
 
@@ -127,7 +127,7 @@ async def account_catalog(section: str, request: Request, auth: dict = Depends(c
 @router.get('/providers')
 async def providers(request: Request, auth: dict = Depends(current_account)):
     from core.key_policy import candidates, allowed
-    rows = await db_manager.fetch('SELECT provider,label,is_active,admin_updated FROM router_user_provider_keys WHERE key_id=$1', auth['key_id'])
+    rows = await db_manager.fetch('SELECT provider,label,is_active,admin_updated,api_key FROM router_user_provider_keys WHERE key_id=$1', auth['key_id'])
     capabilities = request.app.state.dynamic_router.get_capabilities()
     summary = {}
     for row in await candidates(auth['key_id']):
@@ -144,8 +144,15 @@ async def providers(request: Request, auth: dict = Depends(current_account)):
     from core import config
     addresses = () if container() and not config.MDNS_CONTAINER_HOST_NETWORK else lan_addresses(config.MDNS_INTERFACES, config.TLS_HOST)
     host = next(iter(addresses), '127.0.0.1')
+    from api.admin import _mask_key
+    personal = []
+    for row in rows:
+        item = dict(row)
+        value = decrypt(item.pop('api_key'))
+        item['masked_key'] = _mask_key(value) if value else '••••'
+        personal.append(item)
     return {'providers': sorted(capabilities), 'configured': [r['provider'] for r in rows],
-            'personal_keys': [dict(r) for r in rows], 'summary': list(summary.values()),
+            'personal_keys': personal, 'summary': list(summary.values()),
             'active_keys': sum(r['shared'] + r['private'] for r in summary.values()),
             'dashboard_url': f'https://{host}:{config.TLS_PORT}/dashboard'}
 

@@ -400,7 +400,7 @@
   "access.loadError": "Bilgiler alınamadı.",
   "access.saveError": "Değişiklik kaydedilemedi.",
   "access.usage": "Kullanım istatistikleri",
-  "access.localDates": "Tüm geçmiş kayıtlar. Tarihler cihazınızın saat dilimindedir; bitiş günü dahildir.",
+  "access.localDates": "Tarihler cihazınızın saat dilimindedir; bitiş günü dahildir.",
   "access.start": "Başlangıç tarihi",
   "access.end": "Bitiş tarihi",
   "access.filter": "Filtrele",
@@ -463,5 +463,11 @@
   "access.copyAndClose": "Anahtarı kopyala ve kapat",
   "access.chooseSeries": "Görüntülemek için bir istek türü seçin.",
   "access.chartTypes": "İstek türleri",
-  "access.date": "Tarih"
+  "access.date": "Tarih",
+  "access.startShort": "Başlangıç",
+  "access.endShort": "Bitiş",
+  "access.range.day": "Günlük",
+  "access.range.week": "Haftalık",
+  "access.range.month": "Aylık",
+  "access.range.all": "Tümü"
 }

@@ -56,7 +56,8 @@ async def virtual_access(identifier: str):
         r['reason'] = ('Pasif' if not r['is_active'] or not r['account_active'] else
                        'Sağlayıcı anahtarı bu sanal anahtara izin vermiyor' if not r['layer_a'] else
                        'Bu sanal anahtarın kısıtı dışında' if not r['layer_b'] else None)
-    return {'mode': row['provider_key_mode'], 'selected': [r['provider_key_id'] for r in selected], 'keys': visible}
+    known = {r['id'] for r in visible}
+    return {'mode': row['provider_key_mode'], 'selected': [r['provider_key_id'] for r in selected if r['provider_key_id'] in known], 'keys': visible}
 
 
 @router.put('/api/keys/{identifier}/access')

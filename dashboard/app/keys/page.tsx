@@ -377,7 +377,6 @@ export default function VirtualKeysPage() {
           </div>
 
           <KeyAccess key={editingVirtualKey.id} id={editingVirtualKey.id} kind="virtual" value={editAccess} onChange={setEditAccess}/>
-          <a href={`/dashboard?key_id=${encodeURIComponent(editingVirtualKey.id)}#usage`} className="mt-4 inline-flex rounded-lg border border-zinc-800 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800">{t('access.viewUsage')}</a>
           <DialogFooter className="mt-4 flex justify-between w-full gap-3">
             <Button
               onClick={() => handleDeleteKey(editingVirtualKey.id)}

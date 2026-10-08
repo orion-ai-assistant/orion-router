@@ -102,12 +102,20 @@ export function KeyUsage({id='', provider='', hubId='', embedded=false}: {id?: s
   const {t,locale} = useApp();
   const [data,setData] = useState<{totals: UsageBucket[]; daily: UsageBucket[]} | null>(null);
   const [start,setStart] = useState(''); const [end,setEnd] = useState('');
+  const [range,setRange] = useState('all');
+  function preset(days:number, label:string) {
+    setRange(label);
+    if(!days){setStart('');setEnd('');return;}
+    const endDate=new Date(),startDate=new Date();startDate.setDate(startDate.getDate()-days+1);
+    const date=(d:Date)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    setStart(date(startDate));setEnd(date(endDate));
+  }
   const [message,setMessage] = useState(''); const [busy,setBusy] = useState(false);
   const [open,setOpen] = useState(true);
   const sequence = useRef(0);
   async function load() {
     const seq = ++sequence.current;
-    if(start && end && start > end) {setMessage(t('access.invalidDates'));return;}
+    if(start && end && start > end) {setBusy(false);setMessage(t('access.invalidDates'));return;}
     const params = new URLSearchParams({timezone:Intl.DateTimeFormat().resolvedOptions().timeZone});
     if(id) params.set('key_id',id);
     if(provider) params.set('provider',provider);
@@ -118,7 +126,7 @@ export function KeyUsage({id='', provider='', hubId='', embedded=false}: {id?: s
     try {const next=await read('/dashboard/api/usage?'+params);if(seq===sequence.current){setData(next);setMessage('');}} catch {if(seq===sequence.current)setMessage(t('access.usageError'));}
     finally {if(seq===sequence.current)setBusy(false);}
   }
-  useEffect(() => {void load();return()=>{sequence.current++;};}, [id,provider,hubId]);
+  useEffect(() => {const timer=window.setTimeout(()=>{void load();},200);return()=>{window.clearTimeout(timer);sequence.current++;};}, [id,provider,hubId,start,end]);
   const summaries = summarizeUsage(data?.totals || []);
   const unitName=(unit:string)=>({token:t('access.unit.token'),character:t('access.unit.character'),second:t('access.unit.second')}[unit] || unit);
   const totalUsage=(b:ReturnType<typeof summarizeUsage>[number])=>b.capability==='chat' || b.capability==='embed' ? number(b.total) : Object.entries(b.amounts).map(([unit,amount])=>`${number(amount)} ${unitName(unit)}`).join(' · ') || '—';
@@ -128,9 +136,13 @@ export function KeyUsage({id='', provider='', hubId='', embedded=false}: {id?: s
     {!embedded && <Disclosure title={t('access.usage')} icon={<Activity className="size-4 text-purple-400"/>} open={open} onClick={()=>setOpen(!open)}/>}
     {(open || embedded) && <div className="space-y-5 p-4 text-sm">
       <p className="text-xs text-zinc-400">{t('access.localDates')}</p>
-      <div className="flex flex-wrap items-end gap-3"><label className="min-w-0 flex-1 space-y-2 text-xs text-zinc-400">{t('access.start')}<Input className="mt-2 [color-scheme:dark]" type="date" value={start} onChange={e=>setStart(e.target.value)}/></label><label className="min-w-0 flex-1 space-y-2 text-xs text-zinc-400">{t('access.end')}<Input className="mt-2 [color-scheme:dark]" type="date" value={end} onChange={e=>setEnd(e.target.value)}/></label><Button type="button" variant="outline" disabled={busy} onClick={load}>{t('access.filter')}</Button></div>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap gap-1">{[[1,'day'],[7,'week'],[30,'month'],[0,'all']].map(([days,label])=><Button key={label} type="button" size="sm" variant={range===label?'secondary':'ghost'} aria-pressed={range===label} onClick={()=>preset(Number(days),String(label))}>{t('access.range.'+label)}</Button>)}</div>
+        <label className="flex items-center gap-2 text-xs text-zinc-400">{t('access.startShort')}<Input aria-label={t('access.start')} className="h-8 w-36 [color-scheme:dark]" type="date" value={start} onChange={e=>{setRange('custom');setStart(e.target.value);}}/></label>
+        <label className="flex items-center gap-2 text-xs text-zinc-400">{t('access.endShort')}<Input aria-label={t('access.end')} className="h-8 w-36 [color-scheme:dark]" type="date" value={end} onChange={e=>{setRange('custom');setEnd(e.target.value);}}/></label>
+      </div>
       {!data?.totals.length && <p className="py-4 text-center text-zinc-500">{t(busy ? 'common.loading' : 'access.noUsage')}</p>}
-      <div className="space-y-3">{summaries.map(b=><div key={b.capability} className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4"><div className="mb-4 flex items-center justify-between"><h4 className="font-semibold">{names[b.capability] || b.capability}</h4><Badge variant="outline">{number(b.requests)} {t('access.requests')}</Badge></div><dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">{[[t('access.success'),number(b.succeeded)],[t('access.failed'),number(b.failed)],[t('access.cost'),b.cost==null ? '—' : '$'+Number(b.cost).toLocaleString(locale,{maximumFractionDigits:6})],[t('access.input'),number(b.input)],[t('access.output'),number(b.output)],[t('access.thoughts'),number(b.thoughts)],[t('access.total'),totalUsage(b)],[t('access.unit'),Object.keys(b.amounts).map(unitName).join(' · ') || t('access.unknown')]].map(([label,value])=><div key={label}><dt className="text-xs text-zinc-500">{label}</dt><dd className="mt-1 font-mono text-sm text-zinc-200">{value}</dd></div>)}</dl></div>)}</div>
+      <div className="grid gap-3 lg:grid-cols-2">{summaries.map(b=><div key={b.capability} className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3"><div className="mb-3 flex items-center justify-between"><h4 className="font-semibold">{names[b.capability] || b.capability}</h4><Badge variant="outline">{number(b.requests)} {t('access.requests')}</Badge></div><dl className="grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-3 xl:grid-cols-4">{[[t('access.success'),number(b.succeeded)],[t('access.failed'),number(b.failed)],[t('access.cost'),b.cost==null ? '—' : '$'+Number(b.cost).toLocaleString(locale,{maximumFractionDigits:6})],[t('access.input'),number(b.input)],[t('access.output'),number(b.output)],[t('access.thoughts'),number(b.thoughts)],[t('access.total'),totalUsage(b)],[t('access.unit'),Object.keys(b.amounts).map(unitName).join(' · ') || t('access.unknown')]].map(([label,value])=><div key={label}><dt className="text-xs text-zinc-500">{label}</dt><dd className="mt-1 font-mono text-sm text-zinc-200">{value}</dd></div>)}</dl></div>)}</div>
       {!!data?.daily.length && <DailyRequestsChart rows={data.daily} names={names}/>}
     </div>}{message && <p role="alert" className="px-4 pb-3 text-xs text-red-400">{message}</p>}
   </div>;

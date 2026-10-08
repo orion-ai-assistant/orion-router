@@ -41,9 +41,9 @@ export function UsageExplorer() {
     void load();return()=>{current=false;};
   },[adminKey]);
   const visibleAccounts=accounts.filter(k=>hub==='all'||k.hub_id===hub).map(k=>({...k,name:ownerLabel(k)}));
-  return <section id="usage" className="mt-8 scroll-mt-8 rounded-xl border border-zinc-800 bg-[#18181b]">
-    <Button type="button" variant="ghost" aria-expanded={open} className="h-auto w-full justify-between p-5 text-left" onClick={()=>setOpen(!open)}><span className="flex items-center gap-2"><Activity className="size-4 text-purple-400"/>{t('access.usage')}</span><ChevronDown className={`size-4 ${open?'rotate-180':''}`}/></Button>
-    {open && <div className="border-t border-zinc-800 p-5">
+  return <section id="usage" className={`mt-5 min-h-0 rounded-xl border border-zinc-800 bg-[#18181b] ${open?'flex flex-1 flex-col overflow-hidden':'shrink-0'}`}>
+    <Button type="button" variant="ghost" aria-expanded={open} className="h-auto w-full shrink-0 justify-between p-4 text-left" onClick={()=>setOpen(!open)}><span className="flex items-center gap-2"><Activity className="size-4 text-purple-400"/>{t('access.usage')}</span><ChevronDown className={`size-4 ${open?'rotate-180':''}`}/></Button>
+    {open && <div tabIndex={0} aria-label={t('access.usage')} className="min-h-0 overflow-y-auto overscroll-contain border-t border-zinc-800 p-4 custom-scrollbar">
       <div className="grid gap-3 sm:grid-cols-3">
         <Filter label={t('access.allHubs')} value={hub} options={hubs} onChange={value=>{setHub(value);setAccount('all');}}/>
         <Filter label={t('access.allUsers')} value={account} options={visibleAccounts} onChange={setAccount}/>

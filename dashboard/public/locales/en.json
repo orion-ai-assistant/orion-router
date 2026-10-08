@@ -400,7 +400,7 @@
   "access.loadError": "Could not load information.",
   "access.saveError": "Could not save changes.",
   "access.usage": "Usage statistics",
-  "access.localDates": "All historical records. Dates use your device time zone; the end date is included.",
+  "access.localDates": "Dates use your device time zone; the end date is included.",
   "access.start": "Start date",
   "access.end": "End date",
   "access.filter": "Filter",
@@ -463,5 +463,11 @@
   "access.copyAndClose": "Copy key and close",
   "access.chooseSeries": "Select a request type to display.",
   "access.chartTypes": "Request types",
-  "access.date": "Date"
+  "access.date": "Date",
+  "access.startShort": "From",
+  "access.endShort": "To",
+  "access.range.day": "Daily",
+  "access.range.week": "Weekly",
+  "access.range.month": "Monthly",
+  "access.range.all": "All"
 }

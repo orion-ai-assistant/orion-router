@@ -18,7 +18,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full" suppressHydrationWarning>
-      <body className="h-full bg-[#121212] text-[#fafafa]">
+      <body className="h-full overflow-hidden bg-[#121212] text-[#fafafa]">
         <AppProvider>
           <DashboardLayout>
             {children}

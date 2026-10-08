@@ -33,6 +33,22 @@ class DashboardKeyFormTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code,200,response.text)
         self.assertEqual(await eligible_ids(self.x,'openrouter'),{self.a})
 
+    async def test_edit_discards_orphaned_personal_permission_ids(self):
+        headers={'x-admin-key':'admin'}
+        response=await self.client.post('/dashboard/api/personal-provider-keys',headers=headers,json={
+            'provider':'openrouter','key_id':self.x,'api_key':'old-personal-fixture'})
+        self.assertEqual(response.status_code,200,response.text)
+        identifier=response.json()['id']
+        await self.conn.execute("UPDATE router_virtual_keys SET provider_key_mode='only_selected' WHERE id=$1",self.x)
+        await self.conn.execute('INSERT INTO router_virtual_key_access(virtual_key_id,provider_key_id) VALUES($1,$2)',self.x,identifier)
+        await self.conn.execute('DELETE FROM router_user_provider_keys WHERE id=$1',identifier)
+        access=(await self.client.get('/dashboard/api/keys/'+self.x+'/access',headers=headers)).json()
+        self.assertNotIn(identifier,access['selected'])
+        response=await self.client.put('/dashboard/api/keys/'+self.x,headers=headers,json={
+            'name':'renamed','access':{'mode':access['mode'],'selected':access['selected']}})
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertEqual(await eligible_ids(self.x,'openrouter'),set())
+
     async def test_provider_create_and_edit_use_same_permission_transaction(self):
         response=await self.client.post('/dashboard/api/provider-key-pool',headers={'x-admin-key':'admin'},json={
             'provider':'openrouter','label':'limited','api_key':'upstream-fixture','access':{'mode':'selected','selected':[self.x]}})
@@ -62,6 +78,13 @@ class DashboardKeyFormTests(unittest.IsolatedAsyncioTestCase):
         listing=await self.client.get('/dashboard/api/personal-provider-keys',headers={'x-admin-key':'admin'})
         self.assertNotIn('personal-fixture-secret',listing.text)
         self.assertNotIn('api_key',listing.json()['keys'][0])
+        summary=await self.client.get('/api/v1/hubs/providers',headers={'Authorization':'Bearer '+self.key})
+        self.assertEqual(summary.status_code,200,summary.text)
+        self.assertEqual(summary.json()['personal_keys'][0]['masked_key'],'••••cret')
+        self.assertNotIn('personal-fixture-secret',summary.text)
+        self.assertNotIn(stored,summary.text)
+        self.assertNotIn('api_key',summary.json()['personal_keys'][0])
+
         response=await self.client.put('/dashboard/api/personal-provider-keys/'+identifier,headers={'x-admin-key':'admin'},json={'priority':1,'is_active':False,'label':'renamed','api_key':''})
         self.assertEqual(response.status_code,200,response.text)
         self.assertEqual(response.json()['priority'],1)
