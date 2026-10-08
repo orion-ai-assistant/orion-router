@@ -41,8 +41,15 @@ _factory = logging.getLogRecordFactory()
 
 def _safe_record(*args, **kwargs):
     record = _factory(*args, **kwargs)
-    record.msg = redact(record.getMessage())
-    record.args = ()
+    if (record.name == 'uvicorn' or record.name.startswith('uvicorn.')) and isinstance(record.args, tuple):
+        # AccessFormatter unpacks HTTP fields; DefaultFormatter also needs the
+        # args for Uvicorn's color_message template (added after this factory).
+        # Mask each field without collapsing the record to text.
+        record.msg = redact(record.msg)
+        record.args = tuple(redact(value) for value in record.args)
+    else:
+        record.msg = redact(record.getMessage())
+        record.args = ()
     if record.exc_info:
         record.exc_text = redact(''.join(traceback.format_exception(*record.exc_info)))
         record.exc_info = None

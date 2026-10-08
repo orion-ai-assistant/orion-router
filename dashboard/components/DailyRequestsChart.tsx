@@ -12,10 +12,11 @@ export function DailyRequestsChart({rows,names}: {rows:UsageBucket[];names:Recor
   const scroller=useRef<HTMLDivElement>(null);
   const [plotWidth,setPlotWidth]=useState(400);
   const days=dailyRequests(rows),types=[...new Set(rows.map(row=>row.capability))].sort();
-  const lastDay=days.at(-1)?.day;
-  useEffect(()=>{const element=scroller.current;if(element)element.scrollLeft=element.scrollWidth-element.clientWidth;},[lastDay,plotWidth]);
   const visible=types.filter(type=>!hidden.includes(type));
   const hasSeries=visible.length>0;
+  // A new range can keep the same last day while changing the plot width.
+  // Reset after every new result, including when the series are shown again.
+  useEffect(()=>{const element=scroller.current;if(element)element.scrollLeft=element.scrollWidth-element.clientWidth;},[rows,plotWidth,hasSeries]);
   useEffect(()=>{
     const element=scroller.current;if(!element)return;
     const measure=()=>setPlotWidth(element.clientWidth);

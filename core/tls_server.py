@@ -1,6 +1,7 @@
 """HTTPS listener wrapper; production runs one primary TLS listener."""
 import asyncio
 import ipaddress
+import logging
 from urllib.parse import urlsplit
 from contextlib import contextmanager
 
@@ -52,6 +53,17 @@ class _LoopbackApplication:
 
 
 class _Server(uvicorn.Server):
+    def _log_started_message(self, listeners):
+        # The main TLS server prints Uvicorn's process banner. Identify this
+        # companion listener separately, keeping its actual bound port visible.
+        host, port = listeners[0].getsockname()[:2]
+        scheme = 'https' if self.config.ssl else 'http'
+        label = 'HTTPS' if self.config.ssl else 'local HTTP'
+        if ':' in host:
+            host = f'[{host}]'
+        logging.getLogger('service-router').info(
+            'Router %s listener running on %s://%s:%d', label, scheme, host, port)
+
     async def serve(self, sockets=None):
         try:
             await super().serve(sockets=sockets)
