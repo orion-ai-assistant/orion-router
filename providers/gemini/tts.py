@@ -93,19 +93,42 @@ def _extract_audio_from_response(response) -> bytes:
 
 from core.http_client import get_http_client
 
-_FALLBACK_VOICES = [
-    # Geleneksel popüler sesler
+# Klasik popüler astronomik sesler (Gemini 3.1 & 2.x modelleri)
+CLASSIC_GEMINI_VOICES = [
     "Achernar", "Achird", "Algenib", "Algieba", "Alnilam", "Aoede", "Autonoe",
     "Callirrhoe", "Charon", "Despina", "Enceladus", "Erinome", "Fenrir", "Gacrux",
     "Iapetus", "Kore", "Laomedeia", "Leda", "Orus", "Puck", "Pulcherrima",
     "Rasalgethi", "Sadachbia", "Sadaltager", "Schedar", "Sulafat", "Umbriel",
     "Vindemiatrix", "Zephyr", "Zubenelgenubi",
-    # Yeni Gemini 3.x sesleri
+]
+
+# Yeni nesil Gemini 3.8+ sesleri
+NEW_GEMINI_VOICES = [
     "Arlo", "Bodi", "Brio", "Cleo", "Cruz", "Daro", "Elio", "Enya", "Enzo",
     "Finn", "Fola", "Gero", "Hali", "Jett", "Jori", "Kira", "Knox", "Koda",
     "Lora", "Ludo", "Lumi", "Mako", "Milo", "Neno", "Nika", "Nyla", "Olin",
     "Rami", "Riko", "Rina", "Sami", "Sola", "Tari", "Tavi", "Tova", "Varo",
     "Veda", "Zali", "Zeno", "Zuri",
+]
+
+_FALLBACK_VOICES = CLASSIC_GEMINI_VOICES + NEW_GEMINI_VOICES
+
+# Aynı sesleri paylaşan modeller için grup tanımları
+MODEL_VOICE_GROUPS = [
+    {
+        "group_id": "gemini_preview_3_1",
+        "label": "Gemini 3.1 & 2.x Önizleme Modelleri",
+        "models": ["gemini-3.1-flash-tts-preview", "gemini-2.0-flash-preview", "gemini-2.5-flash-preview"],
+        "match_patterns": ["3.1", "2.0", "2.5", "1.5"],
+        "voices": CLASSIC_GEMINI_VOICES,
+    },
+    {
+        "group_id": "gemini_modern_3_8",
+        "label": "Gemini 3.8+ Güncel Modeller",
+        "models": ["gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts"],
+        "match_patterns": ["3.8", "default"],
+        "voices": _FALLBACK_VOICES,
+    },
 ]
 
 
@@ -115,9 +138,29 @@ class GeminiTTSProvider(BaseTTS):
         super().__init__()
         self._cached_voices: list[str] = list(_FALLBACK_VOICES)
 
-    def get_voices(self) -> list[str]:
-        """Gemini tarafından desteklenen prebuilt seslerin listesini döner."""
+    def get_voices(self, model: str | None = None) -> list[str]:
+        """Gemini tarafından desteklenen seslerin listesini döner. Model verilirse modele özel grubu döner."""
+        if model:
+            model_lower = model.lower()
+            for grp in MODEL_VOICE_GROUPS:
+                if any(m.lower() == model_lower for m in grp.get("models", [])):
+                    return list(grp["voices"])
+                if any(p != "default" and p in model_lower for p in grp.get("match_patterns", [])):
+                    return list(grp["voices"])
         return list(self._cached_voices)
+
+    def get_model_voice_groups(self) -> list[dict]:
+        """Model grupları ve desteklenen ses kümesini döner."""
+        return [
+            {
+                "group_id": grp["group_id"],
+                "label": grp["label"],
+                "models": grp["models"],
+                "match_patterns": grp["match_patterns"],
+                "voices": list(grp["voices"]),
+            }
+            for grp in MODEL_VOICE_GROUPS
+        ]
 
     async def fetch_remote_voices(self, api_key: str | None = None) -> list[str]:
         """Google Gemini Voices API (v1beta/voices) üzerinden tüm sesleri dinamik çeker ve önbelleğe alır."""

@@ -80,8 +80,12 @@ async def account(payload: Account, hub: dict = Depends(current_hub)):
 @router.get('/catalog/{section}')
 async def catalog(section: str, request: Request, hub: dict = Depends(current_hub)):
     from api import admin
+    async def get_catalog_voices():
+        v = await admin.get_admin_voices(request)
+        return {'voices': v.get('voices', {})}
+
     handlers = {'models': admin.list_models, 'model-groups': admin.list_model_groups,
-                'voices': lambda: admin.get_admin_voices(request),
+                'voices': get_catalog_voices,
                 'local-tts-info': admin.get_local_tts_info}
     if section not in handlers:
         raise HTTPException(404, 'Unknown catalog section')

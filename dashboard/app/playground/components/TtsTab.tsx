@@ -124,6 +124,7 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
   }>({ active: false, engine: null });
 
   const [voicesByProvider, setVoicesByProvider] = useState<Record<string, string[]>>({});
+  const [modelVoiceGroups, setModelVoiceGroups] = useState<Record<string, any[]>>({});
   const [voices, setVoices] = useState<string[]>([]);
   const [languagesByProvider, setLanguagesByProvider] = useState<Record<string, string[]>>({});
   const [languages, setLanguages] = useState<string[]>([]);
@@ -137,6 +138,7 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
       if (res.ok) {
         const data = await res.json();
         setVoicesByProvider(data.voices || {});
+        setModelVoiceGroups(data.model_voice_groups || {});
       }
     } catch (e) {
       console.error('Failed to load voices:', e);
@@ -267,27 +269,21 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
         nextVoices = []; // Will show manual text input instead
       }
     } else {
-      if (provider && Array.isArray(voicesByProvider[provider])) {
+      const providerGroups = modelVoiceGroups[provider] || [];
+      const matchedGroup = providerGroups.find((g: any) =>
+        (Array.isArray(g.models) && g.models.some((m: string) => m.toLowerCase() === ttsModel.toLowerCase())) ||
+        (Array.isArray(g.match_patterns) && g.match_patterns.some((p: string) => p !== 'default' && ttsModel.toLowerCase().includes(p.toLowerCase())))
+      ) || providerGroups.find((g: any) => Array.isArray(g.match_patterns) && g.match_patterns.includes('default'));
+
+      if (matchedGroup && Array.isArray(matchedGroup.voices)) {
+        nextVoices = matchedGroup.voices.filter((v: any) => typeof v === 'string' && v.toLowerCase() !== 'none');
+      } else if (provider && Array.isArray(voicesByProvider[provider])) {
         nextVoices = voicesByProvider[provider].filter(v => typeof v === 'string' && v.toLowerCase() !== 'none');
       } else {
         nextVoices = Object.values(voicesByProvider)
           .filter(val => Array.isArray(val))
           .flat()
           .filter(v => typeof v === 'string' && v.toLowerCase() !== 'none');
-      }
-
-      // Gemini model bazlı ses filtreleme:
-      // gemini-3.1 ve önceki nesil modeller yalnızca klasik gök cismi seslerini destekler.
-      // Tavi, Arlo, Finn vb. yeni nesil sesler Gemini 3.8+ modellerine aittir.
-      if (provider === 'gemini' && (ttsModel.includes('3.1') || ttsModel.includes('2.0') || ttsModel.includes('2.5') || ttsModel.includes('1.5'))) {
-        const CLASSIC_GEMINI_VOICES = new Set([
-          "achernar", "achird", "algenib", "algieba", "alnilam", "aoede", "autonoe",
-          "callirrhoe", "charon", "despina", "enceladus", "erinome", "fenrir", "gacrux",
-          "iapetus", "kore", "laomedeia", "leda", "orus", "puck", "pulcherrima",
-          "rasalgethi", "sadachbia", "sadaltager", "schedar", "sulafat", "umbriel",
-          "vindemiatrix", "zephyr", "zubenelgenubi"
-        ]);
-        nextVoices = nextVoices.filter(v => CLASSIC_GEMINI_VOICES.has(v.toLowerCase()));
       }
     }
 
