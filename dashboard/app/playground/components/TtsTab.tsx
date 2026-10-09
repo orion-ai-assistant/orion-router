@@ -90,6 +90,7 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
   const audioContextRef = useRef<AudioContext | null>(null);
   const streamSourcesRef = useRef<AudioBufferSourceNode[]>([]);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const currentPcmChunksRef = useRef<Uint8Array[]>([]);
   const [streamProgress, setStreamProgress] = useState<{
     currentTime: number;
     totalDuration: number;
@@ -548,6 +549,45 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
     return '';
   };
 
+  const handleStopTTS = () => {
+    if (ttsAbortControllerRef.current) {
+      ttsAbortControllerRef.current.abort();
+    }
+    if (audioContextRef.current) {
+      try {
+        audioContextRef.current.close();
+      } catch {}
+      audioContextRef.current = null;
+    }
+    streamSourcesRef.current.forEach((s) => {
+      try {
+        s.stop();
+      } catch {}
+    });
+    streamSourcesRef.current = [];
+    setStreamProgress(null);
+    setIsPlayingStream(false);
+    setIsGeneratingTTS(false);
+
+    const chunks = currentPcmChunksRef.current;
+    if (chunks.length > 0) {
+      const wavBlob = pcmToWavBlob(chunks, 24000);
+      setTtsUrl(URL.createObjectURL(wavBlob));
+      const totalMs = ttsStartedAtRef.current ? Math.round(performance.now() - ttsStartedAtRef.current) : 0;
+      setTtsLatencyMs(totalMs);
+      setTtsResponseJson(JSON.stringify({
+        stream: true,
+        stopped_early: true,
+        content_type: 'audio/pcm',
+        chunks: chunks.length,
+        total_bytes: chunks.reduce((acc, c) => acc + c.length, 0),
+        metrics: {
+          total_duration_ms: totalMs,
+        }
+      }, null, 2));
+    }
+  };
+
   const handleGenerateTTS = async () => {
     const text = ttsInput.trim();
     if (!text) {
@@ -657,30 +697,10 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
       payload.stream = true;
     }
 
-    const handleStopTTS = () => {
-      if (ttsAbortControllerRef.current) {
-        ttsAbortControllerRef.current.abort();
-      }
-      if (audioContextRef.current) {
-        try {
-          audioContextRef.current.close();
-        } catch {}
-        audioContextRef.current = null;
-      }
-      streamSourcesRef.current.forEach((s) => {
-        try {
-          s.stop();
-        } catch {}
-      });
-      streamSourcesRef.current = [];
-      setStreamProgress(null);
-      setIsPlayingStream(false);
-      setIsGeneratingTTS(false);
-    };
-
     try {
       setIsGeneratingTTS(true);
       setStreamProgress(null);
+      currentPcmChunksRef.current = [];
       if (audioContextRef.current) {
         try {
           audioContextRef.current.close();
@@ -773,6 +793,7 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
             const { done, value } = await reader.read();
             if (done) break;
             if (value && value.length > 0) {
+              currentPcmChunksRef.current.push(value);
               pcmChunks.push(value);
 
               let chunkData: Uint8Array;
@@ -834,11 +855,17 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
             }
           }
 
-          // Await completion of scheduled audio playback in AudioContext
+          // Await completion of scheduled audio playback in AudioContext (cancellable via abort signal)
           if (nextStartTime > 0 && audioCtx) {
             const remainingPlayTimeMs = Math.max(0, (nextStartTime - audioCtx.currentTime) * 1000);
             if (remainingPlayTimeMs > 0) {
-              await new Promise((resolve) => setTimeout(resolve, remainingPlayTimeMs));
+              await new Promise<void>((resolve) => {
+                const timer = setTimeout(resolve, remainingPlayTimeMs);
+                ttsAbortControllerRef.current?.signal.addEventListener('abort', () => {
+                  clearTimeout(timer);
+                  resolve();
+                }, { once: true });
+              });
             }
           }
         } finally {
@@ -880,8 +907,24 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
       }
     } catch (e: any) {
       if (e.name === 'AbortError') {
-        if (ttsStartedAtRef.current !== null) {
-          setTtsLatencyMs(Math.round(performance.now() - ttsStartedAtRef.current));
+        const totalMs = ttsStartedAtRef.current !== null ? Math.round(performance.now() - ttsStartedAtRef.current) : null;
+        if (totalMs !== null) {
+          setTtsLatencyMs(totalMs);
+        }
+        const chunks = currentPcmChunksRef.current;
+        if (chunks.length > 0) {
+          const wavBlob = pcmToWavBlob(chunks, 24000);
+          setTtsUrl(URL.createObjectURL(wavBlob));
+          setTtsResponseJson(JSON.stringify({
+            stream: true,
+            stopped_early: true,
+            content_type: 'audio/pcm',
+            chunks: chunks.length,
+            total_bytes: chunks.reduce((acc, c) => acc + c.length, 0),
+            metrics: {
+              total_duration_ms: totalMs,
+            }
+          }, null, 2));
         }
       } else {
         setTtsError('❌ Error: ' + e.message);
@@ -1539,26 +1582,7 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
           <div className="flex items-center gap-2">
             {isGeneratingTTS || isPlayingStream ? (
               <Button
-                onClick={() => {
-                  if (ttsAbortControllerRef.current) {
-                    ttsAbortControllerRef.current.abort();
-                  }
-                  if (audioContextRef.current) {
-                    try {
-                      audioContextRef.current.close();
-                    } catch {}
-                    audioContextRef.current = null;
-                  }
-                  streamSourcesRef.current.forEach((s) => {
-                    try {
-                      s.stop();
-                    } catch {}
-                  });
-                  streamSourcesRef.current = [];
-                  setStreamProgress(null);
-                  setIsPlayingStream(false);
-                  setIsGeneratingTTS(false);
-                }}
+                onClick={handleStopTTS}
                 className="bg-red-600 text-white hover:bg-red-700 font-semibold px-5 py-2 rounded-lg text-xs min-w-[70px]"
               >
                 {t('playground.stop')}

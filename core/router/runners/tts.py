@@ -353,7 +353,14 @@ class TTSRunner:
                         await self.key_pool.mark_key_error(key_pool_id, str(exc))
                         last_err = exc
         except asyncio.CancelledError:
-            res_err = {"error": "Client disconnected / Request Cancelled"}
+            duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+            res_err = {
+                "stream": True,
+                "stopped_early": total_bytes > 0,
+                "size_bytes": total_bytes,
+                "error": "Client disconnected / Request Cancelled",
+                "metrics": {"total_duration_ms": duration_ms},
+            }
             asyncio.create_task(
                 self.telemetry.log_usage(
                     key_id,
@@ -364,6 +371,7 @@ class TTSRunner:
                     response_json=json.dumps(res_err, ensure_ascii=False),
                     success=None,
                     capability="tts",
+                    duration_ms=duration_ms,
                     log_id=log_id,
                 )
             )
