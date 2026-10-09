@@ -719,30 +719,50 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
         }
         setIsPlayingStream(true);
 
-        let nextStartTime = audioCtx.currentTime;
+        let nextStartTime = 0;
         const pcmChunks: Uint8Array[] = [];
         const reader = res.body.getReader();
         let ttftRecorded = false;
+        let leftoverByte: Uint8Array | null = null;
 
         try {
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
             if (value && value.length > 0) {
-              if (!ttftRecorded && ttsStartedAtRef.current !== null) {
-                ttftRecorded = true;
-                const ttftMs = Math.round(performance.now() - ttsStartedAtRef.current);
-                setTtsLatencyMs(ttftMs);
-              }
               pcmChunks.push(value);
 
-              const numSamples = Math.floor(value.length / 2);
+              let chunkData: Uint8Array;
+              if (leftoverByte && leftoverByte.length > 0) {
+                chunkData = new Uint8Array(leftoverByte.length + value.length);
+                chunkData.set(leftoverByte, 0);
+                chunkData.set(value, leftoverByte.length);
+                leftoverByte = null;
+              } else {
+                chunkData = value;
+              }
+
+              // 16-bit PCM (2 bytes per sample) - keep trailing odd byte for next chunk
+              if (chunkData.length % 2 !== 0) {
+                leftoverByte = chunkData.slice(chunkData.length - 1);
+                chunkData = chunkData.slice(0, chunkData.length - 1);
+              }
+
+              const numSamples = chunkData.length / 2;
               if (numSamples > 0) {
-                const int16 = new Int16Array(value.buffer, value.byteOffset, numSamples);
+                if (!ttftRecorded && ttsStartedAtRef.current !== null) {
+                  ttftRecorded = true;
+                  const ttftMs = Math.round(performance.now() - ttsStartedAtRef.current);
+                  setTtsLatencyMs(ttftMs);
+                }
+
+                // Clean 16-bit signed little-endian PCM sample decoding
+                const dataView = new DataView(chunkData.buffer, chunkData.byteOffset, chunkData.length);
                 const float32 = new Float32Array(numSamples);
                 for (let i = 0; i < numSamples; i++) {
-                  float32[i] = int16[i] / 32768.0;
+                  float32[i] = dataView.getInt16(i * 2, true) / 32768.0;
                 }
+
                 const buffer = audioCtx.createBuffer(1, numSamples, 24000);
                 buffer.copyToChannel(float32, 0);
 
@@ -751,6 +771,10 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
                 source.connect(audioCtx.destination);
                 streamSourcesRef.current.push(source);
 
+                if (nextStartTime === 0) {
+                  // Pre-buffer initial 120ms to prevent network jitter buffer-underrun buzz/clicks
+                  nextStartTime = audioCtx.currentTime + 0.12;
+                }
                 const startTime = Math.max(audioCtx.currentTime, nextStartTime);
                 source.start(startTime);
                 nextStartTime = startTime + buffer.duration;
@@ -767,7 +791,7 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
           const totalMs = ttsStartedAtRef.current ? Math.round(performance.now() - ttsStartedAtRef.current) : 0;
           setTtsLatencyMs(totalMs);
           setTtsResponseJson(JSON.stringify({
-            detail: 'Audio stream playback completed',
+            stream: true,
             content_type: 'audio/pcm',
             chunks: pcmChunks.length,
             total_bytes: pcmChunks.reduce((acc, c) => acc + c.length, 0),

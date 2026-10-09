@@ -1088,7 +1088,7 @@ router.include_router(key_management_router)
 @router.head("/", include_in_schema=False)
 @router.get("/{path:path}", include_in_schema=False)
 @router.head("/{path:path}", include_in_schema=False)
-async def get_admin_ui(path: str = ""):
+async def get_admin_ui(request: Request, path: str = ""):
     """SPA Client-Side Router for Next.js - returns HTML and RSC payloads."""
     # Exclude API routes
     if path.startswith("api/") or path == "api":
@@ -1109,10 +1109,29 @@ async def get_admin_ui(path: str = ""):
     # 1. Clean up the path (remove leading slashes if any)
     safe_path = path.lstrip("/")
     target_path = os.path.join(out_dir, safe_path) if safe_path else out_dir
+
+    # Detect Next.js App Router client-side navigation (RSC flight payloads)
+    is_rsc_request = (
+        request.headers.get("rsc") == "1"
+        or "_rsc" in request.query_params
+        or request.headers.get("next-router-state-tree") is not None
+    )
+
+    if is_rsc_request:
+        txt_path = f"{target_path}.txt"
+        if os.path.isfile(txt_path):
+            return FileResponse(txt_path, media_type="text/x-component")
+        index_txt = os.path.join(target_path, "index.txt")
+        if os.path.isdir(target_path) and os.path.isfile(index_txt):
+            return FileResponse(index_txt, media_type="text/x-component")
+        root_txt = os.path.join(out_dir, "index.txt")
+        if os.path.isfile(root_txt):
+            return FileResponse(root_txt, media_type="text/x-component")
     
     # 2. Check if the exact requested file exists (e.g. favicon.ico, settings.txt, __next._index.txt)
     if safe_path and os.path.isfile(target_path):
-        return FileResponse(target_path)
+        media = "text/x-component" if target_path.endswith(".txt") else None
+        return FileResponse(target_path, media_type=media)
         
     # 3. Check if an HTML file exists for the requested path (e.g. /keys -> keys.html)
     if safe_path and not safe_path.endswith(".html") and not safe_path.endswith(".txt"):

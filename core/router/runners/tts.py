@@ -153,7 +153,6 @@ class TTSRunner:
                             "thoughts_tokens": 0,
                         }
                         res_success = {
-                            "detail": "Audio generation successful",
                             "stream": False,
                             "content_type": content_type,
                             "size_bytes": len(audio_bytes),
@@ -326,7 +325,6 @@ class TTSRunner:
 
                         duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
                         res_success = {
-                            "detail": "Audio stream successful",
                             "stream": True,
                             "size_bytes": total_bytes,
                             "metrics": {"total_duration_ms": duration_ms},
