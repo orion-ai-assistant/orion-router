@@ -91,18 +91,72 @@ def _extract_audio_from_response(response) -> bytes:
     return b"".join(audio_chunks)
 
 
+from core.http_client import get_http_client
+
+_FALLBACK_VOICES = [
+    # Geleneksel popüler sesler
+    "Achernar", "Achird", "Algenib", "Algieba", "Alnilam", "Aoede", "Autonoe",
+    "Callirrhoe", "Charon", "Despina", "Enceladus", "Erinome", "Fenrir", "Gacrux",
+    "Iapetus", "Kore", "Laomedeia", "Leda", "Orus", "Puck", "Pulcherrima",
+    "Rasalgethi", "Sadachbia", "Sadaltager", "Schedar", "Sulafat", "Umbriel",
+    "Vindemiatrix", "Zephyr", "Zubenelgenubi",
+    # Yeni Gemini 3.x sesleri
+    "Arlo", "Bodi", "Brio", "Cleo", "Cruz", "Daro", "Elio", "Enya", "Enzo",
+    "Finn", "Fola", "Gero", "Hali", "Jett", "Jori", "Kira", "Knox", "Koda",
+    "Lora", "Ludo", "Lumi", "Mako", "Milo", "Neno", "Nika", "Nyla", "Olin",
+    "Rami", "Riko", "Rina", "Sami", "Sola", "Tari", "Tavi", "Tova", "Varo",
+    "Veda", "Zali", "Zeno", "Zuri",
+]
+
+
 class GeminiTTSProvider(BaseTTS):
 
+    def __init__(self):
+        super().__init__()
+        self._cached_voices: list[str] = list(_FALLBACK_VOICES)
 
     def get_voices(self) -> list[str]:
         """Gemini tarafından desteklenen prebuilt seslerin listesini döner."""
-        return [
-            "Achernar", "Achird", "Algenib", "Algieba", "Alnilam", "Aoede", "Autonoe",
-            "Callirrhoe", "Charon", "Despina", "Enceladus", "Erinome", "Fenrir", "Gacrux",
-            "Iapetus", "Kore", "Laomedeia", "Leda", "Orus", "Puck", "Pulcherrima",
-            "Rasalgethi", "Sadachbia", "Sadaltager", "Schedar", "Sulafat", "Umbriel",
-            "Vindemiatrix", "Zephyr", "Zubenelgenubi"
-        ]
+        return list(self._cached_voices)
+
+    async def fetch_remote_voices(self, api_key: str | None = None) -> list[str]:
+        """Google Gemini Voices API (v1beta/voices) üzerinden tüm sesleri dinamik çeker ve önbelleğe alır."""
+        resolved_key = self._resolve_api_key(api_key=api_key)
+        if not resolved_key:
+            return list(self._cached_voices)
+
+        all_names: list[str] = []
+        token = None
+        client = get_http_client(timeout=15.0)
+
+        try:
+            while True:
+                url = f"https://generativelanguage.googleapis.com/v1beta/voices?key={resolved_key}&pageSize=1000"
+                if token:
+                    url += f"&page_token={token}"
+                res = await client.get(url)
+                if res.status_code != 200:
+                    logger.debug("Gemini voices API returned status %s: %s", res.status_code, res.text[:200])
+                    break
+                data = res.json()
+                for v in data.get("voices", []):
+                    name = v.get("display_name") or v.get("name") or v.get("id")
+                    if name and name not in all_names:
+                        all_names.append(name)
+                token = data.get("next_page_token")
+                if not token:
+                    break
+
+            if all_names:
+                personas = [n for n in all_names if not any(role in n for role in ("Advisor", "Agent", "Voiceover", "Assistant", "Concierge", "Tutor", "Podcaster", "Storyteller"))]
+                roles = [n for n in all_names if n not in personas]
+                sorted_voices = sorted(personas) + sorted(roles)
+                self._cached_voices = sorted_voices
+                logger.info("Loaded %d dynamic Gemini voices from Google API.", len(sorted_voices))
+        except Exception as exc:
+            logger.warning("Could not dynamically load Gemini voices from Google API: %s", exc)
+
+        return list(self._cached_voices)
 
     async def generate_speech(
         self,

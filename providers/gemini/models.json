@@ -23,6 +23,16 @@
       }
     },
     {
+      "name": "gemini-3.8-flash-lite-tts",
+      "provider": "gemini",
+      "capability": "tts",
+      "pricing": {
+        "input": 1,
+        "output": 20,
+        "think": 0
+      }
+    },
+    {
       "name": "gemini-3.5-transcribe",
       "provider": "gemini",
       "capability": "stt"

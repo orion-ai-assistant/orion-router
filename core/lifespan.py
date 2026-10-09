@@ -227,6 +227,31 @@ async def lifespan(app: FastAPI):
 
     app.state.dynamic_router = DynamicLLMRouter(app.state)
 
+    # Gemini ve diğer TTS sağlayıcıların seslerini arka planda 1 kere çekip hafızaya al
+    async def _warmup_provider_voices():
+        try:
+            gemini_provider = app.state.dynamic_router.tts_providers.get("gemini")
+            if gemini_provider and hasattr(gemini_provider, "fetch_remote_voices"):
+                from core.security import decrypt
+                row = await db_manager.fetchrow(
+                    "SELECT api_key FROM router_provider_key_pool WHERE provider='gemini' AND is_active=true ORDER BY priority ASC LIMIT 1"
+                )
+                key = None
+                if row and row.get("api_key"):
+                    try:
+                        key = decrypt(row["api_key"])
+                    except Exception:
+                        key = row["api_key"]
+                if not key:
+                    raw_keys = await db_manager.get_config("provider_api_keys") or {}
+                    key = raw_keys.get("gemini")
+                if key:
+                    await gemini_provider.fetch_remote_voices(api_key=key)
+        except Exception as exc:
+            logger.debug("Background voices warmup skipped: %s", exc)
+
+    asyncio.create_task(_warmup_provider_voices())
+
     if os.getenv("ORION_NO_BANNER") != "1":
         if sys.platform == "win32":
             os.system("")
