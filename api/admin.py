@@ -1110,6 +1110,11 @@ async def get_admin_ui(request: Request, path: str = ""):
     safe_path = path.lstrip("/")
     target_path = os.path.join(out_dir, safe_path) if safe_path else out_dir
 
+    # 2. Check if the exact requested file exists (e.g. static assets, _next/..., keys/__next._tree.txt)
+    if safe_path and os.path.isfile(target_path):
+        media = "text/x-component" if target_path.endswith(".txt") else None
+        return FileResponse(target_path, media_type=media)
+
     # Detect Next.js App Router client-side navigation (RSC flight payloads)
     is_rsc_request = (
         request.headers.get("rsc") == "1"
@@ -1118,21 +1123,24 @@ async def get_admin_ui(request: Request, path: str = ""):
     )
 
     if is_rsc_request:
+        # Check target_path.txt (e.g. /dashboard/models -> models.txt)
         txt_path = f"{target_path}.txt"
         if os.path.isfile(txt_path):
             return FileResponse(txt_path, media_type="text/x-component")
-        index_txt = os.path.join(target_path, "index.txt")
-        if os.path.isdir(target_path) and os.path.isfile(index_txt):
-            return FileResponse(index_txt, media_type="text/x-component")
-        root_txt = os.path.join(out_dir, "index.txt")
-        if os.path.isfile(root_txt):
-            return FileResponse(root_txt, media_type="text/x-component")
+
+        # Check inside directory (e.g. /dashboard/keys -> keys/__next._full.txt or keys/index.txt)
+        if os.path.isdir(target_path):
+            for candidate in ("__next._full.txt", "index.txt"):
+                c_path = os.path.join(target_path, candidate)
+                if os.path.isfile(c_path):
+                    return FileResponse(c_path, media_type="text/x-component")
+
+        # Only fall back to root index.txt if the requested route is the root itself
+        if not safe_path:
+            root_txt = os.path.join(out_dir, "index.txt")
+            if os.path.isfile(root_txt):
+                return FileResponse(root_txt, media_type="text/x-component")
     
-    # 2. Check if the exact requested file exists (e.g. favicon.ico, settings.txt, __next._index.txt)
-    if safe_path and os.path.isfile(target_path):
-        media = "text/x-component" if target_path.endswith(".txt") else None
-        return FileResponse(target_path, media_type=media)
-        
     # 3. Check if an HTML file exists for the requested path (e.g. /keys -> keys.html)
     if safe_path and not safe_path.endswith(".html") and not safe_path.endswith(".txt"):
         html_path = f"{target_path}.html"

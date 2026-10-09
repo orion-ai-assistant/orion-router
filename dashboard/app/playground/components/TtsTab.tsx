@@ -89,6 +89,20 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
   const ttsStartedAtRef = useRef<number | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const streamSourcesRef = useRef<AudioBufferSourceNode[]>([]);
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const [streamProgress, setStreamProgress] = useState<{
+    currentTime: number;
+    totalDuration: number;
+    isPlaying: boolean;
+  } | null>(null);
+
+  const formatAudioTime = (sec: number) => {
+    if (isNaN(sec) || sec < 0) return '0:00';
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    const ms = Math.floor((sec % 1) * 10);
+    return `${m}:${s < 10 ? '0' : ''}${s}.${ms}`;
+  };
 
   useEffect(() => {
     return () => {
@@ -663,12 +677,14 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
         } catch {}
       });
       streamSourcesRef.current = [];
+      setStreamProgress(null);
       setIsPlayingStream(false);
       setIsGeneratingTTS(false);
     };
 
     try {
       setIsGeneratingTTS(true);
+      setStreamProgress(null);
       if (audioContextRef.current) {
         try {
           audioContextRef.current.close();
@@ -738,10 +754,23 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
         setIsPlayingStream(true);
 
         let nextStartTime = 0;
+        let streamPlaybackStartTime = 0;
+        let totalDuration = 0;
         const pcmChunks: Uint8Array[] = [];
         const reader = res.body.getReader();
         let ttftRecorded = false;
         let leftoverByte: Uint8Array | null = null;
+        let progressInterval: any = null;
+
+        const updateProgress = () => {
+          if (!audioCtx) return;
+          const elapsed = streamPlaybackStartTime > 0 ? Math.max(0, audioCtx.currentTime - streamPlaybackStartTime) : 0;
+          setStreamProgress({
+            currentTime: Math.min(elapsed, totalDuration),
+            totalDuration: totalDuration,
+            isPlaying: true,
+          });
+        };
 
         try {
           while (true) {
@@ -792,14 +821,36 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
                 if (nextStartTime === 0) {
                   // Pre-buffer initial 120ms to prevent network jitter buffer-underrun buzz/clicks
                   nextStartTime = audioCtx.currentTime + 0.12;
+                  streamPlaybackStartTime = nextStartTime;
                 }
                 const startTime = Math.max(audioCtx.currentTime, nextStartTime);
                 source.start(startTime);
                 nextStartTime = startTime + buffer.duration;
+                totalDuration += buffer.duration;
+
+                if (!progressInterval) {
+                  updateProgress();
+                  progressInterval = setInterval(updateProgress, 35);
+                } else {
+                  updateProgress();
+                }
               }
             }
           }
+
+          // Await completion of scheduled audio playback in AudioContext
+          if (nextStartTime > 0 && audioCtx) {
+            const remainingPlayTimeMs = Math.max(0, (nextStartTime - audioCtx.currentTime) * 1000);
+            if (remainingPlayTimeMs > 0) {
+              await new Promise((resolve) => setTimeout(resolve, remainingPlayTimeMs));
+            }
+          }
         } finally {
+          if (progressInterval) {
+            clearInterval(progressInterval);
+            progressInterval = null;
+          }
+          setStreamProgress(null);
           setIsPlayingStream(false);
         }
 
@@ -823,6 +874,12 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
         const blob = await res.blob();
         setTtsLatencyMs(totalDurationMs ?? (ttsStartedAtRef.current ? Math.round(performance.now() - ttsStartedAtRef.current) : null));
         setTtsUrl(URL.createObjectURL(blob));
+        // Auto-play for non-streamed responses so native player slider moves right away
+        setTimeout(() => {
+          if (audioPlayerRef.current) {
+            audioPlayerRef.current.play().catch(() => {});
+          }
+        }, 50);
         showToast(t('playground.toast.audioSuccess'));
       }
     } catch (e: any) {
@@ -1502,6 +1559,7 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
                     } catch {}
                   });
                   streamSourcesRef.current = [];
+                  setStreamProgress(null);
                   setIsPlayingStream(false);
                   setIsGeneratingTTS(false);
                 }}
@@ -1526,10 +1584,48 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
           </div>
         )}
 
-        {ttsUrl && (
+        {streamProgress && (
+          <div className="p-4 bg-white/5 border border-emerald-500/30 rounded-lg flex flex-col gap-3 mt-1 shadow-lg shadow-emerald-950/20">
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+                <span className="text-emerald-400 font-medium text-[11px] tracking-wide">
+                  Canlı Ses Akışı Çalınıyor...
+                </span>
+              </div>
+              <div className="font-mono text-zinc-400 text-[11px]">
+                {formatAudioTime(streamProgress.currentTime)} / {formatAudioTime(streamProgress.totalDuration)}
+              </div>
+            </div>
+
+            {/* Canlı Akış Slider / İlerleme Çubuğu */}
+            <div className="relative w-full h-2.5 bg-zinc-800 rounded-full overflow-hidden flex items-center">
+              <div
+                className="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-300 rounded-full transition-all duration-75"
+                style={{
+                  width: `${
+                    streamProgress.totalDuration > 0
+                      ? Math.min(100, Math.max(0, (streamProgress.currentTime / streamProgress.totalDuration) * 100))
+                      : 0
+                  }%`,
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {ttsUrl && !streamProgress && (
           <div className="p-4 bg-white/5 border border-zinc-800 rounded-lg flex flex-col gap-3 mt-1">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <audio src={ttsUrl} controls className="w-full sm:flex-1 sm:max-w-[520px] h-10" />
+              <audio
+                ref={audioPlayerRef}
+                src={ttsUrl}
+                controls
+                className="w-full sm:flex-1 sm:max-w-[520px] h-10"
+              />
               <a
                 href={ttsUrl}
                 download="speech.wav"
