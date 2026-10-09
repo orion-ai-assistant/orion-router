@@ -184,6 +184,29 @@ class DynamicLLMRouter:
             **kwargs,
         )
 
+    async def run_speech_stream(
+        self,
+        provider: str | None,
+        model: str,
+        input_text: str,
+        voice: str | None = None,
+        api_key: str | None = None,
+        auth_header: str | None = None,
+        key_id: str | None = None,
+        **kwargs,
+    ):
+        async for chunk in self.tts_runner.run_speech_stream(
+            provider,
+            model,
+            input_text,
+            voice=voice,
+            api_key=api_key,
+            auth_header=auth_header,
+            key_id=key_id,
+            **kwargs,
+        ):
+            yield chunk
+
     async def run_transcription(
         self,
         provider: str | None,

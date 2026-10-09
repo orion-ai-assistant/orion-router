@@ -124,6 +124,26 @@ class BaseTTS(_ProviderMixin, ABC):
         """
         raise NotImplementedError
 
+    async def generate_speech_stream(
+        self,
+        model: str,
+        input_text: str,
+        voice: str | None = None,
+        api_key: str | None = None,
+        auth_header: str | None = None,
+        **kwargs,
+    ):
+        """Varsayılan akış (streaming) implementasyonu: sesi üretip parça döner."""
+        audio_bytes, _, _ = await self.generate_speech(
+            model=model,
+            input_text=input_text,
+            voice=voice,
+            api_key=api_key,
+            auth_header=auth_header,
+            **kwargs,
+        )
+        yield audio_bytes
+
     def get_voices(self) -> list[str]:
         """Desteklenen seslerin listesini döner."""
         return []

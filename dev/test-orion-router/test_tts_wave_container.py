@@ -76,6 +76,26 @@ class SpeechEndpointTests(unittest.IsolatedAsyncioTestCase):
                 response = await self._speech_response('local', audio, mime)
                 self.assertEqual(response.body, audio)
 
+    async def test_endpoint_streaming_speech(self):
+        async def dummy_stream(*args, **kwargs):
+            yield b"chunk1"
+            yield b"chunk2"
+
+        request = SimpleNamespace(
+            headers={'x-orion-provider': 'gemini'},
+            json=AsyncMock(return_value={'input': 'hello', 'stream': True}),
+            is_disconnected=AsyncMock(return_value=False),
+            app=SimpleNamespace(state=SimpleNamespace(dynamic_router=SimpleNamespace(
+                run_speech_stream=dummy_stream,
+            ))),
+        )
+        response = await audio_speech(request, auth={})
+        self.assertEqual(response.media_type, 'audio/pcm')
+        chunks = []
+        async for chunk in response.body_iterator:
+            chunks.append(chunk)
+        self.assertEqual(b"".join(chunks), b"chunk1chunk2")
+
     async def _speech_response(self, provider, audio, mime):
         request = SimpleNamespace(
             headers={'x-orion-provider': provider},
@@ -86,3 +106,45 @@ class SpeechEndpointTests(unittest.IsolatedAsyncioTestCase):
             ))),
         )
         return await audio_speech(request, auth={})
+
+
+class TTSRunnerKwargsCollisionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_tts_runner_cleans_voice_and_explicit_kwargs(self):
+        from core.router.runners.tts import TTSRunner
+        from core.router.route_types import RoutePlan, ResolvedRoute
+
+        mock_plugin = SimpleNamespace(
+            generate_speech=AsyncMock(return_value=(b"wav_bytes", "audio/wav", {"prompt_tokens": 10, "completion_tokens": 20}))
+        )
+        registry = SimpleNamespace(tts_providers={"gemini": mock_plugin})
+        route_resolver = SimpleNamespace(
+            resolve=AsyncMock(return_value=RoutePlan(
+                routes=(ResolvedRoute(provider="gemini", model="gemini-3.8-flash-lite-tts", default_config={"voice": "Achernar", "engine": "omnivoice"}),),
+                requested_provider="gemini",
+            ))
+        )
+        key_pool = SimpleNamespace(
+            get_keys_for_provider=AsyncMock(return_value=[("test-key", "test-key-id")]),
+            mark_key_error=AsyncMock(),
+        )
+        telemetry = SimpleNamespace(
+            create_processing_log=AsyncMock(return_value="log-1"),
+            log_usage=AsyncMock(),
+            finish_processing_log=AsyncMock(),
+        )
+
+        runner = TTSRunner(registry, route_resolver, key_pool, telemetry)
+        audio, mime, meta = await runner.run_speech(
+            provider="gemini",
+            model="gemini-3.8-flash-lite-tts",
+            input_text="hello",
+            voice="Achernar",
+        )
+
+        self.assertEqual(audio, b"wav_bytes")
+        mock_plugin.generate_speech.assert_awaited_once()
+        _, call_kwargs = mock_plugin.generate_speech.call_args
+        self.assertEqual(call_kwargs["voice"], "Achernar")
+        self.assertNotIn("voice", call_kwargs.get("kwargs", {}))
+        self.assertEqual(call_kwargs.get("engine"), "omnivoice")
+

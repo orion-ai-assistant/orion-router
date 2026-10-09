@@ -17,6 +17,34 @@ interface TtsTabProps {
   groups: any[];
 }
 
+function pcmToWavBlob(pcmChunks: Uint8Array[], sampleRate = 24000) {
+  const totalLength = pcmChunks.reduce((acc, c) => acc + c.length, 0);
+  const buffer = new ArrayBuffer(44 + totalLength);
+  const view = new DataView(buffer);
+
+  view.setUint32(0, 0x52494646, false); // "RIFF"
+  view.setUint32(4, 36 + totalLength, true); // ChunkSize
+  view.setUint32(8, 0x57415645, false); // "WAVE"
+  view.setUint32(12, 0x666d7420, false); // "fmt "
+  view.setUint32(16, 16, true); // Subchunk1Size
+  view.setUint16(20, 1, true); // AudioFormat (PCM)
+  view.setUint16(22, 1, true); // NumChannels (1 mono)
+  view.setUint32(24, sampleRate, true); // SampleRate
+  view.setUint32(28, sampleRate * 2, true); // ByteRate (24000 * 2)
+  view.setUint16(32, 2, true); // BlockAlign
+  view.setUint16(34, 16, true); // BitsPerSample
+  view.setUint32(36, 0x64617461, false); // "data"
+  view.setUint32(40, totalLength, true); // Subchunk2Size
+
+  const outBytes = new Uint8Array(buffer);
+  let offset = 44;
+  for (const chunk of pcmChunks) {
+    outBytes.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return new Blob([buffer], { type: 'audio/wav' });
+}
+
 export default function TtsTab({ models, groups }: TtsTabProps) {
   const { showToast, locale, t } = useApp();
 
@@ -55,8 +83,22 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
   const [ttsError, setTtsError] = useState('');
   const [isGeneratingTTS, setIsGeneratingTTS] = useState(false);
   const [ttsLatencyMs, setTtsLatencyMs] = useState<number | null>(null);
+  const [ttsStream, setTtsStream] = useState<boolean>(true);
+  const [isPlayingStream, setIsPlayingStream] = useState<boolean>(false);
   const ttsAbortControllerRef = useRef<AbortController | null>(null);
   const ttsStartedAtRef = useRef<number | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const streamSourcesRef = useRef<AudioBufferSourceNode[]>([]);
+
+  useEffect(() => {
+    return () => {
+      if (audioContextRef.current) {
+        try {
+          audioContextRef.current.close();
+        } catch {}
+      }
+    };
+  }, []);
 
   // Custom tts_instruct and active engine info state for local TTS
   const [ttsInstruct, setTtsInstruct] = useState(getSavedState('pg_ttsInstruct', ''));
@@ -583,8 +625,45 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
       }
     }
 
+    if (ttsStream) {
+      payload.stream = true;
+    }
+
+    const handleStopTTS = () => {
+      if (ttsAbortControllerRef.current) {
+        ttsAbortControllerRef.current.abort();
+      }
+      if (audioContextRef.current) {
+        try {
+          audioContextRef.current.close();
+        } catch {}
+        audioContextRef.current = null;
+      }
+      streamSourcesRef.current.forEach((s) => {
+        try {
+          s.stop();
+        } catch {}
+      });
+      streamSourcesRef.current = [];
+      setIsPlayingStream(false);
+      setIsGeneratingTTS(false);
+    };
+
     try {
       setIsGeneratingTTS(true);
+      if (audioContextRef.current) {
+        try {
+          audioContextRef.current.close();
+        } catch {}
+        audioContextRef.current = null;
+      }
+      streamSourcesRef.current.forEach((s) => {
+        try {
+          s.stop();
+        } catch {}
+      });
+      streamSourcesRef.current = [];
+
       ttsStartedAtRef.current = performance.now();
       ttsAbortControllerRef.current = new AbortController();
 
@@ -600,11 +679,22 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error?.message || err.detail || res.statusText);
+        const errText = await res.text().catch(() => '');
+        let errObj: any = null;
+        try {
+          errObj = JSON.parse(errText);
+        } catch {}
+        const errorMsg =
+          errObj?.detail ||
+          errObj?.error?.message ||
+          (typeof errObj?.error === 'string' ? errObj.error : null) ||
+          errText ||
+          res.statusText ||
+          'Request failed';
+        throw new Error(errorMsg);
       }
 
-      const blob = await res.blob();
+      const contentType = res.headers.get('content-type') || '';
       const metricsHeader = res.headers.get('x-orion-metrics');
       let totalDurationMs: number | null = null;
       if (metricsHeader) {
@@ -619,9 +709,80 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
           // Ignore malformed optional metrics headers.
         }
       }
-      setTtsLatencyMs(totalDurationMs);
-      setTtsUrl(URL.createObjectURL(blob));
-      showToast(t('playground.toast.audioSuccess'));
+
+      if (ttsStream && contentType.includes('audio/pcm') && res.body) {
+        const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext;
+        const audioCtx = new AudioCtxClass({ sampleRate: 24000 });
+        audioContextRef.current = audioCtx;
+        if (audioCtx.state === 'suspended') {
+          await audioCtx.resume();
+        }
+        setIsPlayingStream(true);
+
+        let nextStartTime = audioCtx.currentTime;
+        const pcmChunks: Uint8Array[] = [];
+        const reader = res.body.getReader();
+        let ttftRecorded = false;
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (value && value.length > 0) {
+              if (!ttftRecorded && ttsStartedAtRef.current !== null) {
+                ttftRecorded = true;
+                const ttftMs = Math.round(performance.now() - ttsStartedAtRef.current);
+                setTtsLatencyMs(ttftMs);
+              }
+              pcmChunks.push(value);
+
+              const numSamples = Math.floor(value.length / 2);
+              if (numSamples > 0) {
+                const int16 = new Int16Array(value.buffer, value.byteOffset, numSamples);
+                const float32 = new Float32Array(numSamples);
+                for (let i = 0; i < numSamples; i++) {
+                  float32[i] = int16[i] / 32768.0;
+                }
+                const buffer = audioCtx.createBuffer(1, numSamples, 24000);
+                buffer.copyToChannel(float32, 0);
+
+                const source = audioCtx.createBufferSource();
+                source.buffer = buffer;
+                source.connect(audioCtx.destination);
+                streamSourcesRef.current.push(source);
+
+                const startTime = Math.max(audioCtx.currentTime, nextStartTime);
+                source.start(startTime);
+                nextStartTime = startTime + buffer.duration;
+              }
+            }
+          }
+        } finally {
+          setIsPlayingStream(false);
+        }
+
+        if (pcmChunks.length > 0) {
+          const wavBlob = pcmToWavBlob(pcmChunks, 24000);
+          setTtsUrl(URL.createObjectURL(wavBlob));
+          const totalMs = ttsStartedAtRef.current ? Math.round(performance.now() - ttsStartedAtRef.current) : 0;
+          setTtsLatencyMs(totalMs);
+          setTtsResponseJson(JSON.stringify({
+            detail: 'Audio stream playback completed',
+            content_type: 'audio/pcm',
+            chunks: pcmChunks.length,
+            total_bytes: pcmChunks.reduce((acc, c) => acc + c.length, 0),
+            metrics: {
+              total_duration_ms: totalMs,
+            }
+          }, null, 2));
+        }
+        showToast(t('playground.toast.audioSuccess'));
+      } else {
+        const blob = await res.blob();
+        setTtsLatencyMs(totalDurationMs ?? (ttsStartedAtRef.current ? Math.round(performance.now() - ttsStartedAtRef.current) : null));
+        setTtsUrl(URL.createObjectURL(blob));
+        showToast(t('playground.toast.audioSuccess'));
+      }
     } catch (e: any) {
       if (e.name === 'AbortError') {
         if (ttsStartedAtRef.current !== null) {
@@ -1232,15 +1393,59 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
         </div>
 
         <div className="flex items-center justify-between">
-          {ttsLatencyMs !== null ? (
-            <div className="text-[11px] text-zinc-400 font-mono">
-              ⏱ {ttsLatencyMs} ms
-            </div>
-          ) : <span />}
+          <div className="flex items-center gap-3">
+            {ttsLatencyMs !== null ? (
+              <div className="text-[11px] text-zinc-400 font-mono flex items-center gap-2">
+                <span>⏱ {ttsLatencyMs} ms</span>
+                {isPlayingStream && (
+                  <span className="text-emerald-400 font-medium text-[10px] animate-pulse flex items-center gap-1 bg-emerald-950/40 border border-emerald-500/20 px-1.5 py-0.5 rounded">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    Canlı Çalınıyor
+                  </span>
+                )}
+              </div>
+            ) : isPlayingStream ? (
+              <span className="text-emerald-400 font-medium text-[10px] animate-pulse flex items-center gap-1 bg-emerald-950/40 border border-emerald-500/20 px-1.5 py-0.5 rounded">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                Canlı Çalınıyor
+              </span>
+            ) : <span />}
+
+            <label className="flex items-center gap-1.5 cursor-pointer select-none py-1 px-2 rounded bg-black/40 hover:bg-black/60 border border-zinc-850 transition-colors">
+              <input
+                type="checkbox"
+                checked={ttsStream}
+                onChange={(e) => setTtsStream(e.target.checked)}
+                className="w-3.5 h-3.5 accent-purple-500 rounded cursor-pointer"
+              />
+              <span className="text-[10px] text-zinc-300 font-medium flex items-center gap-1">
+                ⚡ Stream
+              </span>
+            </label>
+          </div>
+
           <div className="flex items-center gap-2">
-            {isGeneratingTTS ? (
+            {isGeneratingTTS || isPlayingStream ? (
               <Button
-                onClick={() => ttsAbortControllerRef.current?.abort()}
+                onClick={() => {
+                  if (ttsAbortControllerRef.current) {
+                    ttsAbortControllerRef.current.abort();
+                  }
+                  if (audioContextRef.current) {
+                    try {
+                      audioContextRef.current.close();
+                    } catch {}
+                    audioContextRef.current = null;
+                  }
+                  streamSourcesRef.current.forEach((s) => {
+                    try {
+                      s.stop();
+                    } catch {}
+                  });
+                  streamSourcesRef.current = [];
+                  setIsPlayingStream(false);
+                  setIsGeneratingTTS(false);
+                }}
                 className="bg-red-600 text-white hover:bg-red-700 font-semibold px-5 py-2 rounded-lg text-xs min-w-[70px]"
               >
                 {t('playground.stop')}

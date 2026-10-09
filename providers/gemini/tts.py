@@ -146,23 +146,53 @@ class GeminiTTSProvider(BaseTTS):
                     )
                 )
             ),
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
             **config_kwargs,
         )
 
-        response = await client.aio.models.generate_content(
+        # Google Gemini Audio unary çağrılarda 30sn bekletme yapabildiği için
+        # generate_content_stream ile parça parça alıp birleştiriyoruz (~1 sn sürer).
+        response_stream = await client.aio.models.generate_content_stream(
             model=model,
             contents=_build_tts_contents(input_text),
             config=config,
         )
 
-        pcm_data = _extract_audio_from_response(response)
+        audio_chunks: list[bytes] = []
+        text_parts: list[str] = []
+        usage_metadata = None
+
+        async for chunk in response_stream:
+            if getattr(chunk, "usage_metadata", None):
+                usage_metadata = chunk.usage_metadata
+            for candidate in getattr(chunk, "candidates", None) or []:
+                content = getattr(candidate, "content", None)
+                if not content:
+                    continue
+                for part in getattr(content, "parts", None) or []:
+                    inline_data = getattr(part, "inline_data", None)
+                    if inline_data and getattr(inline_data, "data", None):
+                        audio_chunks.append(inline_data.data)
+                    elif getattr(part, "text", None):
+                        text_parts.append(part.text)
+
+        if not audio_chunks:
+            detail = ""
+            if text_parts:
+                preview = " ".join(text_parts)[:200]
+                detail = f" Text parts returned: {preview!r}"
+            raise RuntimeError(
+                "Gemini TTS Error: Model did not return any audio data." + detail
+            )
+
+        pcm_data = b"".join(audio_chunks)
         wav_bytes = _pcm_to_wav(pcm_data)
 
         prompt_tokens = 0
         completion_tokens = 0
-        if hasattr(response, "usage_metadata") and response.usage_metadata:
-            prompt_tokens = response.usage_metadata.prompt_token_count or 0
-            completion_tokens = response.usage_metadata.candidates_token_count or 0
+        if usage_metadata:
+            prompt_tokens = usage_metadata.prompt_token_count or 0
+            completion_tokens = usage_metadata.candidates_token_count or 0
 
         usage_dict = {
             "prompt_tokens": prompt_tokens,
@@ -171,4 +201,65 @@ class GeminiTTSProvider(BaseTTS):
 
         logger.info(f"Gemini TTS complete: {len(wav_bytes)} bytes WAV (In tokens: {prompt_tokens}, Out tokens: {completion_tokens})")
         return wav_bytes, "audio/wav", usage_dict
+
+    async def generate_speech_stream(
+        self,
+        model: str,
+        input_text: str,
+        voice: str | None = None,
+        api_key: str | None = None,
+        auth_header: str | None = None,
+        **kwargs,
+    ):
+        """Gemini TTS anlık akış (stream) üreteci. Ham PCM parçaları (24kHz, 16-bit, mono) anında yield eder."""
+        resolved_key = self._resolve_api_key(
+            auth_header=auth_header,
+            api_key=api_key,
+        )
+
+        if not resolved_key:
+            raise ValueError("Gemini TTS Error: No API key provided.")
+        if not model:
+            raise ValueError("Gemini TTS Error: Model name is required.")
+
+        client = get_gemini_client(resolved_key)
+        voice_name = voice or self.get_voices()[0]
+
+        config_kwargs: dict = {}
+        raw_temp = kwargs.get("temperature")
+        if raw_temp is not None:
+            try:
+                config_kwargs["temperature"] = float(raw_temp)
+            except (ValueError, TypeError):
+                pass
+
+        config = types.GenerateContentConfig(
+            response_modalities=["audio"],
+            speech_config=types.SpeechConfig(
+                voice_config=types.VoiceConfig(
+                    prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                        voice_name=voice_name,
+                    )
+                )
+            ),
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+            **config_kwargs,
+        )
+
+        response_stream = await client.aio.models.generate_content_stream(
+            model=model,
+            contents=_build_tts_contents(input_text),
+            config=config,
+        )
+
+        async for chunk in response_stream:
+            for candidate in getattr(chunk, "candidates", None) or []:
+                content = getattr(candidate, "content", None)
+                if not content:
+                    continue
+                for part in getattr(content, "parts", None) or []:
+                    inline_data = getattr(part, "inline_data", None)
+                    if inline_data and getattr(inline_data, "data", None):
+                        yield inline_data.data
+
 
