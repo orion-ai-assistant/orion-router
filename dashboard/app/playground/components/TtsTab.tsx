@@ -261,6 +261,24 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
           .flat()
           .filter(v => typeof v === 'string' && v.toLowerCase() !== 'none');
       }
+
+      // Gemini model bazlı ses filtreleme:
+      // gemini-3.1 ve önceki nesil modeller yalnızca klasik gök cismi seslerini destekler.
+      // Tavi, Arlo, Finn vb. yeni nesil sesler Gemini 3.8+ modellerine aittir.
+      if (provider === 'gemini' && (ttsModel.includes('3.1') || ttsModel.includes('2.0') || ttsModel.includes('2.5') || ttsModel.includes('1.5'))) {
+        const CLASSIC_GEMINI_VOICES = new Set([
+          "achernar", "achird", "algenib", "algieba", "alnilam", "aoede", "autonoe",
+          "callirrhoe", "charon", "despina", "enceladus", "erinome", "fenrir", "gacrux",
+          "iapetus", "kore", "laomedeia", "leda", "orus", "puck", "pulcherrima",
+          "rasalgethi", "sadachbia", "sadaltager", "schedar", "sulafat", "umbriel",
+          "vindemiatrix", "zephyr", "zubenelgenubi"
+        ]);
+        nextVoices = nextVoices.filter(v => CLASSIC_GEMINI_VOICES.has(v.toLowerCase()));
+      }
+    }
+
+    if (!isLocal && nextVoices.length > 0 && ttsVoice && !nextVoices.map(v => v.toLowerCase()).includes(ttsVoice.toLowerCase())) {
+      setTtsVoice(nextVoices[0]);
     }
 
     setVoices(nextVoices);
