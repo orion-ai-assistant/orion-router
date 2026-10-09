@@ -11,8 +11,10 @@ _secrets = ContextVar('request_secrets', default=())
 
 
 def remember(value):
-    if value and isinstance(value, str) and value not in _secrets.get():
-        _secrets.set((*_secrets.get(), value))
+    if value and isinstance(value, str):
+        val = value.strip()
+        if len(val) >= 8 and val not in _secrets.get():
+            _secrets.set((*_secrets.get(), val))
 
 
 def redact(value):

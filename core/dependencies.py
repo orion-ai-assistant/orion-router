@@ -58,12 +58,12 @@ async def verify_token_string(token: str) -> dict:
     from core.secret_guard import remember
     from core.key_policy import selected_upstream
     selected_upstream.set((None, None))
-    remember(token)
     if not token:
         raise HTTPException(status_code=401, detail="API key is required.")
 
     # --- 1. Virtual Key kontrolü ---
     if token.startswith("sk-orion-"):
+        remember(token)
         key_hash = hashlib.sha256(token.encode()).hexdigest()
 
         # Cache kontrolü
