@@ -1119,9 +1119,11 @@ async def get_admin_ui(request: Request, path: str = ""):
     target_path = os.path.join(out_dir, safe_path) if safe_path else out_dir
 
     # 2. Check if the exact requested file exists (e.g. static assets, _next/..., keys/__next._tree.txt)
+    rsc_headers = {"Cache-Control": "no-cache", "Vary": "RSC, Next-Router-State-Tree, Next-Router-Prefetch, Accept"}
     if safe_path and os.path.isfile(target_path):
         media = "text/x-component" if target_path.endswith(".txt") else None
-        return FileResponse(target_path, media_type=media)
+        headers = rsc_headers if target_path.endswith(".txt") else None
+        return FileResponse(target_path, media_type=media, headers=headers)
 
     # Detect Next.js App Router client-side navigation (RSC flight payloads & prefetches)
     accept = request.headers.get("accept", "").lower()
@@ -1138,36 +1140,37 @@ async def get_admin_ui(request: Request, path: str = ""):
         # Check target_path.txt (e.g. /dashboard/models -> models.txt)
         txt_path = f"{target_path}.txt"
         if os.path.isfile(txt_path):
-            return FileResponse(txt_path, media_type="text/x-component")
+            return FileResponse(txt_path, media_type="text/x-component", headers=rsc_headers)
 
         # Check inside directory (e.g. /dashboard/keys -> keys/__next._full.txt or keys/index.txt)
         if os.path.isdir(target_path):
             for candidate in ("__next._full.txt", "index.txt"):
                 c_path = os.path.join(target_path, candidate)
                 if os.path.isfile(c_path):
-                    return FileResponse(c_path, media_type="text/x-component")
+                    return FileResponse(c_path, media_type="text/x-component", headers=rsc_headers)
 
         # Only fall back to root index.txt if the requested route is the root itself
         if not safe_path:
             root_txt = os.path.join(out_dir, "index.txt")
             if os.path.isfile(root_txt):
-                return FileResponse(root_txt, media_type="text/x-component")
+                return FileResponse(root_txt, media_type="text/x-component", headers=rsc_headers)
     
     # 3. Check if an HTML file exists for the requested path (e.g. /keys -> keys.html)
+    html_headers = {"Cache-Control": "no-cache"}
     if safe_path and not safe_path.endswith(".html") and not safe_path.endswith(".txt"):
         html_path = f"{target_path}.html"
         if os.path.isfile(html_path):
-            return FileResponse(html_path, media_type="text/html")
+            return FileResponse(html_path, media_type="text/html", headers=html_headers)
             
         # 4. Check if there's an index.html inside a directory (e.g. /keys/ -> keys/index.html)
         index_in_dir = os.path.join(target_path, "index.html")
         if os.path.isdir(target_path) and os.path.isfile(index_in_dir):
-            return FileResponse(index_in_dir, media_type="text/html")
+            return FileResponse(index_in_dir, media_type="text/html", headers=html_headers)
 
     # 5. Final Fallback to root index.html (SPA fallback)
     root_index = os.path.join(out_dir, "index.html")
     if os.path.exists(root_index):
-        return FileResponse(root_index, media_type="text/html")
+        return FileResponse(root_index, media_type="text/html", headers=html_headers)
         
     # Fallback to old dashboard index.html if out doesn't exist
     old_index = os.path.join(_DASHBOARD_DIR, "index.html")

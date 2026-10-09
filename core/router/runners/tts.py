@@ -191,7 +191,6 @@ class TTSRunner:
                             "thoughts_tokens": 0,
                         }
                         res_success = {
-                            "stream": False,
                             "content_type": content_type,
                             "size_bytes": len(audio_bytes),
                             "estimated_duration_seconds": completion_tokens / 25.0 if completion_tokens is not None else None,
@@ -367,7 +366,6 @@ class TTSRunner:
                         duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
                         audio_b64, content_type = _build_logged_audio(collected_chunks)
                         res_success = {
-                            "stream": True,
                             "content_type": content_type,
                             "size_bytes": total_bytes,
                             "audio_base64": audio_b64,
@@ -394,7 +392,6 @@ class TTSRunner:
                             duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
                             audio_b64, content_type = _build_logged_audio(collected_chunks)
                             res_err = {
-                                "stream": True,
                                 "stopped_early": True,
                                 "content_type": content_type,
                                 "size_bytes": total_bytes,
@@ -425,7 +422,6 @@ class TTSRunner:
             duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
             audio_b64, content_type = _build_logged_audio(collected_chunks)
             res_err = {
-                "stream": True,
                 "stopped_early": total_bytes > 0,
                 "content_type": content_type,
                 "size_bytes": total_bytes,

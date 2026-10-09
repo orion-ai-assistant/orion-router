@@ -76,6 +76,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <li key={tab.id}>
                 <Link
                   href={tab.url}
+                  prefetch={false}
                   className={`flex items-center gap-3.5 px-5 py-3.5 rounded-md cursor-pointer transition-all duration-200 font-medium text-[15px] ${active
                     ? 'bg-zinc-800 text-white border-l-3 border-l-zinc-300'
                     : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-white'
