@@ -47,7 +47,7 @@ class TTSRunner:
         except Exception as exc:
             logger.warning("TTS route resolution failed for '%s': %s", model, exc)
 
-        req_data = {"model": model, "input": input_text, "voice": voice, **kwargs}
+        req_data = {"model": model, "input": input_text, "voice": voice, "stream": False, **kwargs}
         log_id = await self.telemetry.create_processing_log(
             key_id,
             route_plan.primary_provider,
@@ -154,6 +154,7 @@ class TTSRunner:
                         }
                         res_success = {
                             "detail": "Audio generation successful",
+                            "stream": False,
                             "content_type": content_type,
                             "size_bytes": len(audio_bytes),
                             "estimated_duration_seconds": completion_tokens / 25.0 if completion_tokens is not None else None,
@@ -221,7 +222,7 @@ class TTSRunner:
         except Exception as exc:
             logger.warning("TTS route resolution failed for '%s': %s", model, exc)
 
-        req_data = {"model": model, "input": input_text, "voice": voice, **kwargs}
+        req_data = {"model": model, "input": input_text, "voice": voice, "stream": True, **kwargs}
         log_id = await self.telemetry.create_processing_log(
             key_id,
             route_plan.primary_provider,
@@ -326,6 +327,7 @@ class TTSRunner:
                         duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
                         res_success = {
                             "detail": "Audio stream successful",
+                            "stream": True,
                             "size_bytes": total_bytes,
                             "metrics": {"total_duration_ms": duration_ms},
                         }

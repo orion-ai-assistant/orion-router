@@ -88,3 +88,63 @@ class OpenAITTSProvider(BaseTTS):
             f"(Billed characters: {character_count})"
         )
         return audio_bytes, content_type, usage_dict
+
+    async def generate_speech_stream(
+        self,
+        model: str,
+        input_text: str,
+        voice: str | None = None,
+        api_key: str | None = None,
+        auth_header: str | None = None,
+        **kwargs,
+    ):
+        """OpenAI TTS anlık akış (stream) üreteci. 24kHz 16-bit mono PCM parçaları üretir."""
+        resolved_key = self._resolve_api_key(
+            auth_header=auth_header,
+            api_key=api_key,
+        )
+
+        if not resolved_key:
+            raise ValueError("OpenAI TTS Error: No API key provided.")
+
+        if not model:
+            raise ValueError("OpenAI TTS Error: Model name is required.")
+
+        voice_name = voice or self.get_voices()[0]
+        url = f"{_BASE_URL}/v1/audio/speech"
+
+        headers = {
+            "Authorization": f"Bearer {resolved_key}",
+            "Content-Type": "application/json",
+        }
+
+        payload = {
+            "model": model,
+            "input": input_text,
+            "voice": voice_name,
+            "response_format": "pcm",
+        }
+
+        raw_speed = kwargs.get("speed")
+        if raw_speed is not None:
+            try:
+                payload["speed"] = float(raw_speed)
+            except (ValueError, TypeError):
+                pass
+
+        logger.info(f"Generating OpenAI TTS stream: model={model}, voice={voice_name}")
+
+        client = get_http_client(timeout=60.0)
+        req = client.build_request("POST", url, json=payload, headers=headers)
+        response = await client.send(req, stream=True)
+        if response.status_code != 200:
+            err_detail = (await response.aread()).decode(errors="ignore")
+            await response.aclose()
+            raise RuntimeError(f"OpenAI TTS API Error {response.status_code}: {err_detail}")
+
+        try:
+            async for chunk in response.aiter_bytes():
+                if chunk:
+                    yield chunk
+        finally:
+            await response.aclose()

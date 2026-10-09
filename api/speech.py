@@ -83,15 +83,26 @@ async def audio_speech(
                 logger.exception("Error in TTS streaming generation mid-transmission")
                 raise
 
+        media_type = "audio/pcm"
+        headers = {
+            "Content-Disposition": 'inline; filename="speech.pcm"',
+            "X-Audio-Sample-Rate": "24000",
+            "X-Audio-Channels": "1",
+            "X-Audio-Bits-Per-Sample": "16",
+        }
+
+        if first_chunk:
+            if first_chunk[:4] == b"RIFF" and len(first_chunk) >= 12 and first_chunk[8:12] == b"WAVE":
+                media_type = "audio/wav"
+                headers = {"Content-Disposition": 'inline; filename="speech.wav"'}
+            elif first_chunk[:3] == b"ID3" or (len(first_chunk) >= 2 and first_chunk[0] == 0xFF and (first_chunk[1] & 0xE0) == 0xE0):
+                media_type = "audio/mpeg"
+                headers = {"Content-Disposition": 'inline; filename="speech.mp3"'}
+
         return StreamingResponse(
             audio_stream_generator(),
-            media_type="audio/pcm",
-            headers={
-                "Content-Disposition": 'inline; filename="speech.pcm"',
-                "X-Audio-Sample-Rate": "24000",
-                "X-Audio-Channels": "1",
-                "X-Audio-Bits-Per-Sample": "16",
-            },
+            media_type=media_type,
+            headers=headers,
         )
 
     try:

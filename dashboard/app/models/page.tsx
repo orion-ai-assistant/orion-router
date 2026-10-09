@@ -1065,7 +1065,7 @@ export default function ModelsPage() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className={`grid ${isLocal ? 'grid-cols-2' : 'grid-cols-1'} gap-3`}>
               <div className="flex flex-col gap-1">
                 <label className="text-zinc-500 text-[11px] font-medium">{t('tts.speed')}</label>
                 <Input
@@ -1076,27 +1076,31 @@ export default function ModelsPage() {
                   className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs"
                 />
               </div>
+              {isLocal && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-zinc-500 text-[11px] font-medium">{t('tts.steps')}</label>
+                  <Input
+                    type="number" min="1" max="50" step="1"
+                    value={formState.default_config?.steps || ''}
+                    onChange={(e) => updateDefaultConfig(formState, setFormState, 'steps', e.target.value)}
+                    placeholder="15"
+                    className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs"
+                  />
+                </div>
+              )}
+            </div>
+            {isLocal && (
               <div className="flex flex-col gap-1">
-                <label className="text-zinc-500 text-[11px] font-medium">{t('tts.steps')}</label>
+                <label className="text-zinc-500 text-[11px] font-medium">{t('tts.seed')}</label>
                 <Input
-                  type="number" min="1" max="50" step="1"
-                  value={formState.default_config?.steps || ''}
-                  onChange={(e) => updateDefaultConfig(formState, setFormState, 'steps', e.target.value)}
-                  placeholder="15"
+                  type="number"
+                  value={formState.default_config?.seed || ''}
+                  onChange={(e) => updateDefaultConfig(formState, setFormState, 'seed', e.target.value)}
+                  placeholder="-1"
                   className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs"
                 />
               </div>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-zinc-500 text-[11px] font-medium">{t('tts.seed')}</label>
-              <Input
-                type="number"
-                value={formState.default_config?.seed || ''}
-                onChange={(e) => updateDefaultConfig(formState, setFormState, 'seed', e.target.value)}
-                placeholder="-1"
-                className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs"
-              />
-            </div>
+            )}
           </div>
         )}
       </div>

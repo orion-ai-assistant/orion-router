@@ -935,6 +935,49 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
           />
         </div>
 
+        {/* Konuşma Hızı (Speed) */}
+        <div className="flex flex-col gap-1">
+          <div className="flex justify-between items-center mb-0.5">
+            <label className="text-zinc-400 text-[10px] font-semibold capitalize">
+              {t('tts.speed.speech')}
+            </label>
+            {renderDefaultIndicator('speed', ttsSpeed)}
+          </div>
+          <Input
+            type="number"
+            min="0.25"
+            max="4.0"
+            step="0.1"
+            value={ttsSpeed}
+            onChange={(e) => setTtsSpeed(e.target.value)}
+            placeholder={getTtsFieldDefault('speed') || '1.0'}
+            className="bg-black/40 border border-zinc-855 text-white rounded px-2.5 py-1.5 text-xs placeholder:text-zinc-600"
+          />
+          {!isLocalTts && (
+            <span className="text-[9px] text-zinc-500">
+              {t('tts.speed.supportedNote')}
+            </span>
+          )}
+        </div>
+
+        {/* ⚡ Stream (Akış) Seçeneği */}
+        <div className="flex flex-col gap-1 p-2 rounded bg-black/30 border border-zinc-850">
+          <label className="flex items-center justify-between cursor-pointer select-none">
+            <span className="text-xs text-zinc-200 font-medium flex items-center gap-1.5">
+              <span>⚡</span> {t('tts.stream.label')}
+            </span>
+            <input
+              type="checkbox"
+              checked={ttsStream}
+              onChange={(e) => setTtsStream(e.target.checked)}
+              className="w-4 h-4 accent-purple-500 rounded cursor-pointer"
+            />
+          </label>
+          <span className="text-[10px] text-zinc-400 leading-tight mt-0.5">
+            {t('tts.stream.hint')}
+          </span>
+        </div>
+
         {/* Karakter Tasarımı (OmniVoice) */}
         {isLocalTts && isOmniVoice && (
           <div className="flex flex-col gap-2">
@@ -1179,22 +1222,6 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
                   />
                 </div>
 
-                <div className="flex flex-col gap-1">
-                  <div className="flex justify-between items-center mb-0.5">
-                    <label className="text-zinc-400 text-[10px] font-semibold capitalize">{t('tts.speed.speech')}</label>
-                    {renderDefaultIndicator('speed', ttsSpeed)}
-                  </div>
-                  <Input
-                    type="number"
-                    min="0.5"
-                    max="2.0"
-                    step="0.1"
-                    value={ttsSpeed}
-                    onChange={(e) => setTtsSpeed(e.target.value)}
-                    placeholder={getTtsFieldDefault('speed')}
-                    className="bg-black/40 border border-zinc-855 text-white rounded px-2.5 py-1.5 text-xs placeholder:text-zinc-600"
-                  />
-                </div>
 
                 <div className="flex flex-col gap-1">
                   <div className="flex justify-between items-center mb-0.5">
@@ -1411,17 +1438,7 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
               </span>
             ) : <span />}
 
-            <label className="flex items-center gap-1.5 cursor-pointer select-none py-1 px-2 rounded bg-black/40 hover:bg-black/60 border border-zinc-850 transition-colors">
-              <input
-                type="checkbox"
-                checked={ttsStream}
-                onChange={(e) => setTtsStream(e.target.checked)}
-                className="w-3.5 h-3.5 accent-purple-500 rounded cursor-pointer"
-              />
-              <span className="text-[10px] text-zinc-300 font-medium flex items-center gap-1">
-                ⚡ Stream
-              </span>
-            </label>
+
           </div>
 
           <div className="flex items-center gap-2">
