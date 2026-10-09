@@ -79,6 +79,7 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
   const [isLocalTts, setIsLocalTts] = useState(false);
   const [ttsInput, setTtsInput] = useState('');
   const [ttsUrl, setTtsUrl] = useState('');
+  const [ttsAutoPlay, setTtsAutoPlay] = useState(false);
   const [ttsResponseJson, setTtsResponseJson] = useState('');
   const [ttsError, setTtsError] = useState('');
   const [isGeneratingTTS, setIsGeneratingTTS] = useState(false);
@@ -571,6 +572,7 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
 
     const chunks = currentPcmChunksRef.current;
     if (chunks.length > 0) {
+      setTtsAutoPlay(false);
       const wavBlob = pcmToWavBlob(chunks, 24000);
       setTtsUrl(URL.createObjectURL(wavBlob));
       const totalMs = ttsStartedAtRef.current ? Math.round(performance.now() - ttsStartedAtRef.current) : 0;
@@ -597,6 +599,7 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
 
     setTtsError('');
     setTtsUrl('');
+    setTtsAutoPlay(false);
     setTtsResponseJson('');
     setTtsLatencyMs(null);
 
@@ -887,6 +890,7 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
         }
 
         if (pcmChunks.length > 0) {
+          setTtsAutoPlay(false);
           const wavBlob = pcmToWavBlob(pcmChunks, 24000);
           setTtsUrl(URL.createObjectURL(wavBlob));
           const totalMs = ttsStartedAtRef.current ? Math.round(performance.now() - ttsStartedAtRef.current) : 0;
@@ -905,13 +909,12 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
       } else {
         const blob = await res.blob();
         setTtsLatencyMs(totalDurationMs ?? (ttsStartedAtRef.current ? Math.round(performance.now() - ttsStartedAtRef.current) : null));
-        setTtsUrl(URL.createObjectURL(blob));
-        // Auto-play for non-streamed responses so native player slider moves right away
-        setTimeout(() => {
-          if (audioPlayerRef.current) {
-            audioPlayerRef.current.play().catch(() => {});
-          }
-        }, 50);
+        const blobUrl = URL.createObjectURL(blob);
+        setTtsAutoPlay(true);
+        setTtsUrl(blobUrl);
+        // Native autoPlay attribute with key={ttsUrl} is only enabled for non-streamed responses
+        // so it plays automatically without JS race conditions ("s-selam" stutter), while
+        // streamed responses do NOT replay after live playback finishes.
         showToast(t('playground.toast.audioSuccess'));
       }
     } catch (e: any) {
@@ -1650,9 +1653,11 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
           <div className="p-4 bg-white/5 border border-zinc-800 rounded-lg flex flex-col gap-3 mt-1">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <audio
+                key={ttsUrl}
                 ref={audioPlayerRef}
                 src={ttsUrl}
                 controls
+                autoPlay={ttsAutoPlay}
                 className="w-full sm:flex-1 sm:max-w-[520px] h-10"
               />
               <a
