@@ -15,7 +15,7 @@ import sys
 
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from core.lifespan import lifespan
@@ -223,6 +223,22 @@ async def tls_identity(request: Request):
 @app.get("/", include_in_schema=False)
 async def root():
     return RedirectResponse(url="/dashboard")
+
+@app.get("/dashboard.txt", include_in_schema=False)
+async def dashboard_txt():
+    rsc_headers = {"Cache-Control": "no-cache", "Vary": "RSC, Next-Router-State-Tree, Next-Router-Prefetch, Accept"}
+    root_txt = os.path.join(DASHBOARD_OUT_DIR, "index.txt")
+    if os.path.isfile(root_txt):
+        return FileResponse(root_txt, media_type="text/x-component", headers=rsc_headers)
+    raise HTTPException(status_code=404, detail="Not Found")
+
+@app.get("/dashboard.html", include_in_schema=False)
+async def dashboard_html():
+    html_headers = {"Cache-Control": "no-cache"}
+    root_html = os.path.join(DASHBOARD_OUT_DIR, "index.html")
+    if os.path.isfile(root_html):
+        return FileResponse(root_html, media_type="text/html", headers=html_headers)
+    raise HTTPException(status_code=404, detail="Not Found")
 
 
 # ---------------------------------------------------------------------------
