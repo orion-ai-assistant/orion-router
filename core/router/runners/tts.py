@@ -1,15 +1,53 @@
-from core.secret_guard import redact
-from core.key_policy import authorize_attempt, ACCESS_MESSAGE
-from fastapi import HTTPException
 import asyncio
 import base64
+import io
 import json
 import logging
 import time
+import wave
+from core.audio_container import finalize_buffered_wav
+from core.secret_guard import redact
+from core.key_policy import authorize_attempt, ACCESS_MESSAGE
+from fastapi import HTTPException
 
 from core.router.route_types import RoutePlan
 
 logger = logging.getLogger("service-router.dynamic")
+
+
+def _pcm_to_wav(pcm_data: bytes, sample_rate: int = 24000, channels: int = 1, sampwidth: int = 2) -> bytes:
+    """Wraps raw PCM samples into standard RIFF WAV container."""
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as wf:
+        wf.setnchannels(channels)
+        wf.setsampwidth(sampwidth)
+        wf.setframerate(sample_rate)
+        wf.writeframes(pcm_data)
+    return buffer.getvalue()
+
+
+def _build_logged_audio(collected_chunks: list[bytes]) -> tuple[str | None, str]:
+    """Inspects collected streaming audio chunks and returns (base64_str, content_type)."""
+    if not collected_chunks:
+        return None, "audio/wav"
+    full_audio = b"".join(collected_chunks)
+    if not full_audio:
+        return None, "audio/wav"
+    if full_audio.startswith(b"RIFF"):
+        audio_bytes = finalize_buffered_wav(full_audio)
+        content_type = "audio/wav"
+    elif full_audio.startswith(b"ID3") or full_audio.startswith(b"\xff\xfb"):
+        audio_bytes = full_audio
+        content_type = "audio/mpeg"
+    elif full_audio.startswith(b"OggS"):
+        audio_bytes = full_audio
+        content_type = "audio/ogg"
+    else:
+        # Default TTS stream format: 24kHz 16-bit mono PCM
+        audio_bytes = _pcm_to_wav(full_audio)
+        content_type = "audio/wav"
+    audio_b64 = base64.b64encode(audio_bytes).decode("ascii") if len(audio_bytes) < 5_000_000 else None
+    return audio_b64, content_type
 
 
 def _coerce_default_config(default_config) -> dict:
@@ -236,6 +274,7 @@ class TTSRunner:
         start_time = time.perf_counter()
         stream_started = False
         total_bytes = 0
+        collected_chunks: list[bytes] = []
         try:
             for route in route_plan.routes:
                 p_provider = route.provider
@@ -321,12 +360,17 @@ class TTSRunner:
                         async for chunk in stream_gen:
                             stream_started = True
                             total_bytes += len(chunk)
+                            if total_bytes <= 5_000_000:
+                                collected_chunks.append(chunk)
                             yield chunk
 
                         duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+                        audio_b64, content_type = _build_logged_audio(collected_chunks)
                         res_success = {
                             "stream": True,
+                            "content_type": content_type,
                             "size_bytes": total_bytes,
+                            "audio_base64": audio_b64,
                             "metrics": {"total_duration_ms": duration_ms},
                         }
                         asyncio.create_task(
@@ -347,6 +391,31 @@ class TTSRunner:
                     except Exception as exc:
                         if stream_started:
                             logger.error("TTS stream aborted mid-transmission: %s", exc)
+                            duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+                            audio_b64, content_type = _build_logged_audio(collected_chunks)
+                            res_err = {
+                                "stream": True,
+                                "stopped_early": True,
+                                "content_type": content_type,
+                                "size_bytes": total_bytes,
+                                "audio_base64": audio_b64,
+                                "error": str(exc),
+                                "metrics": {"total_duration_ms": duration_ms},
+                            }
+                            asyncio.create_task(
+                                self.telemetry.log_usage(
+                                    key_id,
+                                    p_provider,
+                                    p_model,
+                                    None,
+                                    request_json=json.dumps(req_data, ensure_ascii=False),
+                                    response_json=json.dumps(res_err, ensure_ascii=False),
+                                    success=False,
+                                    capability="tts",
+                                    duration_ms=duration_ms,
+                                    log_id=log_id,
+                                    )
+                            )
                             raise
                         exc = RuntimeError(redact(str(exc)))
                         logger.error("TTS route %s/%s stream failed: %s", p_provider, p_model, exc)
@@ -354,10 +423,13 @@ class TTSRunner:
                         last_err = exc
         except asyncio.CancelledError:
             duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+            audio_b64, content_type = _build_logged_audio(collected_chunks)
             res_err = {
                 "stream": True,
                 "stopped_early": total_bytes > 0,
+                "content_type": content_type,
                 "size_bytes": total_bytes,
+                "audio_base64": audio_b64,
                 "error": "Client disconnected / Request Cancelled",
                 "metrics": {"total_duration_ms": duration_ms},
             }
