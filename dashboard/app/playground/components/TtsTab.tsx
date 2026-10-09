@@ -827,6 +827,15 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
                   float32[i] = dataView.getInt16(i * 2, true) / 32768.0;
                 }
 
+                // If starting or recovering from a network underrun gap, apply 1ms (24 samples) micro-fade to eliminate clicks
+                const isUnderRun = nextStartTime > 0 && audioCtx.currentTime > nextStartTime;
+                if (nextStartTime === 0 || isUnderRun) {
+                  const deClickSamples = Math.min(24, numSamples);
+                  for (let i = 0; i < deClickSamples; i++) {
+                    float32[i] *= (i / deClickSamples);
+                  }
+                }
+
                 const buffer = audioCtx.createBuffer(1, numSamples, 24000);
                 buffer.copyToChannel(float32, 0);
 
@@ -836,11 +845,11 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
                 streamSourcesRef.current.push(source);
 
                 if (nextStartTime === 0) {
-                  // Pre-buffer initial 120ms to prevent network jitter buffer-underrun buzz/clicks
-                  nextStartTime = audioCtx.currentTime + 0.12;
+                  // Ultra-low latency: minimal 15ms lead-time for audio hardware render quantum (imperceptible to human ear)
+                  nextStartTime = audioCtx.currentTime + 0.015;
                   streamPlaybackStartTime = nextStartTime;
                 }
-                const startTime = Math.max(audioCtx.currentTime, nextStartTime);
+                const startTime = Math.max(audioCtx.currentTime + 0.005, nextStartTime);
                 source.start(startTime);
                 nextStartTime = startTime + buffer.duration;
                 totalDuration += buffer.duration;
