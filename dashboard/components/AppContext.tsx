@@ -135,8 +135,18 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [adminKey, setAdminKeyState] = useState<string>('');
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [adminKey, setAdminKeyState] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return getAdminKey();
+    }
+    return '';
+  });
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return !!getAdminKey();
+    }
+    return false;
+  });
   const [isDefaultPassword, setIsDefaultPassword] = useState<boolean>(false);
   const [defaultPasswordValue, setDefaultPasswordValue] = useState<string>('');
   const [showLogin, setShowLogin] = useState<boolean>(false);
