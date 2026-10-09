@@ -1114,8 +1114,8 @@ async def get_admin_ui(request: Request, path: str = ""):
     from core.config import DASHBOARD_OUT_DIR
     out_dir = DASHBOARD_OUT_DIR
     
-    # 1. Clean up the path (remove leading slashes if any)
-    safe_path = path.lstrip("/")
+    # 1. Clean up the path (remove leading/trailing slashes)
+    safe_path = path.strip("/")
     target_path = os.path.join(out_dir, safe_path) if safe_path else out_dir
 
     # 2. Check if the exact requested file exists (e.g. static assets, _next/..., keys/__next._tree.txt)
@@ -1123,11 +1123,15 @@ async def get_admin_ui(request: Request, path: str = ""):
         media = "text/x-component" if target_path.endswith(".txt") else None
         return FileResponse(target_path, media_type=media)
 
-    # Detect Next.js App Router client-side navigation (RSC flight payloads)
+    # Detect Next.js App Router client-side navigation (RSC flight payloads & prefetches)
+    accept = request.headers.get("accept", "").lower()
     is_rsc_request = (
         request.headers.get("rsc") == "1"
         or "_rsc" in request.query_params
         or request.headers.get("next-router-state-tree") is not None
+        or request.headers.get("next-router-prefetch") is not None
+        or request.headers.get("next-url") is not None
+        or "text/x-component" in accept
     )
 
     if is_rsc_request:
