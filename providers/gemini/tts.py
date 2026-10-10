@@ -141,13 +141,23 @@ class GeminiTTSProvider(BaseTTS):
     def get_voices(self, model: str | None = None) -> list[str]:
         """Gemini tarafından desteklenen seslerin listesini döner. Model verilirse modele özel grubu döner."""
         if model:
-            model_lower = model.lower()
+            name = model.lower()
             for grp in MODEL_VOICE_GROUPS:
-                if any(m.lower() == model_lower for m in grp.get("models", [])):
+                if name in [m.lower() for m in grp.get("models", [])]:
                     return list(grp["voices"])
-                if any(p != "default" and p in model_lower for p in grp.get("match_patterns", [])):
+            for grp in MODEL_VOICE_GROUPS:
+                if any(p != "default" and p.lower() in name for p in grp.get("match_patterns", [])):
                     return list(grp["voices"])
         return list(self._cached_voices)
+
+    def resolve_voice(self, model: str, voice: str | None) -> str:
+        voices = self.get_voices(model)
+        if not voice:
+            return voices[0]
+        for candidate in voices:
+            if candidate.lower() == voice.strip().lower():
+                return candidate
+        raise ValueError(f"Voice {voice!r} is not supported by TTS model {model!r}")
 
     def get_model_voice_groups(self) -> list[dict]:
         """Model grupları ve desteklenen ses kümesini döner."""
@@ -221,7 +231,7 @@ class GeminiTTSProvider(BaseTTS):
             raise ValueError("Gemini TTS Error: Model name is required.")
 
         client = get_gemini_client(resolved_key)
-        voice_name = voice or self.get_voices()[0]
+        voice_name = self.resolve_voice(model, voice)
 
         # Temperature: güvenli parse — geçersiz değer gelirse loglanıp atlanır
         config_kwargs: dict = {}
@@ -320,7 +330,7 @@ class GeminiTTSProvider(BaseTTS):
             raise ValueError("Gemini TTS Error: Model name is required.")
 
         client = get_gemini_client(resolved_key)
-        voice_name = voice or self.get_voices()[0]
+        voice_name = self.resolve_voice(model, voice)
 
         config_kwargs: dict = {}
         raw_temp = kwargs.get("temperature")

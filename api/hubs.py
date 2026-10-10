@@ -82,7 +82,7 @@ async def catalog(section: str, request: Request, hub: dict = Depends(current_hu
     from api import admin
     async def get_catalog_voices():
         v = await admin.get_admin_voices(request)
-        return {'voices': v.get('voices', {})}
+        return {field: v.get(field, {}) for field in ('voices', 'model_voice_groups')}
 
     handlers = {'models': admin.list_models, 'model-groups': admin.list_model_groups,
                 'voices': get_catalog_voices,
@@ -124,7 +124,8 @@ async def account_catalog(section: str, request: Request, auth: dict = Depends(c
         return {'groups': groups}
     if section == 'voices':
         data = await admin.get_admin_voices(request)
-        return {'voices': {p:v for p,v in data['voices'].items() if p in usable}}
+        return {field: {p: v for p, v in data.get(field, {}).items() if p in usable}
+                for field in ('voices', 'model_voice_groups')}
     raise HTTPException(404, 'Unknown catalog section')
 
 
