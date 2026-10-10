@@ -1,5 +1,6 @@
 from core.secret_guard import redact
 from core.key_policy import authorize_attempt, ACCESS_MESSAGE
+from core.logging_utils import log_chat_stream_start
 from fastapi import HTTPException
 import asyncio
 import json
@@ -150,7 +151,7 @@ class ChatRunner:
         start_time = time.perf_counter()
         ttft_ms: float | None = None
 
-        logger.info("Starting chat stream: provider=%s, model=%s, kwargs=%s", provider, model, kwargs)
+        log_chat_stream_start(logger, provider, model, messages, kwargs)
 
         if provider != "gemini":
             messages = sanitize_tool_ids_for_non_gemini(messages)

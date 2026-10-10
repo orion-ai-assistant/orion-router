@@ -8,6 +8,7 @@ import wave
 from core.audio_container import finalize_buffered_wav
 from core.secret_guard import redact
 from core.key_policy import authorize_attempt, ACCESS_MESSAGE
+from core.logging_utils import format_tts_kwargs_summary
 from fastapi import HTTPException
 
 from core.router.route_types import RoutePlan
@@ -163,14 +164,17 @@ class TTSRunner:
                             raise
                         last_err = denied
                         continue
+                    tts_params = format_tts_kwargs_summary(clean_kwargs)
                     logger.info(
-                        "Routing TTS to %s (model=%s, voice=%s) using key %s, kwargs=%s",
+                        "Routing TTS to %s (model=%s, voice=%s) using key %s%s",
                         p_provider,
                         p_model,
                         target_voice,
                         key_pool_id or "default",
-                        clean_kwargs,
+                        f", params={tts_params}" if tts_params else "",
                     )
+                    if logger.isEnabledFor(logging.DEBUG):
+                        logger.debug("TTS route debug: keys=%s", sorted(clean_kwargs.keys()))
                     try:
                         audio_bytes, content_type, usage_meta = await plugin.generate_speech(
                             model=p_model,
@@ -339,14 +343,17 @@ class TTSRunner:
                             raise
                         last_err = denied
                         continue
+                    tts_params = format_tts_kwargs_summary(clean_kwargs)
                     logger.info(
-                        "Routing TTS stream to %s (model=%s, voice=%s) using key %s, kwargs=%s",
+                        "Routing TTS stream to %s (model=%s, voice=%s) using key %s%s",
                         p_provider,
                         p_model,
                         target_voice,
                         key_pool_id or "default",
-                        clean_kwargs,
+                        f", params={tts_params}" if tts_params else "",
                     )
+                    if logger.isEnabledFor(logging.DEBUG):
+                        logger.debug("TTS route stream debug: keys=%s", sorted(clean_kwargs.keys()))
                     try:
                         stream_gen = plugin.generate_speech_stream(
                             model=p_model,
