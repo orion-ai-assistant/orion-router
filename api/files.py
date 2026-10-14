@@ -101,6 +101,11 @@ async def upload_file(
             display_name=name,
             key_id=auth.get('key_id'),
         )
+        from core.document_archive import archive_uploaded_document
+        from core.tts_archive import background
+        from database import db_manager
+        if mime_type.startswith(('text/', 'application/')):
+            background(archive_uploaded_document(file_bytes, mime_type, name, db_manager))
         return result
     except HTTPException:
         raise

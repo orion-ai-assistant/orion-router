@@ -503,7 +503,7 @@
   "logs.mediaUnsupported": "Tarayıcı bu dosya biçimini oynatamıyor veya dosya eksik. Orijinal dosyayı indirip açabilirsiniz.",
   "logs.lastArchiveError": "Bu sunucu oturumundaki son arşiv hatası (geçmiş kayıt)",
   "nav.archives": "Arşiv",
-  "archive.description": "Sesler, görseller ve videolar. En yeni kayıtlar önce gösterilir; loglar silinse de dosyalar korunur.",
+  "archive.description": "Sesler, görseller, videolar ve belgeler. En yeni kayıtlar önce gösterilir; loglar silinse de dosyalar korunur.",
   "archive.audio": "Sesler",
   "archive.image": "Görseller",
   "archive.video": "Videolar",
@@ -517,5 +517,12 @@
   "archive.confirmDelete": "Bu dosya arşivden kalıcı olarak silinecek. Dosyayı kullanan tüm logların önizlemesi de kaldırılır; log kayıtları korunur. Silinsin mi?",
   "archive.deleted": "Dosya arşivden silindi.",
   "archive.deleteFailed": "Dosya silinemedi.",
-  "archive.unnamed": "Dosya adı gönderilmemiş"
+  "archive.unnamed": "Dosya adı gönderilmemiş",
+  "archive.document": "Belgeler",
+  "logs.attachmentDocument": "Belge",
+  "archive.documentReady": "Dosya arşivde saklanıyor. İndirerek açabilirsiniz.",
+  "archive.openPdf": "PDF’i aç",
+  "archive.textTruncated": "Önizleme kısaltıldı. Tam içerik için dosyayı indirin.",
+  "archive.extractedText": "İstemciden dosyanın metni alındı; orijinal dosya gönderilmedi.",
+  "logs.mediaNotFound": "Dosya bulunamadı; arşivden silinmiş olabilir."
 }

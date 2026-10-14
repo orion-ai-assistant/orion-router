@@ -1,10 +1,14 @@
 import { extractLogImages, LogImage, mediaFilename, labelFilename } from './log-images';
+import { extractLogDocuments } from './log-documents';
 
 export type LogAttachment = LogImage & {
-  kind: 'image' | 'audio' | 'video';
+  kind: 'image' | 'audio' | 'video' | 'document';
   direction: 'input' | 'output' | 'archive';
   audio_archive_id?: number;
   video_archive_id?: number;
+  document_archive_id?: number;
+  representation?: 'text' | 'binary';
+  text_content?: string;
   duration_seconds?: number;
   external_url?: string;
 };
@@ -17,11 +21,12 @@ export function extractLogAttachments(request: unknown, response: unknown): LogA
     if (typeof raw === 'string') { try { payload = JSON.parse(raw); } catch { return; } }
     const seen = new Set<string>();
     function add(item: Omit<LogAttachment, 'direction'>) {
-      const key = `${item.kind}:${item.audio_archive_id || item.image_archive_id || item.video_archive_id || item.data_url || item.external_url}:${item.filename || ''}`;
+      const key = `${item.kind}:${item.audio_archive_id || item.image_archive_id || item.video_archive_id || item.document_archive_id || item.data_url || item.text_content || item.external_url}:${item.filename || ''}`;
       if (seen.has(key)) return;
       seen.add(key); attachments.push({ ...item, direction });
     }
     extractLogImages(payload).forEach(image => add({ ...image, kind: 'image' }));
+    extractLogDocuments(payload).forEach(document => add({ ...document, kind: 'document' }));
     function candidate(value: unknown, kind: 'audio' | 'video', mime?: string, filename?: string) {
       if (typeof value !== 'string' || !value) return;
       if (/^https?:\/\//i.test(value)) { add({ kind, external_url: value, mime_type: mime, filename }); return; }

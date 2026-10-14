@@ -1,6 +1,7 @@
 """Admin media library. Explicit deletion affects every log using the file."""
 from datetime import datetime
 from typing import Literal
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
@@ -10,10 +11,11 @@ from database import db_manager
 
 router = APIRouter(prefix='/dashboard/api/media-archives', dependencies=[Depends(verify_admin)], tags=['Dashboard'])
 video_router = APIRouter(prefix='/dashboard/api/video-archives', dependencies=[Depends(verify_admin)], tags=['Dashboard'])
-MediaKind = Literal['image', 'audio', 'video']
+MediaKind = Literal['image', 'audio', 'video', 'document']
 TABLES = {'image': ('router_image_archives', 'image', 'size_bytes'),
           'audio': ('router_tts_audio_archives', 'audio', 'archive_size_bytes'),
-          'video': ('router_video_archives', 'video', 'size_bytes')}
+          'video': ('router_video_archives', 'video', 'size_bytes'),
+          'document': ('router_document_archives', 'document', 'size_bytes')}
 
 
 @router.get('/{kind}')
@@ -28,6 +30,8 @@ async def list_media(kind: MediaKind, limit: int = Query(30, ge=1, le=100), offs
               else 'id, created_at, mime_type, container AS format, archive_size_bytes AS size_bytes, duration_seconds')
     if kind == 'video':
         fields += ', duration_seconds'
+    if kind == 'document':
+        fields = 'id, created_at, mime_type, filename, format, size_bytes, representation'
     where = 'WHERE ($1::timestamptz IS NULL OR created_at >= $1) AND ($2::timestamptz IS NULL OR created_at < $2)'
     rows = await db_manager.fetch(f'SELECT {fields} FROM {table} {where} ORDER BY created_at DESC, id DESC LIMIT $3 OFFSET $4', start, end, limit, offset)
     totals = await db_manager.fetchrow(f'SELECT count(*) AS total, COALESCE(sum({size}),0)::bigint AS total_bytes FROM {table} {where}', start, end)
@@ -41,6 +45,26 @@ async def delete_media(kind: MediaKind, archive_id: int):
     if deleted is None:
         raise HTTPException(404, 'Archived file not found')
     return {'deleted': True}
+
+
+@router.api_route('/document/{archive_id}/file', methods=['GET','HEAD'])
+async def get_document(archive_id: int, request: Request):
+    fields = 'mime_type, size_bytes, filename, format' + (', document' if request.method == 'GET' else '')
+    row = await db_manager.fetchrow(f'SELECT {fields} FROM router_document_archives WHERE id=$1',archive_id)
+    if not row:
+        raise HTTPException(404,'Document archive not found')
+    from fastapi.responses import Response
+    if request.method == 'HEAD':
+        response = Response(headers={'Content-Type':row['mime_type'],'Content-Length':str(row['size_bytes']),
+            'Accept-Ranges':'bytes','Cache-Control':'private, no-store'})
+    else:
+        response = audio_response(bytes(row['document']),row['mime_type'],request.method,
+            request.headers.get('range'),f'"document-{archive_id}"',request.headers.get('if-range'))
+    filename = row['filename'] or f'document-{archive_id}.{row["format"]}'
+    response.headers['Content-Disposition'] = f"attachment; filename*=UTF-8''{quote(filename,safe='')}"
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['Content-Security-Policy'] = "default-src 'none'; sandbox"
+    return response
 
 
 @video_router.api_route('/{archive_id}/video', methods=['GET', 'HEAD'])

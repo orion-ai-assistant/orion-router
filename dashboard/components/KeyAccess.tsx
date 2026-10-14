@@ -5,6 +5,7 @@ import { useApp } from '@/components/AppContext';
 import { adminFetch } from '@/lib/api';
 import { summarizeUsage, UsageBucket } from '@/lib/usage';
 import { DailyRequestsChart } from '@/components/DailyRequestsChart';
+import { DateRangeFilter, DateRangeValue } from '@/components/DateRangeFilter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -101,15 +102,8 @@ export function KeyAccess({id, kind, value, onChange}: {
 export function KeyUsage({id='', provider='', hubId='', embedded=false}: {id?: string; provider?: string; hubId?: string; embedded?: boolean}) {
   const {t,locale} = useApp();
   const [data,setData] = useState<{totals: UsageBucket[]; daily: UsageBucket[]} | null>(null);
-  const [start,setStart] = useState(''); const [end,setEnd] = useState('');
-  const [range,setRange] = useState('all');
-  function preset(days:number, label:string) {
-    setRange(label);
-    if(!days){setStart('');setEnd('');return;}
-    const endDate=new Date(),startDate=new Date();startDate.setDate(startDate.getDate()-days+1);
-    const date=(d:Date)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    setStart(date(startDate));setEnd(date(endDate));
-  }
+  const [dates,setDates] = useState<DateRangeValue>({start:'',end:'',range:'all'});
+  const {start,end} = dates;
   const [message,setMessage] = useState(''); const [busy,setBusy] = useState(false);
   const [open,setOpen] = useState(true);
   const sequence = useRef(0);
@@ -135,12 +129,7 @@ export function KeyUsage({id='', provider='', hubId='', embedded=false}: {id?: s
   return <div className={`${panel} mt-4`}>
     {!embedded && <Disclosure title={t('access.usage')} icon={<Activity className="size-4 text-purple-400"/>} open={open} onClick={()=>setOpen(!open)}/>}
     {(open || embedded) && <div className="space-y-5 p-4 text-sm">
-      <p className="text-xs text-zinc-400">{t('access.localDates')}</p>
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex flex-wrap gap-1">{[[1,'day'],[7,'week'],[30,'month'],[0,'all']].map(([days,label])=><Button key={label} type="button" size="sm" variant={range===label?'secondary':'ghost'} aria-pressed={range===label} onClick={()=>preset(Number(days),String(label))}>{t('access.range.'+label)}</Button>)}</div>
-        <label className="flex items-center gap-2 text-xs text-zinc-400">{t('access.startShort')}<Input aria-label={t('access.start')} className="h-8 w-36 [color-scheme:dark]" type="date" value={start} onChange={e=>{setRange('custom');setStart(e.target.value);}}/></label>
-        <label className="flex items-center gap-2 text-xs text-zinc-400">{t('access.endShort')}<Input aria-label={t('access.end')} className="h-8 w-36 [color-scheme:dark]" type="date" value={end} onChange={e=>{setRange('custom');setEnd(e.target.value);}}/></label>
-      </div>
+      <DateRangeFilter value={dates} onChange={setDates} />
       {!data?.totals.length && <p className="py-4 text-center text-zinc-500">{t(busy ? 'common.loading' : 'access.noUsage')}</p>}
       <div className="grid gap-3 lg:grid-cols-2">{summaries.map(b=><div key={b.capability} className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3"><div className="mb-3 flex items-center justify-between"><h4 className="font-semibold">{names[b.capability] || b.capability}</h4><Badge variant="outline">{number(b.requests)} {t('access.requests')}</Badge></div><dl className="grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-3 xl:grid-cols-4">{[[t('access.success'),number(b.succeeded)],[t('access.failed'),number(b.failed)],[t('access.cost'),b.cost==null ? '—' : '$'+Number(b.cost).toLocaleString(locale,{maximumFractionDigits:6})],[t('access.input'),number(b.input)],[t('access.output'),number(b.output)],[t('access.thoughts'),number(b.thoughts)],[t('access.total'),totalUsage(b)],[t('access.unit'),Object.keys(b.amounts).map(unitName).join(' · ') || t('access.unknown')]].map(([label,value])=><div key={label}><dt className="text-xs text-zinc-500">{label}</dt><dd className="mt-1 font-mono text-sm text-zinc-200">{value}</dd></div>)}</dl></div>)}</div>
       {!!data?.daily.length && <DailyRequestsChart rows={data.daily} names={names}/>}

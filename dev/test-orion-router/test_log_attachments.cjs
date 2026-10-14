@@ -10,6 +10,23 @@ function load(name) {
   return exported;
 }
 const {extractLogAttachments} = load('log-attachments');
+test('document archive references, Hub notes, empty files and PDF base64 are attachments; plain messages are not', () => {
+  const result=extractLogAttachments({messages:[{content:[
+    {type:'text',text:'Ek 1 — Metin dosyası: note.txt\n<file_content>\nkürşat\n</file_content>'},
+    {type:'text',text:'normal conversation'},
+    {type:'text',text:'Ek 2 — Metin dosyası: empty.md\n<file_content>\n\n</file_content>'},
+    {type:'input_file',filename:'report.pdf',file_data:'data:application/pdf;base64,JVBERi0='},
+    {type:'text',text:'data:application/pdf;base64,JVBERi0='},
+    {type:'input_file',file_url:'javascript:alert(1)'},
+  ]}]},{text:{document_archive_id:9,filename:'saved.txt',mime_type:'text/plain'}});
+  assert.equal(result.length,4);
+  assert.equal(result[0].filename,'note.txt');
+  assert.equal(result[0].text_content,'kürşat');
+  assert.equal(result[1].text_content,'');
+  assert.equal(result[2].mime_type,'application/pdf');
+  assert.equal(result[3].document_archive_id,9);
+  assert.deepEqual(extractLogAttachments({messages:[{role:'user',content:'selam'}]},null),[]);
+});
 test('nested legacy filename and MIME are kept without duplicate audio entries', () => {
   const result=extractLogAttachments({content:[
     {type:'image_url',image_url:{filename:'photo.png',url:'data:image/png;base64,aW1hZ2U='}},

@@ -137,6 +137,18 @@ class DatabaseManager:
             CREATE INDEX IF NOT EXISTS router_video_archive_created ON router_video_archives(created_at DESC, id DESC);
         """)
         await conn.execute("""
+            CREATE TABLE IF NOT EXISTS router_document_archives (
+                id BIGSERIAL PRIMARY KEY,
+                sha256 TEXT NOT NULL UNIQUE CHECK (length(sha256) = 64),
+                document BYTEA NOT NULL,
+                mime_type TEXT NOT NULL, format TEXT NOT NULL, size_bytes BIGINT NOT NULL CHECK (size_bytes >= 0),
+                filename TEXT, representation TEXT NOT NULL CHECK (representation IN ('text','binary')),
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            ALTER TABLE router_document_archives ALTER COLUMN document SET STORAGE EXTERNAL;
+            CREATE INDEX IF NOT EXISTS router_document_archive_created ON router_document_archives(created_at DESC, id DESC);
+        """)
+        await conn.execute("""
             CREATE TABLE IF NOT EXISTS router_tts_audio_archives (
                 id BIGSERIAL PRIMARY KEY,
                 log_id BIGINT REFERENCES router_request_logs(id) ON DELETE SET NULL,
