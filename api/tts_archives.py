@@ -70,7 +70,7 @@ async def list_archives(limit: int = 50, offset: int = 0):
     if not 1 <= limit <= 100 or offset < 0:
         raise HTTPException(422, "Invalid pagination")
     rows = await db_manager.fetch("""
-        SELECT id, log_id, provider, requested_model, resolved_model, created_at, tts_text,
+        SELECT id, log_id, provider, requested_model, resolved_model, created_at,
                codec, container, mime_type, duration_seconds, channels, sample_rate,
                source_sample_rate, source_channels, source_format, source_size_bytes,
                archive_size_bytes, generation_status

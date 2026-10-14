@@ -10,12 +10,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { PayloadViewer } from '@/components/PayloadViewer';
-import { AudioArchiveList } from '@/components/AudioArchiveList';
-import { ImageArchiveList } from '@/components/ImageArchiveList';
 import { extractLogAttachments, LogAttachment } from '@/lib/log-attachments';
 import { LogAttachments } from '@/components/LogAttachments';
 import { Input } from '@/components/ui/input';
-import { Archive, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface LogItem {
   id: number;
@@ -52,7 +50,6 @@ export default function LogsPage() {
   const [logs, setLogs] = useState<LogItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [payloadDialogOpen, setPayloadDialogOpen] = useState(false);
-  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [activeLogDetails, setActiveLogDetails] = useState<LogDetails | null>(null);
   const fetchSequence = useRef(0);
   const [offset,setOffset] = useState(0);
@@ -202,7 +199,6 @@ export default function LogsPage() {
           <p className="text-zinc-400 text-sm mt-1">{t('logs.description')}</p>
         </div>
         <div className="flex items-center gap-2">
-        <Button variant="outline" onClick={() => setArchiveDialogOpen(true)}><Archive size={16} />{t('logs.mediaArchive')}</Button>
         <Button
           onClick={() => fetchLogs('refresh')}
           className="bg-transparent border border-zinc-800 text-white hover:bg-zinc-800 font-medium px-5 py-2.5 rounded-md transition-all flex items-center gap-1.5"
@@ -211,12 +207,6 @@ export default function LogsPage() {
         </Button>
         </div>
       </header>
-      <Dialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
-        <DialogContent className="w-[min(94vw,1000px)] max-w-[min(94vw,1000px)] max-h-[85dvh] overflow-auto bg-[#18181b] border border-zinc-800 p-6">
-          <DialogHeader><DialogTitle>{t('logs.mediaArchive')}</DialogTitle></DialogHeader>
-          {archiveDialogOpen && <><AudioArchiveList /><ImageArchiveList /></>}
-        </DialogContent>
-      </Dialog>
 
 
       {/* Table List */}

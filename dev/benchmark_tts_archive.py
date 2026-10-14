@@ -126,8 +126,8 @@ async def main(args):
                 stored = await conn.fetchrow('SELECT audio,pg_column_size(audio) AS stored_size FROM router_tts_audio_archives WHERE id=$1',archive_id)
                 assert bytes(stored['audio']) == encoded
                 await conn.execute('DELETE FROM router_request_logs WHERE id=$1',log_id)
-                preserved = await conn.fetchrow('SELECT log_id,tts_text,audio FROM router_tts_audio_archives WHERE id=$1',archive_id)
-                assert preserved['log_id'] is None and bytes(preserved['audio']) == encoded and preserved['tts_text']
+                preserved = await conn.fetchrow('SELECT log_id,audio FROM router_tts_audio_archives WHERE id=$1',archive_id)
+                assert preserved['log_id'] is None and bytes(preserved['audio']) == encoded
                 with patch.object(db_manager,'get_db_pool',AsyncMock(return_value=pool)):
                     orphan_id = await save_archive(encoded,info,log_id=log_id,provider=provider,requested_model=row['requested_model'],
                         resolved_model=row['requested_model'],text='Already deleted log',status='interrupted',created_at=__import__('datetime').datetime.now(__import__('datetime').timezone.utc))

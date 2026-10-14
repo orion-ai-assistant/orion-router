@@ -501,5 +501,21 @@
   "logs.downloadMedia": "Download file",
   "logs.mediaLoadFailed": "File could not be loaded",
   "logs.mediaUnsupported": "This browser cannot play this format, or the file is incomplete. Download the original file to open it.",
-  "logs.lastArchiveError": "Last archive error in this server session (historical)"
+  "logs.lastArchiveError": "Last archive error in this server session (historical)",
+  "nav.archives": "Archive",
+  "archive.description": "Audio, images and videos. Newest first; files remain after logs are deleted.",
+  "archive.audio": "Audio",
+  "archive.image": "Images",
+  "archive.video": "Videos",
+  "archive.from": "Start date",
+  "archive.until": "End date",
+  "archive.clearDates": "Clear dates",
+  "archive.totals": "{count} files · {mb} MB",
+  "archive.empty": "No archived files in this date range.",
+  "archive.preview": "Preview",
+  "archive.delete": "Delete",
+  "archive.confirmDelete": "Permanently delete this archived file? All logs using this file will lose its preview; log records will be retained.",
+  "archive.deleted": "Archived file deleted.",
+  "archive.deleteFailed": "File could not be deleted.",
+  "archive.unnamed": "No filename was provided"
 }

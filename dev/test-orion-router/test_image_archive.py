@@ -49,6 +49,24 @@ class HeaderTests(unittest.TestCase):
 
 
 class TransformTests(unittest.IsolatedAsyncioTestCase):
+    async def test_original_names_and_generated_image_fields(self):
+        data=image_bytes(); b64=encoded(data)
+        payload={'content':[
+            {'type':'text','text':'Ek 1 — Görsel: first.png'},
+            {'type':'input_image','url':b64},
+            {'type':'text','text':'Ek 2 — Görsel: second.png'},
+            {'b64_json':b64},
+            {'type':'text','text':'Do not archive this prompt as a filename'},
+            {'image_base64':b64},
+        ]}
+        with patch('core.image_archive.save_image',AsyncMock(return_value={'image_archive_id':1,'filename':'first.png'})) as save:
+            stored=json.loads(await archive_images_json(json.dumps(payload),object()))['content']
+        save.assert_awaited_once()
+        self.assertEqual(save.call_args.args[2]['filename'],'first.png')
+        self.assertEqual(stored[1]['url']['filename'],'first.png')
+        self.assertEqual(stored[3]['b64_json']['filename'],'second.png')
+        self.assertNotIn('filename',stored[5]['image_base64'])
+
     async def test_all_image_shapes_deduplicate_without_mutating_source_or_text(self):
         data=image_bytes(); b64=encoded(data)
         payload=message(data)

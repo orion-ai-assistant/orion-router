@@ -14,6 +14,7 @@ import {
   Terminal,
   Info,
   Settings,
+  Archive,
   LogOut,
   ChevronUp
 } from 'lucide-react';
@@ -33,6 +34,7 @@ const TABS: SidebarTab[] = [
   { id: 'models', i18nKey: 'nav.models', icon: Bot, url: '/models' },
   { id: 'groups', i18nKey: 'nav.groups', icon: Network, url: '/groups' },
   { id: 'playground', i18nKey: 'nav.playground', icon: Terminal, url: '/playground' },
+  { id: 'archives', i18nKey: 'nav.archives', icon: Archive, url: '/archives' },
   { id: 'settings', i18nKey: 'nav.settings', icon: Settings, url: '/settings' }
 ];
 

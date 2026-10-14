@@ -394,10 +394,10 @@ async def save_archive(data, info, *, log_id, provider, requested_model, resolve
             linked_id = await conn.fetchval("SELECT id FROM router_request_logs WHERE id=$1 FOR KEY SHARE", log_id) if log_id is not None else None
             return await conn.fetchval("""
                 INSERT INTO router_tts_audio_archives
-                (log_id, audio, provider, requested_model, resolved_model, created_at, tts_text,
+                (log_id, audio, provider, requested_model, resolved_model, created_at,
                  codec, container, mime_type, duration_seconds, channels, sample_rate,
                  source_sample_rate, source_channels, source_format, source_size_bytes, archive_size_bytes, generation_status)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING id
-                """, linked_id, data, provider, requested_model, resolved_model, created_at, text,
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id
+                """, linked_id, data, provider, requested_model, resolved_model, created_at,
                 info["codec"], info["container"], info["mime_type"], info["duration_seconds"], info["channels"], info["sample_rate"],
                 info["source_sample_rate"], info["source_channels"], info["source_format"], info["source_size_bytes"], info["archive_size_bytes"], status)

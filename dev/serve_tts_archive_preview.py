@@ -23,7 +23,7 @@ report=json.loads((output/'report.json').read_text(encoding='utf-8'))
 app=FastAPI()
 counts={'audio_requests':0}
 archives=[dict(id=index+1,log_id=None,provider=sample['provider'],requested_model='fixture',resolved_model='fixture',
-    created_at='2026-10-14T12:00:00Z',tts_text='Browser playback test',codec='opus',container='ogg',mime_type='audio/ogg; codecs=opus',
+    created_at='2026-10-14T12:00:00Z',codec='opus',container='ogg',mime_type='audio/ogg; codecs=opus',
     duration_seconds=sample['opus_duration_seconds'],archive_size_bytes=sample['opus_bytes'],generation_status='completed')
     for index,sample in enumerate(report['samples']) if not sample.get('unavailable')]
 

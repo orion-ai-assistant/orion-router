@@ -19,7 +19,7 @@ from fastapi.responses import RedirectResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from core.lifespan import lifespan
-from api import admin, chat, embeddings, files, speech, transcriptions, hubs, tts_archives, image_archives
+from api import admin, chat, embeddings, files, speech, transcriptions, hubs, tts_archives, image_archives, media_archives
 
 # ---------------------------------------------------------------------------
 #  Logging
@@ -200,6 +200,8 @@ if _next_dir:
 app.include_router(chat.router)
 app.include_router(tts_archives.router)
 app.include_router(image_archives.router)
+app.include_router(media_archives.router)
+app.include_router(media_archives.video_router)
 app.include_router(admin.router)
 app.include_router(hubs.router)
 app.include_router(embeddings.router)

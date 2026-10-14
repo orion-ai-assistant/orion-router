@@ -119,6 +119,22 @@ class DatabaseManager:
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
             ALTER TABLE router_image_archives ALTER COLUMN image SET STORAGE EXTERNAL;
+            ALTER TABLE router_image_archives ADD COLUMN IF NOT EXISTS filename TEXT;
+            CREATE INDEX IF NOT EXISTS router_image_archive_created ON router_image_archives(created_at DESC, id DESC);
+        """)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS router_video_archives (
+                id BIGSERIAL PRIMARY KEY,
+                sha256 TEXT NOT NULL UNIQUE CHECK (length(sha256) = 64),
+                video BYTEA NOT NULL,
+                mime_type TEXT NOT NULL, format TEXT NOT NULL,
+                size_bytes BIGINT NOT NULL CHECK (size_bytes > 0),
+                width INTEGER NOT NULL CHECK (width > 0), height INTEGER NOT NULL CHECK (height > 0),
+                duration_seconds DOUBLE PRECISION, filename TEXT,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            ALTER TABLE router_video_archives ALTER COLUMN video SET STORAGE EXTERNAL;
+            CREATE INDEX IF NOT EXISTS router_video_archive_created ON router_video_archives(created_at DESC, id DESC);
         """)
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS router_tts_audio_archives (
@@ -126,7 +142,7 @@ class DatabaseManager:
                 log_id BIGINT REFERENCES router_request_logs(id) ON DELETE SET NULL,
                 audio BYTEA NOT NULL,
                 provider TEXT NOT NULL, requested_model TEXT NOT NULL, resolved_model TEXT NOT NULL,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), tts_text TEXT NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 codec TEXT NOT NULL, container TEXT NOT NULL, mime_type TEXT NOT NULL,
                 duration_seconds DOUBLE PRECISION NOT NULL, channels INTEGER NOT NULL, sample_rate INTEGER NOT NULL,
                 source_sample_rate INTEGER NOT NULL, source_channels INTEGER NOT NULL, source_format TEXT NOT NULL,
@@ -134,6 +150,7 @@ class DatabaseManager:
                 generation_status TEXT NOT NULL CHECK (generation_status IN ('completed', 'interrupted'))
             );
             ALTER TABLE router_tts_audio_archives ALTER COLUMN audio SET STORAGE EXTERNAL;
+            ALTER TABLE router_tts_audio_archives DROP COLUMN IF EXISTS tts_text;
             CREATE INDEX IF NOT EXISTS router_tts_archive_created ON router_tts_audio_archives(created_at DESC, id DESC);
             CREATE INDEX IF NOT EXISTS router_tts_archive_log ON router_tts_audio_archives(log_id);
         """)
@@ -449,9 +466,9 @@ class DatabaseManager:
         selected_id, selected_source = selected_upstream.get()
         upstream_key_id = upstream_key_id or selected_id
         if capability == "chat":
-            from core.image_archive import archive_images_json
-            request_json = await archive_images_json(request_json, self)
-            response_json = await archive_images_json(response_json, self)
+            from core.video_archive import archive_log_media_json
+            request_json = await archive_log_media_json(request_json, self)
+            response_json = await archive_log_media_json(response_json, self)
         from core.secret_guard import redact_json
         request_json, response_json = redact_json(request_json), redact_json(response_json)
         pool = await self.get_db_pool()
@@ -486,9 +503,9 @@ class DatabaseManager:
     ) -> int:
         """Yeni bir canlı streaming oturumu için log kaydı başlatır ve log_id döner."""
         if capability == "chat":
-            from core.image_archive import archive_images_json
-            request_json = await archive_images_json(request_json, self)
-            response_json = await archive_images_json(response_json, self)
+            from core.video_archive import archive_log_media_json
+            request_json = await archive_log_media_json(request_json, self)
+            response_json = await archive_log_media_json(response_json, self)
         pool = await self.get_db_pool()
         async with pool.acquire() as conn:
             async with conn.transaction():
@@ -531,9 +548,9 @@ class DatabaseManager:
     ) -> None:
         """Canlı streaming oturumunun ara veya nihai sonucunu günceller."""
         if capability == "chat":
-            from core.image_archive import archive_images_json
-            request_json = await archive_images_json(request_json, self)
-            response_json = await archive_images_json(response_json, self)
+            from core.video_archive import archive_log_media_json
+            request_json = await archive_log_media_json(request_json, self)
+            response_json = await archive_log_media_json(response_json, self)
         from core.key_policy import selected_upstream
         upstream_id, upstream_source = selected_upstream.get()
         from core.secret_guard import redact_json
@@ -579,8 +596,8 @@ class DatabaseManager:
 
     async def update_streaming_request(self, log_id: int, request_json: str) -> None:
         # This path records the exact local chat provider payload.
-        from core.image_archive import archive_images_json
-        request_json = await archive_images_json(request_json, self)
+        from core.video_archive import archive_log_media_json
+        request_json = await archive_log_media_json(request_json, self)
         await self.execute(
             "UPDATE router_request_logs SET request_json = $2::jsonb WHERE id = $1",
             log_id,

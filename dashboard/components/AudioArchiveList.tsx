@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { ArchiveAudioPlayer } from '@/components/ArchiveAudioPlayer';
 
 type Archive = { id: number; log_id: number | null; provider: string; requested_model: string; resolved_model: string;
-  created_at: string; tts_text: string; codec: string; duration_seconds: number; archive_size_bytes: number; generation_status: string };
+  created_at: string; codec: string; duration_seconds: number; archive_size_bytes: number; generation_status: string };
 type ArchiveStatus = { available: boolean | null; version?: string; error?: string; last_error?: string;
   archive_relation_bytes?: number; logged_archive_errors?: number; database_error?: string;
   database_disk?: { free_bytes: number; low_space: boolean } };
@@ -60,7 +60,6 @@ export function AudioArchiveList() {
       {loading ? <p>{t('common.loading')}</p> : rows.map(row => <article key={row.id} className="p-4 border border-zinc-700 rounded-lg space-y-2">
         <p className="text-sm">#{row.id} · {row.provider} / {row.resolved_model} · {dateTime(row.created_at)}</p>
         <p className="text-xs text-zinc-400">{row.codec} · {row.duration_seconds.toFixed(1)} s · {(row.archive_size_bytes / 1024).toFixed(1)} KB · {row.generation_status} · {row.log_id === null ? t('logs.audioUnlinked') : `Log #${row.log_id}`}</p>
-        <p className="text-sm whitespace-pre-wrap break-words max-h-32 overflow-auto">{row.tts_text}</p>
         <ArchiveAudioPlayer audio={{ audio_archive_id: row.id }} />
       </article>)}
       {!loading && !rows.length && <p>{t('logs.empty')}</p>}

@@ -97,12 +97,12 @@ akışında oluşturulur. Dashboard üretim çıktısı yeniden derlenmelidir.
 Log detayındaki **Ekler** düğmesi, istek ve yanıttaki görsel/ses/video eklerini
 girdi/çıktı etiketiyle ayrı pencerede gösterir. Yalnızca seçilen arşiv dosyası
 yetkili endpoint'ten yüklenir; önizleme kapanınca blob URL'si serbest bırakılır.
-Eski inline Base64 görsel, ses ve video logları da desteklenir. Video ve giriş
-sesinin depolama biçimi bu değişiklikle değiştirilmez: mevcut log içeriği kullanılır,
-videoya yeni bir BYTEA arşivi veya yeniden kodlama eklenmez. Uzak bağlantılar otomatik
+Eski inline Base64 görsel, ses ve video logları da desteklenir. Yeni videolar da
+`router_video_archives` tablosunda tek kopya tutulur (bkz. `media-archive.md`). Giriş
+sesinin depolama biçimi değiştirilmez. Uzak bağlantılar otomatik
 indirilmez; kullanıcı bağlantıyı açabilir. Tarayıcının desteklemediği formatlarda
-orijinal dosyayı indirme seçeneği bulunur. Bağımsız görsel ve TTS ses listeleri
-Loglar sayfasındaki **Medya arşivi** düğmesinden açılır.
+orijinal dosyayı indirme seçeneği bulunur. Bağımsız medya listeleri sol menüde
+Ayarlar'ın üstündeki **Arşiv** sayfasından açılır.
 
 ```powershell
 .venv/Scripts/python.exe -m unittest discover -s dev/test-orion-router -p test_image_archive.py -v

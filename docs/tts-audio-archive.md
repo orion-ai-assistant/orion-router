@@ -14,8 +14,13 @@ Tamamlanmış üretimde eksik WAV/veri veya yarım PCM frame hata sayılır; erk
 
 Arşivler süresiz saklanır. `log_id` bağlantısı `ON DELETE SET NULL` kullanır; log silme
 ile arşiv INSERT'i yarışırsa satır kilidiyle sıralanır, log zaten silinmişse arşiv bağlantısız
-oluşur. Sağlayıcı, istenen/çözümlenen model, üretim tarihi, metin ve `completed/interrupted`
-durumu arşivde kalır. TTL, kapasite dolunca silme veya otomatik temizlik yoktur.
+oluşur. Sağlayıcı, istenen/çözümlenen model, üretim tarihi ve `completed/interrupted`
+durumu arşivde kalır. Arşive ayrıca prompt/metin kopyalanmaz; önceki `tts_text` kolonu
+başlangıç şema güncellemesinde kaldırılır. Normal istek logundaki metin korunur.
+TTL, kapasite dolunca silme veya otomatik temizlik yoktur. Kullanıcı Arşiv sayfasından
+tek dosyayı onaylayarak silebilir; dosyayı kullanan log kayıtları korunur fakat önizleme
+artık kullanılamaz. Arşivden silme veritabanında alanı yeniden kullanılabilir kılar;
+PostgreSQL'in disk dosyasını anında küçültmesi garanti edilmez.
 
 ## Kaynak sınırları ve hata davranışı
 

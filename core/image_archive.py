@@ -9,6 +9,7 @@ import hashlib
 import io
 import json
 import logging
+from core.media_names import media_filename, label_filename
 
 logger = logging.getLogger("service-router.image-archive")
 MAX_IMAGE_BYTES = 32 * 1024 * 1024
@@ -23,6 +24,8 @@ def image_fields(node):
     kind = node.get("type")
     image_url = node.get("image_url")
     if kind in ("image_url", "input_image"):
+        if "url" in node:
+            yield node, "url"
         if isinstance(image_url, dict):
             yield image_url, "url"
         elif isinstance(image_url, str):
@@ -45,6 +48,9 @@ def image_fields(node):
     if (str(node.get("mime_type", node.get("mimeType", ""))).lower().startswith("image/")
             and node.get("isText") is not True):
         yield node, "data"
+    for key in ("b64_json", "image_base64"):
+        if key in node:
+            yield node, key
 
 
 def _decode_image(value):
@@ -77,10 +83,10 @@ async def save_image(manager, data, metadata):
         # Keep conflict handling and lookup as separate statements: a concurrently
         # inserted winner becomes visible to the second READ COMMITTED snapshot.
         archive_id = await conn.fetchval("""
-            INSERT INTO router_image_archives (sha256, image, mime_type, format, size_bytes, width, height)
-            VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (sha256) DO NOTHING RETURNING id
+            INSERT INTO router_image_archives (sha256, image, mime_type, format, size_bytes, width, height, filename)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (sha256) DO NOTHING RETURNING id
             """, metadata["sha256"], data, metadata["mime_type"], metadata["format"],
-            metadata["size_bytes"], metadata["width"], metadata["height"])
+            metadata["size_bytes"], metadata["width"], metadata["height"], metadata.get("filename"))
         if archive_id is None:
             archive_id = await conn.fetchval("SELECT id FROM router_image_archives WHERE sha256=$1", metadata["sha256"])
         if archive_id is None:
@@ -101,7 +107,7 @@ async def archive_images_json(value, manager):
     references = {}
     visited = set()
 
-    async def replace(container, key):
+    async def replace(container, key, filename=None):
         nonlocal changed
         global _active_jobs
         location = (id(container), key)
@@ -117,13 +123,15 @@ async def archive_images_json(value, manager):
         _active_jobs += 1
         try:
             data, metadata = await asyncio.to_thread(_decode_image, raw)
+            if filename:
+                metadata["filename"] = filename
             digest = metadata["sha256"]
             reference = references.get(digest)
             if reference is None:
                 reference = await save_image(manager, data, metadata)
                 if len(references) < 256:
                     references[digest] = reference
-            container[key] = reference
+            container[key] = {**{k: v for k, v in reference.items() if k != "filename"}, **({"filename": filename} if filename else {})}
             changed = True
         except Exception as exc:
             # Do not include the payload, SQL arguments, or DB exception text (it may
@@ -132,17 +140,21 @@ async def archive_images_json(value, manager):
         finally:
             _active_jobs -= 1
 
-    async def walk(node):
+    async def walk(node, filename=None):
         if isinstance(node, dict):
+            filename = media_filename(node) or filename
             for container, key in image_fields(node):
                 if not isinstance(container, dict) or key in container:
-                    await replace(container, key)
+                    await replace(container, key, media_filename(container) or filename)
             for child in node.values():
                 if isinstance(child, (dict, list)):
-                    await walk(child)
+                    await walk(child, filename)
         elif isinstance(node, list):
+            pending = None
             for child in node:
-                await walk(child)
+                label = label_filename(child)
+                await walk(child, label or pending or filename)
+                pending = label
 
     try:
         await walk(payload)
