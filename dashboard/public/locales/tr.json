@@ -524,5 +524,8 @@
   "archive.openPdf": "PDF’i aç",
   "archive.textTruncated": "Önizleme kısaltıldı. Tam içerik için dosyayı indirin.",
   "archive.extractedText": "İstemciden dosyanın metni alındı; orijinal dosya gönderilmedi.",
-  "logs.mediaNotFound": "Dosya bulunamadı; arşivden silinmiş olabilir."
+  "logs.mediaNotFound": "Dosya bulunamadı; arşivden silinmiş olabilir.",
+  "logs.requestAttachments": "İstek ekleri",
+  "logs.responseAttachments": "Yanıt ekleri",
+  "logs.noAttachments": "Ek yok"
 }

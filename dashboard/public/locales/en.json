@@ -524,5 +524,8 @@
   "archive.openPdf": "Open PDF",
   "archive.textTruncated": "Preview shortened. Download the file for its full contents.",
   "archive.extractedText": "The client sent the file's text; the original file was not provided.",
-  "logs.mediaNotFound": "File not found; it may have been deleted from the archive."
+  "logs.mediaNotFound": "File not found; it may have been deleted from the archive.",
+  "logs.requestAttachments": "Request attachments",
+  "logs.responseAttachments": "Response attachments",
+  "logs.noAttachments": "No attachments"
 }

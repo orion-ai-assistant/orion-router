@@ -73,20 +73,33 @@ export function LogAttachments({ attachments, triggerLabel }: { attachments: Log
   const active = attachments[selected] || attachments[0];
   const single = attachments.length === 1;
   const audioOnly = attachments.every(item => item.kind === 'audio');
+  const isLog = attachments.some(item => item.direction !== 'archive');
+  const groups = (['input','output','archive'] as const).map(direction => ({
+    direction,
+    title: t(direction === 'input' ? 'logs.requestAttachments' : direction === 'output' ? 'logs.responseAttachments' : 'nav.archives'),
+    entries: attachments.map((item,index) => ({item,index})).filter(({item}) => item.direction === direction),
+  })).filter(group => group.direction !== 'archive' || group.entries.length > 0);
   const directionLabel = (item: LogAttachment) => t(item.direction === 'archive' ? 'nav.archives' : item.direction === 'input' ? 'logs.attachmentInput' : 'logs.attachmentOutput');
+  const attachmentButton = (item: LogAttachment, index: number) => {
+    const Icon = item.kind === 'image' ? ImageIcon : item.kind === 'video' ? Film : item.kind === 'document' ? FileText : Volume2;
+    return <button key={index} onClick={() => setSelected(index)} aria-pressed={selected === index} className={`flex shrink-0 sm:shrink items-start gap-2 rounded-lg border p-3 text-left ${selected === index ? 'border-zinc-600 bg-zinc-800 text-white ring-1 ring-inset ring-zinc-600' : 'border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}>
+      <Icon size={17} className="mt-0.5 shrink-0" /><span className="min-w-0"><span title={item.filename} className="block text-sm truncate max-w-40">{item.filename || `${t(`logs.attachment${item.kind === 'image' ? 'Image' : item.kind === 'video' ? 'Video' : item.kind === 'document' ? 'Document' : 'Audio'}`)} ${index + 1}`}</span><span className="block text-xs text-zinc-400">{directionLabel(item)}</span></span>
+    </button>;
+  };
   return <>
     <Button variant="outline" className="w-fit gap-2" onClick={() => setOpen(true)}><Paperclip size={16} />{triggerLabel || `${t('logs.attachments')} (${attachments.length})`}</Button>
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className={`${audioOnly ? single ? 'w-[min(94vw,600px)] max-w-[min(94vw,600px)] h-[min(80dvh,280px)]' : 'w-[min(94vw,900px)] max-w-[min(94vw,900px)] h-[min(80dvh,380px)]' : 'w-[min(94vw,1100px)] max-w-[min(94vw,1100px)] h-[min(86dvh,760px)]'} grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[#18181b] border border-zinc-800 p-5 sm:p-6`}>
-        <DialogHeader><DialogTitle>{t('logs.attachments')} ({attachments.length})</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>{t('logs.attachments')} ({attachments.length})</DialogTitle>
+          {single && isLog && <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-400">{groups.map(group => <span key={group.direction}>{group.title} ({group.entries.length})</span>)}</div>}
+        </DialogHeader>
         <div className={`grid min-w-0 min-h-0 gap-4 ${single ? 'grid-rows-[minmax(0,1fr)]' : 'grid-rows-[100px_minmax(0,1fr)] sm:grid-rows-1 sm:grid-cols-[220px_minmax(0,1fr)]'}`}>
-          {!single && <div className="flex sm:flex-col gap-2 overflow-auto min-h-0" aria-label={t('logs.attachments')}>
-            {attachments.map((item, index) => {
-              const Icon = item.kind === 'image' ? ImageIcon : item.kind === 'video' ? Film : item.kind === 'document' ? FileText : Volume2;
-              return <button key={index} onClick={() => setSelected(index)} aria-pressed={selected === index} className={`flex shrink-0 sm:shrink items-start gap-2 rounded-lg border p-3 text-left ${selected === index ? 'border-zinc-600 bg-zinc-800 text-white ring-1 ring-inset ring-zinc-600' : 'border-zinc-800 text-zinc-400 hover:bg-zinc-800'}`}>
-                <Icon size={17} className="mt-0.5 shrink-0" /><span className="min-w-0"><span title={item.filename} className="block text-sm truncate max-w-40">{item.filename || `${t(`logs.attachment${item.kind === 'image' ? 'Image' : item.kind === 'video' ? 'Video' : item.kind === 'document' ? 'Document' : 'Audio'}`)} ${index + 1}`}</span><span className="block text-xs text-zinc-400">{directionLabel(item)}</span></span>
-              </button>;
-            })}
+          {!single && <div className="flex sm:flex-col gap-4 overflow-auto min-h-0" aria-label={t('logs.attachments')}>
+            {isLog ? groups.map(group => <section key={group.direction} aria-label={group.title} className="shrink-0 min-w-0 space-y-2">
+              <h3 className="text-xs font-medium text-zinc-400">{group.title} ({group.entries.length})</h3>
+              <div className="flex sm:flex-col gap-2">{group.entries.length ? group.entries.map(({item,index}) => attachmentButton(item,index)) : <p className="text-xs text-zinc-500">{t('logs.noAttachments')}</p>}</div>
+            </section>) : attachments.map(attachmentButton)}
           </div>}
           <div className="min-w-0 min-h-0 rounded-lg border border-zinc-800 bg-black/20 p-4 grid grid-rows-[auto_minmax(0,1fr)] gap-4">
             <div className="text-center min-w-0"><p className="text-sm truncate" title={active.filename}>{active.filename || t('archive.unnamed')}</p><p className="text-xs text-zinc-400 truncate">{directionLabel(active)}{active.width && active.height ? ` · ${active.width} × ${active.height}` : ''}{active.size_bytes ? ` · ${(active.size_bytes / 1024).toFixed(1)} KB` : ''}{active.mime_type ? ` · ${active.mime_type}` : ''}</p></div>
