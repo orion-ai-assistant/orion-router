@@ -5,7 +5,8 @@ import time
 from uuid import UUID
 
 from zeroconf import IPVersion, ServiceStateChange
-from zeroconf.asyncio import AsyncServiceBrowser, AsyncServiceInfo, AsyncZeroconf
+from zeroconf.asyncio import AsyncServiceBrowser, AsyncServiceInfo
+from core.zeroconf_compat import AsyncZeroconf
 
 from core.mdns import LAN_NETWORKS, TLS_SERVICE_TYPE, lan_addresses
 

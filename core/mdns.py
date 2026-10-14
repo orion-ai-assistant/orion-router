@@ -12,7 +12,7 @@ from pathlib import Path
 
 import psutil
 from zeroconf import IPVersion, ServiceInfo
-from zeroconf.asyncio import AsyncZeroconf
+from core.zeroconf_compat import AsyncZeroconf
 
 from core import config
 

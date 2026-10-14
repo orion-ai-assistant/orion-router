@@ -167,6 +167,8 @@ async def lifespan(app: FastAPI):
     #  STARTUP                                                             #
     # ------------------------------------------------------------------ #
     logger.info("Starting up Orion Custom Service Router")
+    from core.windows_asyncio import install_reset_cleanup
+    install_reset_cleanup()
     from core.tts_archive import check_runtime
     try:
         logger.info("TTS archive encoder: %s", await asyncio.to_thread(check_runtime))

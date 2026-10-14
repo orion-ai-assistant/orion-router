@@ -54,6 +54,14 @@ worker calls, audio, file and streaming requests) uses that policy. Changes
 to IP/port discovered for the same UUID never replace the pin. Key replacement
 requires deliberate re-pairing; no automatic HTTP fallback is allowed.
 
+Hub's manual Router address can be a reachable HTTPS hostname on another
+network; mDNS browsing is limited to the local network. The connection must
+present the Router's own pinned public key and matching UUID. A standard
+Cloudflare public HTTPS tunnel terminates client TLS at Cloudflare and presents
+an edge certificate, so it cannot satisfy this pin check. Use a network route
+or TCP tunnel that preserves end-to-end Router TLS. Reachability alone does
+not establish Router identity; pin validation must not be disabled.
+
 The browser/OS may require deliberate manual trust of this local self-signed
 certificate before opening `https://localhost:9443/dashboard`; Router does not
 import trust automatically or disable certificate validation. Trust this
