@@ -17,6 +17,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from core.logging_utils import log_http_exception
 
 from core.lifespan import lifespan
 from api import admin, chat, embeddings, files, speech, transcriptions, hubs, tts_archives, image_archives, media_archives
@@ -91,6 +93,11 @@ class UvicornAccessFilter(logging.Filter):
             path = record.args[2]
             if method == "GET" and path.startswith("/dashboard/_next/static/"):
                 return False
+            if len(record.args) >= 5 and isinstance(record.args[4], int):
+                status = record.args[4]
+                if status >= 400:
+                    record.levelno = logging.ERROR if status >= 500 else logging.WARNING
+                    record.levelname = logging.getLevelName(record.levelno)
         return True
 
 logging.getLogger("uvicorn.access").addFilter(UvicornAccessFilter())
@@ -139,6 +146,7 @@ class LocalhostWarningMiddleware(BaseHTTPMiddleware):
 #  Uygulama
 # ---------------------------------------------------------------------------
 app = FastAPI(title="Orion Router", lifespan=lifespan)
+app.add_exception_handler(StarletteHTTPException, log_http_exception)
 from core.tls_server import _TLSApplication
 tls_app = _TLSApplication(app)
 

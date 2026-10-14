@@ -6,7 +6,81 @@ Terminale devasa prompt, mesaj içerikleri veya tool şemaları dökülmesini ö
 Hassas verileri (API anahtarları, authorization vb.) ve bilinmeyen parametreleri filtreler.
 """
 import logging
+import re
+import json
+import httpx
+from starlette.exceptions import HTTPException
 from typing import Any
+
+
+def diagnostic_text(value: Any, limit: int = 800) -> str:
+    """Keep diagnostics redacted, bounded and on one terminal line."""
+    from core.secret_guard import redact
+
+    text = re.sub(r"[\x00-\x20\x7f-\x9f]+", " ", redact(str(value))).strip()
+    return text[:limit] + ("..." if len(text) > limit else "")
+
+
+def is_expected_provider_error(error):
+    if isinstance(error, (ValueError, HTTPException, httpx.HTTPError, TimeoutError, ConnectionError)):
+        return True
+    if isinstance(error, RuntimeError):
+        return any(marker in str(error).lower() for marker in (
+            "http error", "api error", "stream error:",
+        )) or isinstance(error.__cause__ or error.__context__, (httpx.HTTPError, OSError))
+    return False
+
+
+def provider_error_summary(error):
+    """Prefer upstream message/code over dumping the entire HTTP error body."""
+    text = str(error)
+    prefix, separator, body = text.partition("{")
+    if separator:
+        try:
+            payload = json.loads(separator + body)
+        except (ValueError, TypeError):
+            pass
+        else:
+            detail = payload.get("error", payload) if isinstance(payload, dict) else None
+            if isinstance(detail, dict) and detail.get("message"):
+                code = detail.get("code") or detail.get("type")
+                text = prefix + str(detail["message"]) + (f" (code={code})" if code else "")
+    return diagnostic_text(text) or "No error message supplied"
+
+
+def log_provider_failure(logger, capability, provider, model, error, log_id=None, *, unexpected=None):
+    """Expected upstream rejections need a reason; bugs also need a traceback."""
+    if unexpected is None:
+        unexpected = isinstance(error, BaseException) and not is_expected_provider_error(error)
+    level = logging.ERROR if unexpected else logging.WARNING
+    logger.log(
+        level,
+        "%s failed | provider=%s model=%s log_id=%s | %s: %s",
+        capability,
+        diagnostic_text(provider), diagnostic_text(model), log_id if log_id is not None else "-",
+        type(error).__name__ if isinstance(error, BaseException) else "UpstreamError",
+        provider_error_summary(error),
+        exc_info=(type(error), error, error.__traceback__) if unexpected else None,
+    )
+
+
+def log_chat_failure(logger, provider, model, error, log_id=None, *, unexpected=None):
+    log_provider_failure(logger, "Chat", provider, model, error, log_id, unexpected=unexpected)
+
+
+async def log_http_exception(request, exc):
+    """Log HTTP rejection reasons while preserving Starlette's response contract."""
+    from fastapi.exception_handlers import http_exception_handler
+
+    cause = exc.__cause__
+    logging.getLogger("service-router.http").log(
+        logging.ERROR if exc.status_code >= 500 else logging.WARNING,
+        "HTTP %s | %s %s | %s%s",
+        exc.status_code, diagnostic_text(request.method), diagnostic_text(request.url.path),
+        diagnostic_text(exc.detail),
+        f" | cause={type(cause).__name__}: {diagnostic_text(cause) or 'No error message supplied'}" if cause else "",
+    )
+    return await http_exception_handler(request, exc)
 
 # Chat isteklerinde loglanmasına izin verilen güvenli parametreler (whitelist)
 SAFE_CHAT_PARAM_KEYS = (

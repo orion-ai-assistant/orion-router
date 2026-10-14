@@ -1,5 +1,6 @@
 from core.secret_guard import redact
 from core.key_policy import authorize_attempt, ACCESS_MESSAGE
+from core.logging_utils import log_provider_failure
 from fastapi import HTTPException
 import asyncio
 import json
@@ -139,8 +140,8 @@ class STTRunner:
                         )
                         return result
                     except Exception as exc:
+                        log_provider_failure(logger, "STT", p_provider, p_model, exc, log_id)
                         exc = RuntimeError(redact(str(exc)))
-                        logger.error("STT route %s/%s failed: %s", p_provider, p_model, exc)
                         await self.key_pool.mark_key_error(key_pool_id, str(exc))
                         last_err = exc
         except asyncio.CancelledError:

@@ -5,7 +5,7 @@ import time
 from core.tts_archive import ArchiveSession, background
 from core.secret_guard import redact
 from core.key_policy import authorize_attempt, ACCESS_MESSAGE
-from core.logging_utils import format_tts_kwargs_summary
+from core.logging_utils import format_tts_kwargs_summary, log_provider_failure
 from fastapi import HTTPException
 
 from core.router.route_types import RoutePlan
@@ -195,8 +195,8 @@ class TTSRunner:
                         }
                         return audio_bytes, content_type, response_metadata
                     except Exception as exc:
+                        log_provider_failure(logger, "TTS", p_provider, p_model, exc, log_id)
                         exc = RuntimeError(redact(str(exc)))
-                        logger.error("TTS route %s/%s failed: %s", p_provider, p_model, exc)
                         await self.key_pool.mark_key_error(key_pool_id, str(exc))
                         last_err = exc
         except asyncio.CancelledError:
@@ -371,8 +371,8 @@ class TTSRunner:
                         )
                         return
                     except Exception as exc:
+                        log_provider_failure(logger, "TTS stream", p_provider, p_model, exc, log_id)
                         if stream_started:
-                            logger.error("TTS stream aborted mid-transmission: %s", exc)
                             duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
                             content_type = archive.metadata.get("content_type", "audio/pcm")
                             res_err = {
@@ -400,7 +400,6 @@ class TTSRunner:
                                 resolved_model=p_model, text=input_text, status="interrupted")
                             archive = None
                         exc = RuntimeError(redact(str(exc)))
-                        logger.error("TTS route %s/%s stream failed: %s", p_provider, p_model, exc)
                         await self.key_pool.mark_key_error(key_pool_id, str(exc))
                         last_err = exc
         except (asyncio.CancelledError, GeneratorExit):

@@ -118,20 +118,19 @@ class TelemetryService:
                     ttft_ms=ttft_ms,
                 )
             logger.info(
-                "Logged usage for %s/%s [%s]: (In:%s Out:%s Think:%s) | "
-                "TTFT:%sms Dur:%sms | Costs: (In:%.4f Out:%.4f Think:%.4f) | Success: %s",
+                "Request %s | provider=%s model=%s capability=%s log_id=%s | "
+                "tokens(in/out/think)=%s/%s/%s | TTFT=%s duration=%s | cost=%s",
+                "success" if success is True else ("failed" if success is False else "interrupted"),
                 provider,
                 model,
                 capability,
-                p,
-                c,
-                t,
-                ttft_ms,
-                duration_ms,
-                p_cost,
-                c_cost,
-                t_cost,
-                success,
+                log_id if log_id is not None else "-",
+                p if p is not None else "-",
+                c if c is not None else "-",
+                t if t is not None else "-",
+                f"{ttft_ms:.2f}ms" if ttft_ms is not None else "-",
+                f"{duration_ms:.2f}ms" if duration_ms is not None else "-",
+                f"{cost:.6f}" if cost is not None else "-",
             )
         except Exception as exc:
             logger.error("Failed to log usage: %s", exc)

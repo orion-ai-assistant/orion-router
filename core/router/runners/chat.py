@@ -1,6 +1,6 @@
 from core.secret_guard import redact
 from core.key_policy import authorize_attempt, ACCESS_MESSAGE
-from core.logging_utils import log_chat_stream_start
+from core.logging_utils import log_chat_stream_start, log_chat_failure
 from fastapi import HTTPException
 import asyncio
 import json
@@ -77,6 +77,19 @@ def extract_error_message(error_chunk: str | None) -> str | None:
     if error:
         return str(error)
     return None
+
+
+def is_error_chunk(chunk) -> bool:
+    if not isinstance(chunk, str):
+        return False
+    data = chunk.strip()
+    if data.startswith("data:"):
+        data = data[5:].strip()
+    try:
+        payload = json.loads(data)
+    except json.JSONDecodeError:
+        return False
+    return isinstance(payload, dict) and "error" in payload
 
 
 def is_key_specific_error(error_str: str | None) -> bool:
@@ -178,11 +191,6 @@ class ChatRunner:
                     usage = chunk["internal_usage"]
                 else:
                     if isinstance(chunk, str):
-                        if '"error":' in chunk:
-                            logger.error("[%s] API Error chunk: %s", provider, chunk.strip())
-                            has_error = True
-                            status_val = False
-                            error_details = chunk.strip()
                         try:
                             data_str = chunk.strip()
                             if data_str.startswith("data:"):
@@ -190,11 +198,14 @@ class ChatRunner:
                             if data_str and data_str != "[DONE]":
                                 chunk_data = json.loads(data_str)
                                 if "error" in chunk_data:
+                                    has_error = True
+                                    status_val = False
                                     error = chunk_data["error"]
                                     if isinstance(error, dict) and error.get("message"):
                                         error_details = str(error["message"])
                                     elif error:
                                         error_details = str(error)
+                                    log_chat_failure(logger, provider, model, error_details or "Empty error response", log_id)
                                 choices = chunk_data.get("choices", [])
                                 if choices:
                                     delta = choices[0].get("delta", {})
@@ -271,10 +282,7 @@ class ChatRunner:
         except Exception as exc:
             has_error = True
             status_val = False
-            if isinstance(exc, RuntimeError) or "connect" in str(exc).lower():
-                logger.warning("[%s] Stream Connection Failed: %s", provider, exc)
-            else:
-                logger.error("[%s] Stream Exception: %s", provider, exc, exc_info=True)
+            log_chat_failure(logger, provider, model, exc, log_id)
 
             err_msg = redact(str(exc))
             error_details = err_msg
@@ -559,13 +567,8 @@ class ChatRunner:
                             log_id=log_id,
                             **route_kwargs,
                         ):
-                            if isinstance(chunk, str) and '"error"' in chunk:
+                            if is_error_chunk(chunk):
                                 if not yielded_any_this_try:
-                                    logger.warning(
-                                        "Route %s/%s failed with error chunk, evaluating retryability.",
-                                        p_provider,
-                                        p_model,
-                                    )
                                     failed = True
                                     last_error_chunk = chunk
                                     err_msg = extract_error_message(chunk) or "API returned error chunk"
@@ -576,10 +579,10 @@ class ChatRunner:
                                         )
                                     else:
                                         logger.info(
-                                            "Non-retryable model/modality error on %s/%s: %s; stopping key rotation.",
+                                            "Route %s/%s | log_id=%s | Key rotation skipped: request/model error; checking fallback routes.",
                                             p_provider,
                                             p_model,
-                                            err_msg,
+                                            log_id if log_id is not None else "-",
                                         )
                                         should_retry_keys = False
                                     break
@@ -592,17 +595,16 @@ class ChatRunner:
                             success = True
                             break
                     except Exception as exc:
-                        exc = RuntimeError(redact(str(exc)))
-                        logger.error("Route %s/%s failed: %s", p_provider, p_model, exc)
+                        log_chat_failure(logger, p_provider, p_model, exc, log_id)
                         err_str = redact(str(exc))
                         if is_key_specific_error(err_str):
                             await self.key_pool.mark_key_error(key_pool_id, err_str)
                         else:
                             logger.info(
-                                "Non-retryable model/modality error on %s/%s: %s; stopping key rotation.",
+                                "Route %s/%s | log_id=%s | Key rotation skipped: request/model error; checking fallback routes.",
                                 p_provider,
                                 p_model,
-                                err_str,
+                                log_id if log_id is not None else "-",
                             )
                             should_retry_keys = False
                         failed = True
