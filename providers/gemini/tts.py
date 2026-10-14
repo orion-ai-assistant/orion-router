@@ -367,6 +367,15 @@ class GeminiTTSProvider(BaseTTS):
                 for part in getattr(content, "parts", None) or []:
                     inline_data = getattr(part, "inline_data", None)
                     if inline_data and getattr(inline_data, "data", None):
+                        callback = kwargs.get("_archive_metadata")
+                        if callback:
+                            import re
+                            mime = getattr(inline_data, "mime_type", "") or ""
+                            rate = re.search(r"rate=(\d+)", mime)
+                            if not rate or not mime.lower().startswith("audio/l16"):
+                                callback({"content_type": mime})
+                            else:
+                                callback({"format": "s16le", "sample_rate": int(rate.group(1)), "channels": 1, "sample_width": 2})
                         yield inline_data.data
 
 

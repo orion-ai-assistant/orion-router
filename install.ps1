@@ -360,6 +360,8 @@ Set-Content -Path $PROFILE -Value $CurrentProfile.Trim()
 
 Write-Host ""
 if ($Mode -eq "local") {
+    python -m bin.ffmpeg_install
+    if ($LASTEXITCODE -ne 0) { throw "FFmpeg/libopus installation or verification failed." }
     Write-Host "[*] Pre-fetching resources (PostgreSQL) to display live progress..." -ForegroundColor Cyan
     python -c "import sys; sys.path.insert(0, '.'); from bin.common import download_postgres; download_postgres()"
 }

@@ -1,11 +1,8 @@
 import asyncio
-import base64
-import io
 import json
 import logging
 import time
-import wave
-from core.audio_container import finalize_buffered_wav
+from core.tts_archive import ArchiveSession, background
 from core.secret_guard import redact
 from core.key_policy import authorize_attempt, ACCESS_MESSAGE
 from core.logging_utils import format_tts_kwargs_summary
@@ -14,41 +11,6 @@ from fastapi import HTTPException
 from core.router.route_types import RoutePlan
 
 logger = logging.getLogger("service-router.dynamic")
-
-
-def _pcm_to_wav(pcm_data: bytes, sample_rate: int = 24000, channels: int = 1, sampwidth: int = 2) -> bytes:
-    """Wraps raw PCM samples into standard RIFF WAV container."""
-    buffer = io.BytesIO()
-    with wave.open(buffer, "wb") as wf:
-        wf.setnchannels(channels)
-        wf.setsampwidth(sampwidth)
-        wf.setframerate(sample_rate)
-        wf.writeframes(pcm_data)
-    return buffer.getvalue()
-
-
-def _build_logged_audio(collected_chunks: list[bytes]) -> tuple[str | None, str]:
-    """Inspects collected streaming audio chunks and returns (base64_str, content_type)."""
-    if not collected_chunks:
-        return None, "audio/wav"
-    full_audio = b"".join(collected_chunks)
-    if not full_audio:
-        return None, "audio/wav"
-    if full_audio.startswith(b"RIFF"):
-        audio_bytes = finalize_buffered_wav(full_audio)
-        content_type = "audio/wav"
-    elif full_audio.startswith(b"ID3") or full_audio.startswith(b"\xff\xfb"):
-        audio_bytes = full_audio
-        content_type = "audio/mpeg"
-    elif full_audio.startswith(b"OggS"):
-        audio_bytes = full_audio
-        content_type = "audio/ogg"
-    else:
-        # Default TTS stream format: 24kHz 16-bit mono PCM
-        audio_bytes = _pcm_to_wav(full_audio)
-        content_type = "audio/wav"
-    audio_b64 = base64.b64encode(audio_bytes).decode("ascii") if len(audio_bytes) < 5_000_000 else None
-    return audio_b64, content_type
 
 
 def _coerce_default_config(default_config) -> dict:
@@ -68,6 +30,17 @@ class TTSRunner:
         self.route_resolver = route_resolver
         self.key_pool = key_pool
         self.telemetry = telemetry
+
+    async def _log_with_archive(self, archive, *, requested_model, input_text, **log_kwargs):
+        response = json.loads(log_kwargs["response_json"])
+        if archive:
+            response.update(await archive.finish(
+                log_id=log_kwargs.get("log_id"), provider=log_kwargs["provider"],
+                requested_model=requested_model, resolved_model=log_kwargs["model"], text=input_text,
+                status="completed" if log_kwargs["success"] is True else "interrupted",
+            ))
+        log_kwargs["response_json"] = json.dumps(response, ensure_ascii=False)
+        await self.telemetry.log_usage(**log_kwargs)
 
     async def run_speech(
         self,
@@ -142,7 +115,7 @@ class TTSRunner:
 
                 clean_kwargs = {
                     k: v for k, v in route_kwargs.items()
-                    if k not in ("voice", "model", "input_text", "api_key", "auth_header")
+                    if k not in ("voice", "model", "input_text", "api_key", "auth_header", "_archive_metadata")
                 }
 
                 plugin = self.registry.tts_providers.get(p_provider)
@@ -186,7 +159,23 @@ class TTSRunner:
                         )
 
                         duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
-                        audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
+                        archive = ArchiveSession()
+                        archive.set_metadata(usage_meta.get("audio_format", {"content_type": content_type}))
+                        async def archive_response(source):
+                            for offset in range(0, len(source), 65536):
+                                if archive.error:
+                                    break
+                                while archive.queued_bytes > 1024 * 1024 and not archive.error:
+                                    await asyncio.sleep(0.01)
+                                archive.feed(source[offset:offset + 65536])
+                                await asyncio.sleep(0)
+                            del source
+                            await self._log_with_archive(archive, requested_model=model, input_text=input_text,
+                                key_id=key_id, provider=p_provider, model=p_model, usage=usage,
+                                request_json=json.dumps(req_data, ensure_ascii=False),
+                                response_json=json.dumps(res_success, ensure_ascii=False), success=True,
+                                capability="tts", duration_ms=duration_ms, log_id=log_id)
+
                         prompt_tokens = usage_meta.get("prompt_tokens")
                         completion_tokens = usage_meta.get("completion_tokens")
                         usage = None if prompt_tokens is None and completion_tokens is None else {
@@ -198,25 +187,11 @@ class TTSRunner:
                             "content_type": content_type,
                             "size_bytes": len(audio_bytes),
                             "estimated_duration_seconds": completion_tokens / 25.0 if completion_tokens is not None else None,
-                            "audio_base64": audio_b64,
                             "metrics": {"total_duration_ms": duration_ms},
                         }
-                        asyncio.create_task(
-                            self.telemetry.log_usage(
-                                key_id,
-                                p_provider,
-                                p_model,
-                                usage,
-                                request_json=json.dumps(req_data, ensure_ascii=False),
-                                response_json=json.dumps(res_success, ensure_ascii=False),
-                                success=True,
-                                capability="tts",
-                                duration_ms=duration_ms,
-                                log_id=log_id,
-                            )
-                        )
+                        background(archive_response(audio_bytes if not archive.error else b""))
                         response_metadata = {
-                            key: value for key, value in res_success.items() if key != "audio_base64"
+                            key: value for key, value in res_success.items()
                         }
                         return audio_bytes, content_type, response_metadata
                     except Exception as exc:
@@ -226,7 +201,7 @@ class TTSRunner:
                         last_err = exc
         except asyncio.CancelledError:
             res_err = {"error": "Client disconnected / Request Cancelled"}
-            asyncio.create_task(
+            background(
                 self.telemetry.log_usage(
                     key_id,
                     p_provider,
@@ -277,7 +252,7 @@ class TTSRunner:
         start_time = time.perf_counter()
         stream_started = False
         total_bytes = 0
-        collected_chunks: list[bytes] = []
+        archive = None
         try:
             for route in route_plan.routes:
                 p_provider = route.provider
@@ -321,7 +296,7 @@ class TTSRunner:
 
                 clean_kwargs = {
                     k: v for k, v in route_kwargs.items()
-                    if k not in ("voice", "model", "input_text", "api_key", "auth_header")
+                    if k not in ("voice", "model", "input_text", "api_key", "auth_header", "_archive_metadata")
                 }
 
                 plugin = self.registry.tts_providers.get(p_provider)
@@ -355,6 +330,7 @@ class TTSRunner:
                     if logger.isEnabledFor(logging.DEBUG):
                         logger.debug("TTS route stream debug: keys=%s", sorted(clean_kwargs.keys()))
                     try:
+                        archive = ArchiveSession()
                         stream_gen = plugin.generate_speech_stream(
                             model=p_model,
                             input_text=input_text,
@@ -362,28 +338,29 @@ class TTSRunner:
                             api_key=key_val,
                             auth_header=None,
                             **clean_kwargs,
+                            _archive_metadata=archive.set_metadata,
                         )
-                        async for chunk in stream_gen:
-                            stream_started = True
-                            total_bytes += len(chunk)
-                            if total_bytes <= 5_000_000:
-                                collected_chunks.append(chunk)
-                            yield chunk
-
+                        try:
+                            async for chunk in stream_gen:
+                                stream_started = True
+                                total_bytes += len(chunk)
+                                archive.feed(chunk)
+                                yield chunk
+                        finally:
+                            close_stream = getattr(stream_gen, "aclose", None)
+                            if close_stream:
+                                await close_stream()
                         duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
-                        audio_b64, content_type = _build_logged_audio(collected_chunks)
+                        content_type = archive.metadata.get("content_type", "audio/pcm")
                         res_success = {
                             "content_type": content_type,
                             "size_bytes": total_bytes,
-                            "audio_base64": audio_b64,
                             "metrics": {"total_duration_ms": duration_ms},
                         }
-                        asyncio.create_task(
-                            self.telemetry.log_usage(
-                                key_id,
-                                p_provider,
-                                p_model,
-                                None,
+                        background(
+                            self._log_with_archive(
+                                archive, requested_model=model, input_text=input_text,
+                                key_id=key_id, provider=p_provider, model=p_model, usage=None,
                                 request_json=json.dumps(req_data, ensure_ascii=False),
                                 response_json=json.dumps(res_success, ensure_ascii=False),
                                 success=True,
@@ -397,51 +374,49 @@ class TTSRunner:
                         if stream_started:
                             logger.error("TTS stream aborted mid-transmission: %s", exc)
                             duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
-                            audio_b64, content_type = _build_logged_audio(collected_chunks)
+                            content_type = archive.metadata.get("content_type", "audio/pcm")
                             res_err = {
                                 "stopped_early": True,
                                 "content_type": content_type,
                                 "size_bytes": total_bytes,
-                                "audio_base64": audio_b64,
-                                "error": str(exc),
+                                "error": redact(str(exc)),
                                 "metrics": {"total_duration_ms": duration_ms},
                             }
-                            asyncio.create_task(
-                                self.telemetry.log_usage(
-                                    key_id,
-                                    p_provider,
-                                    p_model,
-                                    None,
+                            background(
+                                self._log_with_archive(
+                                    archive, requested_model=model, input_text=input_text,
+                                    key_id=key_id, provider=p_provider, model=p_model, usage=None,
                                     request_json=json.dumps(req_data, ensure_ascii=False),
                                     response_json=json.dumps(res_err, ensure_ascii=False),
                                     success=False,
                                     capability="tts",
                                     duration_ms=duration_ms,
                                     log_id=log_id,
-                                    )
+                                )
                             )
                             raise
+                        if archive:
+                            await archive.finish(log_id=log_id, provider=p_provider, requested_model=model,
+                                resolved_model=p_model, text=input_text, status="interrupted")
+                            archive = None
                         exc = RuntimeError(redact(str(exc)))
                         logger.error("TTS route %s/%s stream failed: %s", p_provider, p_model, exc)
                         await self.key_pool.mark_key_error(key_pool_id, str(exc))
                         last_err = exc
-        except asyncio.CancelledError:
+        except (asyncio.CancelledError, GeneratorExit):
             duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
-            audio_b64, content_type = _build_logged_audio(collected_chunks)
+            content_type = archive.metadata.get("content_type", "audio/pcm") if archive else "audio/pcm"
             res_err = {
                 "stopped_early": total_bytes > 0,
                 "content_type": content_type,
                 "size_bytes": total_bytes,
-                "audio_base64": audio_b64,
                 "error": "Client disconnected / Request Cancelled",
                 "metrics": {"total_duration_ms": duration_ms},
             }
-            asyncio.create_task(
-                self.telemetry.log_usage(
-                    key_id,
-                    p_provider,
-                    p_model,
-                    None,
+            background(
+                self._log_with_archive(
+                    archive, requested_model=model, input_text=input_text,
+                    key_id=key_id, provider=p_provider, model=p_model, usage=None,
                     request_json=json.dumps(req_data, ensure_ascii=False),
                     response_json=json.dumps(res_err, ensure_ascii=False),
                     success=None,

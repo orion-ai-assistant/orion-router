@@ -307,7 +307,7 @@ export function formatPayloadForDisplay(raw: unknown): FormattedPayload {
 
 export function extractTtsAudio(
   raw: unknown
-): { audio_base64: string; content_type?: string } | null {
+): { audio_base64?: string; audio_archive_id?: number; content_type?: string } | null {
   let parsed: unknown = raw;
   if (typeof raw === 'string') {
     try {
@@ -318,6 +318,9 @@ export function extractTtsAudio(
   }
   if (!parsed || typeof parsed !== 'object') return null;
   const data = parsed as Record<string, unknown>;
+  if (typeof data.audio_archive_id === 'number') {
+    return { audio_archive_id: data.audio_archive_id };
+  }
   if (typeof data.audio_base64 !== 'string') return null;
   return {
     audio_base64: data.audio_base64,

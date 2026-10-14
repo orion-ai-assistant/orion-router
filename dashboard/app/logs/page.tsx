@@ -3,15 +3,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { adminFetch } from '@/lib/api';
 import { money, dateTime } from '@/lib/utils';
-import { formatPayloadForDisplay, extractTtsAudio } from '@/lib/format-payload';
+import { formatPayloadForDisplay } from '@/lib/format-payload';
 import { useApp } from '@/components/AppContext';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { PayloadViewer } from '@/components/PayloadViewer';
+import { AudioArchiveList } from '@/components/AudioArchiveList';
+import { ImageArchiveList } from '@/components/ImageArchiveList';
+import { extractLogAttachments, LogAttachment } from '@/lib/log-attachments';
+import { LogAttachments } from '@/components/LogAttachments';
 import { Input } from '@/components/ui/input';
-import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Archive, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface LogItem {
   id: number;
@@ -40,7 +44,7 @@ interface LogDetails {
   fullRequest: string;
   fullResponse: string;
   capability: string;
-  ttsAudio: { audio_base64: string; content_type?: string } | null;
+  attachments: LogAttachment[];
 }
 
 export default function LogsPage() {
@@ -48,6 +52,7 @@ export default function LogsPage() {
   const [logs, setLogs] = useState<LogItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [payloadDialogOpen, setPayloadDialogOpen] = useState(false);
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [activeLogDetails, setActiveLogDetails] = useState<LogDetails | null>(null);
   const fetchSequence = useRef(0);
   const [offset,setOffset] = useState(0);
@@ -145,7 +150,7 @@ export default function LogsPage() {
       fullRequest: '',
       fullResponse: '',
       capability: 'chat',
-      ttsAudio: null,
+      attachments: [],
     });
 
     try {
@@ -155,8 +160,6 @@ export default function LogsPage() {
         const request = formatPayloadForDisplay(data.request_json);
         const response = formatPayloadForDisplay(data.response_json);
         const capability = data.capability || 'chat';
-        const ttsAudio =
-          capability === 'tts' ? extractTtsAudio(data.response_json) : null;
 
         setActiveLogDetails({
           requestHtml: request.displayHtml,
@@ -164,7 +167,7 @@ export default function LogsPage() {
           fullRequest: request.fullText,
           fullResponse: response.fullText,
           capability,
-          ttsAudio,
+          attachments: extractLogAttachments(data.request_json, data.response_json),
         });
       } else {
         showToast(t('logs.toast.loadDetailsFailed'), 'error');
@@ -193,18 +196,27 @@ export default function LogsPage() {
 
   return (
     <section id="logs" className="tab-content active block pt-8">
-      <header className="flex justify-between items-end mb-8 pb-6 border-b border-border">
+      <header className="flex flex-wrap gap-4 justify-between items-end mb-8 pb-6 border-b border-border">
         <div className="header-titles">
           <h1 className="font-heading text-3xl font-semibold tracking-tight">{t('logs.title')}</h1>
           <p className="text-zinc-400 text-sm mt-1">{t('logs.description')}</p>
         </div>
+        <div className="flex items-center gap-2">
+        <Button variant="outline" onClick={() => setArchiveDialogOpen(true)}><Archive size={16} />{t('logs.mediaArchive')}</Button>
         <Button
           onClick={() => fetchLogs('refresh')}
           className="bg-transparent border border-zinc-800 text-white hover:bg-zinc-800 font-medium px-5 py-2.5 rounded-md transition-all flex items-center gap-1.5"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> {t('logs.refresh')}
         </Button>
+        </div>
       </header>
+      <Dialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
+        <DialogContent className="w-[min(94vw,1000px)] max-w-[min(94vw,1000px)] max-h-[85dvh] overflow-auto bg-[#18181b] border border-zinc-800 p-6">
+          <DialogHeader><DialogTitle>{t('logs.mediaArchive')}</DialogTitle></DialogHeader>
+          {archiveDialogOpen && <><AudioArchiveList /><ImageArchiveList /></>}
+        </DialogContent>
+      </Dialog>
 
 
       {/* Table List */}
@@ -360,21 +372,12 @@ export default function LogsPage() {
           if (!open) setActiveLogDetails(null);
         }}
       >
-        <DialogContent className="w-[min(96vw,1720px)] max-w-[min(96vw,1720px)] border border-zinc-800 bg-[#18181b] p-6 sm:p-8 rounded-2xl text-white shadow-2xl">
+        <DialogContent className="w-[min(96vw,1720px)] max-w-[min(96vw,1720px)] max-h-[92dvh] overflow-auto border border-zinc-800 bg-[#18181b] p-6 sm:p-8 rounded-2xl text-white shadow-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-heading font-semibold text-white">{t('logs.payloadModalTitle')}</DialogTitle>
           </DialogHeader>
 
-          {activeLogDetails?.ttsAudio && (
-            <div className="my-4 p-4 bg-zinc-800/40 border border-zinc-700 rounded-lg flex flex-col sm:flex-row sm:items-center gap-3">
-              <span className="font-medium text-zinc-300 text-sm shrink-0">Audio output</span>
-              <audio
-                controls
-                className="w-full sm:max-w-[600px] h-10"
-                src={`data:${activeLogDetails.ttsAudio.content_type || 'audio/wav'};base64,${activeLogDetails.ttsAudio.audio_base64}`}
-              />
-            </div>
-          )}
+          {activeLogDetails && <LogAttachments attachments={activeLogDetails.attachments} />}
 
           {activeLogDetails && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6 my-4 text-left min-h-0">

@@ -501,6 +501,7 @@ export PATH="$INSTALL_DIR:$PATH"
 
 if [ "$MODE" = "local" ]; then
     echo -e "\n[*] Pre-fetching resources (PostgreSQL) to display live progress..."
+    python3 -m bin.ffmpeg_install || { echo "ERROR: FFmpeg/libopus installation or verification failed."; exit 1; }
     python3 -c "import sys; sys.path.insert(0, '.'); from bin.common import download_postgres; download_postgres()"
 fi
 

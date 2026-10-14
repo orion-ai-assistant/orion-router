@@ -167,6 +167,11 @@ async def lifespan(app: FastAPI):
     #  STARTUP                                                             #
     # ------------------------------------------------------------------ #
     logger.info("Starting up Orion Custom Service Router")
+    from core.tts_archive import check_runtime
+    try:
+        logger.info("TTS archive encoder: %s", await asyncio.to_thread(check_runtime))
+    except Exception as exc:
+        logger.error("TTS audio archiving unavailable: %s", exc)
     from core import config
     from core.mdns import router_id
     from core.tls_identity import load_identity
@@ -282,6 +287,8 @@ async def lifespan(app: FastAPI):
     #  SHUTDOWN                                                            #
     # ------------------------------------------------------------------ #
     logger.info("Shutting down Orion Custom Service Router")
+    from core.tts_archive import close_archives
+    await close_archives()
     await close_gemini_clients()
     await close_http_clients()
     await db_manager.close_db()

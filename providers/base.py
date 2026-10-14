@@ -134,7 +134,7 @@ class BaseTTS(_ProviderMixin, ABC):
         **kwargs,
     ):
         """Varsayılan akış (streaming) implementasyonu: sesi üretip parça döner."""
-        audio_bytes, _, _ = await self.generate_speech(
+        audio_bytes, content_type, usage = await self.generate_speech(
             model=model,
             input_text=input_text,
             voice=voice,
@@ -142,7 +142,11 @@ class BaseTTS(_ProviderMixin, ABC):
             auth_header=auth_header,
             **kwargs,
         )
-        yield audio_bytes
+        callback = kwargs.get("_archive_metadata")
+        if callback:
+            callback(usage.get("audio_format", {"content_type": content_type}))
+        for offset in range(0, len(audio_bytes), 65536):
+            yield audio_bytes[offset:offset + 65536]
 
     def get_voices(self) -> list[str]:
         """Desteklenen seslerin listesini döner."""

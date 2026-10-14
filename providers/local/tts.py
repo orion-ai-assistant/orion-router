@@ -138,6 +138,15 @@ class LocalTTSProvider(BaseTTS):
             "prompt_tokens": max(1, len(input_text)),
             "completion_tokens": max(1, len(audio_bytes) // 100) if audio_bytes else 0
         }
+        if payload["response_format"] == "pcm":
+            # Raw PCM must be explicitly described by the local engine.
+            rate = response.headers.get("x-audio-sample-rate") or response.headers.get("x-sample-rate")
+            channels = response.headers.get("x-audio-channels", "")
+            sample_format = response.headers.get("x-audio-format", "")
+            widths = {"u8": 1, "s16le": 2, "s24le": 3, "s32le": 4, "f32le": 4, "f64le": 8}
+            if rate and rate.isdigit() and channels.isdigit() and sample_format in widths:
+                usage_dict["audio_format"] = {"format": sample_format, "sample_rate": int(rate),
+                    "channels": int(channels), "sample_width": widths[sample_format]}
 
         logger.info(f"Local TTS complete: {len(audio_bytes)} bytes WAV")
         return audio_bytes, content_type, usage_dict

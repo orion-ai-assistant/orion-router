@@ -82,6 +82,8 @@ class OpenAITTSProvider(BaseTTS):
             "prompt_tokens": character_count,
             "completion_tokens": 0,
         }
+        if payload.get("response_format") == "pcm":
+            usage_dict["audio_format"] = {"format": "s16le", "sample_rate": 24000, "channels": 1, "sample_width": 2}
 
         logger.info(
             f"OpenAI TTS complete: {len(audio_bytes)} bytes, format={content_type} "
@@ -143,6 +145,9 @@ class OpenAITTSProvider(BaseTTS):
             raise RuntimeError(f"OpenAI TTS API Error {response.status_code}: {err_detail}")
 
         try:
+            callback = kwargs.get("_archive_metadata")
+            if callback:
+                callback({"format": "s16le", "sample_rate": 24000, "channels": 1, "sample_width": 2})
             async for chunk in response.aiter_bytes():
                 if chunk:
                     yield chunk
