@@ -14,11 +14,13 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.websockets import WebSocketState
 import websockets
+import httpx
 
 from core.config import STT_HOST, STT_PORT
 from core.dependencies import authenticate_request, authenticate_websocket
 from core.model_catalog import bundled_model
 from core.utils import run_with_disconnect_check
+from core.http_client import get_http_client
 from database import db_manager
 from dynamic_router import DynamicLLMRouter
 
@@ -26,6 +28,24 @@ logger = logging.getLogger("service-router.transcriptions")
 
 router = APIRouter(tags=["Audio", "Transcriptions"])
 LOCAL_STT_MODEL = bundled_model("local", "stt")
+
+
+@router.get("/v1/audio/languages")
+async def audio_languages(auth: dict = Depends(authenticate_request)):
+    """Expose local STT language metadata without owning its prompt catalog."""
+    try:
+        client = get_http_client()
+        response = await client.get(
+            f"http://{STT_HOST}:{STT_PORT}/v1/audio/language-catalog", timeout=4)
+        response.raise_for_status()
+        data = response.json()
+        return {
+            "aliases": data.get("aliases", {}),
+            "languages": {code: {"name": entry["name"]}
+                          for code, entry in data["languages"].items()},
+        }
+    except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
+        raise HTTPException(503, "STT language catalog is unavailable") from exc
 
 
 @router.post("/v1/audio/transcriptions")
