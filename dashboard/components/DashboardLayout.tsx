@@ -79,6 +79,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <Link
                   href={tab.url}
                   prefetch={false}
+                  title={t(tab.i18nKey)}
+                  aria-label={t(tab.i18nKey)}
                   className={`flex items-center gap-3.5 px-5 py-3.5 rounded-md cursor-pointer transition-all duration-200 font-medium text-[15px] ${active
                     ? 'bg-zinc-800 text-white border-l-3 border-l-zinc-300'
                     : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-white'
@@ -98,6 +100,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <button
             type="button"
             onClick={logout}
+            title={t('nav.signOut')}
+            aria-label={t('nav.signOut')}
             className="flex items-center gap-2.5 pl-3.5 pr-8 py-2 rounded-xl text-xs font-medium text-red-400 hover:text-red-400 hover:bg-red-950/50 border border-transparent hover:border-red-900/30 transition-all duration-200 cursor-pointer"
           >
             <LogOut className="w-4 h-4 text-red-400 shrink-0" />
@@ -124,7 +128,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
 
       {/* Main Content Area */}
-      <main className={`content-area min-w-0 flex-1 overflow-x-hidden h-full custom-scrollbar pr-4 ${overview?'overflow-hidden':'overflow-y-auto'}`}>
+      <main className="content-area min-w-0 flex-1 overflow-x-hidden overflow-y-auto h-full custom-scrollbar pr-4">
         <div className={`animate-in fade-in duration-300 ${overview?'h-full min-h-0 pb-3':'slide-in-from-bottom-3 pb-10'}`}>
           {children}
         </div>

@@ -372,7 +372,7 @@ export default function SettingsPage() {
             <div className="flex relative" ref={dropdownRef}>
               <button
                 onClick={() => setLangDropdownOpen(!langDropdownOpen)}
-                className="flex items-center justify-between bg-black/40 border border-zinc-800 text-white rounded px-4 py-2.5 min-w-[200px] outline-none hover:border-zinc-600 transition-colors"
+                className="flex w-full max-w-[240px] min-w-0 items-center justify-between bg-black/40 border border-zinc-800 text-white rounded px-4 py-2.5 outline-none hover:border-zinc-600 transition-colors"
               >
                 <span>{LOCALE_NAMES[locale] || locale}</span>
                 <ChevronDown className="w-4 h-4 ml-2 text-zinc-400 shrink-0" />
@@ -381,7 +381,7 @@ export default function SettingsPage() {
               {langDropdownOpen && (
                 <div
                   ref={listRef}
-                  className="absolute top-[calc(100%+4px)] left-0 w-[240px] bg-zinc-900 border border-zinc-700 rounded-md shadow-2xl z-50 max-h-64 overflow-y-auto custom-scrollbar py-1"
+                  className="absolute top-[calc(100%+4px)] left-0 w-[240px] max-w-full bg-zinc-900 border border-zinc-700 rounded-md shadow-2xl z-50 max-h-64 overflow-y-auto custom-scrollbar py-1"
                 >
                   {SUPPORTED_LOCALES.map((l) => (
                     <button

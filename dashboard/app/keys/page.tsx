@@ -212,14 +212,14 @@ export default function VirtualKeysPage() {
       <div className="mb-5"><Input aria-label={t('access.searchVirtual')} placeholder={t('access.searchVirtual')} value={search} onChange={e=>setSearch(e.target.value)} className="max-w-md"/></div>
       {/* Table List */}
       <div className="table-container glass-panel bg-[#18181b] border border-zinc-800 rounded-md overflow-hidden shadow-xl">
-        <Table>
+        <Table className="min-w-[640px]">
           <TableHeader className="bg-black/25">
             <TableRow className="border-b border-zinc-850 hover:bg-transparent">
               <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 pl-6 text-left w-[25%]">{t('keys.table.name')}</TableHead>
               <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-left w-[18%]">{t('keys.table.budget')}</TableHead>
               <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-left w-[12%]">{t('keys.table.used')}</TableHead>
               <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-center w-[20%]">{t('keys.table.created')}</TableHead>
-              <TableHead className="text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-right pr-6 w-[25%]">{t('keys.table.actions')}</TableHead>
+              <TableHead className="sticky right-0 z-10 bg-[#121214] text-zinc-400 font-semibold text-xs tracking-wider uppercase py-4 text-right pr-6 w-[25%]">{t('keys.table.actions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -259,7 +259,7 @@ export default function VirtualKeysPage() {
                   <TableCell className="py-4 text-center font-mono text-xs text-zinc-400">
                     {dateTime(key.created_at)}
                   </TableCell>
-                  <TableCell className="text-right py-4 pr-6">
+                  <TableCell className="sticky right-0 bg-[#18181b] text-right py-4 pr-6">
                     <Button
                       variant="outline"
                       onClick={() => openEditModal(key)}

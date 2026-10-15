@@ -95,6 +95,6 @@ export default function ArchivesPage() {
       })}
     </div>
     {!loading && !rows.length && !error && <p className="text-zinc-400 py-10 text-center">{t('archive.empty')}</p>}
-    <div className="flex justify-center items-center gap-4 mt-6"><Button variant="outline" disabled={loading || offset === 0} onClick={() => setOffset(value => Math.max(0, value - 30))}>{t('access.previous')}</Button><span className="text-sm text-zinc-400">{total ? `${offset + 1}–${Math.min(offset + 30,total)} / ${total}` : '0'}</span><Button variant="outline" disabled={loading || offset + 30 >= total} onClick={() => setOffset(value => value + 30)}>{t('access.next')}</Button></div>
+    <div className="flex flex-wrap justify-center items-center gap-4 mt-6"><Button variant="outline" disabled={loading || offset === 0} onClick={() => setOffset(value => Math.max(0, value - 30))}>{t('access.previous')}</Button><span className="text-sm text-zinc-400">{total ? `${offset + 1}–${Math.min(offset + 30,total)} / ${total}` : '0'}</span><Button variant="outline" disabled={loading || offset + 30 >= total} onClick={() => setOffset(value => value + 30)}>{t('access.next')}</Button></div>
   </section>;
 }
