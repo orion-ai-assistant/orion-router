@@ -149,6 +149,7 @@ async def providers(request: Request, auth: dict = Depends(current_account)):
     from core import config
     addresses = () if container() and not config.MDNS_CONTAINER_HOST_NETWORK else lan_addresses(config.MDNS_INTERFACES, config.TLS_HOST)
     host = next(iter(addresses), '127.0.0.1')
+    host = f'[{host}]' if ':' in host else host
     from api.admin import _mask_key
     personal = []
     for row in rows:
@@ -159,7 +160,8 @@ async def providers(request: Request, auth: dict = Depends(current_account)):
     return {'providers': sorted(capabilities), 'configured': [r['provider'] for r in rows],
             'personal_keys': personal, 'summary': list(summary.values()),
             'active_keys': sum(r['shared'] + r['private'] for r in summary.values()),
-            'dashboard_url': f'https://{host}:{config.TLS_PORT}/dashboard'}
+            'dashboard_url': f'https://{host}:{config.TLS_PORT}/dashboard',
+            'local_dashboard_url': f'http://localhost:{config.LOCAL_HTTP_PORT}/dashboard'}
 
 
 class ProviderCredential(BaseModel):

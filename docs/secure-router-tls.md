@@ -70,6 +70,14 @@ does not depend on browser trust.
 The local `http://localhost:20128/dashboard` browser entry avoids certificate
 installation for PC-local administration. Do not send Hub/network traffic there.
 
+The authenticated, TLS-only Hub provider response includes `local_dashboard_url`
+with the actual configured local HTTP port alongside the HTTPS `dashboard_url`.
+Hub selects local navigation only after checking its client's socket peer,
+installer-owned Router UUID/SPKI, existing trust and the live loopback TLS
+identity. Other devices receive HTTPS navigation, never this loopback hint.
+Opening a desktop app window transfers no administrator credentials; the panel
+keeps its own login. This metadata does not change Hub-to-Router API transport.
+
 Development uses Router TLS port 9444 (`ORION_ROUTER_TLS_DEV_PORT`) and a TLS
 Next.js server on the configured UI port. Next receives the persistent key/cert
 via `--experimental-https-key`/`--experimental-https-cert`; its backend proxy
