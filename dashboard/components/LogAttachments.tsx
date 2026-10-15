@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 
 export function AttachmentPreview({ attachment }: { attachment: LogAttachment }) {
   const { t } = useApp();
-  const [result, setResult] = useState<{ src?: string; error?: string; missing?: boolean; text?: string; truncated?: boolean; mime?: string } | null>(null);
+  const [result, setResult] = useState<{ src?: string; error?: string; missing?: boolean; text?: string; mime?: string } | null>(null);
   useEffect(() => {
     const controller = new AbortController();
     let objectUrl = '';
@@ -35,10 +35,10 @@ export function AttachmentPreview({ attachment }: { attachment: LogAttachment })
           blob = await (await fetch(attachment.data_url,{signal:controller.signal})).blob();
         } else throw new Error('Attachment data unavailable');
         const isText = attachment.kind === 'document' && (attachment.representation === 'text' || /^(text\/|application\/(json|xml)(;|$))/i.test(blob.type));
-        const text = isText ? await blob.slice(0,262144).text() : undefined;
+        const text = isText ? await blob.text() : undefined;
         if (controller.signal.aborted) return;
         objectUrl = URL.createObjectURL(blob);
-        setResult({src:objectUrl,text,truncated:isText && blob.size > 262144,mime:blob.type});
+        setResult({src:objectUrl,text,mime:blob.type});
       };
       load().catch(error => {if (!controller.signal.aborted) setResult({error:String(error)});});
     }
@@ -55,11 +55,10 @@ export function AttachmentPreview({ attachment }: { attachment: LogAttachment })
         // eslint-disable-next-line @next/next/no-img-element
         <img src={src} alt={attachment.filename || t('logs.attachmentImage')} className="h-full w-full object-contain" onError={() => setResult({ error: t('logs.mediaUnsupported') })} />)
       : attachment.kind === 'video' ? <video controls preload="metadata" src={src} className="h-full w-full object-contain" onError={() => setResult({ error: t('logs.mediaUnsupported') })} />
-      : attachment.kind === 'document' ? result?.text !== undefined ? <pre className="h-full w-full overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-zinc-300 p-2">{result.text}</pre>
+      : attachment.kind === 'document' ? result?.text !== undefined ? <textarea readOnly spellCheck={false} aria-label={attachment.filename || t('archive.preview')} value={result.text} className="h-full w-full resize-none overflow-auto rounded border-0 bg-transparent p-2 font-mono text-xs leading-relaxed text-zinc-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-600" />
         : <div className="text-center space-y-4"><FileText size={40} className="mx-auto text-zinc-500" /><p className="text-sm text-zinc-400">{t('archive.documentReady')}</p>{result?.mime === 'application/pdf' && <a href={src} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm underline"><ExternalLink size={16}/>{t('archive.openPdf')}</a>}</div>
       : <audio controls preload="metadata" src={src} className="w-full max-w-xl [color-scheme:dark]" style={{colorScheme:'dark'}} onError={() => setResult({ error: t('logs.mediaUnsupported') })} />}
     </div>
-    {result?.truncated && <p className="text-xs text-zinc-500">{t('archive.textTruncated')}</p>}
     {attachment.representation === 'text' && /\.(pdf|docx?|xlsx?|pptx?)$/i.test(attachment.filename || '') && <p className="text-xs text-zinc-400">{t('archive.extractedText')}</p>}
     {src && <a href={src} download={attachment.filename ? attachment.representation === 'text' && /\.(pdf|docx?|xlsx?|pptx?)$/i.test(attachment.filename) ? `${attachment.filename}.txt` : attachment.filename : `attachment.${attachment.format || attachment.mime_type?.split('/')[1]?.split(';')[0] || (attachment.kind === 'audio' ? 'ogg' : 'bin')}`} className="shrink-0 text-sm text-zinc-400 underline">{t('logs.downloadMedia')}</a>}
   </div>;

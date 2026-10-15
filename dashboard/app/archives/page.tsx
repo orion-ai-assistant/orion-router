@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { ImageIcon, Volume2, Film, FileText, RefreshCw, Trash2 } from 'lucide-react';
+import { Fragment, useEffect, useState } from 'react';
+import { ImageIcon, Volume2, Film, FileText, RefreshCw, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { adminFetch } from '@/lib/api';
 import { dateTime } from '@/lib/utils';
 import { LogAttachment } from '@/lib/log-attachments';
@@ -9,6 +9,7 @@ import { LogAttachments } from '@/components/LogAttachments';
 import { DateRangeFilter, DateRangeValue } from '@/components/DateRangeFilter';
 import { useApp } from '@/components/AppContext';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 type Kind = LogAttachment['kind'];
 type Media = { id: number; filename?: string; created_at: string; mime_type: string; format: string;
@@ -23,6 +24,7 @@ export default function ArchivesPage() {
   const {start,end} = dates;
   const invalidDates = !!(start && end && start > end);
   const [offset, setOffset] = useState(0);
+  const [jump, setJump] = useState('');
   const [revision, setRevision] = useState(0);
   const [deleting, setDeleting] = useState('');
   const [result, setResult] = useState<Result | null>(null);
@@ -31,6 +33,12 @@ export default function ArchivesPage() {
   const rows = result?.key === key ? result.items : [];
   const error = invalidDates ? t('access.invalidDates') : result?.key === key ? result.error : '';
   const total = result?.key === key ? result.total : 0;
+  const page = offset / 30 + 1;
+  const pageCount = Math.max(1, Math.ceil(total / 30));
+  const pages = Array.from(new Set([1, pageCount, page - 1, page, page + 1,
+    ...(page < 4 ? [2, 3, 4] : []),
+    ...(page > pageCount - 3 ? [pageCount - 3, pageCount - 2, pageCount - 1] : []),
+  ])).filter(n => n >= 1 && n <= pageCount).sort((a, b) => a - b);
   const Icon = kinds.find(item => item.kind === kind)!.icon;
   useEffect(() => {
     if (invalidDates) return;
@@ -87,14 +95,42 @@ export default function ArchivesPage() {
         const filename = row.filename || `${kind}-${row.id}.${row.format}`;
         const attachment: LogAttachment = { ...row, filename, kind, direction: 'archive',
           ...(kind === 'image' ? { image_archive_id: row.id } : kind === 'audio' ? { audio_archive_id: row.id } : kind === 'video' ? { video_archive_id: row.id } : {document_archive_id:row.id}) };
-        return <article key={`${kind}:${row.id}`} className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 space-y-3 min-w-0">
-          <div className="flex items-center gap-3"><Icon size={20} className="text-zinc-400 shrink-0" /><div className="min-w-0"><p className="text-sm truncate" title={filename}>{filename}</p><p className="text-xs text-zinc-500">{dateTime(row.created_at)}</p></div></div>
-          <p className="text-xs text-zinc-400">{(row.size_bytes / 1024).toFixed(1)} KB{row.width && row.height ? ` · ${row.width} × ${row.height}` : ''}{row.duration_seconds != null ? ` · ${row.duration_seconds.toFixed(1)} s` : ''} · {row.mime_type}</p>
-          <div className="flex justify-between gap-2"><LogAttachments attachments={[attachment]} triggerLabel={t('archive.preview')} /><Button variant="ghost" className="text-red-400" disabled={!!deleting} onClick={() => remove(row)}><Trash2 size={15} />{t('archive.delete')}</Button></div>
+        return <article key={`${kind}:${row.id}`} className="flex min-w-0 flex-col gap-5 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
+          <div className="flex flex-wrap items-start gap-3">
+            <div className="flex min-w-0 flex-1 basis-48 items-center gap-3"><Icon size={20} className="text-zinc-400 shrink-0" /><div className="min-w-0"><p className="text-sm truncate" title={filename}>{filename}</p><p className="text-xs text-zinc-500">{dateTime(row.created_at)}</p></div></div>
+            <div className="ml-auto max-w-full text-right text-xs text-zinc-400">
+              <p>{(row.size_bytes / 1024).toFixed(1)} KB{row.width && row.height ? ` · ${row.width} × ${row.height}` : ''}{row.duration_seconds != null ? ` · ${row.duration_seconds.toFixed(1)} s` : ''}</p>
+              <p className="mt-1 break-all">{row.mime_type}</p>
+            </div>
+          </div>
+          <div className="mt-auto flex items-center justify-between gap-4"><Button variant="ghost" className="text-red-400" disabled={!!deleting} onClick={() => remove(row)}><Trash2 size={15} />{t('archive.delete')}</Button><LogAttachments attachments={[attachment]} triggerLabel={t('archive.preview')} /></div>
         </article>;
       })}
     </div>
     {!loading && !rows.length && !error && <p className="text-zinc-400 py-10 text-center">{t('archive.empty')}</p>}
-    <div className="flex flex-wrap justify-center items-center gap-4 mt-6"><Button variant="outline" disabled={loading || offset === 0} onClick={() => setOffset(value => Math.max(0, value - 30))}>{t('access.previous')}</Button><span className="text-sm text-zinc-400">{total ? `${offset + 1}–${Math.min(offset + 30,total)} / ${total}` : '0'}</span><Button variant="outline" disabled={loading || offset + 30 >= total} onClick={() => setOffset(value => value + 30)}>{t('access.next')}</Button></div>
+    <nav aria-label={t('access.pagination')} className="mt-6 flex flex-col items-center gap-3 pb-6">
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
+        <Button variant="outline" size="icon" aria-label={t('access.previous')} disabled={page === 1 || loading} onClick={() => setOffset(value => Math.max(0, value - 30))}><ChevronLeft /></Button>
+        {pages.map((n, index) => <Fragment key={n}>
+          {index > 0 && n - pages[index - 1] > 1 && <span className="px-2 text-zinc-500">…</span>}
+          <Button variant={n === page ? 'secondary' : 'ghost'} className={n === page ? 'border border-purple-500/30 bg-purple-500/15 text-purple-300' : ''} aria-current={n === page ? 'page' : undefined} disabled={loading} onClick={() => setOffset((n - 1) * 30)}>{n}</Button>
+        </Fragment>)}
+        <Button variant="outline" size="icon" aria-label={t('access.next')} disabled={page >= pageCount || loading} onClick={() => setOffset(value => value + 30)}><ChevronRight /></Button>
+      </div>
+      <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-zinc-500">
+        <span>{t('access.logCount', { total, pages: pageCount })}</span>
+        <form className="flex items-center gap-2" onSubmit={event => {
+          event.preventDefault();
+          const target = Number(jump);
+          if (!loading && Number.isInteger(target) && target >= 1 && target <= pageCount) {
+            setOffset((target - 1) * 30);
+            setJump('');
+          }
+        }}>
+          <Input aria-label={t('access.goPage')} className="h-8 w-20" placeholder={t('access.page')} type="number" min={1} max={pageCount} value={jump} onChange={event => setJump(event.target.value)} />
+          <Button type="submit" size="sm" variant="outline" disabled={loading}>{t('access.go')}</Button>
+        </form>
+      </div>
+    </nav>
   </section>;
 }

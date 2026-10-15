@@ -42,18 +42,23 @@ export default function SettingsPage() {
   const [tlsIdentity, setTlsIdentity] = useState<{id: string; name: string; fp: string; port: number;
     local_dashboard_url: string; lan_dashboard_urls: string[]} | null>(null);
   const [tlsError, setTlsError] = useState(false);
+  const [tlsDetailsOpen, setTlsDetailsOpen] = useState(false);
+  const [tlsLoading, setTlsLoading] = useState(false);
   const copyConnectionAddress = async (url: string) => {
     if (await copyText(url)) showToast(locale === 'tr' ? 'Kopyalandı' : 'Copied', 'success');
     else showToast(t('common.error'), 'error');
   };
   const loadTlsIdentity = async () => {
     setTlsError(false);
+    setTlsLoading(true);
     try {
       const response = await adminFetch('/dashboard/api/tls/identity');
       if (!response.ok) throw new Error('TLS identity unavailable');
       setTlsIdentity(await response.json());
     } catch {
       setTlsError(true);
+    } finally {
+      setTlsLoading(false);
     }
   };
 
@@ -328,7 +333,14 @@ export default function SettingsPage() {
         <p className="text-zinc-400 text-sm mb-4">{locale === 'tr'
           ? 'Aynı bilgisayarda kurulan Hub, Router kimliğini otomatik doğrular. Başka bilgisayardaki Hub için aşağıdaki kimliği ve SPKI parmak izini bir kez Hub bağlantı ekranına aktarın.'
           : 'A Hub installed on this computer verifies this Router automatically. For a Hub on another computer, transfer the identity and SPKI fingerprint below to its connection screen once.'}</p>
-        <Button variant="outline" onClick={loadTlsIdentity}>{locale === 'tr' ? 'Bağlantı adreslerini ve kimliği göster' : 'Show connection addresses and identity'}</Button>
+        <Button variant="outline" aria-expanded={tlsDetailsOpen} aria-controls="tls-connection-details" onClick={() => {
+          setTlsDetailsOpen(value => !value);
+          if (!tlsDetailsOpen && !tlsIdentity && !tlsLoading) void loadTlsIdentity();
+        }}>{locale === 'tr'
+          ? tlsDetailsOpen ? 'Bağlantı adreslerini ve kimliği gizle' : 'Bağlantı adreslerini ve kimliği göster'
+          : tlsDetailsOpen ? 'Hide connection addresses and identity' : 'Show connection addresses and identity'}</Button>
+        <div id="tls-connection-details" hidden={!tlsDetailsOpen}>
+        {tlsLoading && <p className="text-zinc-400 mt-3" role="status">{t('common.loading')}</p>}
         {tlsError && <p className="text-red-400 mt-3" role="alert">{t('common.error')}</p>}
         {tlsIdentity && <div className="mt-4 space-y-2 text-sm">
           <div className="pb-4 mb-4 border-b border-zinc-800 space-y-3">
@@ -359,6 +371,7 @@ export default function SettingsPage() {
             catch { showToast(t('common.error'), 'error'); }
           }}>{locale === 'tr' ? 'Parmak izini kopyala' : 'Copy fingerprint'}</Button>
         </div>}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start max-w-6xl">
