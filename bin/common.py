@@ -99,11 +99,10 @@ else:
         PG_CTL  = Path("pg_ctl")
         PSQL    = Path("psql")
 
-PG_DOWNLOAD_URL = (
-    "https://get.enterprisedb.com/postgresql/"
-    "postgresql-16.3-1-windows-x64-binaries.zip"
-)
-PG_ZIP = CACHE_DIR / "postgres.zip"
+from core.windows_postgres import ARCHIVE_NAME, ARCHIVE_URL, VERSION, provision_runtime, verify_unicode_runtime
+
+PG_DOWNLOAD_URL = ARCHIVE_URL
+PG_ZIP = CACHE_DIR / ARCHIVE_NAME
 
 LOCK_FILE_HANDLE = None
 
@@ -291,6 +290,8 @@ def free_ports(ports: list[int], pg_data: Path, pg_label: str) -> None:
 
 def download_postgres() -> None:
     if (TOOLS_DIR / "pgsql.ready").is_file():
+        if sys.platform == 'win32' and not str(PG_BIN).isascii():
+            verify_unicode_runtime(PG_BIN.parent)
         return
 
     if sys.platform != "win32":
@@ -318,11 +319,9 @@ def download_postgres() -> None:
             err("Please install PostgreSQL (e.g. using: brew install postgresql@16) and make sure it is in your PATH.")
             sys.exit(1)
 
-    import shutil
-    # Sadece Orion'a ait portlardaki postgres'leri kapat, başkalarına dokunma
-    kill_postgres_on_ports()
-    shutil.rmtree(TOOLS_DIR / "pgsql", ignore_errors=True)
-    (TOOLS_DIR / "pgsql.manifest").unlink(missing_ok=True)
+    # An existing runtime is repair evidence, never an extraction target.
+    if (TOOLS_DIR / 'pgsql').exists():
+        raise ValueError('PostgreSQL runtime exists without ready marker; explicit repair required')
 
     print()
     info(t("pg_not_found_downloading"))
@@ -354,24 +353,8 @@ def download_postgres() -> None:
         info("Portable PostgreSQL zip found in cache.")
 
     info(t("extracting_archive"))
-    with zipfile.ZipFile(PG_ZIP, "r") as zf:
-        namelist = zf.namelist()
-        total_files = len(namelist)
-        last_pct = -1
-        for i, member in enumerate(namelist, 1):
-            zf.extract(member, TOOLS_DIR)
-            pct = int(i * 100 / total_files)
-            if pct != last_pct:
-                last_pct = pct
-                bar = "█" * (pct // 5) + "░" * (20 - pct // 5)
-                if sys.stdout.isatty():
-                    print(f"\r    [{bar}] {pct:3d}%  ({i}/{total_files} files)", end="", flush=True)
-                else:
-                    if pct % 10 == 0:
-                        print(f"    [{bar}] {pct:3d}%  ({i}/{total_files} files)", flush=True)
-        if sys.stdout.isatty():
-            print()
-    generate_manifest(TOOLS_DIR, "postgresql-16.3-1-windows-x64-binaries")
+    provision_runtime(PG_ZIP, TOOLS_DIR / 'pgsql')
+    generate_manifest(TOOLS_DIR, 'postgresql-' + VERSION + '-windows-x64-binaries')
     (TOOLS_DIR / "pgsql.ready").touch()
     ok(t("pg_ready"))
 
@@ -387,25 +370,16 @@ def init_database(pg_data: Path, pg_user: str, _repair_attempted: bool = False) 
         "--auth=trust",
         "--locale=C",
         "-E", "UTF8",
-    ], capture_output=True, text=True)
+    ], capture_output=True, text=True,
+       encoding='utf-8' if (PG_BIN.parent / '.orion-postgres-runtime.json').is_file() else None)
 
     if not pg_data.exists() or result.returncode != 0:
         err(t("initdb_failed"))
         print(result.stdout[-2000:])
         print(result.stderr[-2000:])
         
-        if not _repair_attempted:
-            warn(t("pg_checking_integrity"))
-            if not verify_manifest(TOOLS_DIR):
-                err(t("pg_corrupted_rebuilding"))
-                import shutil
-                shutil.rmtree(TOOLS_DIR / "pgsql", ignore_errors=True)
-                (TOOLS_DIR / "pgsql.manifest").unlink(missing_ok=True)
-                (TOOLS_DIR / "pgsql.ready").unlink(missing_ok=True)
-                download_postgres()
-                init_database(pg_data, pg_user, _repair_attempted=True)
-                return
-
+        # Failed initialization retains runtime/data for explicit repair.
+        # Do not delete binaries and retry an unknown existing installation.
         sys.exit(1)
 
     ok(t("db_dir_ready"))
@@ -452,20 +426,20 @@ def setup_db_and_user(pg_user: str, pg_pass: str, pg_port: int, pg_db: str) -> N
         raise LifecycleError('Invalid database identifier')
     # SQL input carries the password through stdin, never process argv/logs.
     escaped = pg_pass.replace("'", "''")
-    env = dict(os.environ, PGPASSWORD=pg_pass, PGCONNECT_TIMEOUT='3')
+    env = dict(os.environ, PGPASSWORD=pg_pass, PGCONNECT_TIMEOUT='3', PGCLIENTENCODING='UTF8')
     command = [str(PSQL), '-h', '127.0.0.1', '-U', pg_user, '-p', str(pg_port),
                '-d', 'postgres', '-w', '-v', 'ON_ERROR_STOP=1', '-At']
     sql = f"ALTER USER {pg_user} WITH PASSWORD '{escaped}';"
-    result = run(command, input=sql, text=True, capture_output=True, env=env, timeout=5)
+    result = run(command, input=sql, text=True, encoding='utf-8', capture_output=True, env=env, timeout=5)
     if result.returncode:
         raise LifecycleError('Database role setup failed')
     exists = run(command + ['-c', f"SELECT 1 FROM pg_database WHERE datname = '{pg_db}'"],
-                 capture_output=True, text=True, env=env, timeout=5)
+                 capture_output=True, text=True, encoding='utf-8', env=env, timeout=5)
     if exists.returncode:
         raise LifecycleError('Database schema check failed')
     if exists.stdout.strip() != '1':
         created = run(command, input=f'CREATE DATABASE {pg_db} OWNER {pg_user};',
-                      capture_output=True, text=True, env=env, timeout=5)
+                      capture_output=True, text=True, encoding='utf-8', env=env, timeout=5)
         if created.returncode:
             raise LifecycleError('Database creation failed')
 
