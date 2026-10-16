@@ -103,6 +103,33 @@ class PostgreSQLHubTests(unittest.IsolatedAsyncioTestCase):
         conflict = await self.create_account(key='sk-orion-' + 'c' * 43)
         self.assertEqual(conflict.status_code, 409)
 
+    async def test_account_inventory_is_hub_scoped_and_never_exposes_credentials(self):
+        created = await self.create_account()
+        await self.conn.execute('UPDATE router_virtual_keys SET is_active=false WHERE id=$1', created.json()['id'])
+        response = await self.client.get('/api/v1/hubs/accounts', headers={'x-orion-hub-key': self.token})
+        self.assertEqual(response.json(), {'accounts': [{'subject_id': self.subject, 'is_active': False}]})
+        self.assertNotIn(self.key, response.text)
+        self.assertNotIn('api_key_hash', response.text)
+        self.assertEqual(401, (await self.client.get('/api/v1/hubs/accounts')).status_code)
+
+    async def test_auth_probe_and_deleted_account_reprovision_respect_deactivation(self):
+        created = await self.create_account()
+        headers = {'Authorization': 'Bearer ' + self.key}
+        self.assertEqual(200, (await self.client.get('/api/v1/hubs/account-status', headers=headers)).status_code)
+        await self.conn.execute('DELETE FROM router_virtual_keys WHERE id=$1', created.json()['id'])
+        invalidate_vkey_cache()
+        self.assertEqual(401, (await self.client.get('/api/v1/hubs/account-status', headers=headers)).status_code)
+        restored = await self.create_account()
+        self.assertEqual(200, restored.status_code)
+        self.assertEqual(200, (await self.client.get('/api/v1/hubs/account-status', headers=headers)).status_code)
+        from core.dependencies import verify_token_string
+        self.assertEqual(restored.json()['id'], (await verify_token_string(self.key))['key_id'])
+        await self.conn.execute('UPDATE router_virtual_keys SET is_active=false WHERE id=$1', restored.json()['id'])
+        invalidate_vkey_cache()
+        self.assertEqual(403, (await self.client.get('/api/v1/hubs/account-status', headers=headers)).status_code)
+        await self.create_account()
+        self.assertFalse(await self.conn.fetchval('SELECT is_active FROM router_virtual_keys WHERE id=$1', restored.json()['id']))
+
     async def test_hub_catalog_works_without_admin_password_and_only_allows_catalog_sections(self):
         headers = {'x-orion-hub-key': self.token}
         models = await self.client.get('/api/v1/hubs/catalog/models', headers=headers)
@@ -112,7 +139,7 @@ class PostgreSQLHubTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(models.json()['models'])
         self.app.state.dynamic_router.tts_providers = {}
         voices = await self.client.get('/api/v1/hubs/catalog/voices', headers=headers)
-        self.assertEqual(voices.json(), {'voices': {}})
+        self.assertEqual(voices.json(), {'voices': {}, 'model_voice_groups': {}})
         forbidden = await self.client.get('/api/v1/hubs/catalog/provider-keys', headers=headers)
         self.assertEqual(forbidden.status_code, 404)
 

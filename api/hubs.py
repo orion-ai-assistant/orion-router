@@ -6,7 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from core.dependencies import authenticate_request, verify_admin
+from core.dependencies import authenticate_request, verify_admin, invalidate_vkey_cache
 from core.security import encrypt, decrypt
 from core.secret_guard import SecretRoute
 from database import db_manager
@@ -61,6 +61,12 @@ class Account(BaseModel):
     key: str = Field(pattern=r'^sk-orion-[A-Za-z0-9_-]{43}$')
 
 
+@router.get('/accounts')
+async def accounts(hub: dict = Depends(current_hub)):
+    rows = await db_manager.fetch('SELECT subject_id,is_active FROM router_virtual_keys WHERE hub_id=$1', hub['id'])
+    return {'accounts': [{'subject_id': str(row['subject_id']), 'is_active': row['is_active']} for row in rows]}
+
+
 @router.post('/accounts')
 async def account(payload: Account, hub: dict = Depends(current_hub)):
     digest = hashlib.sha256(payload.key.encode()).hexdigest()
@@ -74,6 +80,7 @@ async def account(payload: Account, hub: dict = Depends(current_hub)):
     ''', payload.name, digest, hub['user_budget'], hub['id'], str(payload.subject_id))
     if not hmac.compare_digest(row['api_key_hash'], digest):
         raise HTTPException(409, 'Hesap erişimi farklı bir anahtarla kayıtlı; Router yöneticisi kontrol etmeli.')
+    invalidate_vkey_cache(digest)
     return {'id': row['id']}
 
 
@@ -98,6 +105,11 @@ async def current_account(request: Request):
     if auth.get('source') != 'virtual_key':
         raise HTTPException(403, 'Kişisel sağlayıcı için kullanıcı erişimi gerekli.')
     return auth
+
+
+@router.get('/account-status')
+async def account_status(auth: dict = Depends(current_account)):
+    return {'ready': True}
 
 
 @router.get('/account-catalog/{section}')
