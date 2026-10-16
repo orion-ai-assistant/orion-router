@@ -107,43 +107,30 @@ PG_ZIP = CACHE_DIR / "postgres.zip"
 
 LOCK_FILE_HANDLE = None
 
+
 def acquire_lock(lock_name: str) -> bool:
+    from core.process_lifecycle import InstanceLock, LifecycleError
     global LOCK_FILE_HANDLE
-    lock_path = ROOT / lock_name
-    
     try:
-        LOCK_FILE_HANDLE = open(lock_path, "w")
-        if sys.platform == "win32":
-            import msvcrt
-            msvcrt.locking(LOCK_FILE_HANDLE.fileno(), msvcrt.LK_NBLCK, 1)
-        else:
-            import fcntl
-            fcntl.flock(LOCK_FILE_HANDLE.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-            
-        LOCK_FILE_HANDLE.write(str(os.getpid()))
-        LOCK_FILE_HANDLE.flush()
+        # Compatibility API for external callers; never truncate/delete old locks.
+        LOCK_FILE_HANDLE = InstanceLock(ROOT / '.orion-lifecycle' / lock_name, 'instance', timeout=0)
+        LOCK_FILE_HANDLE.__enter__()
         return True
-    except (OSError, IOError):
-        if LOCK_FILE_HANDLE:
-            try:
-                LOCK_FILE_HANDLE.close()
-            except Exception:
-                pass
-            LOCK_FILE_HANDLE = None
+    except LifecycleError:
+        LOCK_FILE_HANDLE = None
         return False
+
 
 def release_lock(lock_name: str) -> None:
     global LOCK_FILE_HANDLE
     if LOCK_FILE_HANDLE:
-        try:
-            LOCK_FILE_HANDLE.close()
-            (ROOT / lock_name).unlink(missing_ok=True)
-        except Exception:
-            pass
-        finally:
-            LOCK_FILE_HANDLE = None
+        LOCK_FILE_HANDLE.__exit__()
+        LOCK_FILE_HANDLE = None
+
 
 def run(cmd: list, **kwargs) -> subprocess.CompletedProcess:
+    if kwargs.get('text') or kwargs.get('universal_newlines'):
+        kwargs.setdefault('errors', 'replace')  # Native Windows tools may emit the OEM codepage.
     try:
         return subprocess.run(cmd, **kwargs)
     except subprocess.TimeoutExpired:
@@ -265,233 +252,42 @@ def _windows_orphan_postgres_children(parent_pid: str) -> list[str]:
             children.append(pid)
     return children
 
-def kill_port(port: int) -> bool:
-    if not is_port_open(port):
-        return False
+def kill_port(port: int, *args, **kwargs) -> bool:
+    from core.process_lifecycle import assert_port_free
+    assert_port_free(port)
+    return False
 
-    import shutil
-    import time
-    killed_any = False
-    
-    if shutil.which("docker"):
-        try:
-            cmd = ["docker", "ps", "--filter", f"publish={port}", "--format", "{{.ID}}"]
-            res = run(cmd, capture_output=True, text=True, timeout=5)
-            if res.returncode == 0:
-                container_ids = [line.strip() for line in res.stdout.splitlines() if line.strip()]
-                if container_ids:
-                    for cid in container_ids:
-                        dim(t("docker_cleaning_port", port=port, cid=cid))
-                        run_silent(["docker", "stop", cid], timeout=DEFAULT_TIMEOUT)
-                        killed_any = True
-                    time.sleep(1.5)
-        except Exception:
-            pass
 
-    if sys.platform == "win32":
-        for pid in _windows_listening_pids(port):
-            result = run(
-                ["taskkill", "/f", "/t", "/pid", pid],
-                capture_output=True, text=True, timeout=DEFAULT_TIMEOUT,
-            )
-            if result.returncode != 0 and port in _ORION_PG_PORTS:
-                for child_pid in _windows_orphan_postgres_children(pid):
-                    child_result = run_silent(["taskkill", "/f", "/t", "/pid", child_pid])
-                    if child_result.returncode == 0:
-                        dim(t("port_killed", port=port, pid=child_pid))
-                        killed_any = True
-                if killed_any and not is_port_open(port):
-                    continue
-            if result.returncode == 0:
-                dim(t("port_killed", port=port, pid=pid))
-                killed_any = True
-            else:
-                warn(t("port_kill_failed", port=port, pid=pid))
-                reason = (result.stderr or result.stdout or "").strip()
-                if reason:
-                    dim(reason)
-    else:
-        try:
-            res = run(["lsof", "-t", f"-i:{port}"], capture_output=True, text=True, timeout=5)
-            if res.returncode == 0:
-                pids = [line.strip() for line in res.stdout.splitlines() if line.strip()]
-                for pid in pids:
-                    if pid.isdigit():
-                        run_silent(["kill", "-9", pid])
-                        dim(t("port_killed", port=port, pid=pid))
-                        killed_any = True
-        except Exception:
-            pass
+def kill_portable_postgres(data_dir: Path, label: str, port=None) -> bool:
+    # Retained API no longer kills by PID/port. Explicit stop has DB ordering.
+    from core.process_lifecycle import LifecycleError
+    raise LifecycleError('Implicit PostgreSQL cleanup disabled; use explicit owned stop')
 
-    if killed_any:
-        time.sleep(2.0)
-    return killed_any
 
-def kill_portable_postgres(data_dir: Path, label: str, port: int | None = None) -> bool:
-    if port is not None and not is_port_open(port):
-        return False
+_ORION_PG_PORTS = [int(read_env('POSTGRES_PORT', '5432')), int(read_env('POSTGRES_DEV_PORT', '5433'))]
 
-    pid_file = data_dir / "postmaster.pid"
 
-    if data_dir.exists() and PG_CTL.exists():
-        run_silent([str(PG_CTL), "-D", str(data_dir), "-t", "5", "-m", "fast", "stop"])
-
-    killed_any = False
-    if pid_file.exists():
-        try:
-            lines = pid_file.read_text().splitlines()
-            if lines and lines[0].isdigit():
-                pid = lines[0]
-                check = run_silent(["tasklist", "/fi", f"PID eq {pid}", "/fo", "csv", "/nh"])
-                if check.returncode == 0:
-                    result = run_silent(["taskkill", "/f", "/t", "/pid", pid])
-                    if result.returncode == 0:
-                        dim(t("old_pg_killed", pid=pid, name=label))
-                        killed_any = True
-        except Exception:
-            pass
-
-    if killed_any:
-        time.sleep(2.0)
-    else:
-        time.sleep(1.0)
-
-    if port is not None and is_port_open(port):
-        return False
-
-    return killed_any
-
-# Orion Router'ın kullandığı PostgreSQL portları (prod: POSTGRES_PORT, dev: POSTGRES_DEV_PORT)
-_ORION_PG_PORTS = [
-    int(read_env("POSTGRES_PORT", "")),
-    int(read_env("POSTGRES_DEV_PORT", "")),
-]
-
-def kill_postgres_on_ports(ports: list[int] | None = None) -> bool:
-    """Sadece verilen portlarda dinleyen postgres süreçlerini öldürür.
-
-    Kullanıcının başka projeleri için çalışan PostgreSQL instance'larına
-    dokunmaz — sadece Orion Router'ın kullandığı portları hedef alır.
-    """
-    if ports is None:
-        ports = _ORION_PG_PORTS
-
-    killed_any = False
-    for port in ports:
-        if not is_port_open(port):
-            continue
-        if sys.platform == "win32":
-            try:
-                result = run(
-                    ["netstat", "-aon"],
-                    capture_output=True, text=True, timeout=DEFAULT_TIMEOUT
-                )
-                for line in result.stdout.splitlines():
-                    if f":{port} " in line and "LISTENING" in line:
-                        pid = line.split()[-1]
-                        if pid.isdigit() and pid != "0":
-                            run_silent(["taskkill", "/f", "/t", "/pid", pid])
-                            dim(f"  PostgreSQL (port {port}, PID {pid}) durduruldu.")
-                            killed_any = True
-            except Exception:
-                pass
-        else:
-            try:
-                res = run(["lsof", "-t", f"-i:{port}"], capture_output=True, text=True, timeout=5)
-                if res.returncode == 0:
-                    for pid in res.stdout.splitlines():
-                        if pid.strip().isdigit():
-                            run_silent(["kill", "-9", pid.strip()])
-                            dim(f"  PostgreSQL (port {port}, PID {pid.strip()}) durduruldu.")
-                            killed_any = True
-            except Exception:
-                pass
-
-    if killed_any:
-        time.sleep(1.5)
-    return killed_any
+def kill_postgres_on_ports(ports=None) -> bool:
+    from core.process_lifecycle import assert_port_free
+    for port in ports or _ORION_PG_PORTS:
+        assert_port_free(port)
+    return False
 
 
 def kill_all_postgres() -> bool:
-    """KALDIRILDI — kill_postgres_on_ports() kullanın.
-
-    Bu fonksiyon artık sadece Orion portlarını hedef alan
-    kill_postgres_on_ports()'a yönlendiriyor. Sistemdeki tüm
-    postgres süreçlerini körü körüne öldürmez.
-    """
     return kill_postgres_on_ports()
 
+
 def kill_orion_pid() -> bool:
-    import time
-    killed_any = False
-    pid_file = ROOT / ".orion.pid"
-    if pid_file.exists():
-        try:
-            lines = pid_file.read_text().splitlines()
-            if lines and lines[0].isdigit():
-                pid = lines[0]
-                if sys.platform == "win32":
-                    check = run_silent(["tasklist", "/fi", f"PID eq {pid}", "/fo", "csv", "/nh"])
-                    if check.returncode == 0:
-                        run_silent(["taskkill", "/f", "/t", "/pid", pid])
-                        dim(t("old_pg_killed", pid=pid, name="orion router"))
-                        killed_any = True
-                else:
-                    try:
-                        res = run(["pgrep", "-P", pid], capture_output=True, text=True, timeout=5)
-                    except Exception:
-                        res = subprocess.CompletedProcess(["pgrep"], 1, stdout="", stderr="")
-                    if res.returncode == 0:
-                        run_silent(["pkill", "-P", pid])
-                    run_silent(["kill", "-9", pid])
-                    dim(t("old_pg_killed", pid=pid, name="orion router"))
-                    killed_any = True
-        except Exception:
-            pass
-        finally:
-            try:
-                pid_file.unlink(missing_ok=True)
-                dim(t("stale_file_deleted", file=".orion.pid", name="router"))
-                killed_any = True
-            except Exception:
-                pass
-    return killed_any
+    from core.process_lifecycle import LifecycleError
+    raise LifecycleError('PID-only shutdown disabled; use cli.py stop')
+
 
 def free_ports(ports: list[int], pg_data: Path, pg_label: str) -> None:
-    ports_str = ", ".join(map(str, ports))
-    info(t("cleaning_ports", ports=ports_str))
-    
-    # Check if we have postgres port in the list to pass to kill_portable_postgres
-    pg_port = None
+    from core.process_lifecycle import assert_port_free
     for port in ports:
-        if port in _ORION_PG_PORTS:
-            pg_port = port
-            break
-            
-    if pg_port is not None:
-        kill_portable_postgres(pg_data, pg_label, port=pg_port)
-    for port in ports:
-        kill_port(port)
+        assert_port_free(port)
 
-    deadline = time.time() + 5.0
-    busy_ports = list(ports)
-    while busy_ports and time.time() < deadline:
-        if sys.platform == "win32":
-            busy_ports = [port for port in ports if _windows_listening_pids(port)]
-        else:
-            busy_ports = [port for port in ports if is_port_open(port)]
-        if busy_ports:
-            time.sleep(0.25)
-
-    if busy_ports:
-        details = []
-        for port in busy_ports:
-            pids = _windows_listening_pids(port)
-            details.append(f"{port} (PID {', '.join(pids)})" if pids else str(port))
-        err(t("port_cleanup_failed", ports=", ".join(details)))
-        if sys.platform == "win32":
-            warn(t("port_cleanup_admin_hint"))
-        raise SystemExit(1)
 
 def download_postgres() -> None:
     if (TOOLS_DIR / "pgsql.ready").is_file():
@@ -614,54 +410,18 @@ def init_database(pg_data: Path, pg_user: str, _repair_attempted: bool = False) 
 
     ok(t("db_dir_ready"))
 
+def database(pg_data, pg_port=None, pg_user=None, pg_db='postgres'):
+    from core.native_postgres import Postgres
+    dev = Path(pg_data).name.endswith('dev')
+    return Postgres(PG_CTL, pg_data,
+        pg_port or int(read_env('POSTGRES_DEV_PORT' if dev else 'POSTGRES_PORT', '5432')),
+        pg_user or ('router_user_dev' if dev else 'router_user'), pg_db,
+        'router_pass_dev' if dev else 'router_pass')
+
+
 def start_postgres(pg_data: Path, pg_port: int, pg_log: Path, label: str) -> None:
-    info(t("starting_pg"))
+    database(pg_data, pg_port).ensure()
 
-    for attempt in range(1, 4):
-        deadline = time.time() + 5.0
-        while time.time() < deadline:
-            try:
-                if pg_log.exists():
-                    pg_log.unlink()
-                break
-            except OSError:
-                time.sleep(0.4)
-        else:
-            import datetime
-            ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            pg_log_alt = pg_data / f"pg_{ts}.log"
-            warn(t("pg_log_lock_warning", name=pg_log_alt.name))
-            result = run([
-                str(PG_CTL),
-                "-D", str(pg_data),
-                "-l", str(pg_log_alt),
-                "-o", f"-p {pg_port} -F",
-                "start",
-            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            if result.returncode == 0:
-                return
-            time.sleep(2.0)
-            kill_portable_postgres(pg_data, label)
-            continue
-
-        try:
-            pg_log.parent.mkdir(parents=True, exist_ok=True)
-            pg_log.touch()
-        except Exception:
-            pass
-
-        result = run([
-            str(PG_CTL),
-            "-D", str(pg_data),
-            "-l", str(pg_log),
-            "-o", f"-p {pg_port} -F",
-            "start",
-        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        if result.returncode == 0:
-            return
-
-        time.sleep(2.0)
-        kill_portable_postgres(pg_data, label)
 
 def print_pg_log_errors(pg_log: Path) -> None:
     if pg_log.exists():
@@ -675,83 +435,40 @@ def print_pg_log_errors(pg_log: Path) -> None:
         except Exception as e:
             dim(f"Could not read pg.log: {e}")
 
-def wait_for_postgres(pg_data: Path, pg_port: int, pg_log: Path, pg_user: str, label: str, timeout: float = DEFAULT_TIMEOUT) -> None:
-    info(t("waiting_for_pg"))
-    start_time = time.time()
-    while time.time() - start_time < timeout:
-        try:
-            import socket
-            with socket.create_connection(("127.0.0.1", pg_port), timeout=1.0):
-                res = psql(["-c", "SELECT 1"], pg_user, pg_port)
-                if res.returncode == 0:
-                    ok(t("pg_accepting_conns"))
-                    return
-        except Exception:
-            pass
-        time.sleep(0.5)
-    err(t("pg_timeout_warning"))
-    print_pg_log_errors(pg_log)
-    
-    warn(t("pg_failed_checking_integrity"))
-    if not verify_manifest(TOOLS_DIR):
-        err(t("pg_corrupted_rebuilding"))
-        import shutil
-        stop_postgres(pg_data)
-        shutil.rmtree(TOOLS_DIR / "pgsql", ignore_errors=True)
-        (TOOLS_DIR / "pgsql.manifest").unlink(missing_ok=True)
-        (TOOLS_DIR / "pgsql.ready").unlink(missing_ok=True)
-        download_postgres()
-        start_postgres(pg_data, pg_port, pg_log, label)
-        _wait_for_postgres_once(pg_port, pg_user, pg_log, timeout)
-        return
-        
-    sys.exit(1)
+def wait_for_postgres(pg_data, pg_port, pg_log, pg_user, label, timeout=DEFAULT_TIMEOUT):
+    from core.process_lifecycle import LifecycleError
+    if not database(pg_data, pg_port, pg_user).ready():
+        raise LifecycleError('PostgreSQL readiness failed')
 
-def _wait_for_postgres_once(pg_port: int, pg_user: str, pg_log: Path, timeout: float) -> None:
-    start_time = time.time()
-    while time.time() - start_time < timeout:
-        try:
-            import socket
-            with socket.create_connection(("127.0.0.1", pg_port), timeout=1.0):
-                res = psql(["-c", "SELECT 1"], pg_user, pg_port)
-                if res.returncode == 0:
-                    ok(t("pg_accepting_conns"))
-                    return
-        except Exception:
-            pass
-        time.sleep(0.5)
-    err(t("pg_timeout_warning"))
-    print_pg_log_errors(pg_log)
-    sys.exit(1)
 
 def stop_postgres(pg_data: Path) -> None:
-    run_silent([str(PG_CTL), "-D", str(pg_data), "-t", "5", "stop"])
+    database(pg_data).stop()
+
 
 def setup_db_and_user(pg_user: str, pg_pass: str, pg_port: int, pg_db: str) -> None:
-    info(t("configuring_db_user"))
+    from core.process_lifecycle import LifecycleError
+    import re
+    if not all(re.fullmatch(r'[a-zA-Z_][a-zA-Z0-9_]*', value) for value in (pg_user, pg_db)):
+        raise LifecycleError('Invalid database identifier')
+    # SQL input carries the password through stdin, never process argv/logs.
+    escaped = pg_pass.replace("'", "''")
+    env = dict(os.environ, PGPASSWORD=pg_pass, PGCONNECT_TIMEOUT='3')
+    command = [str(PSQL), '-h', '127.0.0.1', '-U', pg_user, '-p', str(pg_port),
+               '-d', 'postgres', '-w', '-v', 'ON_ERROR_STOP=1', '-At']
+    sql = f"ALTER USER {pg_user} WITH PASSWORD '{escaped}';"
+    result = run(command, input=sql, text=True, capture_output=True, env=env, timeout=5)
+    if result.returncode:
+        raise LifecycleError('Database role setup failed')
+    exists = run(command + ['-c', f"SELECT 1 FROM pg_database WHERE datname = '{pg_db}'"],
+                 capture_output=True, text=True, env=env, timeout=5)
+    if exists.returncode:
+        raise LifecycleError('Database schema check failed')
+    if exists.stdout.strip() != '1':
+        created = run(command, input=f'CREATE DATABASE {pg_db} OWNER {pg_user};',
+                      capture_output=True, text=True, env=env, timeout=5)
+        if created.returncode:
+            raise LifecycleError('Database creation failed')
 
-    psql(["-c", f"ALTER USER {pg_user} WITH PASSWORD '{pg_pass}'"], pg_user, pg_port)
-
-    check_sql = (
-        f"SELECT 'CREATE DATABASE {pg_db}' "
-        f"WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '{pg_db}')"
-    )
-    select_proc = subprocess.Popen(
-        [str(PSQL), "-U", pg_user, "-p", str(pg_port), "-d", "postgres",
-         "-t", "--no-psqlrc", "-c", check_sql],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-    )
-    exec_proc = subprocess.Popen(
-        [str(PSQL), "-U", pg_user, "-p", str(pg_port), "-d", "postgres"],
-        stdin=select_proc.stdout,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    select_proc.stdout.close()
-    exec_proc.wait()
-
-    ok(t("db_ready", db=pg_db))
 
 def set_env(router_port: str, pg_port: int, pg_db: str, pg_user: str, pg_pass: str, uvicorn_reload: str) -> None:
     os.environ["POSTGRES_HOST"]           = "127.0.0.1"

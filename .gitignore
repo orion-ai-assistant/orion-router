@@ -51,3 +51,7 @@ persistent/
 
 # Scratch files
 scratch/
+
+# Native lifecycle ownership records and runtime controls
+.orion-lifecycle/
+.orion-lifecycle-postgres/

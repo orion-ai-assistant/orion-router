@@ -242,8 +242,7 @@ cat > "$CLI_SCRIPT" << 'EOF'
 ACTION="${1:-help}"
 OPTION="${2:-}"
 PROJECT_DIR="${ORION_INSTALL_DIR:-$HOME/.orion-router}"
-PID_FILE="$PROJECT_DIR/.orion.pid"
-LOG_FILE="$PROJECT_DIR/orion_output.log"
+LOG_FILE="$PROJECT_DIR/.orion-lifecycle/router-prod/supervisor.log"
 ERROR_LOG_FILE="$PROJECT_DIR/orion_error.log"
 
 ORIGINAL_DIR=$(pwd)
@@ -262,44 +261,15 @@ if [ "$ACTION" = "help" ] || [ -z "$ACTION" ]; then
     echo "    help    Shows this help menu"
     echo ""
 elif [ "$ACTION" = "start" ]; then
-    if [ -f "$PID_FILE" ]; then
-        PID=$(cat "$PID_FILE")
-        if ps -p "$PID" > /dev/null 2>&1; then
-            echo "[OK] Orion Router is already running in the background!"
-            echo "To view logs: orionrouter logs"
-            exit 0
-        fi
-        rm -f "$PID_FILE"
-    fi
-
-    echo "Starting Orion Router locally..."
     cd "$PROJECT_DIR"
-    nohup python3 cli.py prod > "$LOG_FILE" 2> "$ERROR_LOG_FILE" &
-    PID=$!
-    echo $PID > "$PID_FILE"
-    
-    if [ "$OPTION" = "-silent" ] || [ "$OPTION" = "--silent" ] || [ "$OPTION" = "silent" ]; then
-        echo -e "\033[92mOrion Router started in the background (Silent).\033[0m"
-        exit 0
-    fi
-    
-    echo -e "\033[92mOrion Router started. Opening logs in a new window...\033[0m"
-    if command -v osascript >/dev/null 2>&1; then
-        osascript -e 'tell application "Terminal" to do script "orionrouter logs"' >/dev/null 2>&1 &
-    elif command -v gnome-terminal >/dev/null 2>&1; then
-        gnome-terminal -- bash -c "orionrouter logs; exec bash" >/dev/null 2>&1 &
-    elif command -v x-terminal-emulator >/dev/null 2>&1; then
-        x-terminal-emulator -e "bash -c 'orionrouter logs; exec bash'" >/dev/null 2>&1 &
-    else
-        echo -e "\033[96mCould not open a new terminal automatically. To view logs, run: orionrouter logs\033[0m"
-    fi
-    exit 0
+    PYTHON="$PROJECT_DIR/.venv/bin/python"
+    [ -x "$PYTHON" ] || PYTHON=python3
+    "$PYTHON" -m core.lifecycle_cli start || exit $?
 elif [ "$ACTION" = "stop" ]; then
-    STOP_SCRIPT="$PROJECT_DIR/bin/stop.py"
-    if [ -f "$STOP_SCRIPT" ]; then
-        python3 "$STOP_SCRIPT" || true
-    fi
-    echo "[OK] Orion Router stopped."
+    cd "$PROJECT_DIR"
+    PYTHON="$PROJECT_DIR/.venv/bin/python"
+    [ -x "$PYTHON" ] || PYTHON=python3
+    "$PYTHON" -m core.lifecycle_cli stop || exit $?
 elif [ "$ACTION" = "logs" ]; then
     PORT="9443"
     if [ -f "$PROJECT_DIR/.env" ]; then

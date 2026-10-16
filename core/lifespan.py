@@ -94,71 +94,8 @@ def print_active_services_banner(
 
 
 def _restart_postgres() -> None:
-    """Restarts the portable PostgreSQL instance if it is in use and pg_ctl exists."""
-    try:
-        from bin.common import PG_CTL
-        pg_ctl = PG_CTL
-    except Exception:
-        import shutil
-        pg_ctl_path = shutil.which("pg_ctl")
-        pg_ctl = Path(pg_ctl_path) if pg_ctl_path else None
-
-    if not pg_ctl or not pg_ctl.exists():
-        logger.warning("PostgreSQL pg_ctl not found. Cannot restart database automatically.")
-        return
-
-    postgres_port = os.getenv("POSTGRES_PORT")
-    if postgres_port == "5444":
-        data_dir = Path(__file__).parent.parent / ".pgdata-dev"
-    elif postgres_port == "5433":
-        data_dir = Path(__file__).parent.parent / ".pgdata-prod"
-    else:
-        logger.warning(f"Unknown POSTGRES_PORT ({postgres_port}), skipping auto-restart.")
-        return
-
-    if not data_dir.exists():
-        logger.warning(f"Data directory {data_dir} does not exist. Skipping auto-restart.")
-        return
-
-    logger.info(f"Attempting to auto-restart PostgreSQL database ({data_dir.name})...")
-    
-    # 1. Stop PG
-    try:
-        subprocess.run(
-            [str(pg_ctl), "-D", str(data_dir), "stop"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            timeout=10
-        )
-    except Exception as e:
-        logger.debug(f"Error stopping postgres during restart: {e}")
-
-    # 2. Remove stale pid
-    pid_file = data_dir / "postmaster.pid"
-    if pid_file.exists():
-        try:
-            pid_file.unlink(missing_ok=True)
-            logger.info(f"Removed stale postmaster.pid from {data_dir.name}")
-        except Exception as e:
-            logger.warning(f"Failed to remove stale postmaster.pid: {e}")
-
-    # 3. Start PG
-    try:
-        subprocess.run(
-            [
-                str(pg_ctl),
-                "-D", str(data_dir),
-                "-l", str(data_dir / "pg.log"),
-                "-o", f"-p {postgres_port} -F",
-                "start",
-            ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            timeout=10
-        )
-        logger.info("PostgreSQL restart command executed successfully.")
-    except Exception as e:
-        logger.error(f"Failed to start postgres during restart: {e}")
+    # API workers must never stop/restart a shared DB while other work is active.
+    raise RuntimeError('Database unavailable; recover through the verified native supervisor')
 
 
 @asynccontextmanager
