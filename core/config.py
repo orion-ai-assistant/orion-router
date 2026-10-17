@@ -10,11 +10,13 @@ import shutil
 import sys
 
 _ROOT = pathlib.Path(__file__).parent.parent
-_ENV_PATH = _ROOT / ".env"
+from core.runtime_layout import data_root
+_DATA_ROOT = data_root(_ROOT)
+_ENV_PATH = _DATA_ROOT / ".env"
 _ENV_EXAMPLE_PATH = _ROOT / ".env.example"
 
 # Sadece ENCRYPTION_KEY için kalıcı volume dizini
-_PERSISTENT_DIR = _ROOT / "persistent"
+_PERSISTENT_DIR = _DATA_ROOT / "persistent"
 _KEY_FILE = _PERSISTENT_DIR / "encryption.key"
 
 

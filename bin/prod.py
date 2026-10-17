@@ -42,7 +42,8 @@ from bin.i18n import t
 # ─────────────────────────────────────────────────────────────────────────────
 # Prod-Specific Paths & Constants
 # ─────────────────────────────────────────────────────────────────────────────
-PG_DATA   = ROOT / ".pgdata-prod"
+from core.runtime_layout import data_root
+PG_DATA   = data_root(ROOT) / ".pgdata-prod"
 PG_LOG    = PG_DATA / "pg.log"
 
 PG_PORT   = int(read_env("POSTGRES_PORT", ""))

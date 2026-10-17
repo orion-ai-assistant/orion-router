@@ -127,6 +127,11 @@ def build_dashboard() -> None:
 
 
 def ensure_dashboard(force: bool = False, *, log: Callable[[str], None] | None = None) -> None:
+    from core.runtime_layout import component
+    if component(ROOT):
+        if force or not (DASHBOARD / 'out/index.html').is_file():
+            raise RuntimeError('Packaged dashboard missing or rebuild requested; package repair required')
+        return
     report = log or (lambda message: print(message, flush=True))
     reason = "Dashboard derlemesi zorlandı" if force else _build_reason()
     if reason is None:

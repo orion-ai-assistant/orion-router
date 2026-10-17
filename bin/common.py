@@ -40,6 +40,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from bin.i18n import t
+from core.runtime_layout import data_root
 from bin.pg_integrity import generate_manifest, verify_manifest
 
 DEFAULT_TIMEOUT = 10.0
@@ -172,7 +173,7 @@ def postgres_is_ready(pg_data: Path, pg_port: int, pg_user: str) -> bool:
         return False
 
 def read_env(key: str, default: str) -> str:
-    env_file = ROOT / ".env"
+    env_file = data_root(ROOT) / ".env"
     if env_file.exists():
         for line in env_file.read_text(encoding="utf-8").splitlines():
             stripped = line.strip()

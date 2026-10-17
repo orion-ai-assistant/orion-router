@@ -62,6 +62,11 @@ def check_for_updates(force: bool = False) -> Dict[str, Any]:
     """
     Uzak GitHub reposundaki pyproject.toml dosyasından yeni sürüm olup olmadığını denetler.
     """
+    from core.runtime_layout import component
+    if component(ROOT):
+        return {"status": "check-unavailable", "current_version": APP_VERSION,
+                "latest_version": None, "update_available": None, "last_checked": None,
+                "reason": "Signed package repository is not configured; Stage 06/07 remains disabled"}
     global _CACHE
     now = time.time()
     if not force and _CACHE["data"] and (now - _CACHE["timestamp"] < CACHE_TTL):
@@ -231,6 +236,9 @@ def _perform_update_worker():
 
 
 def start_update() -> Dict[str, Any]:
+    from core.runtime_layout import component
+    if component(ROOT):
+        return {"status": "error", "message": "Packaged updates require the signed release helper; not enabled in Stage 05"}
     """Güncelleme işlemini başlatır."""
     global _UPDATE_STATE
     with _UPDATE_LOCK:

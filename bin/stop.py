@@ -6,6 +6,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 from core.process_lifecycle import Runtime, LifecycleError, stop_component
 from bin.common import database
+from core.runtime_layout import data_root
 
 
 def main():
@@ -15,7 +16,7 @@ def main():
         record = Runtime(ROOT, component).read()
         if record:
             stop_component(ROOT, component)
-            database(ROOT / ('.pgdata-' + mode)).stop()
+            database(data_root(ROOT) / ('.pgdata-' + mode)).stop()
             found = True
     if not found:
         raise LifecycleError('No verified Router ownership record; stop legacy Router manually')

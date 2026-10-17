@@ -31,6 +31,9 @@ def banner():
     print(f"{CYAN}{BOLD}╚{line}╝{RESET}\n")
 
 def main():
+    from core.runtime_layout import component
+    if component(ROOT):
+        raise SystemExit('Signed package update helper is not enabled; existing release retained')
     banner()
     info(f"Mevcut Sürüm: {BOLD}v{APP_VERSION}{RESET}")
     info("Güncellemeler denetleniyor...")
