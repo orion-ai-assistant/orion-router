@@ -1,15 +1,19 @@
 {
   "schema": 1,
   "component": "router",
-  "package_id": "orion-router-0.1.3-windows-x86_64-cpu",
-  "version": "0.1.3",
-  "sequence": 1,
+  "package_id": "orion-router-0.1.4-windows-x86_64-cpu",
+  "version": "0.1.4",
+  "sequence": 2,
   "platform": "windows",
   "arch": "x86_64",
   "profile": "cpu",
   "api": 2,
   "requires": {},
-  "capabilities": ["hubs.accounts.get", "hubs.account-status.get", "lifecycle.update-quarantine.v1"],
+  "capabilities": [
+    "hubs.accounts.get",
+    "hubs.account-status.get",
+    "lifecycle.update-quarantine.v1"
+  ],
   "data_schema": 1,
   "rollback": "same-schema-only",
   "entrypoint": "cli.py"
