@@ -9,7 +9,7 @@
   "profile": "cpu",
   "api": 2,
   "requires": {},
-  "capabilities": ["hubs.accounts.get", "hubs.account-status.get"],
+  "capabilities": ["hubs.accounts.get", "hubs.account-status.get", "lifecycle.update-quarantine.v1"],
   "data_schema": 1,
   "rollback": "same-schema-only",
   "entrypoint": "cli.py"

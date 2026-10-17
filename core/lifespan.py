@@ -194,7 +194,9 @@ async def lifespan(app: FastAPI):
         except Exception as exc:
             logger.debug("Background voices warmup skipped: %s", exc)
 
-    asyncio.create_task(_warmup_provider_voices())
+    from core.update_gate import blocked
+    if not blocked():
+        asyncio.create_task(_warmup_provider_voices())
 
     if os.getenv("ORION_NO_BANNER") != "1":
         if sys.platform == "win32":
@@ -215,7 +217,8 @@ async def lifespan(app: FastAPI):
     app.state.local_http_listener = local_http_listener
     advertiser = Advertiser()
     app.state.mdns_advertiser = advertiser
-    advertiser.start()
+    if not blocked():
+        advertiser.start()
     try:
         yield
     finally:

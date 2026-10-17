@@ -175,6 +175,8 @@ def _main(runtime, force_build: bool = False) -> None:
 
 
 def main(force_build=False):
+    from core.update_gate import require_start_admission
+    require_start_admission(ROOT)
     from core.process_lifecycle import Runtime
     with Runtime(ROOT, 'router-prod') as runtime:
         return _main(runtime, force_build)

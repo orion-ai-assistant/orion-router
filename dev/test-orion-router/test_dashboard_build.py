@@ -180,35 +180,23 @@ class DashboardBuildTests(unittest.TestCase):
         self.assertEqual((self.dashboard / "out" / build.MANIFEST).read_bytes(), manifest)
 
     def test_cli_update_failure_is_nonzero(self):
-        with patch.object(cli_update, "ROOT", self.root), \
-                patch.object(cli_update, "check_for_updates", return_value={"update_available": True}), \
-                patch.object(cli_update, "ensure_dashboard", side_effect=RuntimeError("build failed")):
-            with self.assertRaises(SystemExit) as result:
-                cli_update.main()
-        self.assertEqual(result.exception.code, 1)
+        with patch.object(cli_update, 'start_update', return_value={'status': 'error'}), \
+                patch.object(sys, 'argv', ['cli.py', 'update']):
+            self.assertEqual(cli_update.main(), 1)
 
     def test_web_update_failure_does_not_restart_or_report_success(self):
-        state = {"logs": [], "success": False, "is_updating": True, "error": None}
-        with patch.object(updater, "ROOT", self.root), \
-                patch.object(updater, "_UPDATE_STATE", state), \
-                patch.object(build, "ensure_dashboard", side_effect=RuntimeError("build failed")), \
-                patch.object(updater.logger, "error"):
-            updater._perform_update_worker()
-        self.assertFalse(state["success"])
-        self.assertEqual(state["step"], "failed")
-        self.assertIn("build failed", state["error"])
+        with patch.object(updater, '_installation', side_effect=ValueError('source installation')), \
+                patch.object(build, 'ensure_dashboard', side_effect=AssertionError('Build forbidden')):
+            result = updater.start_update()
+        self.assertEqual(result['status'], 'error')
         self.assertFalse((self.root / ".restart_requested").exists())
 
     def test_web_backend_update_uses_fast_path(self):
-        self.mark_current()
-        state = {"logs": [], "success": False, "is_updating": True, "error": None}
-        with patch.object(updater, "ROOT", self.root), \
-                patch.object(updater, "_UPDATE_STATE", state), \
-                patch.object(updater.threading, "Thread"), \
-                patch.object(build, "npm_needs_install", side_effect=AssertionError("npm checked")):
-            updater._perform_update_worker()
-        self.assertTrue(state["success"])
-        self.assertTrue(any("derleme atlandı" in line for line in state["logs"]))
+        expected = {'status': 'check-unavailable', 'last_checked': None}
+        with patch.object(updater, 'get_update_status', return_value=expected), \
+                patch.object(updater, 'start_update', side_effect=AssertionError('Public read cannot update')), \
+                patch.object(build, 'npm_needs_install', side_effect=AssertionError('Build forbidden')):
+            self.assertEqual(updater.check_for_updates(force=True), expected)
 
     def test_cli_forwards_both_force_flags(self):
         for flag in ("--build", "--force-build"):

@@ -1,261 +1,92 @@
-"""
-core/updater.py
----------------
-Orion Router için sürüm denetimi ve otomatik güncelleme yöneticisi.
-"""
-
-import os
-import sys
-import time
+"""Signed package update bridge. Never Git/pip/build or restart live work."""
 import json
-import logging
-import threading
-import subprocess
-import urllib.request
 from pathlib import Path
-from typing import Dict, Any, Optional
+from core.config import APP_VERSION
+from core.installation_registry import Registry, operation_lock, _atomic_write
+from core.installation_paths import canonical_path
 
-from core.config import APP_VERSION, GITHUB_REPO
-
-logger = logging.getLogger("service-router.updater")
-
-ROOT = Path(__file__).parent.parent.resolve()
-
-_CACHE: Dict[str, Any] = {
-    "data": None,
-    "timestamp": 0
-}
-CACHE_TTL = 300  # 5 dakika önbellek
-
-_UPDATE_LOCK = threading.Lock()
-_UPDATE_STATE: Dict[str, Any] = {
-    "is_updating": False,
-    "step": "idle",
-    "progress": 0,
-    "logs": [],
-    "error": None,
-    "success": False,
-    "started_at": 0,
-    "finished_at": 0
-}
+ROOT = Path(__file__).resolve().parents[1]
 
 
-def _parse_semver(v: str) -> tuple:
-    """v0.1.2 veya 0.1.2 şeklindeki sürüm dizgesini karşılaştırılabilir tuple'a dönüştürür."""
-    clean = v.strip().lstrip("vV")
-    parts = []
-    for part in clean.split("."):
-        try:
-            parts.append(int(part))
-        except ValueError:
-            parts.append(0)
-    while len(parts) < 3:
-        parts.append(0)
-    return tuple(parts[:3])
+def _installation():
+    registry = Registry()
+    record = registry.read()
+    matches = [c for c in (record or {}).get('components', []) if c['kind'] == 'router'
+               and c['distribution'] == 'packaged' and c['management'] == 'local'
+               and c['ownership'] == 'owned' and Path(c['code_path']).resolve() == ROOT.resolve()]
+    if len(matches) != 1:
+        raise ValueError('Legacy/development installations require explicit package conversion')
+    return registry, record, matches[0]
 
 
-def _is_git_repository() -> bool:
-    return (ROOT / ".git").exists()
+def _json(path, default=None):
+    path = canonical_path(path)
+    return json.loads(path.read_text(encoding='utf-8')) if path.exists() else default
 
 
-def check_for_updates(force: bool = False) -> Dict[str, Any]:
-    """
-    Uzak GitHub reposundaki pyproject.toml dosyasından yeni sürüm olup olmadığını denetler.
-    """
-    from core.runtime_layout import component
-    if component(ROOT):
-        return {"status": "check-unavailable", "current_version": APP_VERSION,
-                "latest_version": None, "update_available": None, "last_checked": None,
-                "reason": "Signed package repository is not configured; Stage 06/07 remains disabled"}
-    global _CACHE
-    now = time.time()
-    if not force and _CACHE["data"] and (now - _CACHE["timestamp"] < CACHE_TTL):
-        return _CACHE["data"]
-
-    current_ver = APP_VERSION
-    latest_ver = current_ver
-    release_notes = ""
-    release_url = f"https://github.com/{GITHUB_REPO}"
-    has_update = False
-
-    # Doğrudan GitHub main dalındaki pyproject.toml dosyasından version kontrolü
-    headers = {"User-Agent": "OrionRouter-Updater"}
-    raw_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/pyproject.toml"
+def get_update_status():
     try:
-        req = urllib.request.Request(raw_url, headers=headers)
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            if resp.status == 200:
-                content = resp.read().decode("utf-8")
-                for line in content.splitlines():
-                    if line.strip().startswith("version"):
-                        parts = line.split("=", 1)
-                        if len(parts) == 2:
-                            parsed = parts[1].strip().strip('"').strip("'")
-                            latest_ver = parsed
-                            if _parse_semver(parsed) > _parse_semver(current_ver):
-                                has_update = True
-                            break
-    except Exception as e:
-        logger.debug(f"GitHub pyproject.toml check failed: {e}")
-
-    result = {
-        "current_version": current_ver,
-        "latest_version": latest_ver,
-        "update_available": has_update,
-        "behind_commits": 0,
-        "release_notes": release_notes,
-        "release_url": release_url,
-        "is_git_repo": _is_git_repository(),
-        "last_checked": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now))
-    }
-
-    _CACHE["data"] = result
-    _CACHE["timestamp"] = now
-    return result
-
-
-def get_update_status() -> Dict[str, Any]:
-    with _UPDATE_LOCK:
-        return dict(_UPDATE_STATE)
-
-
-def _append_log(msg: str):
-    timestamp = time.strftime("%H:%M:%S")
-    formatted = f"[{timestamp}] {msg}"
-    with _UPDATE_LOCK:
-        _UPDATE_STATE["logs"].append(formatted)
-    logger.info(f"[Updater] {msg}")
+        registry, record, item = _installation()
+        base = registry.path.parent
+        manifest = _json(Path(item['code_path']) / 'orion-release.json', {})
+        checked = _json(base / 'updates/router-automatic.json', {})
+        policy = _json(base / 'updates/router-policy.json', {'enabled': False})
+        pointer = _json(base / 'updates/active.json')
+        tx = None
+        if pointer:
+            import uuid
+            identity = str(uuid.UUID(pointer['operation_id']))
+            if identity != pointer['operation_id'] or pointer['schema'] != 1:
+                raise ValueError('Invalid update pointer')
+            tx = _json(base / 'updates' / identity / 'journal.json')
+            if not tx or tx['installation_id'] != record['installation_id']:
+                raise ValueError('Invalid update journal')
+        if tx and 'router' not in tx.get('changes', []):
+            tx = None
+        phase = tx['phase'] if tx else 'idle'
+        pending = phase in {'staged', 'waiting_for_idle'}
+        busy = phase in {'checking', 'downloading', 'verifying', 'draining', 'backing_up', 'switching', 'health_check', 'rollback_pending'}
+        proposed = (tx or {}).get('proposed') or {}
+        target = next((c for c in proposed.get('components', []) if c['kind'] == 'router'), None)
+        latest = _json(Path(target['code_path']) / 'orion-release.json', {}) if target else {}
+        configured = bool(_json(base / 'bootstrap/release-source.json', {}).get('targets', {}).get('router')
+                          and _json(base / 'bootstrap/automatic-runtime.json'))
+        return {'status': 'ready' if configured else 'check-unavailable',
+                'current_version': manifest.get('version', APP_VERSION),
+                'latest_version': latest.get('version'), 'update_available': pending,
+                'last_checked': checked.get('last_success'), 'last_attempt': checked.get('last_attempt'),
+                'automatic_updates': policy.get('enabled', False), 'phase': phase,
+                'is_updating': busy, 'step': phase, 'progress': 100 if phase == 'completed' else 0,
+                'success': phase == 'completed', 'error': checked.get('error') or
+                (phase if phase in {'failed', 'repair_required', 'rolled_back'} else None),
+                'logs': [], 'pending': pending,
+                'message': 'Hazır sürüm sonraki güvenli açılışı bekliyor.' if pending else
+                'İmzalı paket kaynağı ve ayrı yardımcı gerekir; legacy dönüşümü kendiliğinden yapılmaz.'}
+    except (OSError, ValueError, KeyError, TypeError):
+        return {'status': 'check-unavailable', 'current_version': APP_VERSION,
+                'latest_version': None, 'update_available': None, 'last_checked': None,
+                'is_updating': False, 'step': 'unavailable', 'progress': 0,
+                'success': False, 'logs': [], 'error': 'Package installation/update status unavailable'}
 
 
-def _set_step(step: str, progress: int):
-    with _UPDATE_LOCK:
-        _UPDATE_STATE["step"] = step
-        _UPDATE_STATE["progress"] = progress
+def check_for_updates(force=False):
+    # The public version endpoint is read-only, including its historical force flag.
+    return get_update_status()
 
 
-def _run_cmd(cmd, cwd=ROOT, env=None) -> subprocess.CompletedProcess:
-    full_env = {**os.environ, **(env or {})}
-    _append_log(f"$ {cmd if isinstance(cmd, str) else ' '.join(cmd)}")
-    proc = subprocess.run(
-        cmd,
-        cwd=cwd,
-        shell=isinstance(cmd, str),
-        capture_output=True,
-        text=True,
-        env=full_env
-    )
-    if proc.stdout:
-        for line in proc.stdout.strip().splitlines():
-            if line.strip():
-                _append_log(line)
-    if proc.stderr:
-        for line in proc.stderr.strip().splitlines():
-            if line.strip() and not "npm warn" in line.lower():
-                _append_log(f"[stderr] {line}")
-    return proc
-
-
-def _perform_update_worker():
-    global _UPDATE_STATE
+def start_update():
     try:
-        _append_log("Güncelleme süreci başlatıldı.")
-        
-        # 1. Adım: Git Kodlarını Çekme
-        _set_step("git_pull", 15)
-        _append_log("[1/4] GitHub üzerinden en son kodlar alınıyor...")
-        if _is_git_repository():
-            fetch_res = _run_cmd("git fetch origin main")
-            if fetch_res.returncode != 0:
-                raise RuntimeError(f"git fetch failed: {fetch_res.stderr}")
-
-            # Değişiklikleri entegre et
-            pull_res = _run_cmd("git pull --ff-only origin main")
-            if pull_res.returncode != 0:
-                _append_log("ff-only başarısız, reset denetleniyor...")
-                reset_res = _run_cmd("git reset --hard origin/main")
-                if reset_res.returncode != 0:
-                    raise RuntimeError(f"git reset failed: {reset_res.stderr}")
-            _append_log("Kodlar başarıyla güncellendi.")
-        else:
-            _append_log("Git reposu bulunamadı, mevcut dosyalar korunuyor.")
-
-        # 2. Adım: Python Bağımlılıkları
-        _set_step("dependencies", 40)
-        _append_log("[2/4] Python paketleri denetleniyor...")
-        req_file = ROOT / "requirements.txt"
-        if req_file.exists():
-            pip_res = _run_cmd([sys.executable, "-m", "pip", "install", "-r", "requirements.txt", "--quiet"])
-            if pip_res.returncode != 0:
-                _append_log("Uyarı: pip install bazı uyarılar verdi, devam ediliyor.")
-        _append_log("Python bağımlılıkları tamamlandı.")
-
-        # 3. Adım: Dashboard Bağımlılıkları & Build
-        _set_step("build_dashboard", 70)
-        _append_log("[3/4] Dashboard denetleniyor...")
-        from bin.dashboard_build import ensure_dashboard
-        try:
-            ensure_dashboard(log=_append_log)
-        except Exception as exc:
-            raise RuntimeError(f"Kod güncellendi ancak dashboard hazırlanamadı: {exc}") from exc
-        _append_log("Dashboard hazır.")
-
-        # 4. Adım: Tamamlanma ve Yeniden Başlatma Sinyali
-        _set_step("restarting", 95)
-        _append_log("[4/4] Güncelleme tamamlandı! Servis yeniden başlatılıyor...")
-        
-        # Yeniden başlatma dosyasını oluştur (prod.py supervisor bunu algılayacak)
-        restart_flag = ROOT / ".restart_requested"
-        restart_flag.write_text(str(int(time.time())), encoding="utf-8")
-
-        with _UPDATE_LOCK:
-            _UPDATE_STATE["success"] = True
-            _UPDATE_STATE["step"] = "completed"
-            _UPDATE_STATE["progress"] = 100
-            _UPDATE_STATE["finished_at"] = time.time()
-            _UPDATE_STATE["is_updating"] = False
-
-        _append_log("✔ Güncelleme başarıyla bitti! Arayüz kısa süre içinde yenilenecek.")
-
-        # Arka planda 2 saniye sonra FastAPI sürecini kapat (prod.py anında tekrar ayağa kaldıracak)
-        def _delayed_exit():
-            time.sleep(2.5)
-            logger.info("Restart sinyali gereği FastAPI kapatılıyor...")
-            # Sadece Python sürecinden 0 ile çık; prod.py superviser'ı postgres'i kapatmadan main.py'yi tekrar başlatacak
-            os._exit(0)
-
-        threading.Thread(target=_delayed_exit, daemon=True).start()
-
-    except Exception as e:
-        logger.error(f"Update error: {e}", exc_info=True)
-        _append_log(f"✘ HATA: {str(e)}")
-        with _UPDATE_LOCK:
-            _UPDATE_STATE["error"] = str(e)
-            _UPDATE_STATE["step"] = "failed"
-            _UPDATE_STATE["is_updating"] = False
-            _UPDATE_STATE["finished_at"] = time.time()
-
-
-def start_update() -> Dict[str, Any]:
-    from core.runtime_layout import component
-    if component(ROOT):
-        return {"status": "error", "message": "Packaged updates require the signed release helper; not enabled in Stage 05"}
-    """Güncelleme işlemini başlatır."""
-    global _UPDATE_STATE
-    with _UPDATE_LOCK:
-        if _UPDATE_STATE["is_updating"]:
-            return {"status": "already_running", "message": "Güncelleme zaten devam ediyor."}
-
-        _UPDATE_STATE = {
-            "is_updating": True,
-            "step": "started",
-            "progress": 5,
-            "logs": [],
-            "error": None,
-            "success": False,
-            "started_at": time.time(),
-            "finished_at": 0
-        }
-
-    thread = threading.Thread(target=_perform_update_worker, daemon=True)
-    thread.start()
-    return {"status": "started", "message": "Güncelleme başlatıldı."}
+        registry, record, item = _installation()
+        feed = _json(registry.path.parent / 'bootstrap/release-source.json', {})
+        if not feed.get('targets', {}).get('router') or not _json(registry.path.parent / 'bootstrap/automatic-runtime.json'):
+            raise ValueError('Signed Router repository/runtime unavailable')
+        with operation_lock(registry.path, timeout=0):
+            if registry.read() != record:
+                raise ValueError('Installation changed')
+            path = canonical_path(registry.path.parent / 'updates/router-request.json')
+            path.parent.mkdir(exist_ok=True)
+            _atomic_write(path, json.dumps({'schema': 1, 'installation_id': record['installation_id'],
+                                           'action': 'prepare'}).encode())
+        return {'status': 'started', 'message': 'İmzalı kontrol/hazırlama sıraya alındı. Çalışan Router durdurulmaz; hazır sürüm sonraki güvenli açılışta uygulanır.'}
+    except (OSError, ValueError, RuntimeError):
+        return {'status': 'error', 'message': 'Kayıtlı paket kurulumu, imzalı Router kaynağı ve dış launcher gerekir. Yerinde Git/pip güncellemesi kapalıdır.'}

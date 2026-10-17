@@ -26,6 +26,19 @@ fi
 echo "Installation Mode: $MODE"
 INSTALL_DIR="${ORION_INSTALL_DIR:-$HOME/.orion-router}"
 REPO_URL="https://github.com/orion-ai-assistant/orion-router.git"
+if [ -e "$INSTALL_DIR/.orion-converted.json" ] || [ -e "$INSTALL_DIR/orion-release.json" ]; then
+  echo 'Packaged/converted installation: use the signed launcher; source reset is disabled.' >&2
+  exit 1
+fi
+INSTALLATION_REGISTRY="${ORION_INSTALLATION_REGISTRY:-${XDG_CONFIG_HOME:-$HOME/.config}/orion/install.json}"
+if [ -f "$INSTALLATION_REGISTRY" ]; then
+  python3 - "$INSTALLATION_REGISTRY" <<'PY'
+import json,sys
+r=json.load(open(sys.argv[1],encoding='utf-8'))
+if r.get('schema_version') != 1 or any(c['kind']=='router' and c['distribution']=='packaged' for c in r['components']):
+    raise SystemExit('Packaged Router registered: source reset is disabled')
+PY
+fi
 echo "Target Directory:  $INSTALL_DIR"
 
 # 1. Requirement Checks

@@ -23,6 +23,18 @@ if ($Mode -notin @("local", "docker")) {
 Write-Host "Installation Mode: $Mode" -ForegroundColor Yellow
 $TargetFolder = Join-Path $env:LOCALAPPDATA "OrionRouter"
 $RepoUrl = "https://github.com/orion-ai-assistant/orion-router.git"
+if ((Test-Path -LiteralPath (Join-Path $TargetFolder '.orion-converted.json')) -or
+    (Test-Path -LiteralPath (Join-Path $TargetFolder 'orion-release.json'))) {
+    throw 'This installation uses the signed package launcher. Source installation/reset is disabled.'
+}
+$installationRegistry = $env:ORION_INSTALLATION_REGISTRY
+if (-not $installationRegistry) { $installationRegistry = Join-Path $env:LOCALAPPDATA 'Orion/install.json' }
+if (Test-Path -LiteralPath $installationRegistry) {
+    $registered = Get-Content -LiteralPath $installationRegistry -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($registered.schema_version -ne 1 -or @($registered.components | Where-Object { $_.kind -eq 'router' -and $_.distribution -eq 'packaged' }).Count -gt 0) {
+        throw 'A packaged Router is registered. Use its retained signed installer/launcher; no reset was performed.'
+    }
+}
 Write-Host "Target Directory:  $TargetFolder`n" -ForegroundColor DarkGray
 
 # 1. Requirement Checks

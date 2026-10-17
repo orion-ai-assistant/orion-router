@@ -1062,17 +1062,25 @@ async def get_system_version(check_now: bool = False):
 
 
 @router.post("/api/system/check-update", dependencies=[Depends(verify_admin)])
-async def force_check_update():
+async def force_check_update(request: Request):
     """Önbelleği atlayarak GitHub ve Git remote üzerinden canlı sürüm kontrolü yapar."""
-    from core.updater import check_for_updates
-    return check_for_updates(force=True)
+    return await trigger_system_update(request)
 
 
 @router.post("/api/system/update", dependencies=[Depends(verify_admin)])
-async def trigger_system_update():
+async def trigger_system_update(request: Request):
     """Sistem güncelleme sürecini arka planda başlatır."""
     from core.updater import start_update
-    return start_update()
+    import ipaddress
+    if (not request.client or not ipaddress.ip_address(request.client.host).is_loopback
+            or any(name in request.headers for name in ('forwarded', 'x-forwarded-for', 'x-forwarded-host', 'x-real-ip'))):
+        raise HTTPException(403, 'Güncelleme yalnızca Router bilgisayarından yönetilebilir.')
+    origin = request.headers.get('origin')
+    if ((origin and origin != f'{request.url.scheme}://{request.url.netloc}')
+            or request.headers.get('sec-fetch-site') == 'cross-site'):
+        raise HTTPException(403, 'Geçersiz istek kaynağı.')
+    import asyncio
+    return await asyncio.to_thread(start_update)
 
 
 @router.get("/api/system/update-status", dependencies=[Depends(verify_admin)])
