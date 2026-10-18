@@ -71,7 +71,7 @@ export default function SettingsPage() {
       const before = (await refreshVersionInfo(false))?.last_attempt || 0;
       const res = await adminFetch('/dashboard/api/system/check-update', { method: 'POST' });
       const started = res.ok ? await res.json() : null;
-      if (!started || started.status !== 'started') {
+      if (!started || (started.status !== 'started' && started.status !== 'busy')) {
         showToast(started?.message || t('common.error'), 'error');
         return;
       }

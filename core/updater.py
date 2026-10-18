@@ -142,13 +142,22 @@ def start_update():
         feed = _release_sources(registry.path.parent)
         if not router_feed_configured(feed) or not _json(registry.path.parent / 'bootstrap/automatic-runtime.json'):
             raise ValueError('Signed Router repository/runtime unavailable')
-        with operation_lock(registry.path, timeout=0):
+        from core.process_lifecycle import LifecycleError
+        try:
+            lock = operation_lock(registry.path, timeout=0)
+            lock.__enter__()
+        except LifecycleError:
+            # A check, download or update already holds the lock: that is the requested work, not an error.
+            return {'status': 'busy', 'message': 'Bir denetim ya da güncelleme zaten sürüyor; sonucu birazdan burada görünür.'}
+        try:
             if registry.read() != record:
                 raise ValueError('Installation changed')
             path = canonical_path(registry.path.parent / 'updates/router-request.json')
             path.parent.mkdir(exist_ok=True)
             _atomic_write(path, json.dumps({'schema': 1, 'installation_id': record['installation_id'],
                                            'action': 'prepare'}).encode())
+        finally:
+            lock.__exit__(None, None, None)
         return {'status': 'started', 'message': 'İmzalı kontrol/hazırlama sıraya alındı. Çalışan Router durdurulmaz; hazır sürüm sonraki güvenli açılışta uygulanır.'}
     except (OSError, ValueError, RuntimeError):
         return {'status': 'error', 'message': 'Kayıtlı paket kurulumu, imzalı Router kaynağı ve dış launcher gerekir. Yerinde Git/pip güncellemesi kapalıdır.'}
