@@ -62,6 +62,15 @@ export default function SettingsPage() {
     }
   };
 
+  // A check can also be running because the Hub (or the scheduler) started it: the button stays locked and the
+  // status follows it until it ends, so a second click never races the first one.
+  const checkBusy = checkingUpdate || !!versionInfo?.checking || !!versionInfo?.is_updating;
+  React.useEffect(() => {
+    if (checkingUpdate || !(versionInfo?.checking || versionInfo?.is_updating)) return;
+    const timer = setInterval(() => { refreshVersionInfo(false); }, 3000);
+    return () => clearInterval(timer);
+  }, [checkingUpdate, versionInfo?.checking, versionInfo?.is_updating]);
+
   const handleCheckUpdate = async () => {
     setCheckingUpdate(true);
     try {
@@ -487,12 +496,12 @@ export default function SettingsPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    disabled={checkingUpdate || updateRunning}
+                    disabled={checkBusy || updateRunning}
                     onClick={handleCheckUpdate}
                     className="border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-800 px-4 py-2 text-xs font-medium flex items-center gap-2"
                   >
-                    <RefreshCw className={`w-3.5 h-3.5 ${checkingUpdate ? 'animate-spin' : ''}`} />
-                    <span>{checkingUpdate ? t('settings.system.checking') : t('settings.system.checkUpdates')}</span>
+                    <RefreshCw className={`w-3.5 h-3.5 ${checkBusy ? 'animate-spin' : ''}`} />
+                    <span>{checkBusy ? t('settings.system.checking') : t('settings.system.checkUpdates')}</span>
                   </Button>
 
                   {versionInfo?.update_available && (
