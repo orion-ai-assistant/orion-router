@@ -105,6 +105,7 @@ export interface VersionInfo {
   last_attempt?: number | null;
   phase?: string;
   is_updating?: boolean;
+  checking?: boolean;
   message?: string;
   error?: string | null;
 }

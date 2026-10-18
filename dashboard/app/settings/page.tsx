@@ -79,7 +79,7 @@ export default function SettingsPage() {
       for (let i = 0; i < 120; i++) {  // Up to ~4 minutes: a check that finds something also downloads it.
         await new Promise(resolve => setTimeout(resolve, 2000));
         data = await refreshVersionInfo(false);
-        const busy = data?.is_updating || ['checking', 'downloading', 'verifying'].includes(data?.phase || '');
+        const busy = data?.checking || data?.is_updating || ['checking', 'downloading', 'verifying'].includes(data?.phase || '');
         if (data && (data.last_attempt || 0) > before && !busy) break;
       }
       if (data?.update_available) {

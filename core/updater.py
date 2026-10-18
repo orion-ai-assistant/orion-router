@@ -102,6 +102,9 @@ def get_update_status():
         proposed = (tx or {}).get('proposed') or {}
         target = next((c for c in proposed.get('components', []) if c['kind'] == 'router'), None)
         latest = _json(Path(target['code_path']) / 'orion-release.json', {}) if target else {}
+        # A check clears `outcome` when it starts and writes it when it ends: in between it is running.
+        checking = (checked.get('outcome') is None and not checked.get('error')
+                    and (checked.get('last_attempt') or 0) > (checked.get('outcome_at') or 0))
         configured = bool(router_feed_configured(_release_sources(base))
                           and _json(base / 'bootstrap/automatic-runtime.json'))
         return {'status': 'ready' if configured else 'check-unavailable',
@@ -114,8 +117,9 @@ def get_update_status():
                 'success': phase == 'completed', 'error': checked.get('error') or
                 (phase if phase in {'failed', 'repair_required', 'rolled_back'} else None),
                 'logs': [], 'pending': pending,
-                'check_outcome': checked.get('outcome'),
+                'check_outcome': checked.get('outcome'), 'checking': checking,
                 'message': 'Hazır sürüm sonraki güvenli açılışı bekliyor.' if pending else
+                'Güncellemeler denetleniyor…' if checking else
                 ERRORS.get(checked.get('error') or (phase if phase in ERRORS else None)) or
                 OUTCOMES.get(checked.get('outcome')) or
                 ('Henüz denetim yapılmadı. "Güncellemeleri Denetle" ile denetleyin.' if configured else
