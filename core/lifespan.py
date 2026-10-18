@@ -11,7 +11,7 @@ import os
 import sys
 import subprocess
 from pathlib import Path
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 
@@ -194,9 +194,10 @@ async def lifespan(app: FastAPI):
         except Exception as exc:
             logger.debug("Background voices warmup skipped: %s", exc)
 
-    from core.update_gate import blocked
-    if not blocked():
-        asyncio.create_task(_warmup_provider_voices())
+    # A quarantined update candidate may be admitted in place, so optional
+    # startup work waits for admission instead of checking it only once.
+    from core.update_gate import admitted, wait_for_admission
+    warmup_task = asyncio.create_task(admitted(_warmup_provider_voices()))
 
     if os.getenv("ORION_NO_BANNER") != "1":
         if sys.platform == "win32":
@@ -217,11 +218,19 @@ async def lifespan(app: FastAPI):
     app.state.local_http_listener = local_http_listener
     advertiser = Advertiser()
     app.state.mdns_advertiser = advertiser
-    if not blocked():
+
+    async def start_discovery():
+        await wait_for_admission()
         advertiser.start()
+
+    discovery_task = asyncio.create_task(start_discovery())
     try:
         yield
     finally:
+        for task in (discovery_task, warmup_task):
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
         await advertiser.close()
         await local_http_listener.close()
 
