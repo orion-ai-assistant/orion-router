@@ -29,7 +29,12 @@ $bundle = Join-Path $env:TEMP ('orion-router-bootstrap-' + [guid]::NewGuid().ToS
 # A first installation keeps its bundle as the retained bootstrap; an addition runs from a throw-away copy.
 if ($existing) { $target = Join-Path $env:TEMP ('orion-router-installer-' + [guid]::NewGuid().ToString('N')) }
 else { $target = Join-Path $orion 'Bootstrap-Installer' }
-if (-not $existing -and (Test-Path $target)) { throw "$target already exists from an incomplete install. Remove that folder and retry." }
+if (-not $existing -and (Test-Path -LiteralPath $target)) {
+    # No registered installation: this is left over from an earlier removed or failed Orion install. Replace it; if a
+    # closing process still holds it, use a fresh folder next to it (the installer removes the old one later).
+    Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction SilentlyContinue
+    if (Test-Path -LiteralPath $target) { $target = Join-Path $orion ('Bootstrap-Installer-' + [guid]::NewGuid().ToString('N').Substring(0, 8)) }
+}
 try {
     Write-Host 'Downloading the Orion Router installer...'
     Invoke-WebRequest -UseBasicParsing -Uri ($base + 'orion-bootstrap-windows-x64.zip') -OutFile $bundle
