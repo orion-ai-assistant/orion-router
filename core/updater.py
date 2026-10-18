@@ -24,6 +24,20 @@ def _json(path, default=None):
     return json.loads(path.read_text(encoding='utf-8')) if path.exists() else default
 
 
+def router_feed_configured(source):
+    """True when the installation's release source lists a Router target.
+
+    The source is one feed (schema 1: `targets`) or several (schema 2: `sources[].targets`, e.g. the
+    Router's own feed beside the Hub/Client feed). Works for a Router-only install and a Hub-managed one."""
+    if not isinstance(source, dict):
+        return False
+    feeds = source.get('sources') if source.get('schema') == 2 else [source]
+    if not isinstance(feeds, list):
+        return False
+    return any(isinstance(feed, dict) and isinstance(feed.get('targets'), dict) and feed['targets'].get('router')
+               for feed in feeds or [])
+
+
 OUTCOMES = {
     'up_to_date': 'Router güncel; yeni sürüm yok.',
     'update_found': 'Yeni sürüm bulundu; hazırlanıyor. Hazır olunca Orion ayarlarındaki "Şimdi güncelle" veya sonraki güvenli açılış uygular.',
@@ -75,7 +89,7 @@ def get_update_status():
         proposed = (tx or {}).get('proposed') or {}
         target = next((c for c in proposed.get('components', []) if c['kind'] == 'router'), None)
         latest = _json(Path(target['code_path']) / 'orion-release.json', {}) if target else {}
-        configured = bool(_json(base / 'bootstrap/release-source.json', {}).get('targets', {}).get('router')
+        configured = bool(router_feed_configured(_json(base / 'bootstrap/release-source.json', {}))
                           and _json(base / 'bootstrap/automatic-runtime.json'))
         return {'status': 'ready' if configured else 'check-unavailable',
                 'current_version': manifest.get('version', APP_VERSION),
@@ -109,7 +123,7 @@ def start_update():
     try:
         registry, record, item = _installation()
         feed = _json(registry.path.parent / 'bootstrap/release-source.json', {})
-        if not feed.get('targets', {}).get('router') or not _json(registry.path.parent / 'bootstrap/automatic-runtime.json'):
+        if not router_feed_configured(feed) or not _json(registry.path.parent / 'bootstrap/automatic-runtime.json'):
             raise ValueError('Signed Router repository/runtime unavailable')
         with operation_lock(registry.path, timeout=0):
             if registry.read() != record:
