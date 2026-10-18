@@ -1,4 +1,4 @@
-﻿# One-command Orion Router installer (Router only, no Hub): downloads the signed installer bundle from the
+# One-command Orion Router installer (Router only, no Hub): downloads the signed installer bundle from the
 # Router's own GitHub Release feed and installs %LOCALAPPDATA%\Orion\Router.
 #   PowerShell: irm https://raw.githubusercontent.com/orion-ai-assistant/orion-router/main/get-orion-router.ps1 | iex
 # The bundle carries the public trust root; every package is signature-verified by the installer before
@@ -52,16 +52,16 @@ try {
     if ($NoStartWithWindows) { $arguments.NoStartWithWindows = $true }
     if ($NoAutoUpdate) { $arguments.NoAutoUpdate = $true }
     if ($NoFirewall) { $arguments.NoFirewall = $true }
-    if ($existing) { Write-Host 'Mevcut Orion kurulumu bulundu: yalnızca Router eklenecek, kurulu olanlara dokunulmaz.' }
+    if ($existing) { Write-Host 'Mevcut Orion kurulumu bulundu: yalnizca Router eklenecek, kurulu olanlara dokunulmaz.' }
     else { Write-Host 'Installing the Router (this takes a few minutes)...' }
     & (Join-Path $target 'Install-Orion.ps1') @arguments
-    if ($LASTEXITCODE -eq 3) { Write-Host 'Hiçbir şey değiştirilmedi.'; return }
+    if ($LASTEXITCODE -eq 3) { Write-Host 'Hicbir sey degistirilmedi.'; return }
     if ($LASTEXITCODE -ne 0) { throw "Orion Router installation failed (exit $LASTEXITCODE). Your data is kept; see $orion." }
 } finally {
     if ($existing) { Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction SilentlyContinue }
 }
 if ($existing) {
-    Write-Host 'Router eklendi. Orion''u masaüstü kısayolundan açın.'
+    Write-Host 'Router eklendi. Orion''u masaustu kisayolundan acin.'
 } elseif ($elevated -and -not $NoStart) {
     $shortcut = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Orion Router.lnk'
     if (Test-Path -LiteralPath $shortcut) { Start-Process -FilePath 'explorer.exe' -ArgumentList ('"' + $shortcut + '"') }
