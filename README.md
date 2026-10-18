@@ -19,6 +19,23 @@ To install and start using Orion Router on your system, please visit our website
 
 👉 **[Website (Documentation & Installation)](https://orion-ai-assistant.github.io/orion-router/)** 👈
 
+### One-command Windows install (Router only, no Hub)
+
+```powershell
+irm https://raw.githubusercontent.com/orion-ai-assistant/orion-router/main/get-orion-router.ps1 | iex
+```
+
+(`cmd.exe`: download `get-orion-router.cmd` and run it; both forward `-NoStart`, `-NoStartWithWindows`,
+`-NoAutoUpdate` and `-NoFirewall`.) It installs only `%LOCALAPPDATA%\Orion\Router` from the Router's own
+signed release feed (GitHub Release tag `feed` of this repository), creates an **Orion Router** desktop
+shortcut, starts with normal rights and asks Windows **once** (UAC, can be declined) for a private-network
+firewall rule for the Router's HTTPS port only. Updates come from the same feed (dashboard → Updates).
+
+- **Add the Hub later:** run the Hub repository's `get-orion.ps1`. It adds Hub + web client and adopts this Router
+  untouched (no reinstall; its data, identity and releases stay).
+- **Already have Orion (Hub)?** The same command adds the Router next to it and leaves Hub and Client alone.
+- **Remove:** *Settings → Apps → Orion AI Assistant → Uninstall* (choose Router only / everything, keep or delete data).
+
 ---
 
 ## 🤔 What is this project and its purpose?
