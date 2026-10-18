@@ -63,6 +63,19 @@ def _latest_check(base):
     return max(states, key=lambda state: state.get('outcome_at') or state.get('last_attempt') or 0)
 
 
+def _release_sources(base):
+    """Every feed the retained updater uses. `release-sources.json` (all feeds) is written next to the legacy
+    one-feed `release-source.json`, which stays Hub-only so that older Hubs can still read it."""
+    for name in ('release-sources.json', 'release-source.json'):
+        try:
+            value = _json(base / 'bootstrap' / name)
+        except (OSError, ValueError):
+            continue
+        if value and router_feed_configured(value):
+            return value
+    return {}
+
+
 def get_update_status():
     try:
         registry, record, item = _installation()
@@ -89,7 +102,7 @@ def get_update_status():
         proposed = (tx or {}).get('proposed') or {}
         target = next((c for c in proposed.get('components', []) if c['kind'] == 'router'), None)
         latest = _json(Path(target['code_path']) / 'orion-release.json', {}) if target else {}
-        configured = bool(router_feed_configured(_json(base / 'bootstrap/release-source.json', {}))
+        configured = bool(router_feed_configured(_release_sources(base))
                           and _json(base / 'bootstrap/automatic-runtime.json'))
         return {'status': 'ready' if configured else 'check-unavailable',
                 'current_version': manifest.get('version', APP_VERSION),
@@ -122,7 +135,7 @@ def check_for_updates(force=False):
 def start_update():
     try:
         registry, record, item = _installation()
-        feed = _json(registry.path.parent / 'bootstrap/release-source.json', {})
+        feed = _release_sources(registry.path.parent)
         if not router_feed_configured(feed) or not _json(registry.path.parent / 'bootstrap/automatic-runtime.json'):
             raise ValueError('Signed Router repository/runtime unavailable')
         with operation_lock(registry.path, timeout=0):
