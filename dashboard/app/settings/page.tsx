@@ -65,11 +65,27 @@ export default function SettingsPage() {
   const handleCheckUpdate = async () => {
     setCheckingUpdate(true);
     try {
-      const data = await refreshVersionInfo(true);
+      // Same as the Hub's refresh: ask the retained updater for a real signed check (Hub, Client and Router
+      // feeds in one round), then follow its state until that check has run. Reading the status alone only
+      // showed the last check someone else had made.
+      const before = (await refreshVersionInfo(false))?.last_attempt || 0;
+      const res = await adminFetch('/dashboard/api/system/check-update', { method: 'POST' });
+      const started = res.ok ? await res.json() : null;
+      if (!started || started.status !== 'started') {
+        showToast(started?.message || t('common.error'), 'error');
+        return;
+      }
+      let data = null;
+      for (let i = 0; i < 120; i++) {  // Up to ~4 minutes: a check that finds something also downloads it.
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        data = await refreshVersionInfo(false);
+        const busy = data?.is_updating || ['checking', 'downloading', 'verifying'].includes(data?.phase || '');
+        if (data && (data.last_attempt || 0) > before && !busy) break;
+      }
       if (data?.update_available) {
         showToast(`${t('settings.system.updateAvailable')}: v${data.latest_version}`, 'success');
       } else {
-        showToast(`v${data?.current_version || '0.1.0'}`, 'success');
+        showToast(data?.message || `v${data?.current_version || ''}`, 'success');
       }
     } catch (e) {
       showToast(t('common.error'), 'error');

@@ -101,7 +101,12 @@ export interface VersionInfo {
   release_notes?: string;
   release_url?: string;
   is_git_repo?: boolean;
-  last_checked?: string;
+  last_checked?: string | number | null;
+  last_attempt?: number | null;
+  phase?: string;
+  is_updating?: boolean;
+  message?: string;
+  error?: string | null;
 }
 
 interface AppContextType {
