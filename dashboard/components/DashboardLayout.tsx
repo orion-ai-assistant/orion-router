@@ -126,7 +126,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           )}
         </div>
         {/* Update test marker: change the letter per release to see an update arrive. */}
-        <p className="text-[10px] text-zinc-600 text-center pt-1 select-none">Güncelleme test işareti: O</p>
+        <p className="text-[10px] text-zinc-600 text-center pt-1 select-none">Güncelleme test işareti: P</p>
       </aside>
 
       {/* Main Content Area */}
