@@ -24,12 +24,38 @@ def _json(path, default=None):
     return json.loads(path.read_text(encoding='utf-8')) if path.exists() else default
 
 
+OUTCOMES = {
+    'up_to_date': 'Router güncel; yeni sürüm yok.',
+    'update_found': 'Yeni sürüm bulundu; hazırlanıyor. Hazır olunca Orion ayarlarındaki "Şimdi güncelle" veya sonraki güvenli açılış uygular.',
+    'pending': 'Başka bir güncelleme zaten hazır veya sürüyor; Orion ayarlarındaki "Şimdi güncelle" ile uygulanır. Yeni denetim, o bitince yapılır.',
+    'disabled': 'Otomatik güncellemeler kapalı olduğu için denetlenmedi.',
+    'paused': 'Ağ kullanımı duraklatıldığı için denetlenmedi.',
+    'no_source': 'Bu kurulumda güncelleme kaynağı yapılandırılmamış.',
+    'bootstrap_updated': 'Güncelleme yardımcısı yenilendi; birkaç saniye içinde yeniden denetlenecek.',
+}
+ERRORS = {
+    'URLError': 'Güncelleme sunucusuna ulaşılamadı. İnternet bağlantısını kontrol edip yeniden denetleyin.',
+    'UpdateError': 'Güncelleme hazırlanamadı (imza, uyumluluk veya bekleyen işlem denetimi). Yeniden denetleyebilirsiniz.',
+    'MigrationError': 'Orion süreçleri güncelleme sırasında hâlâ çalışıyordu; güncelleme uygulanmadı. Yeniden denetleyebilirsiniz.',
+    'failed': 'Önceki güncelleme başarısız oldu; yeniden denetleyebilirsiniz.',
+    'rolled_back': 'Yeni sürüm çalışmadı, önceki sürüme dönüldü; yeniden denetleyebilirsiniz.',
+    'repair_required': 'Güncelleme yarıda kaldı; yerel onarma gerekli.',
+}
+
+
+def _latest_check(base):
+    """Router and Hub schedulers both check the Router now; report whichever ran last."""
+    states = [_json(base / 'updates' / name, {}) or {} for name in ('router-automatic.json', 'automatic.json')]
+    return max(states, key=lambda state: state.get('outcome_at') or state.get('last_attempt') or 0)
+
+
 def get_update_status():
     try:
         registry, record, item = _installation()
         base = registry.path.parent
         manifest = _json(Path(item['code_path']) / 'orion-release.json', {})
-        checked = _json(base / 'updates/router-automatic.json', {})
+        checked = _latest_check(base)
+        router_state = _json(base / 'updates/router-automatic.json', {})
         policy = _json(base / 'updates/router-policy.json', {'enabled': False})
         pointer = _json(base / 'updates/active.json')
         tx = None
@@ -54,14 +80,19 @@ def get_update_status():
         return {'status': 'ready' if configured else 'check-unavailable',
                 'current_version': manifest.get('version', APP_VERSION),
                 'latest_version': latest.get('version'), 'update_available': pending,
-                'last_checked': checked.get('last_success'), 'last_attempt': checked.get('last_attempt'),
+                'last_checked': max(checked.get('last_success') or 0, router_state.get('last_success') or 0) or None,
+                'last_attempt': checked.get('last_attempt'),
                 'automatic_updates': policy.get('enabled', False), 'phase': phase,
                 'is_updating': busy, 'step': phase, 'progress': 100 if phase == 'completed' else 0,
                 'success': phase == 'completed', 'error': checked.get('error') or
                 (phase if phase in {'failed', 'repair_required', 'rolled_back'} else None),
                 'logs': [], 'pending': pending,
+                'check_outcome': checked.get('outcome'),
                 'message': 'Hazır sürüm sonraki güvenli açılışı bekliyor.' if pending else
-                'İmzalı paket kaynağı ve ayrı yardımcı gerekir; legacy dönüşümü kendiliğinden yapılmaz.'}
+                ERRORS.get(checked.get('error') or (phase if phase in ERRORS else None)) or
+                OUTCOMES.get(checked.get('outcome')) or
+                ('Henüz denetim yapılmadı. "Güncellemeleri Denetle" ile denetleyin.' if configured else
+                 'İmzalı paket kaynağı ve ayrı yardımcı gerekir; legacy dönüşümü kendiliğinden yapılmaz.')}
     except (OSError, ValueError, KeyError, TypeError):
         return {'status': 'check-unavailable', 'current_version': APP_VERSION,
                 'latest_version': None, 'update_available': None, 'last_checked': None,
