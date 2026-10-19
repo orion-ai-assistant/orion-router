@@ -11,6 +11,10 @@ from core.process_lifecycle import (
 )
 
 
+class SettingDenied(LifecycleError):
+    """The role may not read this server setting (it lacks pg_read_all_settings)."""
+
+
 class Postgres:
     def __init__(self, ctl, data, port, user, database, password=None):
         self.ctl, self.data = Path(ctl).resolve(), Path(data).resolve()
@@ -33,7 +37,9 @@ class Postgres:
             if canonical(lines[1]) != canonical(self.data):
                 raise LifecycleError('PostgreSQL data identity mismatch')
             process = psutil.Process(pid)
-            if abs(process.create_time() - started) > 2 or canonical(process.exe()) != canonical(self.executable):
+            if abs(process.create_time() - started) > 2:
+                return None  # Stale lock file of a crashed postmaster; its PID now belongs to another process.
+            if canonical(process.exe()) != canonical(self.executable):
                 raise LifecycleError('PostgreSQL PID ownership mismatch; record retained')
             command = process.cmdline()
             if not any(canonical(arg) == canonical(self.data) for arg in command[1:] if not arg.startswith('-')):
@@ -53,8 +59,20 @@ class Postgres:
                                 capture_output=True, text=True, encoding='utf-8', env=env, timeout=5,
                                 **({'creationflags': 0x08000000} if os.name == 'nt' else {}))
         if result.returncode:
+            if 'pg_read_all_settings' in result.stderr:
+                raise SettingDenied(query)
             raise LifecycleError('PostgreSQL authenticated readiness failed')
         return result.stdout.strip()
+
+    def same_cluster(self):
+        """The connection reaches the postmaster that owner() verified for this data directory."""
+        try:
+            return canonical(self.sql('SHOW data_directory')) == canonical(self.data)
+        except SettingDenied:
+            # A role without pg_read_all_settings (older developer databases) cannot read data_directory; the
+            # server's start time is readable by every role and must equal the one in this cluster's postmaster.pid.
+            started = int((self.data / 'postmaster.pid').read_text(encoding='utf-8').splitlines()[2])
+            return abs(int(self.sql('SELECT extract(epoch FROM pg_postmaster_start_time())::bigint')) - started) <= 1
 
     def ready(self):
         owner = self.owner()
@@ -65,7 +83,7 @@ class Postgres:
                                     timeout=5, **({'creationflags': 0x08000000} if os.name == 'nt' else {}))
             if status.returncode:
                 return False
-            if canonical(self.sql('SHOW data_directory')) != canonical(self.data):
+            if not self.same_cluster():
                 raise LifecycleError('Connected to another PostgreSQL cluster')
             for setting in ('fsync', 'full_page_writes', 'synchronous_commit'):
                 if self.sql('SHOW ' + setting) != 'on':
@@ -81,7 +99,9 @@ class Postgres:
             assert_port_free(self.port)
             if not (self.data / 'PG_VERSION').is_file() or not self.ctl.is_file():
                 raise LifecycleError('PostgreSQL requires setup before start')
-            command = [str(self.ctl), 'start', '-D', str(self.data), '-l', str(self.data / 'server.log'),
+            # The log lives beside the data directory: crash recovery fsyncs every file inside it, and on Windows
+            # the log that pg_ctl holds open made that walk retry for 30 s (a failed first start after power loss).
+            command = [str(self.ctl), 'start', '-D', str(self.data), '-l', str(self.data.parent / 'server.log'),
                        '-o', f'-p {self.port} -c fsync=on -c full_page_writes=on -c synchronous_commit=on', '-w', '-t', '30']
             # Windows pg_ctl may hand inherited pipe handles to its daemon.
             # A logfile + DEVNULL avoids communicate() waiting on that daemon.
