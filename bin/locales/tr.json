@@ -37,7 +37,6 @@
     "waiting_for_pg": "PostgreSQL'in hazır olması bekleniyor...",
     "waiting_for_backend": "FastAPI backendinin hazır olması bekleniyor...",
     "pg_accepting_conns": "PostgreSQL hazır ve bağlantıları kabul ediyor.",
-    "pg_reusing_existing": "Mevcut Orion PostgreSQL örneği sağlıklı; yeniden kullanılıyor.",
     "pg_timeout_warning": "PostgreSQL hazır olma zaman aşımına uğradı, yine de devam ediliyor...",
     "configuring_db_user": "Veritabanı ve kullanıcı yapılandırılıyor...",
     "db_ready": "Veritabanı hazır ({db})",

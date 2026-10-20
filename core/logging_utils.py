@@ -73,8 +73,12 @@ async def log_http_exception(request, exc):
     from fastapi.exception_handlers import http_exception_handler
 
     cause = exc.__cause__
+    from core.availability import ServiceUnavailable
+    # An optional local service that is not running is a state, already logged once when it began.
+    level = (logging.DEBUG if isinstance(exc, ServiceUnavailable)
+             else logging.ERROR if exc.status_code >= 500 else logging.WARNING)
     logging.getLogger("service-router.http").log(
-        logging.ERROR if exc.status_code >= 500 else logging.WARNING,
+        level,
         "HTTP %s | %s %s | %s%s",
         exc.status_code, diagnostic_text(request.method), diagnostic_text(request.url.path),
         diagnostic_text(exc.detail),

@@ -16,6 +16,7 @@ from fastapi.websockets import WebSocketState
 import websockets
 import httpx
 
+from core.availability import ServiceUnavailable, available, unavailable
 from core.config import STT_HOST, STT_PORT
 from core.dependencies import authenticate_request, authenticate_websocket
 from core.model_catalog import bundled_model
@@ -28,6 +29,7 @@ logger = logging.getLogger("service-router.transcriptions")
 
 router = APIRouter(tags=["Audio", "Transcriptions"])
 LOCAL_STT_MODEL = bundled_model("local", "stt")
+STT_SERVICE = "Local speech-to-text service"
 
 
 @router.get("/v1/audio/languages")
@@ -39,11 +41,16 @@ async def audio_languages(auth: dict = Depends(authenticate_request)):
             f"http://{STT_HOST}:{STT_PORT}/v1/audio/language-catalog", timeout=4)
         response.raise_for_status()
         data = response.json()
-        return {
+        result = {
             "aliases": data.get("aliases", {}),
             "languages": {code: {"name": entry["name"]}
                           for code, entry in data["languages"].items()},
         }
+        available(STT_SERVICE)
+        return result
+    except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
+        # Not running (not installed or not started yet): a state, logged once, tried again next time.
+        raise ServiceUnavailable(STT_SERVICE, "STT language catalog is unavailable", exc) from exc
     except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
         raise HTTPException(503, "STT language catalog is unavailable") from exc
 
@@ -186,6 +193,7 @@ async def audio_transcriptions_stream(
 
     try:
         async with websockets.connect(backend_url) as backend_ws:
+            available(STT_SERVICE)
             key_repr = auth.get("name") or auth.get("source") or "authenticated"
             logger.info(f"WebSocket STT streaming started for '{key_repr}', proxied to {backend_url}")
 
@@ -272,7 +280,7 @@ async def audio_transcriptions_stream(
                 task.cancel()
     except (ConnectionRefusedError, OSError, websockets.exceptions.WebSocketException) as e:
         err_message = str(e)
-        logger.error(f"Failed to connect to local Whisper STT at {backend_url}: {e}")
+        unavailable(STT_SERVICE, e)
         try:
             await websocket.send_json({
                 "type": "error",

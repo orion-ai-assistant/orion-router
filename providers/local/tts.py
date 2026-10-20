@@ -1,11 +1,13 @@
 import httpx
 import logging
 from providers.base import BaseTTS
+from core.availability import available, unavailable
 from core.config import TTS_HOST, TTS_PORT
 from core.http_client import get_http_client
 from core.model_catalog import bundled_model
 
 logger = logging.getLogger("service-router.local.tts")
+TTS_SERVICE = "Local text-to-speech service"
 _LOCAL_TTS_NAMES = {bundled_model("local", "tts")["name"]}
 
 class LocalTTSProvider(BaseTTS):
@@ -120,11 +122,13 @@ class LocalTTSProvider(BaseTTS):
         client = get_http_client(timeout=120.0)
         try:
             response = await client.post(url, json=payload)
-        except httpx.ConnectError:
+        except (httpx.ConnectError, httpx.ConnectTimeout) as e:
+            unavailable(TTS_SERVICE, e)  # Not running: a state, logged once; tried again with every request.
             raise RuntimeError(f"Could not connect to local TTS service ({TTS_HOST}:{TTS_PORT}).")
         except httpx.RequestError as e:
             logger.error(f"Failed to connect to local TTS server: {e}")
             raise RuntimeError(f"Local TTS Service Unreachable: {e}")
+        available(TTS_SERVICE)
 
         if response.status_code != 200:
             logger.error(f"Local TTS API Error: {response.text}")

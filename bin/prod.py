@@ -30,7 +30,7 @@ from bin.common import (
     ok, info, warn, err, dim,
     acquire_lock, release_lock, run, run_silent, psql, read_env,
     kill_port, kill_portable_postgres, free_ports, postgres_is_ready,
-    download_postgres, init_database, start_postgres, wait_for_postgres, stop_postgres,
+    download_postgres, init_database, stop_postgres,
     setup_db_and_user, set_env
 )
 
@@ -94,26 +94,19 @@ def _main(runtime, force_build: bool = False) -> None:
         router_port = read_env("ORION_ROUTER_TLS_PORT", "9443")
         from bin.common import database
         pg = database(PG_DATA, PG_PORT, PG_USER)
-        reuse_postgres = bool(pg.owner())
-        if reuse_postgres and not pg.ready():
-            raise RuntimeError('Existing database not ready')
 
         from core.process_lifecycle import assert_port_free
         if 'backend' not in runtime.children:
             assert_port_free(router_port)
-        if not reuse_postgres:
-            assert_port_free(PG_PORT)
         print()
 
         download_postgres()
         init_database(PG_DATA, PG_USER)
-        if reuse_postgres:
-            ok(t("pg_reusing_existing"))
-        else:
-            start_postgres(PG_DATA, PG_PORT, PG_LOG, "prod")
-            started_postgres = True
-            wait_for_postgres(PG_DATA, PG_PORT, PG_LOG, PG_USER, "prod")
+        # This supervisor owns its database (core/native_postgres.py): a server whose owner has ended is
+        # restarted as ours, never reused ownerless, and it ends with this supervisor at the latest.
         runtime.database = pg
+        pg.ensure()
+        started_postgres = True
         setup_db_and_user(PG_USER, PG_PASS, PG_PORT, PG_DB)
         print()
 

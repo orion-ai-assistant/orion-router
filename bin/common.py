@@ -394,10 +394,6 @@ def database(pg_data, pg_port=None, pg_user=None, pg_db='postgres'):
         'router_pass_dev' if dev else 'router_pass')
 
 
-def start_postgres(pg_data: Path, pg_port: int, pg_log: Path, label: str) -> None:
-    database(pg_data, pg_port).ensure()
-
-
 def print_pg_log_errors(pg_log: Path) -> None:
     if pg_log.exists():
         try:
@@ -410,10 +406,6 @@ def print_pg_log_errors(pg_log: Path) -> None:
         except Exception as e:
             dim(f"Could not read pg.log: {e}")
 
-def wait_for_postgres(pg_data, pg_port, pg_log, pg_user, label, timeout=DEFAULT_TIMEOUT):
-    from core.process_lifecycle import LifecycleError
-    if not database(pg_data, pg_port, pg_user).ready():
-        raise LifecycleError('PostgreSQL readiness failed')
 
 
 def stop_postgres(pg_data: Path) -> None:

@@ -95,8 +95,11 @@ class UvicornAccessFilter(logging.Filter):
                 return False
             if len(record.args) >= 5 and isinstance(record.args[4], int):
                 status = record.args[4]
-                if status >= 400:
-                    record.levelno = logging.ERROR if status >= 500 else logging.WARNING
+                # An access line only records the request. A fault is logged once, as an ERROR with its cause,
+                # by the code that knows it (core/logging_utils.py); 503 "temporarily unavailable" is a state
+                # (e.g. a local voice service that is not running, core/availability.py), not a fault.
+                if status >= 400 and status != 503:
+                    record.levelno = logging.WARNING
                     record.levelname = logging.getLevelName(record.levelno)
         return True
 
