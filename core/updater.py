@@ -40,13 +40,28 @@ def router_feed_configured(source):
 
 OUTCOMES = {
     'up_to_date': 'Router güncel; yeni sürüm yok.',
-    'update_found': 'Yeni sürüm bulundu; hazırlanıyor. Hazır olunca Orion ayarlarındaki "Şimdi güncelle" veya sonraki güvenli açılış uygular.',
-    'pending': 'Başka bir güncelleme zaten hazır veya sürüyor; Orion ayarlarındaki "Şimdi güncelle" ile uygulanır. Yeni denetim, o bitince yapılır.',
+    'update_found': 'Yeni sürüm bulundu; hazırlanıyor. Hazır olunca {apply}',
+    'pending': 'Başka bir güncelleme zaten hazır veya sürüyor; {apply} Yeni denetim, o bitince yapılır.',
     'disabled': 'Otomatik güncellemeler kapalı olduğu için denetlenmedi.',
     'paused': 'Ağ kullanımı duraklatıldığı için denetlenmedi.',
     'no_source': 'Bu kurulumda güncelleme kaynağı yapılandırılmamış.',
     'bootstrap_updated': 'Güncelleme yardımcısı yenilendi; birkaç saniye içinde yeniden denetlenecek.',
 }
+NAMES = {'hub': 'Hub', 'client': 'Arayüz', 'router': 'Router', 'bootstrap': 'Güncelleyici'}
+
+
+def _names(kinds):
+    return ', '.join(NAMES.get(kind, str(kind)) for kind in kinds)
+
+
+def _apply_hint(hub_present):
+    """How a prepared update gets installed: the Hub's settings card has "Şimdi kur"; a Router-only install has no
+    such card, so it waits for the next safe start."""
+    if hub_present:
+        return 'Orion ayarlarındaki "Şimdi kur" veya sonraki güvenli açılış kurar.'
+    return "Router'ın sonraki güvenli açılışında kurulur."
+
+
 ERRORS = {
     'URLError': 'Güncelleme sunucusuna ulaşılamadı. İnternet bağlantısını kontrol edip yeniden denetleyin.',
     'UpdateError': 'Güncelleme hazırlanamadı (imza, uyumluluk veya bekleyen işlem denetimi). Yeniden denetleyebilirsiniz.',
@@ -55,6 +70,19 @@ ERRORS = {
     'rolled_back': 'Yeni sürüm çalışmadı, önceki sürüme dönüldü; yeniden denetleyebilirsiniz.',
     'repair_required': 'Güncelleme yarıda kaldı; yerel onarma gerekli.',
 }
+
+
+def _outcome_message(outcome, hub_present, found, waiting, version):
+    text = OUTCOMES.get(outcome)
+    if text is None:
+        return None
+    apply = _apply_hint(hub_present)
+    if outcome == 'update_found' and found:
+        text = text.replace('Yeni sürüm bulundu;', 'Yeni sürüm bulundu: %s;' % _names(found))
+    if outcome == 'pending' and waiting:
+        text = text.replace('Başka bir güncelleme', 'Başka bir güncelleme (%s)' % _names(waiting))
+        text += ' Router (v%s) bu güncellemede değişmiyor.' % version
+    return text.replace('{apply}', apply)
 
 
 def _latest_check(base):
@@ -94,8 +122,12 @@ def get_update_status():
             tx = _json(base / 'updates' / identity / 'journal.json')
             if not tx or tx['installation_id'] != record['installation_id']:
                 raise ValueError('Invalid update journal')
+        other = [kind for kind in (tx or {}).get('changes', []) if kind != 'router']
+        waiting = (tx or {}).get('phase') in {'staged', 'waiting_for_idle'}
         if tx and 'router' not in tx.get('changes', []):
             tx = None
+        hub_present = any(c.get('kind') == 'hub' for c in record['components'])
+        found = [kind for kind in ((checked.get('newer') or {}).get('components') or {})]
         phase = tx['phase'] if tx else 'idle'
         pending = phase in {'staged', 'waiting_for_idle'}
         busy = phase in {'checking', 'downloading', 'verifying', 'draining', 'backing_up', 'switching', 'health_check', 'rollback_pending'}
@@ -121,7 +153,8 @@ def get_update_status():
                 'message': 'Hazır sürüm sonraki güvenli açılışı bekliyor.' if pending else
                 'Güncellemeler denetleniyor…' if checking else
                 ERRORS.get(checked.get('error') or (phase if phase in ERRORS else None)) or
-                OUTCOMES.get(checked.get('outcome')) or
+                _outcome_message(checked.get('outcome'), hub_present, found if checked.get('outcome') == 'update_found' else [],
+                                 other if waiting else [], manifest.get('version', APP_VERSION)) or
                 ('Henüz denetim yapılmadı. "Güncellemeleri Denetle" ile denetleyin.' if configured else
                  'İmzalı paket kaynağı ve ayrı yardımcı gerekir; legacy dönüşümü kendiliğinden yapılmaz.')}
     except (OSError, ValueError, KeyError, TypeError):

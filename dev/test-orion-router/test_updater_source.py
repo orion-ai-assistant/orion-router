@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from core.updater import _release_sources, router_feed_configured
+from core.updater import _outcome_message, _release_sources, router_feed_configured
 
 HUB = 'https://github.com/orion-ai-assistant/orion-ai-assistant/releases/download/feed/'
 ROUTER = 'https://github.com/orion-ai-assistant/orion-router/releases/download/feed/'
@@ -47,6 +47,25 @@ class RouterFeedSource(unittest.TestCase):
             both = {'schema': 2, 'sources': [feed(HUB, {'hub': 'h.zip'}), feed(ROUTER, {'router': 'r.zip'})]}
             (folder / 'release-sources.json').write_text(json.dumps(both))
             self.assertTrue(router_feed_configured(_release_sources(Path(root))))
+
+
+class PanelMessages(unittest.TestCase):
+    def test_waiting_hub_update_is_named_and_router_is_said_unchanged(self):
+        text = _outcome_message('pending', True, [], ['hub', 'client'], '0.2.19')
+        self.assertIn('Hub, Arayüz', text)
+        self.assertIn('"Şimdi kur"', text)
+        self.assertNotIn('Şimdi güncelle', text)
+        self.assertIn('Router (v0.2.19) bu güncellemede değişmiyor', text)
+
+    def test_router_only_install_has_no_settings_card_to_point_at(self):
+        text = _outcome_message('update_found', False, ['router'], [], '0.2.19')
+        self.assertIn('Yeni sürüm bulundu: Router', text)
+        self.assertIn('sonraki güvenli açılışında kurulur', text)
+        self.assertNotIn('Orion ayarları', text)
+
+    def test_other_outcomes_are_unchanged(self):
+        self.assertEqual(_outcome_message('up_to_date', True, [], [], '0.2.19'), 'Router güncel; yeni sürüm yok.')
+        self.assertIsNone(_outcome_message(None, True, [], [], '0.2.19'))
 
 
 if __name__ == '__main__':
