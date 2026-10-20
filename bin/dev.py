@@ -30,7 +30,7 @@ from bin.common import (
     setup_db_and_user, set_env
 )
 
-from core.lifespan import print_active_services_banner
+from core.banner import print_active_services_banner
 from core.tls_local import open_health
 from bin.npm_integrity import npm_needs_install, record_npm_install
 from bin.i18n import t
@@ -123,7 +123,7 @@ def _main(runtime) -> None:
     try:
         banner()
 
-        run_silent([sys.executable, "-c", "import core.config"], cwd=ROOT)
+        # core.config is already imported (core.tls_local): .env exists and is merged with .env.example.
         router_port = read_env("ORION_ROUTER_TLS_DEV_PORT", "9444")
         from bin.common import database
         pg = database(PG_DATA, PG_PORT, PG_USER)

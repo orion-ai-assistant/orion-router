@@ -7,15 +7,15 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-# Initialize Terminal Encoding/ANSI Support
+ROOT = Path(__file__).parent.parent.resolve()
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+# Initialize Terminal Encoding/ANSI Support (console API: no cmd.exe per start)
 if sys.platform == "win32":
-    os.system("chcp 65001 >nul")
+    from core.console import utf8_console
+    utf8_console(line_buffering=True)
     os.environ["PYTHONUTF8"] = "1"
-    try:
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
-        sys.stderr.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
-    except Exception:
-        pass
 
 # Terminal Colors
 RESET  = "\033[0m"
@@ -34,10 +34,6 @@ def info(msg: str) -> None: _p("→", msg, CYAN)
 def warn(msg: str) -> None: _p("⚠", msg, YELLOW)
 def err(msg: str)  -> None: _p("✘", msg, RED)
 def dim(msg: str)  -> None: _p(" ", msg, GRAY)
-
-ROOT = Path(__file__).parent.parent.resolve()
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
 
 from bin.i18n import t
 from core.runtime_layout import data_root
@@ -422,19 +418,15 @@ def setup_db_and_user(pg_user: str, pg_pass: str, pg_port: int, pg_db: str) -> N
     env = dict(os.environ, PGPASSWORD=pg_pass, PGCONNECT_TIMEOUT='3', PGCLIENTENCODING='UTF8')
     command = [str(PSQL), '-h', '127.0.0.1', '-U', pg_user, '-p', str(pg_port),
                '-d', 'postgres', '-w', '-v', 'ON_ERROR_STOP=1', '-At']
-    sql = f"ALTER USER {pg_user} WITH PASSWORD '{escaped}';"
-    result = run(command, input=sql, text=True, encoding='utf-8', capture_output=True, env=env, timeout=5)
+    # One psql session for the role and the database (each psql start is a process on every Router start).
+    # CREATE DATABASE cannot run inside a function or transaction: \gexec runs it as its own statement, and
+    # only when the database is missing. ON_ERROR_STOP: any failing statement fails the whole setup.
+    sql = (f"ALTER USER {pg_user} WITH PASSWORD '{escaped}';\n"
+           f"SELECT 'CREATE DATABASE {pg_db} OWNER {pg_user}' "
+           f"WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = '{pg_db}') \\gexec\n")
+    result = run(command, input=sql, text=True, encoding='utf-8', capture_output=True, env=env, timeout=10)
     if result.returncode:
-        raise LifecycleError('Database role setup failed')
-    exists = run(command + ['-c', f"SELECT 1 FROM pg_database WHERE datname = '{pg_db}'"],
-                 capture_output=True, text=True, encoding='utf-8', env=env, timeout=5)
-    if exists.returncode:
-        raise LifecycleError('Database schema check failed')
-    if exists.stdout.strip() != '1':
-        created = run(command, input=f'CREATE DATABASE {pg_db} OWNER {pg_user};',
-                      capture_output=True, text=True, encoding='utf-8', env=env, timeout=5)
-        if created.returncode:
-            raise LifecycleError('Database creation failed')
+        raise LifecycleError('Database role or database setup failed')
 
 
 def set_env(router_port: str, pg_port: int, pg_db: str, pg_user: str, pg_pass: str, uvicorn_reload: str) -> None:

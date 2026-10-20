@@ -8,7 +8,6 @@ ve uygulama state'ini (pricing cache, model info cache, dynamic router) hazırla
 import asyncio
 import logging
 import os
-import sys
 import subprocess
 from pathlib import Path
 from contextlib import asynccontextmanager, suppress
@@ -21,76 +20,9 @@ from core.config import ROUTER_PORT
 from core.model_catalog import load_model_catalog, unit_pricing
 from core.http_client import close_http_clients
 from providers.gemini.client import close_gemini_clients
+from core.banner import print_active_services_banner
 
 logger = logging.getLogger("service-router")
-
-
-def get_local_ip() -> str:
-    import socket
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
-    except Exception:
-        return "127.0.0.1"
-
-
-def print_active_services_banner(
-    router_port: str | None,
-    dashboard_port: str | None = None,
-) -> None:
-    # Terminal Colors (ANSI)
-    BLUE   = "\033[94m"
-    GREEN  = "\033[92m"
-    CYAN   = "\033[96m"
-    UNDERLINE = "\033[4m"
-    YELLOW = "\033[93m"
-    BOLD   = "\033[1m"
-    GRAY   = "\033[90m"
-    RESET  = "\033[0m"
-
-    port = router_port or str(__import__('core.config', fromlist=['TLS_PORT']).TLS_PORT)
-    is_docker = os.path.exists("/.dockerenv")
-
-    # Try to resolve IP
-    local_ip = os.getenv("LOCAL_IP") or os.getenv("HOST_IP")
-    if not local_ip:
-        if is_docker:
-            local_ip = "192.168.x.x"  # Monospaced safe placeholder
-        else:
-            local_ip = get_local_ip()
-
-    from core import config
-    dashboard_url = f"http://localhost:{config.LOCAL_HTTP_PORT}/dashboard"
-    local_url = f"https://{local_ip}:{port}/dashboard"
-
-    try:
-        from bin.i18n import t
-        local_net_label = t("banner_other_devices_https")
-        local_pc_label = t("banner_this_pc_http")
-        cmds_hint = t("banner_commands_hint")
-    except Exception:
-        local_net_label = "Other devices (HTTPS)"
-        local_pc_label = "This PC (HTTP)"
-        cmds_hint = "Commands: orionrouter start | stop | logs | help"
-
-    border_line = f"{GRAY}────────────────────────────────────────────────{RESET}"
-    title_colored = f"{BLUE}{BOLD}ORION ROUTER{RESET}"
-    dash_colored  = f"{BLUE}➜{RESET}  {BOLD}{local_pc_label}:{RESET}   {CYAN}{UNDERLINE}{dashboard_url}{RESET}"
-    ip_colored    = f"{BLUE}➜{RESET}  {BOLD}{local_net_label}:{RESET}    {CYAN}{UNDERLINE}{local_url}{RESET}"
-
-    # Print the banner block with clean newlines to separate from surrounding logs
-    print()
-    print(border_line)
-    print(title_colored)
-    print()
-    print(dash_colored)
-    print(ip_colored)
-    print(border_line)
-    print(f"{GRAY}{cmds_hint}{RESET}")
-    print()
 
 
 def _restart_postgres() -> None:
@@ -104,13 +36,22 @@ async def lifespan(app: FastAPI):
     #  STARTUP                                                             #
     # ------------------------------------------------------------------ #
     logger.info("Starting up Orion Custom Service Router")
+    from core.launch_timing import process_age, report, timed
+    report('backend.process', process_age())
     from core.windows_asyncio import install_reset_cleanup
     install_reset_cleanup()
     from core.tts_archive import check_runtime
-    try:
-        logger.info("TTS archive encoder: %s", await asyncio.to_thread(check_runtime))
-    except Exception as exc:
-        logger.error("TTS audio archiving unavailable: %s", exc)
+
+    async def check_encoder():
+        # Diagnostics only (logged, and reported by the TTS archive status); archiving never waits for it, so
+        # it runs beside the start instead of before /health (ffmpeg and ffprobe took ~2 s on Windows).
+        with timed('backend.ffmpeg'):
+            try:
+                logger.info("TTS archive encoder: %s", await asyncio.to_thread(check_runtime))
+            except Exception as exc:
+                logger.error("TTS audio archiving unavailable: %s", exc)
+
+    encoder_task = asyncio.create_task(check_encoder())
     from core import config
     from core.mdns import router_id
     from core.tls_identity import load_identity
@@ -200,8 +141,8 @@ async def lifespan(app: FastAPI):
     warmup_task = asyncio.create_task(admitted(_warmup_provider_voices()))
 
     if os.getenv("ORION_NO_BANNER") != "1":
-        if sys.platform == "win32":
-            os.system("")
+        from core.console import enable_ansi
+        enable_ansi()
 
         async def _show_banner_after_startup():
             # Uvicorn'un 'Application startup complete.' logunu basması için
@@ -224,10 +165,11 @@ async def lifespan(app: FastAPI):
         advertiser.start()
 
     discovery_task = asyncio.create_task(start_discovery())
+    report('backend.started', process_age())
     try:
         yield
     finally:
-        for task in (discovery_task, warmup_task):
+        for task in (discovery_task, warmup_task, encoder_task):
             task.cancel()
             with suppress(asyncio.CancelledError):
                 await task

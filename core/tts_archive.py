@@ -62,13 +62,25 @@ def binary(name):
 
 
 def _check_runtime():
-    """Native installation/startup check, also usable without a database."""
+    """Native installation/startup check, also usable without a database.
+
+    Each ffmpeg/ffprobe start costs most of a second on Windows, so they run at the same time and one ffmpeg
+    run answers both questions: its banner (stderr) starts with the line `ffmpeg -version` prints, and the
+    encoder list goes to stdout."""
+    from concurrent.futures import ThreadPoolExecutor
     flags = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
-    version = subprocess.run([binary("ffmpeg"), "-version"], capture_output=True, text=True, timeout=15, check=True, **flags).stdout.splitlines()[0]
-    encoders = subprocess.run([binary("ffmpeg"), "-hide_banner", "-encoders"], capture_output=True, text=True, timeout=15, check=True, **flags).stdout
-    if "libopus" not in encoders:
+    with ThreadPoolExecutor(2) as pool:
+        ffmpeg = pool.submit(subprocess.run, [binary("ffmpeg"), "-encoders"], capture_output=True, text=True,
+                             encoding="utf-8", errors="replace", timeout=15, check=True, **flags)
+        ffprobe = pool.submit(subprocess.run, [binary("ffprobe"), "-version"], capture_output=True, timeout=15,
+                              check=True, **flags)
+        encoders = ffmpeg.result()
+        ffprobe.result()  # Raises like check=True when ffprobe is missing or fails.
+    version = next((line for line in encoders.stderr.splitlines() if line.startswith("ffmpeg version")), None)
+    if version is None:
+        raise RuntimeError("FFmpeg did not report its version")
+    if "libopus" not in encoders.stdout:
         raise RuntimeError("FFmpeg was built without libopus")
-    subprocess.run([binary("ffprobe"), "-version"], capture_output=True, timeout=15, check=True, **flags)
     return version
 
 

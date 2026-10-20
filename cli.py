@@ -9,19 +9,14 @@ Kullanim:
 """
 
 import os
+import runpy
 import sys
-import subprocess
 from pathlib import Path
 from bin.i18n import t
+from core.console import utf8_console
 
-# Terminal Renkleri (ANSI)
-if sys.platform == "win32":
-    os.system("chcp 65001 >nul")  # UTF-8 kod sayfasini ayarla ve Windows ANSI destegini etkinlestir
-    try:
-        sys.stdout.reconfigure(encoding='utf-8')
-        sys.stderr.reconfigure(encoding='utf-8')
-    except Exception:
-        pass
+# UTF-8 kod sayfasi ve Windows ANSI destegi (cmd.exe baslatmadan)
+utf8_console()
 
 RESET  = "\033[0m"
 BOLD   = "\033[1m"
@@ -73,10 +68,12 @@ def main():
             sys.exit(1)
         
         try:
-            # İlgili scripti doğrudan çalıştır
-            args = [sys.executable, str(script_path), *sys.argv[2:]]
-            result = subprocess.run(args, cwd=ROOT)
-            sys.exit(result.returncode)
+            # İlgili scripti bu süreçte çalıştır: ikinci bir Python her başlatmaya yorumlayıcı açılışını ve
+            # import'ları ekliyordu. Betik, kendi süreciymiş gibi çalışır (argv, __main__, çalışma dizini);
+            # çıkış kodu sys.exit ile aynen döner. Hub'ın başlattığı süreç böylece supervisor'ın kendisidir.
+            sys.argv = [str(script_path), *sys.argv[2:]]
+            os.chdir(ROOT)
+            runpy.run_path(str(script_path), run_name="__main__")
         except KeyboardInterrupt:
             # CTRL+C ile kesildiğinde ana script temiz sonlansın
             pass

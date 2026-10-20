@@ -199,14 +199,18 @@ class DashboardBuildTests(unittest.TestCase):
             self.assertEqual(updater.check_for_updates(force=True), expected)
 
     def test_cli_forwards_both_force_flags(self):
+        # The script runs in the cli.py process itself (no second Python), with its own argv.
         for flag in ("--build", "--force-build"):
+            seen = []
             with self.subTest(flag=flag), patch.object(sys, "argv", ["cli.py", "prod", flag]), \
-                    patch.object(cli.subprocess, "run") as run:
-                run.return_value.returncode = 0
-                with self.assertRaises(SystemExit) as exit_result:
-                    cli.main()
-                self.assertEqual(exit_result.exception.code, 0)
-                self.assertEqual(run.call_args.args[0][-1], flag)
+                    patch.object(cli.os, "chdir"), \
+                    patch.object(cli.runpy, "run_path", side_effect=lambda path, run_name: seen.append(
+                        (path, run_name, list(sys.argv)))):
+                cli.main()
+                path, run_name, argv = seen[0]
+                self.assertEqual(Path(path).name, "prod.py")
+                self.assertEqual(run_name, "__main__")
+                self.assertEqual(argv[1:], [flag])
 
 
 if __name__ == "__main__":

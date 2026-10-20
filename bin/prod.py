@@ -34,10 +34,11 @@ from bin.common import (
     setup_db_and_user, set_env
 )
 
-from core.lifespan import print_active_services_banner
+from core.banner import print_active_services_banner
 from core.tls_local import open_health
 from bin.dashboard_build import ensure_dashboard
 from bin.i18n import t
+from core.launch_timing import process_age, report, timed
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Prod-Specific Paths & Constants
@@ -90,7 +91,7 @@ def _main(runtime, force_build: bool = False) -> None:
     try:
         banner()
 
-        run_silent([sys.executable, "-c", "import core.config"], cwd=ROOT)
+        # core.config is already imported (core.tls_local): .env exists and is merged with .env.example.
         router_port = read_env("ORION_ROUTER_TLS_PORT", "9443")
         from bin.common import database
         pg = database(PG_DATA, PG_PORT, PG_USER)
@@ -105,22 +106,26 @@ def _main(runtime, force_build: bool = False) -> None:
         # This supervisor owns its database (core/native_postgres.py): a server whose owner has ended is
         # restarted as ours, never reused ownerless, and it ends with this supervisor at the latest.
         runtime.database = pg
-        pg.ensure()
+        with timed('router.postgres.start'):
+            pg.ensure()
         started_postgres = True
-        setup_db_and_user(PG_USER, PG_PASS, PG_PORT, PG_DB)
+        with timed('router.postgres.setup'):
+            setup_db_and_user(PG_USER, PG_PASS, PG_PORT, PG_DB)
         print()
 
         ensure_dashboard(force=force_build)
         print()
 
         set_env(router_port, PG_PORT, PG_DB, PG_USER, PG_PASS, "0")
-        procs.extend(launch(router_port, runtime))
+        with timed('router.backend'):
+            procs.extend(launch(router_port, runtime))
 
-        from core.process_lifecycle import wait_health
-        from core import config
-        wait_health(procs[0][1], router_port, certificate=config.TLS_DIRECTORY / 'certificate.pem',
-                    identity=config.MDNS_ID_FILE.read_text().strip())
+            from core.process_lifecycle import wait_health
+            from core import config
+            wait_health(procs[0][1], router_port, certificate=config.TLS_DIRECTORY / 'certificate.pem',
+                        identity=config.MDNS_ID_FILE.read_text().strip())
         runtime.ready()
+        report('router.ready', process_age())
 
         # ── Print Banner when server is ready ───────
         def wait_for_server_and_print_banner(port: str) -> None:
@@ -168,6 +173,7 @@ def _main(runtime, force_build: bool = False) -> None:
 
 
 def main(force_build=False):
+    report('router.process', process_age())
     from core.update_gate import require_start_admission
     require_start_admission(ROOT)
     from core.process_lifecycle import Runtime
