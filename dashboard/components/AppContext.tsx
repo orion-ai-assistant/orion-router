@@ -98,6 +98,7 @@ export interface VersionInfo {
   latest_version: string;
   update_available: boolean;
   apply_hint?: string;
+  can_apply?: boolean;
   ready_components?: string[];
   behind_commits?: number;
   release_notes?: string;
@@ -237,12 +238,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setUpdateSuccess(false);
 
     try {
-      const res = await adminFetch('/dashboard/api/system/update', {
+      // Router-only installation: the retained watcher applies the prepared update and restarts the Router.
+      const res = await adminFetch('/dashboard/api/system/apply', {
         method: 'POST',
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail || 'Güncelleme başlatılamadı');
+      const started = await res.json().catch(() => ({}));
+      if (!res.ok || started.status !== 'started') {
+        throw new Error(started.message || started.detail || 'Güncelleme başlatılamadı');
       }
 
       const pollInterval = setInterval(async () => {
@@ -657,13 +659,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
             {/* Steps pills */}
             <div className="grid grid-cols-4 gap-2 text-center text-[11px] font-medium">
-              <div className={`p-1.5 rounded border ${updateProgress >= 15 ? 'bg-blue-950/40 border-blue-500/40 text-blue-300' : 'bg-zinc-900 border-zinc-800 text-zinc-600'}`}>
+              <div className={`p-1.5 rounded border ${updateProgress >= 3 ? 'bg-blue-950/40 border-blue-500/40 text-blue-300' : 'bg-zinc-900 border-zinc-800 text-zinc-600'}`}>
                 1. {t('settings.system.stepGit')}
               </div>
-              <div className={`p-1.5 rounded border ${updateProgress >= 40 ? 'bg-blue-950/40 border-blue-500/40 text-blue-300' : 'bg-zinc-900 border-zinc-800 text-zinc-600'}`}>
+              <div className={`p-1.5 rounded border ${updateProgress >= 10 ? 'bg-blue-950/40 border-blue-500/40 text-blue-300' : 'bg-zinc-900 border-zinc-800 text-zinc-600'}`}>
                 2. {t('settings.system.stepDeps')}
               </div>
-              <div className={`p-1.5 rounded border ${updateProgress >= 70 ? 'bg-blue-950/40 border-blue-500/40 text-blue-300' : 'bg-zinc-900 border-zinc-800 text-zinc-600'}`}>
+              <div className={`p-1.5 rounded border ${updateProgress >= 45 ? 'bg-blue-950/40 border-blue-500/40 text-blue-300' : 'bg-zinc-900 border-zinc-800 text-zinc-600'}`}>
                 3. {t('settings.system.stepBuild')}
               </div>
               <div className={`p-1.5 rounded border ${updateProgress >= 95 ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300' : 'bg-zinc-900 border-zinc-800 text-zinc-600'}`}>

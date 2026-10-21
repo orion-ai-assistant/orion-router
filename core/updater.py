@@ -147,12 +147,14 @@ def get_update_status():
                 'last_checked': max(checked.get('last_success') or 0, router_state.get('last_success') or 0) or None,
                 'last_attempt': checked.get('last_attempt'),
                 'automatic_updates': policy.get('enabled', False), 'phase': phase,
-                'is_updating': busy, 'step': phase, 'progress': 100 if phase == 'completed' else 0,
+                'is_updating': busy, 'step': phase, 'progress': 100 if phase == 'completed' else int(((tx or {}).get('progress') or {}).get('percent') or 0),
                 'success': phase == 'completed', 'error': checked.get('error') or
                 (phase if phase in {'failed', 'repair_required', 'rolled_back'} else None),
                 'logs': [], 'pending': pending,
                 'check_outcome': checked.get('outcome'), 'checking': checking,
                 'apply_hint': _apply_hint(hub_present),
+                # Only a Router-only installation installs from this panel; with a Hub its "Şimdi kur" does.
+                'can_apply': bool(pending and not hub_present),
                 'ready_components': list((tx or {}).get('changes', [])) if pending else [],
                 'message': 'Hazır: %s%s. %s' % (_names((tx or {}).get('changes', [])),
                                                 ' ' + str(latest.get('version')) if latest.get('version') else '',
@@ -168,6 +170,25 @@ def get_update_status():
                 'latest_version': None, 'update_available': None, 'last_checked': None,
                 'is_updating': False, 'step': 'unavailable', 'progress': 0,
                 'success': False, 'logs': [], 'error': 'Package installation/update status unavailable'}
+
+
+def start_apply():
+    """Router-only "Şimdi kur": ask the retained watcher to apply the prepared Router update. It stops the Router,
+    backs it up, switches, health-checks and starts it again (the panel reloads when it is back)."""
+    try:
+        registry, record, item = _installation()
+        if any(c['kind'] == 'hub' for c in record['components']):
+            return {'status': 'error', 'message': 'Hub kurulu: hazır güncelleme Orion ayarlarındaki "Şimdi kur" ile kurulur.'}
+        status = get_update_status()
+        if not status.get('can_apply'):
+            return {'status': 'error', 'message': 'Kurulmaya hazır bir Router güncellemesi yok. Önce güncellemeleri denetleyin.'}
+        path = canonical_path(registry.path.parent / 'updates/router-request.json')
+        path.parent.mkdir(exist_ok=True)
+        _atomic_write(path, json.dumps({'schema': 1, 'installation_id': record['installation_id'],
+                                       'action': 'apply'}).encode())
+        return {'status': 'started', 'message': 'Güncelleme başlatıldı; Router kısa süre kapanıp yeniden açılacak.'}
+    except (OSError, ValueError, RuntimeError):
+        return {'status': 'error', 'message': 'Güncelleme başlatılamadı: kayıtlı paket kurulumu ve dış güncelleme yardımcısı gerekir.'}
 
 
 def check_for_updates(force=False):

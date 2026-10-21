@@ -1083,6 +1083,22 @@ async def trigger_system_update(request: Request):
     return await asyncio.to_thread(start_update)
 
 
+@router.post("/api/system/apply", dependencies=[Depends(verify_admin)])
+async def apply_prepared_update(request: Request):
+    """Router-only kurulum: hazırlanmış Router güncellemesini kurar (Hub varsa Orion ayarlarındaki "Şimdi kur" kurar)."""
+    from core.updater import start_apply
+    import ipaddress
+    if (not request.client or not ipaddress.ip_address(request.client.host).is_loopback
+            or any(name in request.headers for name in ('forwarded', 'x-forwarded-for', 'x-forwarded-host', 'x-real-ip'))):
+        raise HTTPException(403, 'Güncelleme yalnızca Router bilgisayarından yönetilebilir.')
+    origin = request.headers.get('origin')
+    if ((origin and origin != f'{request.url.scheme}://{request.url.netloc}')
+            or request.headers.get('sec-fetch-site') == 'cross-site'):
+        raise HTTPException(403, 'Geçersiz istek kaynağı.')
+    import asyncio
+    return await asyncio.to_thread(start_apply)
+
+
 @router.get("/api/system/update-status", dependencies=[Depends(verify_admin)])
 async def get_update_progress():
     """Devam eden veya tamamlanan güncellemenin durumunu ve loglarını döner."""
