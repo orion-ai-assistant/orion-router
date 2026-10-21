@@ -122,6 +122,8 @@ def get_update_status():
             tx = _json(base / 'updates' / identity / 'journal.json')
             if not tx or tx['installation_id'] != record['installation_id']:
                 raise ValueError('Invalid update journal')
+        if tx and tx.get('phase') == 'failed' and tx.get('reason') == 'Superseded':
+            tx = None  # A newer release replaced a half-published one: not a failure the user has to see.
         other = [kind for kind in (tx or {}).get('changes', []) if kind != 'router']
         waiting = (tx or {}).get('phase') in {'staged', 'waiting_for_idle'}
         if tx and 'router' not in tx.get('changes', []):
@@ -150,7 +152,11 @@ def get_update_status():
                 (phase if phase in {'failed', 'repair_required', 'rolled_back'} else None),
                 'logs': [], 'pending': pending,
                 'check_outcome': checked.get('outcome'), 'checking': checking,
-                'message': 'Hazır sürüm sonraki güvenli açılışı bekliyor.' if pending else
+                'apply_hint': _apply_hint(hub_present),
+                'ready_components': list((tx or {}).get('changes', [])) if pending else [],
+                'message': 'Hazır: %s%s. %s' % (_names((tx or {}).get('changes', [])),
+                                                ' ' + str(latest.get('version')) if latest.get('version') else '',
+                                                _apply_hint(hub_present)) if pending else
                 'Güncellemeler denetleniyor…' if checking else
                 ERRORS.get(checked.get('error') or (phase if phase in ERRORS else None)) or
                 _outcome_message(checked.get('outcome'), hub_present, found if checked.get('outcome') == 'update_found' else [],

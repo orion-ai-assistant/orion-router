@@ -97,6 +97,8 @@ export interface VersionInfo {
   current_version: string;
   latest_version: string;
   update_available: boolean;
+  apply_hint?: string;
+  ready_components?: string[];
   behind_commits?: number;
   release_notes?: string;
   release_url?: string;

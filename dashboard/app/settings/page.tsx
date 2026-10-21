@@ -6,7 +6,7 @@ import { useApp, BANNER_PRESETS } from '@/components/AppContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { ChevronDown, Check, RefreshCw, Sparkles, CheckCircle2, AlertCircle, Terminal, ExternalLink } from 'lucide-react';
+import { ChevronDown, Check, RefreshCw, CheckCircle2, AlertCircle, Terminal, ExternalLink } from 'lucide-react';
 import { SUPPORTED_LOCALES, LOCALE_NAMES, Locale } from '@/lib/i18n';
 import { copyText } from '@/lib/clipboard';
 
@@ -21,7 +21,6 @@ export default function SettingsPage() {
     updateActiveBannerId,
     versionInfo,
     refreshVersionInfo,
-    startSystemUpdate,
     updateRunning
   } = useApp();
   
@@ -92,7 +91,8 @@ export default function SettingsPage() {
         if (data && (data.last_attempt || 0) > before && !busy) break;
       }
       if (data?.update_available) {
-        showToast(`${t('settings.system.updateAvailable')}: v${data.latest_version}`, 'success');
+        // The message names what is ready (Hub, Arayüz, Router ...) and how it gets installed.
+        showToast(data.message || `${t('settings.system.updateAvailable')}: v${data.latest_version}`, 'success');
       } else {
         showToast(data?.message || `v${data?.current_version || ''}`, 'success');
       }
@@ -503,20 +503,16 @@ export default function SettingsPage() {
                     <RefreshCw className={`w-3.5 h-3.5 ${checkBusy ? 'animate-spin' : ''}`} />
                     <span>{checkBusy ? t('settings.system.checking') : t('settings.system.checkUpdates')}</span>
                   </Button>
-
-                  {versionInfo?.update_available && (
-                    <Button
-                      type="button"
-                      disabled={updateRunning}
-                      onClick={startSystemUpdate}
-                      className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-2 text-xs rounded transition-all duration-200 shadow-lg shadow-emerald-900/30 flex items-center gap-2 cursor-pointer"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>{t('settings.system.updateNow')}</span>
-                    </Button>
-                  )}
                 </div>
               </div>
+
+              {/* A prepared update is installed by the Orion installation, not by this page: no button that
+                  would only queue another check. */}
+              {versionInfo?.update_available && (
+                <p className="text-xs text-emerald-300 bg-emerald-950/30 border border-emerald-500/20 rounded-lg px-4 py-3">
+                  {versionInfo.message}
+                </p>
+              )}
             </div>
           </div>
         </div>
