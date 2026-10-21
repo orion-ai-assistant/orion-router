@@ -1096,7 +1096,14 @@ async def apply_prepared_update(request: Request):
             or request.headers.get('sec-fetch-site') == 'cross-site'):
         raise HTTPException(403, 'Geçersiz istek kaynağı.')
     import asyncio
-    return await asyncio.to_thread(start_apply)
+    from core.update_activity import activity
+    # Running API requests finish first; nothing is cut. New ones get 503 + Retry-After meanwhile.
+    if not await activity.drain():
+        return {'status': 'busy', 'message': 'Çalışan istekler var (sohbet, ses vb.); bitince yeniden deneyin. Hiçbir iş kesilmedi.'}
+    result = await asyncio.to_thread(start_apply)
+    if result.get('status') != 'started':
+        activity.release()
+    return result
 
 
 @router.get("/api/system/update-status", dependencies=[Depends(verify_admin)])

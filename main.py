@@ -150,7 +150,9 @@ class LocalhostWarningMiddleware(BaseHTTPMiddleware):
 # ---------------------------------------------------------------------------
 app = FastAPI(title="Orion Router", lifespan=lifespan)
 from core.update_gate import UpdateAdmission
+from core.update_activity import ActivityTracker
 app.add_middleware(UpdateAdmission)
+app.add_middleware(ActivityTracker)
 app.add_exception_handler(StarletteHTTPException, log_http_exception)
 from core.tls_server import _TLSApplication
 tls_app = _TLSApplication(app)
