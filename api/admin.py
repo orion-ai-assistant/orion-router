@@ -1098,7 +1098,8 @@ async def apply_prepared_update(request: Request):
     import asyncio
     from core.update_activity import activity
     # Running API requests finish first; nothing is cut. New ones get 503 + Retry-After meanwhile.
-    if not await activity.drain():
+    from core import tts_archive
+    if not await activity.drain(extra=tts_archive.pending):
         return {'status': 'busy', 'message': 'Çalışan istekler var (sohbet, ses vb.); bitince yeniden deneyin. Hiçbir iş kesilmedi.'}
     result = await asyncio.to_thread(start_apply)
     if result.get('status') != 'started':

@@ -50,6 +50,11 @@ async def close_archives():
     _active.clear()
 
 
+def pending():
+    """Archive work still running after its response (finalization, ffmpeg encoders): an update waits for it."""
+    return len(_background) + len(_active)
+
+
 def runtime_status():
     return {**_runtime, "active_encoders": len(_active), "encoder_limit": MAX_ENCODERS,
             "errors_since_start": _error_count, "last_error": _last_error}

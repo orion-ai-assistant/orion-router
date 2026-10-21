@@ -26,12 +26,13 @@ class Activity:
     def release(self):
         self.hold_until = 0.0
 
-    async def drain(self, timeout=DRAIN_TIMEOUT, hold=DRAIN_HOLD, sleep=asyncio.sleep):
-        """True when no request is running any more (new ones are refused meanwhile); False on timeout, with
-        the hold lifted again so nothing is left refused."""
+    async def drain(self, timeout=DRAIN_TIMEOUT, hold=DRAIN_HOLD, sleep=asyncio.sleep, extra=lambda: 0):
+        """True when no request is running any more (new ones are refused meanwhile) and `extra()` - work that
+        outlives its request, like archive encoding - is zero; False on timeout, with the hold lifted again so
+        nothing is left refused."""
         self.hold_until = self.clock() + hold
         deadline = self.clock() + timeout
-        while self.active > 0:
+        while self.active > 0 or extra() > 0:
             if self.clock() >= deadline:
                 self.release()
                 return False
