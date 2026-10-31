@@ -1,4 +1,4 @@
-"""Offline checks for prompt caching: usage shapes, billing, conversation keys and provider hooks."""
+"""Offline checks for prompt caching: usage shapes, billing and provider hooks."""
 
 import asyncio
 import json
@@ -11,12 +11,9 @@ from unittest.mock import AsyncMock, patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from core.model_catalog import load_model_catalog, unit_pricing
-from core.prompt_cache import (
-    CacheRequest, CacheUsage, derive_cache_key, extract_cache_usage, normalize_usage, prompt_cost,
-)
+from core.prompt_cache import CacheUsage, extract_cache_usage, normalize_usage, prompt_cost
 from core.router.runners.chat import ChatRunner
 from core.router.telemetry import TelemetryService
-from providers.base import BaseChat
 from providers.deepseek.chat import DeepSeekChatProvider
 from providers.gemini.chat import GeminiChatProvider
 from providers.openai.chat import OpenAIChatProvider
@@ -88,58 +85,19 @@ class PromptCostTests(unittest.TestCase):
         self.assertTrue(prompt_cost(0, CacheUsage(), {}).known)
 
 
-class ConversationKeyTests(unittest.TestCase):
-    def test_none_when_the_client_names_no_conversation(self):
-        self.assertIsNone(derive_cache_key({}, {}, 'key-1'))
-        self.assertIsNone(derive_cache_key({'session_id': '  '}, {}, 'key-1'))
-
-    def test_body_fields_and_headers_are_equivalent(self):
-        key = derive_cache_key({'prompt_cache_key': 'chat-1'}, {}, 'key-1')
-        self.assertEqual(key, derive_cache_key({'session_id': 'chat-1'}, {}, 'key-1'))
-        self.assertEqual(key, derive_cache_key({}, {'x-orion-session': 'chat-1'}, 'key-1'))
-        self.assertEqual(len(key), 32)
-        self.assertNotIn('chat-1', key)
-
-    def test_callers_never_share_a_cache(self):
-        self.assertNotEqual(derive_cache_key({'session_id': 'c'}, {}, 'key-1'),
-                            derive_cache_key({'session_id': 'c'}, {}, 'key-2'))
-        self.assertNotEqual(derive_cache_key({'session_id': 'a'}, {}, 'key-1'),
-                            derive_cache_key({'session_id': 'b'}, {}, 'key-1'))
-
-
 class ProviderHookTests(unittest.TestCase):
-    CACHE = CacheRequest('abc')
-
-    def test_default_hook_adds_nothing(self):
-        for provider in (GeminiChatProvider(), DeepSeekChatProvider()):
+    def test_automatic_caches_add_nothing(self):
+        for provider in (GeminiChatProvider(), DeepSeekChatProvider(), OpenAIChatProvider()):
             payload = {}
-            provider.apply_cache(payload, 'm', self.CACHE)
+            provider.apply_cache(payload, 'm')
             self.assertEqual(payload, {}, type(provider).__name__)
 
-    def test_openai_sends_prompt_cache_key(self):
+    def test_openrouter_marks_only_claude(self):
         payload = {}
-        OpenAIChatProvider().apply_cache(payload, 'gpt-4o-mini', self.CACHE)
-        self.assertEqual(payload, {'prompt_cache_key': 'abc'})
-        payload = {}
-        OpenAIChatProvider().apply_cache(payload, 'gpt-4o-mini', CacheRequest())
+        OpenRouterChatProvider().apply_cache(payload, 'openai/gpt-4o')
         self.assertEqual(payload, {})
-
-    def test_openrouter_sends_session_and_claude_breakpoint(self):
-        payload = {}
-        OpenRouterChatProvider().apply_cache(payload, 'openai/gpt-4o', self.CACHE)
-        self.assertEqual(payload, {'session_id': 'abc'})
-        payload = {}
-        OpenRouterChatProvider().apply_cache(payload, 'anthropic/claude-sonnet-4.6', self.CACHE)
-        self.assertEqual(payload, {'session_id': 'abc', 'cache_control': {'type': 'ephemeral'}})
-
-    def test_kwargs_carry_the_key(self):
-        self.assertEqual(BaseChat.extract_cache_request({'cache_key': 'abc'}), self.CACHE)
-        self.assertEqual(BaseChat.extract_cache_request({}), CacheRequest())
-
-    def test_openai_responses_payload_carries_key_and_usage_reports_hits(self):
-        provider = OpenAIChatProvider()
-        payload = provider._responses_payload('o3-mini', [{'role': 'user', 'content': 'hi'}], {'cache_key': 'abc'})
-        self.assertEqual(payload['prompt_cache_key'], 'abc')
+        OpenRouterChatProvider().apply_cache(payload, 'anthropic/claude-sonnet-4.6')
+        self.assertEqual(payload, {'cache_control': {'type': 'ephemeral'}})
 
 
 class BillingFlowTests(unittest.IsolatedAsyncioTestCase):

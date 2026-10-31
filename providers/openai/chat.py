@@ -11,7 +11,6 @@ from typing import AsyncGenerator, Any
 
 from providers.base import BaseChat
 
-from core.prompt_cache import CacheRequest
 from core.thinking import ThinkingConfig
 from core.http_client import get_http_client
 from core.video import prepare_openai_videos
@@ -35,11 +34,6 @@ class OpenAIChatProvider(BaseChat):
 
         if thinking.level is not None:
             payload["reasoning_effort"] = thinking.level
-
-    def apply_cache(self, payload: dict[str, Any], model: str, cache: CacheRequest) -> None:
-        """OpenAI prefix cache'i otomatiktir; prompt_cache_key sohbeti aynı cache'e yönlendirir."""
-        if cache.key:
-            payload["prompt_cache_key"] = cache.key
 
     @staticmethod
     def _responses_input(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -101,7 +95,6 @@ class OpenAIChatProvider(BaseChat):
             "stream": True,
             "store": False,
         }
-        self.apply_cache(payload, model, self.extract_cache_request(kwargs))
         thinking = self.extract_thinking_config(kwargs)
         if thinking.level is not None:
             payload["reasoning"] = {"effort": thinking.level}
@@ -213,7 +206,6 @@ class OpenAIChatProvider(BaseChat):
             "stream": True,
             "stream_options": {"include_usage": True},
         }
-        self.apply_cache(payload, model, self.extract_cache_request(kwargs))
         thinking = self.extract_thinking_config(kwargs)
         self.apply_thinking(payload, thinking)
         if "reasoning_effort" not in payload and kwargs.get("temperature") is not None:

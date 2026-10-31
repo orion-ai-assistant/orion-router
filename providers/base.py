@@ -18,7 +18,6 @@ import json
 from abc import ABC, abstractmethod
 from typing import AsyncGenerator, Any
 
-from core.prompt_cache import CacheRequest
 from core.thinking import ThinkingConfig
 
 
@@ -80,17 +79,12 @@ class BaseChat(_ProviderMixin, ABC):
         """
         pass
 
-    @staticmethod
-    def extract_cache_request(kwargs: dict[str, Any]) -> CacheRequest:
-        """kwargs içinden Router'ın türettiği sohbet anahtarını (cache_key) okur."""
-        return CacheRequest.from_kwargs(kwargs)
-
-    def apply_cache(self, target: dict[str, Any], model: str, cache: CacheRequest) -> None:
+    def apply_cache(self, target: dict[str, Any], model: str) -> None:
         """Provider'a özgü prompt cache parametrelerini payload'a ekler (apply_thinking gibi, Open-Closed).
 
-        Varsayılan hiçbir şey eklemez: Gemini, DeepSeek ve yerel model otomatik cache'ler, önek aynı
-        kaldıkça isabet olur. Bir ipucu ya da işaret isteyen provider (OpenAI prompt_cache_key,
-        OpenRouter session_id ...) bu metodu ezer.
+        Varsayılan hiçbir şey eklemez: OpenAI, Gemini, DeepSeek ve yerel model otomatik cache'ler, önek
+        aynı kaldıkça isabet olur. Bir işaret isteyen provider (OpenRouter'daki Claude cache_control)
+        bu metodu ezer.
 
         Yanıt tarafı sözleşmesi: ``{"internal_usage": usage}`` içinde ``prompt_tokens`` cache'liler
         DAHİL tüm istem token'larıdır; cache isabeti ``prompt_tokens_details.cached_tokens`` (veya

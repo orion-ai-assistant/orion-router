@@ -6,30 +6,25 @@ rate only for what is new. Orion supports it end to end: requests keep the promp
 name the conversation, the Router reads the cache hits the provider reports, bills them at the
 cached rate and shows the savings on the dashboard.
 
+Providers match their cache on the start of the prompt alone, so every chat reuses its own history
+and all chats share the common system prompt and tool definitions. No conversation key is sent: the
+routing hints some providers accept (OpenAI `prompt_cache_key`, OpenRouter `session_id`) gave too
+little for a single user to be worth carrying.
+
 ## What each provider needs
 
 | Provider | Cache | What the Router does |
 | --- | --- | --- |
 | Gemini 2.5+ | automatic (implicit), no guarantee | nothing to send; reads `cached_content_token_count` |
 | DeepSeek | automatic (disk), best effort | nothing to send; reads `prompt_cache_hit_tokens` |
-| OpenAI | automatic, prompts of 1024+ tokens | sends `prompt_cache_key`; reads `cached_tokens` |
-| OpenRouter | provider dependent | sends `session_id` (sticky routing) and, for `anthropic/*`, a top-level `cache_control`; reads `cached_tokens` and `cache_write_tokens` |
+| OpenAI | automatic, prompts of 1024+ tokens | nothing to send; reads `cached_tokens` |
+| OpenRouter | provider dependent | for `anthropic/*`, a top-level `cache_control`; reads `cached_tokens` and `cache_write_tokens` |
 | Local | llama.cpp keeps its own KV cache | nothing |
 
 A prompt is only cached while its **start stays byte-identical** between requests, so the Hub keeps the
 system prompt and the older history unchanged (its history window slides in blocks of turns, not every turn;
 see `HISTORY_SLIDE_TURNS`) and sorts tool definitions. Caches live minutes, so a chat that pauses
 for a long time starts cold again.
-
-## Naming a conversation
-
-A client names the conversation with `prompt_cache_key` or `session_id` in the body, or the
-`x-orion-session` / `x-session-id` header. The Router hashes it together with the caller's virtual
-key id (chat ids never reach providers, and two callers cannot share a cache) and hands every
-provider the same opaque key as the `cache_key` keyword. The key is only a routing hint: a provider
-matches its cache on the start of the prompt, not on the chat. The Hub sends the user id, because all of a
-user's chats begin with the same system prompt and tool definitions (about a thousand tokens), so a new chat can
-already hit the cache of the previous one.
 
 ## Pricing
 
@@ -49,8 +44,8 @@ Clients also get the OpenAI-shaped `usage.prompt_tokens_details.cached_tokens` i
 
 ## Adding a provider
 
-* Request side: override `BaseChat.apply_cache(payload, model, cache)` (providers/base.py) when the
-  API wants a hint or marker. The default adds nothing, which is right for automatic caches.
+* Request side: override `BaseChat.apply_cache(payload, model)` (providers/base.py) when the
+  API wants a marker. The default adds nothing, which is right for automatic caches.
 * Response side: yield `{"internal_usage": usage}` with `prompt_tokens` counting **all** prompt
   tokens, cached ones included, and the cached share in `prompt_tokens_details.cached_tokens` (or any
   shape `core/prompt_cache.py::extract_cache_usage` knows). No billing code is needed in the provider:

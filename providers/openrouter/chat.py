@@ -12,7 +12,6 @@ from typing import AsyncGenerator, Any
 
 from providers.base import BaseChat
 
-from core.prompt_cache import CacheRequest
 from core.thinking import ThinkingConfig
 from core.http_client import get_http_client
 
@@ -200,10 +199,8 @@ class OpenRouterChatProvider(BaseChat):
             payload["thinking_budget_tokens"] = thinking.budget
             payload["reasoning"] = {"max_tokens": thinking.budget}
 
-    def apply_cache(self, payload: dict[str, Any], model: str, cache: CacheRequest) -> None:
-        """session_id sohbeti aynı upstream provider'da tutar (sticky routing); Claude cache_control ister."""
-        if cache.key:
-            payload["session_id"] = cache.key
+    def apply_cache(self, payload: dict[str, Any], model: str) -> None:
+        """Claude cache_control ister; diğer upstream'ler otomatik cache'ler."""
         if model.lower().startswith("anthropic/"):
             # OpenRouter'ın üst düzey (otomatik) kesme noktası: yalnızca Anthropic'in kendi uçlarına yönlenir.
             payload["cache_control"] = {"type": "ephemeral"}
@@ -253,7 +250,7 @@ class OpenRouterChatProvider(BaseChat):
         if kwargs.get("chat_template_kwargs") and isinstance(kwargs["chat_template_kwargs"], dict):
             payload["chat_template_kwargs"] = dict(kwargs["chat_template_kwargs"])
 
-        self.apply_cache(payload, model, self.extract_cache_request(kwargs))
+        self.apply_cache(payload, model)
         thinking = self.extract_thinking_config(kwargs)
         self.apply_thinking(payload, thinking)
 

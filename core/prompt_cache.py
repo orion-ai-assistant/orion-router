@@ -6,13 +6,11 @@ before and the normal rate only for what is new.  Providers differ in how they e
 
 * automatic, nothing to send (Gemini 2.5+, DeepSeek, OpenAI): the prefix of the prompt only has to
   stay byte-identical between requests; hits show up in the usage block;
-* routing hints (OpenAI ``prompt_cache_key``, OpenRouter ``session_id``): keep a conversation on
-  the machine / upstream provider that holds its cache;
 * explicit markers (Anthropic ``cache_control``).
 
 Everything provider-neutral lives here.  A provider only adapts to its own API:
 
-* request side: override ``BaseChat.apply_cache`` (see providers/base.py) to add its parameters;
+* request side: override ``BaseChat.apply_cache`` (see providers/base.py) to add a marker;
 * response side: yield ``{"internal_usage": usage}`` with ``prompt_tokens`` counting *all* prompt
   tokens (cached ones included) and the cached share in one of the shapes ``extract_cache_usage``
   understands, preferably OpenAI's ``prompt_tokens_details.cached_tokens``.  ChatRunner then
@@ -25,46 +23,9 @@ this feature existed.
 
 from __future__ import annotations
 
-import hashlib
 import math
 from dataclasses import dataclass
 from typing import Any, Mapping
-
-# Fields a client may use to name a conversation.  ``prompt_cache_key`` is OpenAI's name,
-# ``session_id`` OpenRouter's; the Router accepts either (or the headers) and sends each provider
-# the form it understands.
-CACHE_KEY_FIELDS = ("prompt_cache_key", "session_id")
-CACHE_KEY_HEADERS = ("x-orion-session", "x-session-id")
-
-
-@dataclass(frozen=True)
-class CacheRequest:
-    """What a chat request tells providers about caching."""
-
-    key: str | None = None
-
-    @classmethod
-    def from_kwargs(cls, kwargs: Mapping[str, Any]) -> "CacheRequest":
-        key = kwargs.get("cache_key")
-        return cls(key if isinstance(key, str) and key else None)
-
-
-def derive_cache_key(body: Mapping[str, Any], headers: Mapping[str, str], scope: str | None) -> str | None:
-    """Opaque per-conversation key for a request, or None when the client named no conversation.
-
-    The raw value is hashed together with the caller's virtual key id: provider-side keys then
-    never expose chat ids, and two callers using the same chat id cannot share a cache.
-    """
-    raw = next(
-        (str(value).strip() for value in (
-            *(body.get(field) for field in CACHE_KEY_FIELDS),
-            *(headers.get(name) for name in CACHE_KEY_HEADERS),
-        ) if value not in (None, "") and str(value).strip()),
-        None,
-    )
-    if raw is None:
-        return None
-    return hashlib.sha256(f"{scope or ''}\0{raw}".encode("utf-8")).hexdigest()[:32]
 
 
 @dataclass(frozen=True)
