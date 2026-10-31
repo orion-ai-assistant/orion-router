@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   title: "Orion Router",
   description: "Enterprise Service Router and Key Management Panel",
   icons: {
-    icon: "/dashboard/favicon.svg",
+    icon: "/dashboard/favicon.ico",
   },
 };
 
