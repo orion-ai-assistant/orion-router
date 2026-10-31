@@ -10,6 +10,7 @@ from typing import Any, AsyncGenerator
 
 from providers.base import BaseChat
 from core.local_chat_defaults import LOCAL_SAMPLING_DEFAULTS, LOCAL_TEMPERATURE_DEFAULT
+from core.prompt_cache import normalize_usage
 
 logger = logging.getLogger("service-router.dynamic")
 
@@ -133,12 +134,48 @@ def is_key_specific_error(error_str: str | None) -> bool:
     return True
 
 
+class _ProcessingLog:
+    """The request-log row of one run_combo call, once it has been created."""
+    __slots__ = ("id",)
+
+    def __init__(self) -> None:
+        self.id: int | None = None
+
+
 class ChatRunner:
+    MAX_TRACKED_LOGS = 4096
+
     def __init__(self, registry, route_resolver, key_pool, telemetry) -> None:
         self.registry = registry
         self.route_resolver = route_resolver
         self.key_pool = key_pool
         self.telemetry = telemetry
+        # Request logs whose final state is written by someone else already (stream() or an explicit finish).
+        self._settled_logs: dict[int, None] = {}
+        self._log_writers: set[asyncio.Task] = set()
+
+    def _settle(self, log_id: int | None) -> None:
+        if log_id is None:
+            return
+        self._settled_logs[log_id] = None
+        while len(self._settled_logs) > self.MAX_TRACKED_LOGS:
+            del self._settled_logs[next(iter(self._settled_logs))]
+
+    async def _finish_log(self, lease: _ProcessingLog, response: dict, status: str, success: bool | None) -> None:
+        self._settle(lease.id)
+        await self.telemetry.finish_processing_log(lease.id, response, status, success)
+
+    async def _close_unsettled_log(self, log_id: int | None, status: str, success: bool | None, message: str) -> None:
+        """A request that ended before stream() took over its log (client gone, access denied, an error)."""
+        if log_id is None:
+            return
+        if log_id in self._settled_logs:
+            del self._settled_logs[log_id]
+            return
+        try:
+            await asyncio.shield(self.telemetry.finish_processing_log(log_id, {"error": message}, status, success))
+        except Exception as exc:
+            logger.warning("Could not close request log %s: %s", log_id, exc)
 
     async def stream(
         self,
@@ -152,6 +189,8 @@ class ChatRunner:
         log_id=None,
         **kwargs,
     ):
+        # From here this generator writes the log's final state, also when the client leaves (finally below).
+        self._settle(log_id)
         accumulated_content = ""
         accumulated_reasoning = ""
         accumulated_tool_calls: list[dict] = []
@@ -188,7 +227,7 @@ class ChatRunner:
             ):
                 chunk = redact(chunk)
                 if isinstance(chunk, dict) and "internal_usage" in chunk:
-                    usage = chunk["internal_usage"]
+                    usage = normalize_usage(chunk["internal_usage"])
                 else:
                     if isinstance(chunk, str):
                         try:
@@ -381,7 +420,7 @@ class ChatRunner:
                 if usage:
                     res_data["usage"] = usage
 
-            asyncio.create_task(
+            writer = asyncio.create_task(
                 self.telemetry.log_usage(
                     key_id,
                     provider,
@@ -396,9 +435,42 @@ class ChatRunner:
                     log_id=log_id,
                 )
             )
+            # The loop holds tasks weakly; without this a log write could be collected before it finishes.
+            self._log_writers.add(writer)
+            writer.add_done_callback(self._log_writers.discard)
 
     async def run_combo(
         self,
+        provider: str | None,
+        model: str,
+        messages: list[dict[str, Any]],
+        api_key: str | None = None,
+        auth_header: str | None = None,
+        key_id: str | None = None,
+        **kwargs,
+    ) -> AsyncGenerator[str, None]:
+        """Stream a chat; its request log never stays "processing".
+
+        stream() writes the final state of every request that reached a provider. One that ends before that
+        (the client left while keys were being picked, access denied, an unexpected error) is closed here.
+        """
+        lease = _ProcessingLog()
+        outcome = ("failed", False, "Request ended without a result")
+        try:
+            async for chunk in self._run_combo(lease, provider, model, messages, api_key, auth_header, key_id, **kwargs):
+                yield chunk
+        except Exception as exc:
+            outcome = ("failed", False, redact(str(exc)))
+            raise
+        except BaseException:
+            outcome = ("interrupted", None, "Client disconnected / Request Cancelled")
+            raise
+        finally:
+            await self._close_unsettled_log(lease.id, *outcome)
+
+    async def _run_combo(
+        self,
+        lease: _ProcessingLog,
         provider: str | None,
         model: str,
         messages: list[dict[str, Any]],
@@ -455,10 +527,11 @@ class ChatRunner:
             "chat",
             req_data,
         )
+        lease.id = log_id
 
         if route_resolution_error:
-            await self.telemetry.finish_processing_log(
-                log_id,
+            await self._finish_log(
+                lease,
                 {"error": route_resolution_error},
                 "failed",
                 False,
@@ -625,8 +698,8 @@ class ChatRunner:
             if not success and not yielded_any:
                 error_message = extract_error_message(last_error_chunk)
                 final_error = error_message or (ACCESS_MESSAGE if key_id else "All routes and fallbacks failed.")
-                await self.telemetry.finish_processing_log(
-                    log_id,
+                await self._finish_log(
+                    lease,
                     {"error": final_error},
                     "failed",
                     False,
@@ -655,7 +728,7 @@ class ChatRunner:
         )
         if provider not in self.registry.chat_providers:
             err_msg = f"Unknown chat provider: {provider}"
-            await self.telemetry.finish_processing_log(log_id, {"error": err_msg}, "failed", False)
+            await self._finish_log(lease, {"error": err_msg}, "failed", False)
             yield f"data: {json.dumps({'error': {'message': err_msg, 'type': 'api_error'}}, ensure_ascii=False)}\n\n"
             return
 

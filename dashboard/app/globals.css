@@ -471,7 +471,20 @@ body.rtl-language input[type="email"] {
 }
 
 .stats-grid {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Four stat cards: one column, then 2x2, then one row, by the space beside the sidebar (no 3+1 orphan). */
+@container dashboard-content (min-width: 560px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container dashboard-content (min-width: 1180px) {
+  .stats-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .stat-card {

@@ -5,7 +5,7 @@ import { adminFetch } from '@/lib/api';
 import { money, formatNumber } from '@/lib/utils';
 import { useApp } from '@/components/AppContext';
 import { UsageExplorer } from '@/components/UsageExplorer';
-import { Coins, Cpu, Key } from 'lucide-react';
+import { Coins, Cpu, Key, PiggyBank } from 'lucide-react';
 import { Tooltip } from '@base-ui/react/tooltip';
 
 interface Stats {
@@ -17,6 +17,11 @@ interface Stats {
   prompt_tokens: number;
   completion_tokens: number;
   thoughts_tokens: number;
+  // Prompt-cache stats; absent until the Router reports them.
+  cached_tokens: number;
+  cache_write_tokens: number;
+  cache_prompt_tokens: number;
+  cache_saved_cost: number;
   total_keys: number;
 }
 
@@ -31,6 +36,10 @@ export default function OverviewPage() {
     prompt_tokens: 0,
     completion_tokens: 0,
     thoughts_tokens: 0,
+    cached_tokens: 0,
+    cache_write_tokens: 0,
+    cache_prompt_tokens: 0,
+    cache_saved_cost: 0,
     total_keys: 0,
   });
 
@@ -48,6 +57,10 @@ export default function OverviewPage() {
           prompt_tokens: data.prompt_tokens || 0,
           completion_tokens: data.completion_tokens || 0,
           thoughts_tokens: data.thoughts_tokens || 0,
+          cached_tokens: Number(data.cached_tokens) || 0,
+          cache_write_tokens: Number(data.cache_write_tokens) || 0,
+          cache_prompt_tokens: Number(data.cache_prompt_tokens) || 0,
+          cache_saved_cost: Number(data.cache_saved_cost) || 0,
           total_keys: data.total_keys || 0,
         });
       }
@@ -70,6 +83,13 @@ export default function OverviewPage() {
     };
   }, []);
 
+  // Share of prompt tokens served from the provider cache (0 without prompts), shown with one decimal at most.
+  // Only requests that reported cache usage count: older requests and embeddings never did.
+  const cacheBase = stats.cache_prompt_tokens > 0 ? stats.cache_prompt_tokens : stats.prompt_tokens;
+  const cacheHitRate = cacheBase > 0
+    ? Math.min(100, (stats.cached_tokens / cacheBase) * 100).toLocaleString(undefined, { maximumFractionDigits: 1 })
+    : '0';
+
   return (
     <section id="dashboard" className="tab-content active flex h-full min-h-0 flex-col pt-5">
       <div className="dashboard-banner shrink-0 !h-[clamp(70px,13vh,130px)]" style={bannerStyle}></div>
@@ -81,7 +101,7 @@ export default function OverviewPage() {
         </div>
       </header>
 
-      <div className="shrink-0 stats-grid grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="shrink-0 stats-grid grid grid-cols-1 gap-6">
         {/* Total Cost Card */}
         <div className="stat-card glass-panel p-4 pl-6 flex items-center gap-6 bg-[#131315] border border-white/5 rounded-md hover:translate-y-[-2px] hover:bg-[#18181b] hover:border-blue-500/35 hover:shadow-[0_8px_30px_rgba(59,130,246,0.15)] transition-all duration-200">
           <div className="stat-icon text-blue-400 bg-blue-500/10 border border-blue-500/20 w-11 h-11 flex items-center justify-center rounded-xl">
@@ -169,6 +189,54 @@ export default function OverviewPage() {
                           <span className="text-zinc-500 w-8 text-right">%{stats.total_tokens > 0 ? Math.round((stats.completion_tokens / stats.total_tokens) * 100) : 0}</span>
                           <span className="text-zinc-200 font-medium w-16 text-right">{formatNumber(stats.completion_tokens)}</span>
                         </div>
+                      </div>
+                      {stats.cached_tokens > 0 && (
+                        <div className="flex items-center justify-between gap-6 border-t border-zinc-800/80 pt-1.5 mt-0.5">
+                          <span className="text-zinc-400 font-sans">{t('overview.cachedInput')}</span>
+                          <div className="flex items-center">
+                            <span className="text-zinc-500 w-8 text-right">%{stats.total_tokens > 0 ? Math.round((stats.cached_tokens / stats.total_tokens) * 100) : 0}</span>
+                            <span className="text-zinc-200 font-medium w-16 text-right">{formatNumber(stats.cached_tokens)}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </Tooltip.Popup>
+                </Tooltip.Positioner>
+              </Tooltip.Portal>
+            </div>
+          </Tooltip.Root>
+        </div>
+
+        {/* Cache Savings Card */}
+        <div className="stat-card glass-panel p-4 pl-6 flex items-center gap-6 bg-[#131315] border border-white/5 rounded-md hover:translate-y-[-2px] hover:bg-[#18181b] hover:border-emerald-500/35 hover:shadow-[0_8px_30px_rgba(16,185,129,0.15)] transition-all duration-200">
+          <div className="stat-icon text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 w-11 h-11 flex items-center justify-center rounded-xl">
+            <PiggyBank className="w-6 h-6 stroke-[1.8]" />
+          </div>
+          <Tooltip.Root>
+            <div className="stat-details">
+              <Tooltip.Trigger render={<div tabIndex={0} />} delay={0}>
+                <h3 className="text-zinc-400 text-xs font-medium mb-1">{t('overview.cacheSavings')}</h3>
+                <div className="value val-cache font-heading text-3xl font-bold bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
+                  {money(stats.cache_saved_cost, 4)}
+                </div>
+              </Tooltip.Trigger>
+
+              <Tooltip.Portal>
+                <Tooltip.Positioner side="bottom" sideOffset={8} positionMethod="fixed" collisionPadding={12} className="z-[100]">
+                  <Tooltip.Popup className="max-w-[calc(100vw-24px)] bg-[#18181b]/95 border border-zinc-800 text-zinc-200 p-3 rounded-lg shadow-2xl backdrop-blur-md">
+                    <div className="font-semibold text-[10px] text-zinc-400 mb-2.5 uppercase tracking-wider border-b border-zinc-800/80 pb-1.5 text-center">{t('overview.cacheBreakdown')}</div>
+                    <div className="flex flex-col gap-1.5 font-mono text-xs">
+                      <div className="flex items-center justify-between gap-6">
+                        <span className="text-zinc-400 font-sans">{t('overview.cachedTokens')}</span>
+                        <span className="text-zinc-200 font-medium text-right">{formatNumber(stats.cached_tokens)}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-6">
+                        <span className="text-zinc-400 font-sans">{t('overview.cacheHitRate')}</span>
+                        <span className="text-zinc-200 font-medium text-right">%{cacheHitRate}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-6">
+                        <span className="text-zinc-400 font-sans">{t('overview.cacheWriteTokens')}</span>
+                        <span className="text-zinc-200 font-medium text-right">{formatNumber(stats.cache_write_tokens)}</span>
                       </div>
                     </div>
                   </Tooltip.Popup>

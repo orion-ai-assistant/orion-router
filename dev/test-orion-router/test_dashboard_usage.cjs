@@ -27,3 +27,11 @@ test('daily series sum unit buckets once per day and operation in date order',()
  {day:'2026-10-07',counts:{chat:10,tts:4}}, {day:'2026-10-08',counts:{chat:3}}
  ]);
 });
+test('cache fields sum like the other totals and stay null when the Router reports none',()=>{
+ const [cached]=summarizeUsage([bucket({cached_tokens:5,cache_saved_cost:0.5}),bucket({cached_tokens:7,cache_saved_cost:null}),bucket({cached_tokens:null,cache_saved_cost:0.25})]);
+ assert.equal(cached.cached_tokens,12);
+ assert.equal(cached.cache_saved_cost,0.75);
+ const [plain]=summarizeUsage([bucket({}),bucket({})]);
+ assert.equal(plain.cached_tokens,null);
+ assert.equal(plain.cache_saved_cost,null);
+});

@@ -174,7 +174,8 @@ async def usage(start: datetime | None = None, end: datetime | None = None,
         sum(l.prompt_tokens) AS input,sum(l.completion_tokens) AS output,
         sum(l.thoughts_tokens) AS thoughts,sum(l.tokens_used) AS total,
         count(*) FILTER(WHERE l.tokens_used IS NULL) AS missing_usage,
-        sum(l.usage_amount) AS usage_amount,sum(l.cost) AS cost,count(*) FILTER(WHERE l.cost IS NULL) AS missing_cost'''
+        sum(l.usage_amount) AS usage_amount,sum(l.cost) AS cost,count(*) FILTER(WHERE l.cost IS NULL) AS missing_cost,
+        sum(l.cached_tokens) AS cached_tokens,sum(l.cache_saved_cost) AS cache_saved_cost'''
     base = ' FROM router_request_logs l LEFT JOIN router_virtual_keys v ON v.id=l.key_id WHERE ' + filters
     args = (start,end,hub_id,key_id,provider,model,upstream_key_id)
     totals = await db_manager.fetch('SELECT l.capability,l.usage_unit,'+fields+base+' GROUP BY l.capability,l.usage_unit', *args)

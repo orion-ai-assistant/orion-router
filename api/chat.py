@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse, JSONResponse
 
 from core.dependencies import authenticate_request
+from core.prompt_cache import CACHE_KEY_FIELDS, derive_cache_key
 from dynamic_router import DynamicLLMRouter
 
 logger = logging.getLogger("service-router.chat")
@@ -64,9 +65,15 @@ async def chat_completions(
         if v is not None and k not in (
             "stream", "messages", "model", "thinking", "thinking_level",
             "reasoning_effort", "thinking_budget",
-            "system_prompt", "tools", "tool_choice", "is_playground", "bypass_defaults"
+            "system_prompt", "tools", "tool_choice", "is_playground", "bypass_defaults",
+            *CACHE_KEY_FIELDS,
         )
     }
+    # A conversation name (session_id / prompt_cache_key / header) becomes one opaque key every
+    # provider can use to keep the conversation on the cache that holds its prefix.
+    cache_key = derive_cache_key(body, request.headers, key_info.get("key_id") if key_info else None)
+    if cache_key:
+        kwargs["cache_key"] = cache_key
 
     dynamic_router: DynamicLLMRouter = request.app.state.dynamic_router
     optional_args = {

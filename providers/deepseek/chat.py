@@ -101,6 +101,8 @@ def transform_deepseek_messages(messages: list[dict[str, Any]]) -> list[dict[str
 
 
 class DeepSeekChatProvider(BaseChat):
+    # Disk context cache is automatic (apply_cache stays the default no-op); the usage block's
+    # prompt_cache_hit_tokens is read by core.prompt_cache.extract_cache_usage.
     provider_name: str = "deepseek"
 
     def apply_thinking(self, payload: dict[str, Any], thinking: ThinkingConfig) -> None:

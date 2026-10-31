@@ -1,6 +1,7 @@
 import json
 import logging
 
+from core.prompt_cache import CacheUsage, extract_cache_usage, prompt_cost
 from database import db_manager
 
 logger = logging.getLogger("service-router.dynamic")
@@ -40,6 +41,8 @@ class TelemetryService:
             usage_unit = usage_unit or ('character' if capability == 'tts' and provider == 'openai' else 'token')
             cost = None
             p_cost, c_cost, t_cost = 0.0, 0.0, 0.0
+            cache = extract_cache_usage(usage) if capability == "chat" else CacheUsage()
+            cache_saved = 0.0
 
             should_calculate = False
             if usage is not None:
@@ -57,17 +60,25 @@ class TelemetryService:
                 if model in pricing_cache:
                     prices = pricing_cache[model]
                     # Fiyatlar 1M token/karakter başına; birim maliyete çevirmek için 1_000_000'a bölüyoruz.
-                    p_cost = (p or 0) / 1_000_000 * (prices.get("input") or 0.0)
+                    # Girdi: cache'ten gelen token'lar cache_read, yazılanlar cache_write fiyatından (yoksa input).
+                    prompt = prompt_cost(p, cache, prices)
+                    p_cost, cache_saved = prompt.cost, prompt.saved
                     c_cost = (c or 0) / 1_000_000 * (prices.get("output") or 0.0)
                     t_cost = (t or 0) / 1_000_000 * (prices.get("think") or 0.0)
-                    if all(prices.get(key) is not None or not count for key, count in (
-                        ("input", p), ("output", c), ("think", t)
+                    if prompt.known and all(prices.get(key) is not None or not count for key, count in (
+                        ("output", c), ("think", t)
                     )):
                         cost = p_cost + c_cost + t_cost
             else:
                 cost = 0.0 if success is False else None
                 p, c, t = None, None, None
                 tokens_used = None
+                cache = CacheUsage()
+
+            # Cache sayıları yalnızca sohbet isteklerinde ve sağlayıcı kullanım bildirdiğinde yazılır.
+            cached_tokens = cache.read_tokens if capability == "chat" and p is not None else None
+            cache_write_tokens = cache.write_tokens if cached_tokens is not None else None
+            cache_saved_cost = cache_saved if cached_tokens is not None else None
 
             if log_id is None:
                 await db_manager.log_request(
@@ -90,6 +101,9 @@ class TelemetryService:
                     duration_ms=duration_ms,
                     usage_unit=usage_unit,
                     usage_amount=usage_amount,
+                    cached_tokens=cached_tokens,
+                    cache_write_tokens=cache_write_tokens,
+                    cache_saved_cost=cache_saved_cost,
                 )
             else:
                 await db_manager.update_streaming_log(
@@ -116,10 +130,13 @@ class TelemetryService:
                     usage_unit=usage_unit,
                     usage_amount=usage_amount,
                     ttft_ms=ttft_ms,
+                    cached_tokens=cached_tokens,
+                    cache_write_tokens=cache_write_tokens,
+                    cache_saved_cost=cache_saved_cost,
                 )
             logger.info(
                 "Request %s | provider=%s model=%s capability=%s log_id=%s | "
-                "tokens(in/out/think)=%s/%s/%s | TTFT=%s duration=%s | cost=%s",
+                "tokens(in/out/think)=%s/%s/%s cached=%s | TTFT=%s duration=%s | cost=%s",
                 "success" if success is True else ("failed" if success is False else "interrupted"),
                 provider,
                 model,
@@ -128,6 +145,7 @@ class TelemetryService:
                 p if p is not None else "-",
                 c if c is not None else "-",
                 t if t is not None else "-",
+                cached_tokens if cached_tokens is not None else "-",
                 f"{ttft_ms:.2f}ms" if ttft_ms is not None else "-",
                 f"{duration_ms:.2f}ms" if duration_ms is not None else "-",
                 f"{cost:.6f}" if cost is not None else "-",

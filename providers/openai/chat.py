@@ -11,6 +11,7 @@ from typing import AsyncGenerator, Any
 
 from providers.base import BaseChat
 
+from core.prompt_cache import CacheRequest
 from core.thinking import ThinkingConfig
 from core.http_client import get_http_client
 from core.video import prepare_openai_videos
@@ -34,6 +35,11 @@ class OpenAIChatProvider(BaseChat):
 
         if thinking.level is not None:
             payload["reasoning_effort"] = thinking.level
+
+    def apply_cache(self, payload: dict[str, Any], model: str, cache: CacheRequest) -> None:
+        """OpenAI prefix cache'i otomatiktir; prompt_cache_key sohbeti aynı cache'e yönlendirir."""
+        if cache.key:
+            payload["prompt_cache_key"] = cache.key
 
     @staticmethod
     def _responses_input(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -95,6 +101,7 @@ class OpenAIChatProvider(BaseChat):
             "stream": True,
             "store": False,
         }
+        self.apply_cache(payload, model, self.extract_cache_request(kwargs))
         thinking = self.extract_thinking_config(kwargs)
         if thinking.level is not None:
             payload["reasoning"] = {"effort": thinking.level}
@@ -154,6 +161,9 @@ class OpenAIChatProvider(BaseChat):
                             "prompt_tokens": usage.get("input_tokens", 0),
                             "completion_tokens": max(0, (usage.get("output_tokens", 0) or 0) - reasoning),
                             "thoughts_tokens": reasoning,
+                            "prompt_tokens_details": {
+                                "cached_tokens": (usage.get("input_tokens_details") or {}).get("cached_tokens", 0) or 0,
+                            },
                         }}
                 elif kind in ("error", "response.failed"):
                     error = event.get("error") or event.get("response", {}).get("error") or event
@@ -203,6 +213,7 @@ class OpenAIChatProvider(BaseChat):
             "stream": True,
             "stream_options": {"include_usage": True},
         }
+        self.apply_cache(payload, model, self.extract_cache_request(kwargs))
         thinking = self.extract_thinking_config(kwargs)
         self.apply_thinking(payload, thinking)
         if "reasoning_effort" not in payload and kwargs.get("temperature") is not None:

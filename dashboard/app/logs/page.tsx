@@ -27,6 +27,8 @@ interface LogItem {
   prompt_tokens: number;
   completion_tokens: number;
   thoughts_tokens: number;
+  cached_tokens?: number | null;
+  cache_write_tokens?: number | null;
   cost: number | null;
   success: boolean | null;
   status?: string;
@@ -92,7 +94,9 @@ export default function LogsPage() {
                   fresh.tokens_used !== old.tokens_used ||
                   fresh.prompt_tokens !== old.prompt_tokens ||
                   fresh.completion_tokens !== old.completion_tokens ||
-                  fresh.thoughts_tokens !== old.thoughts_tokens)
+                  fresh.thoughts_tokens !== old.thoughts_tokens ||
+                  fresh.cached_tokens !== old.cached_tokens ||
+                  fresh.cache_write_tokens !== old.cache_write_tokens)
               ) {
                 changed = true;
                 return fresh;
@@ -299,6 +303,17 @@ export default function LogsPage() {
                         </div>
                       )}
                     </div>
+                    {(log.cached_tokens ?? 0) > 0 && (
+                      <div
+                        className="mt-0.5 text-[9px] font-mono text-zinc-500"
+                        title={[
+                          t('logs.cacheTooltip', { count: log.cached_tokens ?? 0 }),
+                          (log.cache_write_tokens ?? 0) > 0 ? t('logs.cacheWriteTooltip', { count: log.cache_write_tokens ?? 0 }) : '',
+                        ].filter(Boolean).join(' · ')}
+                      >
+                        {t('logs.cachedShort', { count: log.cached_tokens ?? 0 })}
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell className="py-4 text-center font-mono text-xs">
                     {log.cost === null || log.cost === undefined

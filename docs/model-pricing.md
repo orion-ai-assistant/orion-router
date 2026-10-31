@@ -3,8 +3,10 @@
 `providers/*/models.json` stores USD prices per **one million tokens** by default:
 
 ```json
-{"name": "example-chat", "provider": "example", "capability": "chat", "pricing": {"input": 0.15, "output": 0.6, "think": 0.6}}
+{"name": "example-chat", "provider": "example", "capability": "chat", "pricing": {"input": 0.15, "output": 0.6, "think": 0.6, "cache_read": 0.015}}
 ```
+
+`cache_read` (cached input) and `cache_write` are optional.
 
 Character-billed TTS models override the unit on the model:
 
@@ -17,7 +19,9 @@ admin API and dashboard also display and accept prices per 1M units. Telemetry a
 transcription cost calculation scales usage by dividing tokens / characters by 1,000,000
 before multiplying by these rates.
 
-- Chat: input, final output and thinking tokens are counted separately.
+- Chat: input, final output and thinking tokens are counted separately. Input tokens the provider
+  served from its prompt cache are billed at `cache_read`, tokens written into a cache at
+  `cache_write`; both default to `input` when unset (see [prompt-caching.md](prompt-caching.md)).
 - Embeddings: input tokens are billable; vector dimensions are not output tokens.
 - Token-billed TTS: provider-reported input/output token counts are used.
 - Character-billed `tts-1`: input character count is used.

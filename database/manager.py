@@ -108,6 +108,11 @@ class DatabaseManager:
         await conn.execute("ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS ttft_ms NUMERIC(10, 2);")
         await conn.execute("ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS duration_ms NUMERIC(10, 2);")
         await conn.execute("ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS resolved_model TEXT;")
+        # Prompt cache: prompt tokens served from / written to the provider cache, and the USD saved
+        # against billing them at the full input price. NULL = not a chat request or no usage reported.
+        await conn.execute("ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS cached_tokens INTEGER;")
+        await conn.execute("ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS cache_write_tokens INTEGER;")
+        await conn.execute("ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS cache_saved_cost NUMERIC(10, 6);")
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS router_image_archives (
                 id BIGSERIAL PRIMARY KEY,
@@ -186,7 +191,10 @@ class DatabaseManager:
             );
             """
         )
-        
+        # NULL = not priced separately: cached / cache-written tokens are billed at input_price.
+        await conn.execute("ALTER TABLE router_model_pricing ADD COLUMN IF NOT EXISTS cache_read_price NUMERIC(15, 10);")
+        await conn.execute("ALTER TABLE router_model_pricing ADD COLUMN IF NOT EXISTS cache_write_price NUMERIC(15, 10);")
+
         # 5. Configurations (for admin secret hash, etc.)
         await conn.execute(
             """
@@ -422,32 +430,46 @@ class DatabaseManager:
 
     # --- Repository Methods ---
     
-    async def upsert_pricing(self, model_name: str, input_price: float | None, output_price: float | None, think_price: float | None):
+    async def upsert_pricing(
+        self,
+        model_name: str,
+        input_price: float | None,
+        output_price: float | None,
+        think_price: float | None,
+        cache_read_price: float | None = None,
+        cache_write_price: float | None = None,
+    ):
         pool = await self.get_db_pool()
         async with pool.acquire() as conn:
             await conn.execute(
                 """
-                INSERT INTO router_model_pricing (model_name, input_price, output_price, think_price)
-                VALUES ($1, $2, $3, $4)
+                INSERT INTO router_model_pricing (model_name, input_price, output_price, think_price, cache_read_price, cache_write_price)
+                VALUES ($1, $2, $3, $4, $5, $6)
                 ON CONFLICT (model_name) DO UPDATE SET
                     input_price = EXCLUDED.input_price,
                     output_price = EXCLUDED.output_price,
                     think_price = EXCLUDED.think_price,
+                    cache_read_price = EXCLUDED.cache_read_price,
+                    cache_write_price = EXCLUDED.cache_write_price,
                     updated_at = NOW();
                 """,
-                model_name, input_price, output_price, think_price
+                model_name, input_price, output_price, think_price, cache_read_price, cache_write_price
             )
 
     async def get_all_pricing(self) -> dict:
         pool = await self.get_db_pool()
         async with pool.acquire() as conn:
-            rows = await conn.fetch("SELECT model_name, input_price, output_price, think_price FROM router_model_pricing")
+            rows = await conn.fetch(
+                "SELECT model_name, input_price, output_price, think_price, cache_read_price, cache_write_price FROM router_model_pricing"
+            )
             result = {}
             for row in rows:
                 result[row["model_name"]] = {
-                    "input": float(row["input_price"]) if row["input_price"] is not None else None,
-                    "output": float(row["output_price"]) if row["output_price"] is not None else None,
-                    "think": float(row["think_price"]) if row["think_price"] is not None else None,
+                    key: float(row[column]) if row[column] is not None else None
+                    for key, column in (
+                        ("input", "input_price"), ("output", "output_price"), ("think", "think_price"),
+                        ("cache_read", "cache_read_price"), ("cache_write", "cache_write_price"),
+                    )
                 }
             return result
             
@@ -473,7 +495,7 @@ class DatabaseManager:
                 return json.loads(val)
             return None
 
-    async def log_request(self, key_id, provider, model, tokens_used, prompt_tokens, completion_tokens, thoughts_tokens, cost, request_json=None, response_json=None, upstream_key_id=None, success=True, capability='chat', prompt_cost=0.0, completion_cost=0.0, thoughts_cost=0.0, status=None, ttft_ms=None, duration_ms=None, usage_unit=None, usage_amount=None):
+    async def log_request(self, key_id, provider, model, tokens_used, prompt_tokens, completion_tokens, thoughts_tokens, cost, request_json=None, response_json=None, upstream_key_id=None, success=True, capability='chat', prompt_cost=0.0, completion_cost=0.0, thoughts_cost=0.0, status=None, ttft_ms=None, duration_ms=None, usage_unit=None, usage_amount=None, cached_tokens=None, cache_write_tokens=None, cache_saved_cost=None):
         from core.key_policy import selected_upstream
         selected_id, selected_source = selected_upstream.get()
         upstream_key_id = upstream_key_id or selected_id
@@ -492,10 +514,10 @@ class DatabaseManager:
                     """
                     INSERT INTO router_request_logs
                         (key_id, provider, requested_model, tokens_used,
-                         prompt_tokens, completion_tokens, thoughts_tokens, cost, success, request_json, response_json, upstream_key_id, capability, prompt_cost, completion_cost, thoughts_cost, status, ttft_ms, duration_ms, upstream_key_source, recorded_key_id, recorded_hub_id, usage_unit, usage_amount)
-                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13,$14,$15,$16,$17,$18,$19,$20,$1,(SELECT hub_id FROM router_virtual_keys WHERE id=$1),$21,$22)
+                         prompt_tokens, completion_tokens, thoughts_tokens, cost, success, request_json, response_json, upstream_key_id, capability, prompt_cost, completion_cost, thoughts_cost, status, ttft_ms, duration_ms, upstream_key_source, recorded_key_id, recorded_hub_id, usage_unit, usage_amount, cached_tokens, cache_write_tokens, cache_saved_cost)
+                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13,$14,$15,$16,$17,$18,$19,$20,$1,(SELECT hub_id FROM router_virtual_keys WHERE id=$1),$21,$22,$23,$24,$25)
                     """,
-                    key_id, provider, model, tokens_used, prompt_tokens, completion_tokens, thoughts_tokens, cost, success, request_json, response_json, upstream_key_id, capability, prompt_cost, completion_cost, thoughts_cost, status, ttft_ms, duration_ms, selected_source, usage_unit, usage_amount
+                    key_id, provider, model, tokens_used, prompt_tokens, completion_tokens, thoughts_tokens, cost, success, request_json, response_json, upstream_key_id, capability, prompt_cost, completion_cost, thoughts_cost, status, ttft_ms, duration_ms, selected_source, usage_unit, usage_amount, cached_tokens, cache_write_tokens, cache_saved_cost
                 )
                 if key_id and cost is not None and (success or cost > 0):
                     await conn.execute(
@@ -557,6 +579,9 @@ class DatabaseManager:
         usage_unit: str | None = None,
         usage_amount: float | None = None,
         capability: str | None = None,
+        cached_tokens: int | None = None,
+        cache_write_tokens: int | None = None,
+        cache_saved_cost: float | None = None,
     ) -> None:
         """Canlı streaming oturumunun ara veya nihai sonucunu günceller."""
         if capability == "chat":
@@ -592,19 +617,39 @@ class DatabaseManager:
                         upstream_key_id = COALESCE($18, upstream_key_id),
                         upstream_key_source = COALESCE($19, upstream_key_source),
                         usage_unit = COALESCE($20, usage_unit),
-                        usage_amount = COALESCE($21, usage_amount)
+                        usage_amount = COALESCE($21, usage_amount),
+                        cached_tokens = COALESCE($22, cached_tokens),
+                        cache_write_tokens = COALESCE($23, cache_write_tokens),
+                        cache_saved_cost = COALESCE($24, cache_saved_cost)
                                         WHERE id = $1
                                             AND ($3 = 'success' OR status NOT IN ('success', 'failed', 'interrupted'))
                     """,
                     log_id, response_json, status, success, tokens_used, prompt_tokens,
                                         completion_tokens, thoughts_tokens, cost, prompt_cost, completion_cost,
-                                        thoughts_cost, duration_ms, ttft_ms, provider, model, request_json, upstream_id, upstream_source, usage_unit, usage_amount
+                                        thoughts_cost, duration_ms, ttft_ms, provider, model, request_json, upstream_id, upstream_source, usage_unit, usage_amount,
+                                        cached_tokens, cache_write_tokens, cache_saved_cost
                 )
                 if key_id and cost is not None and cost > 0:
                     await conn.execute(
                         "UPDATE router_virtual_keys SET used_amount = used_amount + $1 WHERE id = $2",
                         cost, key_id,
                     )
+
+    async def close_abandoned_logs(self, min_age_seconds: int = 120) -> int:
+        """Mark requests still "processing" after a restart as interrupted: the process that ran them is gone."""
+        pool = await self.get_db_pool()
+        async with pool.acquire() as conn:
+            closed = await conn.fetch(
+                """
+                UPDATE router_request_logs
+                SET status = 'interrupted', success = NULL,
+                    response_json = '{"error": "Router stopped before this request finished"}'::jsonb
+                WHERE status = 'processing' AND created_at < NOW() - make_interval(secs => $1)
+                RETURNING id
+                """,
+                min_age_seconds,
+            )
+        return len(closed)
 
     async def update_streaming_request(self, log_id: int, request_json: str) -> None:
         # This path records the exact local chat provider payload.

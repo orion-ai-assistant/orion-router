@@ -5,6 +5,12 @@
       "provider": "gemini",
       "capability": "chat",
       "temperature": 0.7,
+      "pricing": {
+        "input": 0.25,
+        "output": 1.5,
+        "think": 1.5,
+        "cache_read": 0.025
+      },
       "thinking": {
         "type": "budget",
         "auto_value": -1,

@@ -10,6 +10,10 @@ from typing import Any
 
 PROVIDERS_DIR = Path(__file__).resolve().parent.parent / "providers"
 
+# Rates a model can carry. cache_read / cache_write price prompt-cache hits and cache writes; unset
+# means "bill like input" (see core/prompt_cache.py).
+PRICE_KEYS = ("input", "output", "think", "cache_read", "cache_write")
+
 @lru_cache(maxsize=1)
 def load_model_catalog() -> dict[str, Any]:
     catalog = {"pricing_unit": "per_million_tokens", "models": []}
@@ -42,7 +46,7 @@ def load_model_catalog() -> dict[str, Any]:
         pricing = model.get("pricing")
         if pricing is not None:
             if not isinstance(pricing, dict) or any(
-                key not in ("input", "output", "think") or
+                key not in PRICE_KEYS or
                 (value is not None and (isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0))
                 for key, value in pricing.items()
             ):
@@ -72,5 +76,5 @@ def unit_pricing(model: dict[str, Any]) -> dict[str, float | None] | None:
         raise ValueError(f"Unsupported pricing unit: {unit}")
     return {
         key: None if pricing.get(key) is None else float(Decimal(str(pricing[key])))
-        for key in ("input", "output", "think")
+        for key in PRICE_KEYS
     }

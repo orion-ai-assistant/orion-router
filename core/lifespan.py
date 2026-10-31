@@ -83,6 +83,14 @@ async def lifespan(app: FastAPI):
             except Exception as restart_err:
                 logger.error(f"PostgreSQL otomatik yeniden başlatma sırasında hata oluştu: {restart_err}")
 
+    # Requests the previous process never finished would otherwise show "processing" forever.
+    try:
+        closed = await db_manager.close_abandoned_logs()
+        if closed:
+            logger.info("Marked %d unfinished request log(s) from before this start as interrupted.", closed)
+    except Exception as exc:
+        logger.warning("Could not close unfinished request logs: %s", exc)
+
     # --- Fiyatlandırmayı seed et ---
     try:
         for model in load_model_catalog()["models"]:
@@ -94,6 +102,8 @@ async def lifespan(app: FastAPI):
                 pricing.get("input"),
                 pricing.get("output"),
                 pricing.get("think"),
+                pricing.get("cache_read"),
+                pricing.get("cache_write"),
             )
         logger.info("Synced model pricing from models.json to DB.")
     except Exception as exc:

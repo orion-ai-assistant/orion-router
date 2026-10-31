@@ -24,6 +24,9 @@ interface ModelItem {
   input_price: number | string | null;
   output_price: number | string | null;
   think_price: number | string | null;
+  // Prompt-cache prices (per 1M tokens, chat only). Absent/null = not set: billed at the input price.
+  cache_read_price?: number | string | null;
+  cache_write_price?: number | string | null;
   thinking_level?: string | null;
   system_prompt?: string | null;
   default_config?: Record<string, any>;
@@ -39,6 +42,8 @@ interface ModelItem {
     input_price: number | null;
     output_price: number | null;
     think_price: number | null;
+    cache_read_price: number | null;
+    cache_write_price: number | null;
     thinking_level?: string | null;
     system_prompt?: string | null;
     default_config?: Record<string, any>;
@@ -152,14 +157,14 @@ const cleanNumberInput = (val: string): string => {
   return val;
 };
 
-const optionalPrice = (value: number | string | null): number | null => {
-  if (value === null || value === '') return null;
+const optionalPrice = (value: number | string | null | undefined): number | null => {
+  if (value === null || value === undefined || value === '') return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 };
 
-const priceLabel = (value: number | string | null): string =>
-  value === null || value === '' ? '-' : money(value);
+const priceLabel = (value: number | string | null | undefined): string =>
+  value === null || value === undefined || value === '' ? '-' : money(value);
 
 const parseModelConfig = (value: unknown): Record<string, any> => {
   if (typeof value === 'string') {
@@ -213,6 +218,8 @@ export default function ModelsPage() {
     input_price: '' as string | number,
     output_price: '' as string | number,
     think_price: '' as string | number,
+    cache_read_price: '' as string | number,
+    cache_write_price: '' as string | number,
     thinking_level: '',
     system_prompt: '',
     default_config: {} as Record<string, any>,
@@ -228,6 +235,8 @@ export default function ModelsPage() {
     input_price: '',
     output_price: '',
     think_price: '',
+    cache_read_price: '',
+    cache_write_price: '',
     thinking_level: null,
     system_prompt: null,
   });
@@ -304,6 +313,8 @@ export default function ModelsPage() {
           const input_price = model.input_price ?? null;
           const output_price = model.output_price ?? null;
           const think_price = model.think_price ?? null;
+          const cache_read_price = model.cache_read_price ?? null;
+          const cache_write_price = model.cache_write_price ?? null;
           const thinking_level = model.thinking_level || null;
           const system_prompt = model.system_prompt || null;
           const is_builtin_thinking = !!model.is_builtin_thinking;
@@ -323,6 +334,8 @@ export default function ModelsPage() {
             input_price,
             output_price,
             think_price,
+            cache_read_price,
+            cache_write_price,
             thinking_level,
             system_prompt,
             is_builtin_thinking,
@@ -338,6 +351,8 @@ export default function ModelsPage() {
               input_price,
               output_price,
               think_price,
+              cache_read_price,
+              cache_write_price,
               thinking_level,
               system_prompt,
               is_builtin_thinking,
@@ -571,6 +586,8 @@ export default function ModelsPage() {
           input_price: optionalPrice(addForm.input_price),
           output_price: optionalPrice(addForm.output_price),
           think_price: optionalPrice(addForm.think_price),
+          cache_read_price: capability === 'chat' ? optionalPrice(addForm.cache_read_price) : null,
+          cache_write_price: capability === 'chat' ? optionalPrice(addForm.cache_write_price) : null,
           thinking_level: addForm.thinking_level || null,
           system_prompt: addForm.system_prompt || null,
           default_config: configObj,
@@ -585,6 +602,8 @@ export default function ModelsPage() {
           input_price: '',
           output_price: '',
           think_price: '',
+          cache_read_price: '',
+          cache_write_price: '',
           thinking_level: '',
           system_prompt: '',
           default_config: {},
@@ -657,6 +676,8 @@ export default function ModelsPage() {
           input_price: optionalPrice(editingModel.input_price),
           output_price: optionalPrice(editingModel.output_price),
           think_price: optionalPrice(editingModel.think_price),
+          cache_read_price: editingModel.capability === 'chat' ? optionalPrice(editingModel.cache_read_price) : null,
+          cache_write_price: editingModel.capability === 'chat' ? optionalPrice(editingModel.cache_write_price) : null,
           thinking_level: editingModel.thinking_level || null,
           system_prompt: editingModel.system_prompt || null,
           default_config: configObj,
@@ -712,6 +733,8 @@ export default function ModelsPage() {
       optionalPrice(model.input_price) !== optionalPrice(model._original.input_price) ||
       optionalPrice(model.output_price) !== optionalPrice(model._original.output_price) ||
       optionalPrice(model.think_price) !== optionalPrice(model._original.think_price) ||
+      optionalPrice(model.cache_read_price) !== optionalPrice(model._original.cache_read_price) ||
+      optionalPrice(model.cache_write_price) !== optionalPrice(model._original.cache_write_price) ||
       (model.thinking_level || null) !== (model._original.thinking_level || null) ||
       (model.system_prompt || null) !== (model._original.system_prompt || null) ||
       JSON.stringify(model.default_config || {}) !== JSON.stringify(model._original.default_config || {})
@@ -727,6 +750,8 @@ export default function ModelsPage() {
       input_price: formatPriceForInput(model.input_price),
       output_price: formatPriceForInput(model.output_price),
       think_price: formatPriceForInput(model.think_price),
+      cache_read_price: formatPriceForInput(model.cache_read_price),
+      cache_write_price: formatPriceForInput(model.cache_write_price),
     });
     setShowEditTtsDefaults(false);
     setShowEditLocalSampling(false);
@@ -1387,6 +1412,18 @@ export default function ModelsPage() {
                           <span className="text-xs font-mono text-zinc-300">{priceLabel(model.think_price)}</span>
                         </div>
                       )}
+                      {model.capability === 'chat' && (
+                        <div className="flex flex-col items-center justify-center gap-0.5" title={t('models.cacheHint')}>
+                          <span className="text-[9px] font-semibold text-zinc-500 capitalize tracking-wider">{t('models.cacheRead')}</span>
+                          <span className="text-xs font-mono text-zinc-300">{priceLabel(model.cache_read_price)}</span>
+                        </div>
+                      )}
+                      {model.capability === 'chat' && (
+                        <div className="flex flex-col items-center justify-center gap-0.5" title={t('models.cacheHint')}>
+                          <span className="text-[9px] font-semibold text-zinc-500 capitalize tracking-wider">{t('models.cacheWrite')}</span>
+                          <span className="text-xs font-mono text-zinc-300">{priceLabel(model.cache_write_price)}</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-center justify-end gap-1.5">
@@ -1552,6 +1589,38 @@ export default function ModelsPage() {
                   </div>
                 )}
               </div>
+
+              {addForm.capability === 'chat' && (
+                <>
+                  <div className="flex gap-3">
+                    <div className="flex-1 flex flex-col gap-1">
+                      <span className="text-[11px] text-zinc-500 font-semibold">{t('models.cacheRead')}</span>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={addForm.cache_read_price}
+                        onChange={(e) => setAddForm({ ...addForm, cache_read_price: cleanNumberInput(e.target.value) })}
+                        placeholder={t('models.cachePlaceholder')}
+                        className="bg-black/40 border border-zinc-855 text-white text-xs px-3 py-2 rounded"
+                      />
+                    </div>
+                    <div className="flex-1 flex flex-col gap-1">
+                      <span className="text-[11px] text-zinc-500 font-semibold">{t('models.cacheWrite')}</span>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={addForm.cache_write_price}
+                        onChange={(e) => setAddForm({ ...addForm, cache_write_price: cleanNumberInput(e.target.value) })}
+                        placeholder={t('models.cachePlaceholder')}
+                        className="bg-black/40 border border-zinc-855 text-white text-xs px-3 py-2 rounded"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[11px] leading-snug text-zinc-500">{t('models.cacheHint')}</p>
+                </>
+              )}
             </div>
 
             {renderLocalSampling(addForm, setAddForm, showAddLocalSampling, setShowAddLocalSampling)}
@@ -1725,6 +1794,38 @@ export default function ModelsPage() {
                   </div>
                 )}
               </div>
+
+              {editingModel.capability === 'chat' && (
+                <>
+                  <div className="flex gap-3">
+                    <div className="flex-1 flex flex-col gap-1">
+                      <span className="text-[11px] text-zinc-500 font-semibold">{t('models.cacheRead')}</span>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={editingModel.cache_read_price ?? ''}
+                        onChange={(e) => setEditingModel({ ...editingModel, cache_read_price: cleanNumberInput(e.target.value) })}
+                        placeholder={t('models.cachePlaceholder')}
+                        className="bg-black/40 border border-zinc-855 text-white text-xs px-3 py-2 rounded"
+                      />
+                    </div>
+                    <div className="flex-1 flex flex-col gap-1">
+                      <span className="text-[11px] text-zinc-500 font-semibold">{t('models.cacheWrite')}</span>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={editingModel.cache_write_price ?? ''}
+                        onChange={(e) => setEditingModel({ ...editingModel, cache_write_price: cleanNumberInput(e.target.value) })}
+                        placeholder={t('models.cachePlaceholder')}
+                        className="bg-black/40 border border-zinc-855 text-white text-xs px-3 py-2 rounded"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[11px] leading-snug text-zinc-500">{t('models.cacheHint')}</p>
+                </>
+              )}
             </div>
 
             {renderLocalSampling(editingModel, setEditingModel, showEditLocalSampling, setShowEditLocalSampling)}

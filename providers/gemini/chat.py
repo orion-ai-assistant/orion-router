@@ -9,6 +9,10 @@ Token sayım kuralı:
   candidates_token_count = out + think (toplam output)
   thoughts_token_count   = sadece think
   → completion_tokens (out) = candidates - thoughts
+
+Prompt cache: Gemini 2.5+ örtük cache'i otomatiktir, istekte bir şey gönderilmez (apply_cache varsayılan
+no-op); system_instruction ve araç tanımları istekler arasında aynı kalırsa önek isabet eder.
+cached_content_token_count isabeti bildirir ve prompt_token_count'un içindedir.
 """
 import json
 import logging
@@ -314,9 +318,11 @@ class GeminiChatProvider(BaseChat):
                 thoughts   = getattr(final_usage, "thoughts_token_count", 0) or 0
                 prompt     = getattr(final_usage, "prompt_token_count", 0) or 0
                 total      = getattr(final_usage, "total_token_count", 0) or 0
+                # prompt_token_count cache'lenen kısmı da içerir; örtük cache isabeti burada raporlanır.
+                cached     = getattr(final_usage, "cached_content_token_count", 0) or 0
 
                 logger.info(
-                    f"Gemini usage: prompt={prompt} candidates={candidates} "
+                    f"Gemini usage: prompt={prompt} cached={cached} candidates={candidates} "
                     f"thoughts={thoughts} total={total}"
                 )
 
@@ -326,6 +332,7 @@ class GeminiChatProvider(BaseChat):
                         "completion_tokens": candidates,
                         "thoughts_tokens": thoughts,
                         "total_tokens": total,
+                        "prompt_tokens_details": {"cached_tokens": cached},
                     }
                 }
         except Exception as e:

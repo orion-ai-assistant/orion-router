@@ -1,4 +1,4 @@
-export type UsageBucket = {capability: string; usage_unit?: string | null; usage_amount?: number | null; day?: string; requests: number; input: number|null; output: number|null; thoughts: number|null; total: number|null; cost: number|null; succeeded: number; failed: number; missing_usage: number; missing_cost: number};
+export type UsageBucket = {capability: string; usage_unit?: string | null; usage_amount?: number | null; day?: string; requests: number; input: number|null; output: number|null; thoughts: number|null; total: number|null; cost: number|null; cached_tokens?: number|null; cache_saved_cost?: number|null; succeeded: number; failed: number; missing_usage: number; missing_cost: number};
 export type UsageSummary = UsageBucket & {amounts: Record<string, number|null>};
 const nullableSum = (a: number|null|undefined, b: number|null|undefined): number|null =>
   a == null && b == null ? null : Number(a ?? 0) + Number(b ?? 0);
@@ -10,12 +10,12 @@ export function summarizeUsage(rows: UsageBucket[]): UsageSummary[] {
     let group = groups.get(row.capability);
     if (!group) {
       group = {...row, requests:0, succeeded:0, failed:0, missing_usage:0, missing_cost:0,
-        input:null, output:null, thoughts:null, total:null, cost:null, amounts:{}};
+        input:null, output:null, thoughts:null, total:null, cost:null, cached_tokens:null, cache_saved_cost:null, amounts:{}};
       groups.set(row.capability, group);
     }
     for (const field of ['requests','succeeded','failed','missing_usage','missing_cost'] as const)
       group[field] += Number(row[field] ?? 0);
-    for (const field of ['input','output','thoughts','total','cost'] as const)
+    for (const field of ['input','output','thoughts','total','cost','cached_tokens','cache_saved_cost'] as const)
       group[field] = nullableSum(group[field], row[field]);
     if (row.usage_unit)
       group.amounts[row.usage_unit] = nullableSum(group.amounts[row.usage_unit], row.usage_amount);

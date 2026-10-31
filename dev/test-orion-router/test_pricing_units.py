@@ -42,7 +42,8 @@ class PricingTests(unittest.IsolatedAsyncioTestCase):
     def test_unknown_free_and_partial_prices(self):
         self.assertIsNone(unit_pricing({}))
         self.assertEqual(unit_pricing({'pricing': {'input': 0}}),
-                         {'input': 0, 'output': None, 'think': None})
+                         {'input': 0, 'output': None, 'think': None, 'cache_read': None, 'cache_write': None})
+        self.assertEqual(unit_pricing({'pricing': {'input': 1, 'cache_read': 0.1}})['cache_read'], 0.1)
         # unit_pricing returns per-million values as-is (no division)
         self.assertEqual(unit_pricing({'pricing': {'input': 0.15}})['input'], 0.15)
         with self.assertRaises(ValueError):

@@ -259,7 +259,7 @@ async def get_admin_logs(limit: int = 100, offset: int = 0):
         rows = await db_manager.fetch(
             """
             SELECT l.id, k.name as key_name, k.hub_id, h.name AS hub_name, l.upstream_key_id, l.upstream_key_source, l.provider, l.requested_model, l.resolved_model,
-                   l.tokens_used, l.prompt_tokens, l.completion_tokens,
+                   l.tokens_used, l.prompt_tokens, l.completion_tokens, l.cached_tokens, l.cache_write_tokens,
                    COALESCE(
                        NULLIF(l.thoughts_tokens, 0),
                        CASE
@@ -340,10 +340,16 @@ async def get_admin_stats():
                 SUM(tokens_used) as total,
                 SUM(prompt_tokens) as prompt,
                 SUM(completion_tokens) as completion,
-                SUM(thoughts_tokens) as thoughts
+                SUM(thoughts_tokens) as thoughts,
+                SUM(cached_tokens) as cached,
+                SUM(cache_write_tokens) as cache_write,
+                SUM(prompt_tokens) FILTER (WHERE cached_tokens IS NOT NULL) as cache_prompt
             FROM router_request_logs
             WHERE capability IN ('chat','embed')
             """
+        )
+        cache_saved_cost = await db_manager.fetchval(
+            "SELECT SUM(cache_saved_cost) FROM router_request_logs WHERE capability = 'chat'"
         )
         total_keys = await db_manager.fetchval(
             "SELECT COUNT(*) FROM router_virtual_keys"
@@ -386,6 +392,12 @@ async def get_admin_stats():
             "prompt_tokens": prompt_tokens,
             "completion_tokens": completion_tokens,
             "thoughts_tokens": thoughts_tokens,
+            "cached_tokens": (tokens_row["cached"] or 0) if tokens_row else 0,
+            "cache_write_tokens": (tokens_row["cache_write"] or 0) if tokens_row else 0,
+            # Prompt tokens of the requests that reported cache usage: the hit rate's denominator
+            # (older requests and embeddings never reported it and would drown the rate).
+            "cache_prompt_tokens": (tokens_row["cache_prompt"] or 0) if tokens_row else 0,
+            "cache_saved_cost": float(cache_saved_cost or 0.0),
             "total_keys": total_keys or 0,
         }
     except Exception as e:
@@ -674,7 +686,7 @@ async def list_models():
         """
         SELECT m.id, m.name, m.provider, m.capability, m.temperature, m.is_active, m.created_at, m.thinking_level, m.system_prompt,
                m.default_config,
-               p.input_price, p.output_price, p.think_price
+               p.input_price, p.output_price, p.think_price, p.cache_read_price, p.cache_write_price
         FROM router_models m
         LEFT JOIN router_model_pricing p ON m.name = p.model_name
         ORDER BY m.capability ASC, m.provider ASC, m.name ASC
@@ -687,6 +699,8 @@ async def list_models():
         item["input_price"] = _optional_price(item["input_price"])
         item["output_price"] = _optional_price(item["output_price"])
         item["think_price"] = _optional_price(item["think_price"])
+        item["cache_read_price"] = _optional_price(item["cache_read_price"])
+        item["cache_write_price"] = _optional_price(item["cache_write_price"])
         item["default_config"] = _parse_default_config(item.get("default_config"))
         
         # Inject thinking schema from JSON catalog if exists, else from default_config
@@ -727,6 +741,8 @@ async def create_model(request: Request):
     input_price = _optional_price(body.get("input_price"))
     output_price = _optional_price(body.get("output_price"))
     think_price = _optional_price(body.get("think_price"))
+    cache_read_price = _optional_price(body.get("cache_read_price"))
+    cache_write_price = _optional_price(body.get("cache_write_price"))
     thinking_level = body.get("thinking_level")
     thinking_level = str(thinking_level).strip() if thinking_level not in (None, "") else None
     system_prompt = body.get("system_prompt")
@@ -750,14 +766,16 @@ async def create_model(request: Request):
         system_prompt,
         default_config_json,
     )
-    await db_manager.upsert_pricing(name, input_price, output_price, think_price)
+    await db_manager.upsert_pricing(name, input_price, output_price, think_price, cache_read_price, cache_write_price)
 
     # Refresh pricing cache dynamically
     if hasattr(request.app.state, "pricing_cache"):
         request.app.state.pricing_cache[name] = {
             "input": input_price,
             "output": output_price,
-            "think": think_price
+            "think": think_price,
+            "cache_read": cache_read_price,
+            "cache_write": cache_write_price,
         }
 
     item = dict(row)
@@ -765,6 +783,8 @@ async def create_model(request: Request):
     item["input_price"] = input_price
     item["output_price"] = output_price
     item["think_price"] = think_price
+    item["cache_read_price"] = cache_read_price
+    item["cache_write_price"] = cache_write_price
     item["default_config"] = _parse_default_config(item.get("default_config"))
     return item
 
@@ -775,7 +795,7 @@ async def update_model(model_id: str, request: Request):
     existing = await db_manager.fetchrow(
         """SELECT m.name, m.provider, m.capability, m.temperature, m.is_active,
                   m.thinking_level, m.system_prompt, m.default_config,
-                  p.input_price, p.output_price, p.think_price
+                  p.input_price, p.output_price, p.think_price, p.cache_read_price, p.cache_write_price
            FROM router_models m
            LEFT JOIN router_model_pricing p ON p.model_name = m.name
            WHERE m.id = $1""",
@@ -803,7 +823,9 @@ async def update_model(model_id: str, request: Request):
     input_price = _optional_price(body.get("input_price", existing["input_price"]))
     output_price = _optional_price(body.get("output_price", existing["output_price"]))
     think_price = _optional_price(body.get("think_price", existing["think_price"]))
-    
+    cache_read_price = _optional_price(body.get("cache_read_price", existing["cache_read_price"]))
+    cache_write_price = _optional_price(body.get("cache_write_price", existing["cache_write_price"]))
+
     new_thinking = body.get("thinking_level", existing["thinking_level"])
     thinking_level = str(new_thinking).strip() if new_thinking not in (None, "") else None
     new_system_prompt = body.get("system_prompt", existing["system_prompt"])
@@ -830,14 +852,16 @@ async def update_model(model_id: str, request: Request):
         system_prompt,
         default_config_json,
     )
-    await db_manager.upsert_pricing(name, input_price, output_price, think_price)
+    await db_manager.upsert_pricing(name, input_price, output_price, think_price, cache_read_price, cache_write_price)
 
     # Refresh pricing cache dynamically
     if hasattr(request.app.state, "pricing_cache"):
         request.app.state.pricing_cache[name] = {
             "input": input_price,
             "output": output_price,
-            "think": think_price
+            "think": think_price,
+            "cache_read": cache_read_price,
+            "cache_write": cache_write_price,
         }
 
     item = dict(row)
@@ -845,6 +869,8 @@ async def update_model(model_id: str, request: Request):
     item["input_price"] = input_price
     item["output_price"] = output_price
     item["think_price"] = think_price
+    item["cache_read_price"] = cache_read_price
+    item["cache_write_price"] = cache_write_price
     item["default_config"] = _parse_default_config(item.get("default_config"))
     return item
 
