@@ -10,7 +10,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response, StreamingResponse
 
-from core.audio_container import finalize_buffered_wav
+from core.audio_container import finalize_buffered_wav, stream_media
 from core.dependencies import authenticate_request
 from core.utils import run_with_disconnect_check
 from dynamic_router import DynamicLLMRouter
@@ -83,21 +83,7 @@ async def audio_speech(
                 logger.exception("Error in TTS streaming generation mid-transmission")
                 raise
 
-        media_type = "audio/pcm"
-        headers = {
-            "Content-Disposition": 'inline; filename="speech.pcm"',
-            "X-Audio-Sample-Rate": "24000",
-            "X-Audio-Channels": "1",
-            "X-Audio-Bits-Per-Sample": "16",
-        }
-
-        if first_chunk:
-            if first_chunk[:4] == b"RIFF" and len(first_chunk) >= 12 and first_chunk[8:12] == b"WAVE":
-                media_type = "audio/wav"
-                headers = {"Content-Disposition": 'inline; filename="speech.wav"'}
-            elif first_chunk[:3] == b"ID3" or (len(first_chunk) >= 2 and first_chunk[0] == 0xFF and (first_chunk[1] & 0xE0) == 0xE0):
-                media_type = "audio/mpeg"
-                headers = {"Content-Disposition": 'inline; filename="speech.mp3"'}
+        media_type, headers = stream_media(first_chunk, body.get("response_format"))
 
         return StreamingResponse(
             audio_stream_generator(),
