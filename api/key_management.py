@@ -24,10 +24,11 @@ async def hub_enrollment_code():
 
 @router.delete('/api/hubs/{hub_id}')
 async def remove_hub(hub_id: str):
-    # The Hub's credential and its users' account keys (with their saved provider keys) go together;
-    # usage history stays. The Hub needs a new connection code to come back.
+    # The Hub's credential and its users' account keys (with their saved provider keys, key limits and
+    # spend) go together; usage history stays. Only a new connection code brings the Hub back.
     row = await db_manager.fetchrow('''
-        WITH removed_accounts AS (DELETE FROM router_virtual_keys WHERE hub_id=$1)
+        WITH removed_accounts AS (DELETE FROM router_virtual_keys WHERE hub_id=$1),
+             remembered AS (INSERT INTO router_removed_hubs(id) VALUES ($1) ON CONFLICT (id) DO NOTHING)
         DELETE FROM router_hubs WHERE id=$1 RETURNING id''', hub_id)
     if not row:
         raise HTTPException(404, 'Hub bulunamadı.')

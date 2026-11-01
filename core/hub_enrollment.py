@@ -30,7 +30,7 @@ def local_token_path() -> Path:
 
 def ensure_local_token() -> None:
     path = local_token_path()
-    if path.exists():
+    if _read_local_token() is not None:
         return
     path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as file:
@@ -40,19 +40,27 @@ def ensure_local_token() -> None:
         file.flush()
         os.fsync(file.fileno())
     try:
-        os.link(temporary, path)  # Never replace a token another start already published.
+        if path.exists():
+            os.replace(temporary, path)  # Damaged: it would disable same-PC enrollment for good.
+        else:
+            os.link(temporary, path)  # Never replace a token another start already published.
     except FileExistsError:
         pass
     finally:
         temporary.unlink(missing_ok=True)
 
 
-def _local_token_matches(token: str) -> bool:
+def _read_local_token() -> str | None:
     try:
-        expected = local_token_path().read_text(encoding='ascii').strip()
-    except OSError:
-        return False
-    return len(expected) >= 32 and hmac.compare_digest(token.encode(), expected.encode())
+        token = local_token_path().read_text(encoding='ascii').strip()
+    except (OSError, UnicodeDecodeError):
+        return None
+    return token if len(token) >= 32 else None
+
+
+def _local_token_matches(token: str) -> bool:
+    expected = _read_local_token()
+    return expected is not None and hmac.compare_digest(token.encode(), expected.encode())
 
 
 def _normalize(code: str) -> str:
@@ -95,8 +103,8 @@ async def _consume_code(code: str) -> bool:
     return bool(used)
 
 
-async def authorize_enrollment(request: Request) -> None:
-    """A FastAPI dependency for the Hub enrollment endpoint."""
+async def authorize_enrollment(request: Request) -> str:
+    """A FastAPI dependency for the Hub enrollment endpoint: how the Hub was admitted, 'local' or 'code'."""
     token = request.headers.get('x-orion-local-enrollment')
     if token is not None:
         try:
@@ -104,9 +112,9 @@ async def authorize_enrollment(request: Request) -> None:
         except (AttributeError, ValueError):
             loopback = False
         if loopback and _local_token_matches(token):
-            return
+            return 'local'
         raise HTTPException(401, 'local_enrollment_rejected')
     code = request.headers.get('x-orion-enrollment-code')
     if code is not None and await _consume_code(code):
-        return
+        return 'code'
     raise HTTPException(401, 'enrollment_code_invalid')

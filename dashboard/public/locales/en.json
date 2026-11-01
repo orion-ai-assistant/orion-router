@@ -451,7 +451,7 @@
   "access.hubInactive": "Inactive",
   "access.hubActive": "Active",
   "access.removeHubTitle": "Remove {name}?",
-  "access.removeHubConfirm": "Its user accounts and their saved provider keys are deleted from this Router. Usage history stays. The Hub needs a new connection code to connect again.",
+  "access.removeHubConfirm": "Its user accounts are deleted from this Router, with their own provider keys, the shared keys they may use and their spending. If the Hub connects again, its users start with access to every shared key and an unused budget. Usage history stays. The Hub needs a new connection code to connect again, even on this PC.",
   "access.accounts": "Virtual keys ({count})",
   "access.searchOwner": "Search user, key or provider…",
   "access.allUsers": "All users",

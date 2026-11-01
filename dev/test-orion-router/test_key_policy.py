@@ -203,6 +203,22 @@ class PolicyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await self.enroll(self.hub,self.token)).status_code,200)
         self.assertEqual((await self.client.delete('/dashboard/api/hubs/unknown',headers={'x-admin-key':'admin'})).status_code,404)
 
+    async def test_a_removed_hub_on_this_pc_needs_a_code_to_return(self):
+        import shutil, tempfile
+        from pathlib import Path
+        from core.hub_enrollment import ensure_local_token
+        directory=Path(tempfile.mkdtemp()); self.addCleanup(shutil.rmtree,directory)
+        with patch('core.hub_enrollment.local_token_path',return_value=directory/'hub-enrollment-token'):
+            ensure_local_token()
+            local={'x-orion-local-enrollment':(directory/'hub-enrollment-token').read_text(encoding='ascii')}
+            body={'id':self.hub,'name':'PC','token':self.token}
+            self.assertEqual((await self.client.post('/api/v1/hubs/enroll',headers=local,json=body)).status_code,200)
+            await self.client.delete('/dashboard/api/hubs/'+self.hub,headers={'x-admin-key':'admin'})
+            # The Hub retries every 15 s with the same-PC token; removal must stick.
+            self.assertEqual((await self.client.post('/api/v1/hubs/enroll',headers=local,json=body)).status_code,401)
+            self.assertEqual((await self.enroll(self.hub,self.token)).status_code,200)
+            self.assertEqual((await self.client.post('/api/v1/hubs/enroll',headers=local,json=body)).status_code,200)
+
     async def test_hub_deactivation_preserves_reconnect_decision(self):
         response=await self.client.put('/dashboard/api/hubs/'+self.hub,headers={'x-admin-key':'admin'},json={'is_active':False})
         self.assertEqual(response.status_code,200)

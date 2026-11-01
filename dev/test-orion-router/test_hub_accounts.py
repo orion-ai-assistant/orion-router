@@ -154,6 +154,24 @@ class PostgreSQLHubTests(unittest.IsolatedAsyncioTestCase):
                 response = await remote.post('/api/v1/hubs/enroll', headers={'x-orion-local-enrollment': token}, json=body)
             self.assertEqual(response.status_code, 401)
 
+    async def test_a_registered_hub_id_cannot_be_taken_over(self):
+        # Hub ids are public on the LAN; any valid code must not replace another Hub's key.
+        taken = await self.enroll(self.hub, 'hub-orion-' + 'e' * 43)
+        self.assertEqual(taken.status_code, 409)
+        self.assertEqual((await self.create_account()).status_code, 200)
+        self.assertEqual((await self.enroll(self.hub, self.token)).status_code, 200)
+
+    async def test_a_damaged_local_token_is_replaced(self):
+        directory = Path(tempfile.mkdtemp()); self.addCleanup(shutil.rmtree, directory)
+        token_file = directory / 'hub-enrollment-token'
+        token_file.write_text('short', encoding='ascii')
+        with patch('core.hub_enrollment.local_token_path', return_value=token_file):
+            ensure_local_token()
+            token = token_file.read_text(encoding='ascii')
+            self.assertGreaterEqual(len(token), 32)
+            ensure_local_token()
+            self.assertEqual(token_file.read_text(encoding='ascii'), token)
+
     async def create_account(self, subject=None, key=None):
         return await self.client.post('/api/v1/hubs/accounts', headers={'x-orion-hub-key': self.token},
             json={'subject_id': subject or self.subject, 'name': 'user', 'key': key or self.key})

@@ -40,14 +40,23 @@ class Enrollment(BaseModel):
     token: str = Field(pattern=r'^hub-orion-[A-Za-z0-9_-]{43}$')
 
 
-@router.post('/enroll', dependencies=[Depends(require_tls), Depends(authorize_enrollment)])
-async def enroll(payload: Enrollment):
-    # Reconnecting preserves the Router administrator's active flag and policy.
+@router.post('/enroll', dependencies=[Depends(require_tls)])
+async def enroll(payload: Enrollment, method: str = Depends(authorize_enrollment)):
+    hub_id = str(payload.id)
+    if method == 'local' and await db_manager.fetchval('SELECT 1 FROM router_removed_hubs WHERE id=$1', hub_id):
+        # The administrator removed this Hub: the same-PC token alone never brings it back.
+        raise HTTPException(401, 'hub_removed')
+    # Reconnecting preserves the Router administrator's active flag and policy. A Hub derives its key
+    # from its own secret, so a real reconnection presents the same key. Hub ids are public (mDNS): a
+    # different key for a registered id would take that Hub's place.
     row = await db_manager.fetchrow('''
         INSERT INTO router_hubs(id, name, token_hash) VALUES ($1,$2,$3)
-        ON CONFLICT(id) DO UPDATE SET name=excluded.name, token_hash=excluded.token_hash
+        ON CONFLICT(id) DO UPDATE SET name=excluded.name WHERE router_hubs.token_hash=excluded.token_hash
         RETURNING is_active
-    ''', str(payload.id), payload.name, hashlib.sha256(payload.token.encode()).hexdigest())
+    ''', hub_id, payload.name, hashlib.sha256(payload.token.encode()).hexdigest())
+    if not row:
+        raise HTTPException(409, 'Bu Hub kimliği başka bir anahtarla kayıtlı; Router panelinden kaldırıp yeniden bağlayın.')
+    await db_manager.execute('DELETE FROM router_removed_hubs WHERE id=$1', hub_id)
     if not row['is_active']:
         raise HTTPException(403, 'Router yöneticisi bu Hub’ın erişimini kapatmış.')
     return {'connected': True}

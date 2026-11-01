@@ -51,6 +51,9 @@ class DatabaseManager:
             ALTER TABLE router_virtual_keys ADD COLUMN IF NOT EXISTS hub_id TEXT REFERENCES router_hubs(id);
             ALTER TABLE router_virtual_keys ADD COLUMN IF NOT EXISTS subject_id TEXT;
             CREATE UNIQUE INDEX IF NOT EXISTS router_hub_subject ON router_virtual_keys(hub_id, subject_id);
+            CREATE TABLE IF NOT EXISTS router_removed_hubs (
+                id TEXT PRIMARY KEY, removed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
             CREATE TABLE IF NOT EXISTS router_hub_enrollment_codes (
                 code_hash TEXT PRIMARY KEY, expires_at TIMESTAMPTZ NOT NULL,
                 used_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

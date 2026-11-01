@@ -451,7 +451,7 @@
   "access.hubInactive": "Pasif",
   "access.hubActive": "Etkin",
   "access.removeHubTitle": "{name} kaldırılsın mı?",
-  "access.removeHubConfirm": "Kullanıcı hesapları ve bu hesaplara kaydedilmiş sağlayıcı anahtarları bu Router’dan silinir. Kullanım geçmişi kalır. Hub yeniden bağlanmak için yeni bir bağlantı kodu ister.",
+  "access.removeHubConfirm": "Kullanıcı hesapları bu Router’dan silinir; kendi sağlayıcı anahtarları, hangi ortak anahtarları kullanabilecekleri ve harcamaları da gider. Hub yeniden bağlanırsa kullanıcıları bütün ortak anahtarlarla ve harcanmamış bütçeyle başlar. Kullanım geçmişi kalır. Hub yeniden bağlanmak için, bu bilgisayarda olsa bile, yeni bir bağlantı kodu ister.",
   "access.accounts": "Sanal anahtarlar ({count})",
   "access.searchOwner": "Kullanıcı, anahtar veya sağlayıcı ara…",
   "access.allUsers": "Tüm kullanıcılar",
