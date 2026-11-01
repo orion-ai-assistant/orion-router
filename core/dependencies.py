@@ -53,7 +53,7 @@ async def prewarm_vkey_cache() -> None:
         logging.getLogger("service-router.auth").error(f"Failed to pre-warm virtual keys: {e}")
 
 
-async def verify_token_string(token: str) -> dict:
+async def verify_token_string(token: str, scope=None) -> dict:
     """Verilen ham API anahtarını veya admin secret'ını doğrular."""
     from core.secret_guard import remember
     from core.key_policy import selected_upstream
@@ -104,8 +104,8 @@ async def verify_token_string(token: str) -> dict:
         return {"source": "virtual_key", "key_id": row["id"], "name": row["name"]}
 
     # --- 2. Admin Secret kontrolü ---
-    from core.security import check_admin_secret
-    if await check_admin_secret(token):
+    from core.security import check_admin_secret, remote_default_secret
+    if await check_admin_secret(token) and not remote_default_secret(scope or {}, token):
         return {"source": "system", "key_id": None}
 
     # --- 3. Tanınmayan token ---
@@ -142,7 +142,7 @@ async def authenticate_request(request: Request) -> dict:
     if not token:
         raise HTTPException(status_code=401, detail="API key is required. Send via Authorization: Bearer <key>")
 
-    return await verify_token_string(token)
+    return await verify_token_string(token, request.scope)
 
 
 async def authenticate_websocket(websocket: WebSocket) -> dict:
@@ -172,7 +172,7 @@ async def authenticate_websocket(websocket: WebSocket) -> dict:
         )
 
     try:
-        return await verify_token_string(token)
+        return await verify_token_string(token, websocket.scope)
     except HTTPException as e:
         raise WebSocketException(
             code=status.WS_1008_POLICY_VIOLATION,
@@ -183,14 +183,16 @@ async def authenticate_websocket(websocket: WebSocket) -> dict:
 
 import urllib.parse
 
-async def verify_admin(x_admin_key: str = Header(default=None)):
+async def verify_admin(request: Request, x_admin_key: str = Header(default=None)):
     """Dependency: Admin yetkisi kontrolü."""
     if not x_admin_key:
         raise HTTPException(status_code=401, detail="Unauthorized admin access")
-    
+
     x_admin_key = urllib.parse.unquote(x_admin_key)
-    
-    from core.security import check_admin_secret
+
+    from core.security import check_admin_secret, remote_default_secret
     if not await check_admin_secret(x_admin_key):
         raise HTTPException(status_code=401, detail="Unauthorized admin access")
+    if remote_default_secret(request.scope, x_admin_key):
+        raise HTTPException(status_code=403, detail="default_password_remote")
     return True

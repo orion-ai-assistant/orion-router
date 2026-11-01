@@ -1,4 +1,6 @@
+import asyncio
 import hashlib
+import hmac
 import os
 from cryptography.fernet import Fernet, InvalidToken
 
@@ -14,7 +16,7 @@ def hash_secret(secret: str, salt: bytes = b"orion-router-salt") -> str:
 
 def verify_secret(secret: str, hashed_secret: str, salt: bytes = b"orion-router-salt") -> bool:
     """Verifies a secret against a stored hash."""
-    return hash_secret(secret, salt) == hashed_secret
+    return hmac.compare_digest(hash_secret(secret, salt), hashed_secret)
 
 async def check_admin_secret(secret: str | None) -> bool:
     """Verifies an admin secret against the stored DB hash or fallback config."""
@@ -25,10 +27,22 @@ async def check_admin_secret(secret: str | None) -> bool:
     try:
         hashed_db = await db_manager.get_config("admin_secret_hash")
         if hashed_db:
-            return verify_secret(secret, hashed_db)
+            # PBKDF2 takes ~25 ms: off the event loop, so guesses cannot stall other requests.
+            return await asyncio.to_thread(verify_secret, secret, hashed_db)
     except Exception:
         pass
-    return bool(config.ADMIN_SECRET and secret == config.ADMIN_SECRET)
+    return bool(config.ADMIN_SECRET and is_default_secret(secret))
+
+
+def is_default_secret(secret: str) -> bool:
+    from core import config
+    return bool(config.ADMIN_SECRET) and hmac.compare_digest(secret.encode(), config.ADMIN_SECRET.encode())
+
+
+def remote_default_secret(scope, secret: str) -> bool:
+    """The shipped default password opens the Router only on this PC (the
+    loopback listener). Over the network it must be changed first: it is public."""
+    return not scope.get('orion_loopback_listener') and is_default_secret(secret)
 
 def _get_cipher() -> Fernet:
     from core.config import ENCRYPTION_KEY

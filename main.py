@@ -173,14 +173,17 @@ class RequireTLS:
         await self.app(scope, receive, send)
 
 
-# CORS ayarları: frontend geliştirme sunucusunun (localhost:3001) API'ye doğrudan erişebilmesi için
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# The dashboard is served from the Router itself (same origin). Only the Next.js dev
+# server (bin/dev.py, port 3001) is a different origin; no other web page may call the API.
+if os.getenv("UVICORN_RELOAD", "").lower() in ("1", "true", "yes"):
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["https://127.0.0.1:3001", "https://localhost:3001",
+                       "http://127.0.0.1:3001", "http://localhost:3001"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 app.add_middleware(RequireTLS)
 
 # Dashboard UI statik dosyaları

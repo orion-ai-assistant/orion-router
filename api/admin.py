@@ -4,6 +4,7 @@ api/admin.py
 Admin paneli için UI sunumu ve CRUD endpoint'leri.
 """
 from core.key_policy import mutate_with_access
+import asyncio
 import hashlib
 import json
 import logging
@@ -98,18 +99,19 @@ async def browse_router_directory(request: Request):
 
 
 @router.get("/api/settings/is-default-password")
-async def is_default_password():
+async def is_default_password(request: Request):
     from core.security import verify_secret
     from core import config
     hashed_db = await db_manager.get_config("admin_secret_hash")
     default_pass = config.ADMIN_SECRET
-    
+
     if hashed_db:
-        is_default = verify_secret(default_pass, hashed_db)
+        is_default = await asyncio.to_thread(verify_secret, default_pass, hashed_db)
     else:
         is_default = True
-        
-    return {"is_default": is_default, "default_password": default_pass if is_default else None}
+    # Shown only on this PC's panel; the network never learns it and cannot use it.
+    shown = is_default and request.scope.get('orion_loopback_listener')
+    return {"is_default": is_default, "default_password": default_pass if shown else None}
 
 
 @router.put("/api/settings/admin-secret", dependencies=[Depends(verify_admin)])
@@ -1179,7 +1181,15 @@ async def get_admin_ui(request: Request, path: str = ""):
     
     # 1. Clean up the path (remove leading/trailing slashes)
     safe_path = path.strip("/")
-    target_path = os.path.join(out_dir, safe_path) if safe_path else out_dir
+    out_dir = os.path.realpath(out_dir)
+    target_path = os.path.realpath(os.path.join(out_dir, safe_path)) if safe_path else out_dir
+    # A drive letter or a decoded "../" must never leave the dashboard folder.
+    try:
+        inside = os.path.commonpath([out_dir, target_path]) == out_dir
+    except ValueError:  # another drive
+        inside = False
+    if not inside:
+        raise HTTPException(status_code=404, detail="Not Found")
 
     # 2. Check if the exact requested file exists (e.g. static assets, _next/..., keys/__next._tree.txt)
     rsc_headers = {"Cache-Control": "no-cache", "Vary": "RSC, Next-Router-State-Tree, Next-Router-Prefetch, Accept"}
