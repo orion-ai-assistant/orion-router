@@ -381,13 +381,35 @@ def init_database(pg_data: Path, pg_user: str, _repair_attempted: bool = False) 
 
     ok(t("db_dir_ready"))
 
-def database(pg_data, pg_port=None, pg_user=None, pg_db='postgres'):
+def database(pg_data, pg_port=None, pg_user=None, pg_db='postgres', password=None):
     from core.native_postgres import Postgres
     dev = Path(pg_data).name.endswith('dev')
     return Postgres(PG_CTL, pg_data,
         pg_port or int(read_env('POSTGRES_DEV_PORT' if dev else 'POSTGRES_PORT', '5432')),
         pg_user or ('router_user_dev' if dev else 'router_user'), pg_db,
-        'router_pass_dev' if dev else 'router_pass')
+        password or ('router_pass_dev' if dev else 'router_pass'))
+
+
+def database_passwords():
+    """This installation's PostgreSQL passwords (core/postgres_auth.py), created once and kept beside its
+    other secrets (persistent/, private to the installing user)."""
+    from core.postgres_auth import new_password
+    from core.runtime_layout import data_root
+    path = data_root(ROOT) / 'persistent' / 'postgres.json'
+    try:
+        saved = json.loads(path.read_text(encoding='utf-8'))
+        if saved.get('admin') and saved.get('app'):
+            return saved
+    except FileNotFoundError:
+        pass
+    except ValueError:
+        pass  # Unreadable: new passwords; postgres_auth applies them through setup access.
+    created = {'admin': new_password(), 'app': new_password()}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + '.tmp')
+    temporary.write_text(json.dumps(created), encoding='utf-8')
+    os.replace(temporary, path)
+    return created
 
 
 def print_pg_log_errors(pg_log: Path) -> None:

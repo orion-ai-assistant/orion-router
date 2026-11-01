@@ -31,7 +31,7 @@ from bin.common import (
     acquire_lock, release_lock, run, run_silent, psql, read_env,
     kill_port, kill_portable_postgres, free_ports, postgres_is_ready,
     download_postgres, init_database, stop_postgres,
-    setup_db_and_user, set_env
+    set_env
 )
 
 from core.banner import print_active_services_banner
@@ -48,8 +48,8 @@ PG_DATA   = data_root(ROOT) / ".pgdata-prod"
 PG_LOG    = PG_DATA / "pg.log"
 
 PG_PORT   = int(read_env("POSTGRES_PORT", ""))
-PG_USER   = "router_user"
-PG_PASS   = "router_pass"
+PG_USER   = "router_user"  # The cluster's superuser (initdb): only for setup and readiness.
+PG_APP_USER = "router_app"  # The Router's own logins: owns orion_router, no superuser.
 PG_DB     = "orion_router"
 
 
@@ -93,8 +93,11 @@ def _main(runtime, force_build: bool = False) -> None:
 
         # core.config is already imported (core.tls_local): .env exists and is merged with .env.example.
         router_port = read_env("ORION_ROUTER_TLS_PORT", "9443")
-        from bin.common import database
-        pg = database(PG_DATA, PG_PORT, PG_USER)
+        from bin.common import database, database_passwords
+        from core import postgres_auth
+        passwords = database_passwords()
+        admin, app = (PG_USER, passwords['admin']), (PG_APP_USER, passwords['app'])
+        pg = database(PG_DATA, PG_PORT, PG_USER, password=passwords['admin'])
 
         from core.process_lifecycle import assert_port_free
         if 'backend' not in runtime.children:
@@ -106,17 +109,25 @@ def _main(runtime, force_build: bool = False) -> None:
         # This supervisor owns its database (core/native_postgres.py): a server whose owner has ended is
         # restarted as ours, never reused ownerless, and it ends with this supervisor at the latest.
         runtime.database = pg
+        postgres_auth.prepare(pg, admin, app, PG_DB)
         with timed('router.postgres.start'):
             pg.ensure()
         started_postgres = True
         with timed('router.postgres.setup'):
-            setup_db_and_user(PG_USER, PG_PASS, PG_PORT, PG_DB)
+            # Creates the database on the first start; from then on only password logins from this PC.
+            try:
+                protected = postgres_auth.secure(pg, admin, app, PG_DB)
+            except (OSError, RuntimeError, subprocess.SubprocessError) as error:
+                warn(f'PostgreSQL password setup failed: {error}')
+                protected = False
+            if not protected:
+                warn('PostgreSQL still accepts logins without a password from this PC')
         print()
 
         ensure_dashboard(force=force_build)
         print()
 
-        set_env(router_port, PG_PORT, PG_DB, PG_USER, PG_PASS, "0")
+        set_env(router_port, PG_PORT, PG_DB, PG_APP_USER, passwords["app"], "0")
         with timed('router.backend'):
             procs.extend(launch(router_port, runtime))
 
