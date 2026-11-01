@@ -30,6 +30,7 @@
   "auth.invalidKey": "Incorrect password",
   "auth.failed": "Authentication failed",
   "auth.defaultPasswordInfo": "You can change it later in settings. Default password:",
+  "auth.defaultPasswordRemote": "The default password works only on the computer that runs the Router. To sign in from here, first change it in the panel on that computer.",
   "settings.title": "Settings",
   "settings.description": "Manage dashboard and server settings.",
   "settings.language.title": "Language",

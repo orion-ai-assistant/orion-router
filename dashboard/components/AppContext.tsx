@@ -421,7 +421,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         // Reload page data
         window.dispatchEvent(new Event('orion-authenticated'));
       } else {
-        setLoginError(t('auth.invalidKey'));
+        const detail = res.status === 403 ? (await res.json().catch(() => ({}))).detail : undefined;
+        // The default password works only on the PC that runs the Router.
+        setLoginError(detail === 'default_password_remote' ? t('auth.defaultPasswordRemote') : t('auth.invalidKey'));
         setAdminKey('');
       }
     } catch (err) {
@@ -547,7 +549,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 <span>{loginError}</span>
               </div>
             )}
-            {isDefaultPassword && (
+            {isDefaultPassword && !defaultPasswordValue && (
+              <div className="mt-3 text-zinc-500 text-center text-xs leading-relaxed">
+                {t('auth.defaultPasswordRemote')}
+              </div>
+            )}
+            {isDefaultPassword && defaultPasswordValue && (
               <div className="mt-3 w-full [container-type:inline-size]">
                 <div 
                   className="text-zinc-500 text-center leading-relaxed whitespace-nowrap overflow-hidden text-ellipsis flex items-center justify-center gap-1.5"

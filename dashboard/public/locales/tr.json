@@ -30,6 +30,7 @@
   "auth.invalidKey": "Şifre yanlış",
   "auth.failed": "Kimlik doğrulama başarısız",
   "auth.defaultPasswordInfo": "Şifrenizi daha sonra ayarlardan değiştirebilirsiniz. Varsayılan şifre:",
+  "auth.defaultPasswordRemote": "Varsayılan şifre yalnızca Router'ın kurulu olduğu bilgisayarda geçerli. Buradan girmek için önce o bilgisayardaki panelde şifreyi değiştirin.",
   "settings.title": "Ayarlar",
   "settings.description": "Panel ve sunucu ayarlarını yönetin.",
   "settings.language.title": "Dil",
