@@ -472,22 +472,27 @@ async def get_admin_providers(request: Request):
 async def get_admin_voices(request: Request):
     """Her TTS sağlayıcısı ve model grupları için desteklenen sesleri döner."""
     try:
-        router_instance = request.app.state.dynamic_router
-        voices_by_provider = {}
-        model_voice_groups_by_provider = {}
+        import asyncio
         from fastapi.concurrency import run_in_threadpool
-        for provider_name, provider_inst in router_instance.tts_providers.items():
-            if hasattr(provider_inst, "get_voices"):
-                voices_by_provider[provider_name] = await run_in_threadpool(provider_inst.get_voices)
-            else:
-                voices_by_provider[provider_name] = []
-            if hasattr(provider_inst, "get_model_voice_groups"):
-                model_voice_groups_by_provider[provider_name] = await run_in_threadpool(provider_inst.get_model_voice_groups)
-            else:
-                model_voice_groups_by_provider[provider_name] = []
+        providers = request.app.state.dynamic_router.tts_providers
+
+        async def ask(provider_inst, method):
+            return await run_in_threadpool(getattr(provider_inst, method)) if hasattr(provider_inst, method) else []
+
+        # A stopped local service waits for its connection timeouts; asked together,
+        # those waits overlap instead of adding up past the Hub's catalog timeout.
+        # An empty language list: the provider takes no language and reads it from the text.
+        methods = ("get_voices", "get_model_voice_groups", "get_languages")
+        answers = await asyncio.gather(*(ask(provider_inst, method)
+                                         for provider_inst in providers.values() for method in methods))
+        by_method = {method: {} for method in methods}
+        for index, provider_name in enumerate(providers):
+            for offset, method in enumerate(methods):
+                by_method[method][provider_name] = answers[index * len(methods) + offset]
         return {
-            "voices": voices_by_provider,
-            "model_voice_groups": model_voice_groups_by_provider,
+            "voices": by_method["get_voices"],
+            "model_voice_groups": by_method["get_model_voice_groups"],
+            "languages": by_method["get_languages"],
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

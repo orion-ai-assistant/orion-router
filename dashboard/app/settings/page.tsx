@@ -39,11 +39,24 @@ export default function SettingsPage() {
 
   // System Update states
   const [checkingUpdate, setCheckingUpdate] = useState<boolean>(false);
-  const [tlsIdentity, setTlsIdentity] = useState<{id: string; name: string; fp: string; port: number;
-    local_dashboard_url: string; lan_dashboard_urls: string[]} | null>(null);
+  const [tlsIdentity, setTlsIdentity] = useState<{local_dashboard_url: string; lan_dashboard_urls: string[]} | null>(null);
   const [tlsError, setTlsError] = useState(false);
   const [tlsDetailsOpen, setTlsDetailsOpen] = useState(false);
   const [tlsLoading, setTlsLoading] = useState(false);
+  const [hubCode, setHubCode] = useState<{code: string; expires_at: string} | null>(null);
+  const [hubCodeBusy, setHubCodeBusy] = useState(false);
+  const createHubCode = async () => {
+    setHubCodeBusy(true);
+    try {
+      const response = await adminFetch('/dashboard/api/hubs/enrollment-codes', {method: 'POST'});
+      if (!response.ok) throw new Error();
+      setHubCode(await response.json());
+    } catch {
+      showToast(t('common.error'), 'error');
+    } finally {
+      setHubCodeBusy(false);
+    }
+  };
   const copyConnectionAddress = async (url: string) => {
     if (await copyText(url)) showToast(locale === 'tr' ? 'Kopyalandı' : 'Copied', 'success');
     else showToast(t('common.error'), 'error');
@@ -357,46 +370,53 @@ export default function SettingsPage() {
       <div className="glass-panel p-6 mb-8 bg-[#18181b] border border-zinc-800 rounded-md max-w-6xl">
         <h2 className="font-heading text-lg font-semibold mb-2">{locale === 'tr' ? 'Hub ile güvenli bağlantı' : 'Secure connection to Hub'}</h2>
         <p className="text-zinc-400 text-sm mb-4">{locale === 'tr'
-          ? 'Aynı bilgisayarda kurulan Hub, Router kimliğini otomatik doğrular. Başka bilgisayardaki Hub için aşağıdaki kimliği ve SPKI parmak izini bir kez Hub bağlantı ekranına aktarın.'
-          : 'A Hub installed on this computer verifies this Router automatically. For a Hub on another computer, transfer the identity and SPKI fingerprint below to its connection screen once.'}</p>
-        <Button variant="outline" aria-expanded={tlsDetailsOpen} aria-controls="tls-connection-details" onClick={() => {
-          setTlsDetailsOpen(value => !value);
-          if (!tlsDetailsOpen && !tlsIdentity && !tlsLoading) void loadTlsIdentity();
-        }}>{locale === 'tr'
-          ? tlsDetailsOpen ? 'Bağlantı adreslerini ve kimliği gizle' : 'Bağlantı adreslerini ve kimliği göster'
-          : tlsDetailsOpen ? 'Hide connection addresses and identity' : 'Show connection addresses and identity'}</Button>
-        <div id="tls-connection-details" hidden={!tlsDetailsOpen}>
-        {tlsLoading && <p className="text-zinc-400 mt-3" role="status">{t('common.loading')}</p>}
-        {tlsError && <p className="text-red-400 mt-3" role="alert">{t('common.error')}</p>}
-        {tlsIdentity && <div className="mt-4 space-y-2 text-sm">
-          <div className="pb-4 mb-4 border-b border-zinc-800 space-y-3">
-            <div>
-              <p className="font-medium">{locale === 'tr' ? 'Bu PC (HTTP)' : 'This PC (HTTP)'}</p>
-              <div className="flex items-center gap-3 flex-wrap">
-                <a className="text-indigo-300 underline break-all" href={tlsIdentity.local_dashboard_url} target="_blank" rel="noopener noreferrer">{tlsIdentity.local_dashboard_url}</a>
-                <Button variant="outline" onClick={() => copyConnectionAddress(tlsIdentity.local_dashboard_url)}>{t('common.copy')}</Button>
-              </div>
+          ? 'Aynı bilgisayarda kurulan Hub kendiliğinden bağlanır. Başka bilgisayardaki Hub için bir bağlantı kodu oluşturup Hub’ın bağlantı penceresine girin; Hub bu Router’ı kodla doğrular. Router şifresi Hub’a verilmez.'
+          : 'A Hub installed on this computer connects by itself. For a Hub on another computer, create a connection code and enter it in the Hub’s connection window; the Hub verifies this Router with the code. The Router password is never given to a Hub.'}</p>
+        <div className="space-y-3">
+          <Button disabled={hubCodeBusy} onClick={createHubCode}>{locale === 'tr' ? 'Hub bağlantı kodu oluştur' : 'Create Hub connection code'}</Button>
+          {hubCode && <div className="flex flex-wrap items-center gap-4 rounded-md border border-zinc-800 bg-black/30 px-4 py-3" role="status">
+            <div className="min-w-0 flex-1">
+              <p className="font-mono text-2xl tracking-widest select-all">{hubCode.code}</p>
+              <p className="text-zinc-400 text-xs">{locale === 'tr'
+                ? `Tek kullanımlık. ${new Date(hubCode.expires_at).toLocaleTimeString()} saatine kadar geçerli.`
+                : `Single use. Valid until ${new Date(hubCode.expires_at).toLocaleTimeString()}.`}</p>
             </div>
+            <Button variant="outline" size="sm" onClick={() => copyConnectionAddress(hubCode.code)}>{t('common.copy')}</Button>
+          </div>}
+        </div>
+        <div className="mt-6 border-t border-zinc-800 pt-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="font-medium">{locale === 'tr' ? 'Diğer cihazlar (HTTPS)' : 'Other devices (HTTPS)'}</p>
-              {(tlsIdentity.lan_dashboard_urls || []).map(url => <div key={url} className="flex items-center gap-3 flex-wrap">
-                <a className="text-indigo-300 underline break-all" href={url} target="_blank" rel="noopener noreferrer">{url}</a>
-                <Button variant="outline" onClick={() => copyConnectionAddress(url)}>{t('common.copy')}</Button>
-              </div>)}
-              {!tlsIdentity.lan_dashboard_urls?.length && <p className="text-zinc-400 text-xs">{locale === 'tr' ? 'Ağ adresi bulunamadı.' : 'No LAN address available.'}</p>}
+              <h3 className="font-medium">{locale === 'tr' ? 'Router paneli adresleri' : 'Router dashboard addresses'}</h3>
+              <p className="text-zinc-400 text-xs">{locale === 'tr' ? 'Bu paneli başka bir cihazdan açmak için.' : 'To open this dashboard from another device.'}</p>
             </div>
-            <p className="text-zinc-400 text-xs">{locale === 'tr'
-              ? 'Bu PC adresi yalnız Router bilgisayarında kullanılır. Başka cihazlar için HTTPS adresini kopyalayın; localhost yerine elle IP yazmayın.'
-              : 'The local address works on the Router computer. Copy the HTTPS address for other devices; do not manually replace localhost with an IP.'}</p>
+            <Button variant="outline" size="sm" aria-expanded={tlsDetailsOpen} aria-controls="tls-connection-details" onClick={() => {
+              setTlsDetailsOpen(value => !value);
+              if (!tlsDetailsOpen && !tlsIdentity && !tlsLoading) void loadTlsIdentity();
+            }}>{locale === 'tr' ? (tlsDetailsOpen ? 'Gizle' : 'Göster') : (tlsDetailsOpen ? 'Hide' : 'Show')}</Button>
           </div>
-          <p>{tlsIdentity.name} · HTTPS :{tlsIdentity.port}</p>
-          <p className="font-mono break-all">ID: {tlsIdentity.id}</p>
-          <p className="font-mono break-all select-all">SPKI SHA-256: {tlsIdentity.fp}</p>
-          <Button variant="outline" onClick={async () => {
-            try { await copyText(tlsIdentity.fp); showToast(locale === 'tr' ? 'Kopyalandı' : 'Copied', 'success'); }
-            catch { showToast(t('common.error'), 'error'); }
-          }}>{locale === 'tr' ? 'Parmak izini kopyala' : 'Copy fingerprint'}</Button>
-        </div>}
+          <div id="tls-connection-details" hidden={!tlsDetailsOpen} className="mt-4 space-y-2">
+            {tlsLoading && <p className="text-zinc-400 text-sm" role="status">{t('common.loading')}</p>}
+            {tlsError && <p className="text-red-400 text-sm" role="alert">{t('common.error')}</p>}
+            {tlsIdentity && <>
+              {[[locale === 'tr' ? 'Bu bilgisayar' : 'This computer', tlsIdentity.local_dashboard_url],
+                ...(tlsIdentity.lan_dashboard_urls || []).map(url => [locale === 'tr' ? 'Diğer cihazlar' : 'Other devices', url])].map(([label, url]) =>
+                <div key={url} className="flex items-center gap-3 rounded-md border border-zinc-800 bg-black/30 px-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-zinc-400">{label}</p>
+                    <p className="font-mono text-sm text-zinc-100 truncate" title={url}>{url}</p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => copyConnectionAddress(url)}>{t('common.copy')}</Button>
+                  <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex h-7 items-center gap-1 rounded-md border border-zinc-700 px-2.5 text-[0.8rem] text-zinc-200 hover:bg-zinc-800">
+                    <ExternalLink className="size-3.5"/>{locale === 'tr' ? 'Aç' : 'Open'}
+                  </a>
+                </div>)}
+              {!tlsIdentity.lan_dashboard_urls?.length && <p className="text-zinc-400 text-xs">{locale === 'tr' ? 'Ağ adresi bulunamadı.' : 'No LAN address available.'}</p>}
+              <p className="text-zinc-400 text-xs">{locale === 'tr'
+                ? 'Bu bilgisayar adresi yalnız Router’ın çalıştığı bilgisayarda açılır. Başka cihazlar için ağ adresini kopyalayın.'
+                : 'The first address only opens on the Router computer. Copy the network address for other devices.'}</p>
+            </>}
+          </div>
         </div>
       </div>
 

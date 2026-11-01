@@ -1,5 +1,9 @@
 """Hub delegation, private credentials and PostgreSQL retry/limit regressions."""
 import hashlib
+import hmac
+from pathlib import Path
+import shutil
+import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest.mock import AsyncMock, patch
@@ -13,6 +17,7 @@ import httpx
 from api import hubs
 from core import config
 from core.dependencies import invalidate_vkey_cache
+from core.hub_enrollment import create_code, ensure_local_token
 from core.router.routing_services import ProviderKeyPool
 from core.security import decrypt
 from core.tls_server import _TLSApplication
@@ -73,7 +78,7 @@ class PostgreSQLHubTests(unittest.IsolatedAsyncioTestCase):
         await self.conn.execute('SET LOCAL search_path TO ' + schema + ', public')
         await db_manager._ensure_tables(self.conn)
         await db_manager._ensure_tables(self.conn)
-        for name in ('execute', 'fetch', 'fetchrow'):
+        for name in ('execute', 'fetch', 'fetchrow', 'fetchval'):
             p = patch.object(db_manager, name, getattr(self.conn, name)); p.start(); self.addCleanup(p.stop)
         p = patch.object(config, 'ENCRYPTION_KEY', Fernet.generate_key().decode()); p.start(); self.addCleanup(p.stop)
         invalidate_vkey_cache(); self.addCleanup(invalidate_vkey_cache)
@@ -83,10 +88,71 @@ class PostgreSQLHubTests(unittest.IsolatedAsyncioTestCase):
         self.addAsyncCleanup(self.client.aclose)
         self.hub = str(uuid4()); self.subject = str(uuid4())
         self.token = 'hub-orion-' + 'a' * 43; self.key = 'sk-orion-' + 'b' * 43
+        response = await self.enroll(self.hub, self.token)
+        self.assertEqual(response.status_code, 200)
+
+    async def enroll(self, hub, token):
+        code = (await create_code())['code']
+        return await self.client.post('/api/v1/hubs/enroll', headers={'x-orion-enrollment-code': code},
+            json={'id': hub, 'name': 'PC', 'token': token})
+
+    async def test_connection_code_is_single_use_and_expires(self):
+        code = (await create_code())['code']
+        body = {'id': str(uuid4()), 'name': 'PC', 'token': 'hub-orion-' + 'f' * 43}
+        first = await self.client.post('/api/v1/hubs/enroll', headers={'x-orion-enrollment-code': code.lower()}, json=body)
+        self.assertEqual(first.status_code, 200)
+        again = await self.client.post('/api/v1/hubs/enroll', headers={'x-orion-enrollment-code': code}, json=body)
+        self.assertEqual(again.status_code, 401)
+        late = (await create_code())['code']
+        await self.conn.execute("UPDATE router_hub_enrollment_codes SET expires_at=NOW()-interval '1 second'")
+        expired = await self.client.post('/api/v1/hubs/enroll', headers={'x-orion-enrollment-code': late}, json=body)
+        self.assertEqual(expired.status_code, 401)
+
+    async def test_router_proves_its_identity_with_the_code_without_revealing_it(self):
+        self.app.state.tls_identity = SimpleNamespace(id=str(uuid4()), fp='ab' * 32)
+        nonce = 'cd' * 32
+        none = await self.client.post('/api/v1/hubs/pairing-proof', json={'nonce': nonce})
+        self.assertEqual(none.status_code, 404)
+        code = (await create_code())['code']
+        other = (await create_code())['code']
+        response = await self.client.post('/api/v1/hubs/pairing-proof', json={'nonce': nonce})
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['id'], self.app.state.tls_identity.id)
+        def proof(value):
+            key = hashlib.sha256(value.replace('-', '').encode()).digest()
+            message = '|'.join(('orion-hub-pairing-v1', data['id'], 'ab' * 32, nonce)).encode()
+            return hmac.new(key, message, hashlib.sha256).hexdigest()
+        self.assertIn(proof(code), data['proofs'])
+        self.assertIn(proof(other), data['proofs'])
+        self.assertNotIn(code, response.text)
+        await self.client.post('/api/v1/hubs/enroll', headers={'x-orion-enrollment-code': code},
+            json={'id': str(uuid4()), 'name': 'PC', 'token': 'hub-orion-' + 'f' * 43})
+        used = (await self.client.post('/api/v1/hubs/pairing-proof', json={'nonce': nonce})).json()['proofs']
+        self.assertNotIn(proof(code), used)
+
+    async def test_administrator_password_never_enrolls_a_hub(self):
         with patch('core.security.check_admin_secret', AsyncMock(return_value=True)):
             response = await self.client.post('/api/v1/hubs/enroll', headers={'x-admin-key': 'password'},
-                json={'id': self.hub, 'name': 'PC', 'token': self.token})
-        self.assertEqual(response.status_code, 200)
+                json={'id': str(uuid4()), 'name': 'PC', 'token': 'hub-orion-' + 'f' * 43})
+        self.assertEqual(response.status_code, 401)
+
+    async def test_local_token_enrolls_only_a_hub_on_this_pc(self):
+        directory = Path(tempfile.mkdtemp()); self.addCleanup(shutil.rmtree, directory)
+        token_file = directory / 'hub-enrollment-token'
+        with patch('core.hub_enrollment.local_token_path', return_value=token_file):
+            ensure_local_token()
+            token = token_file.read_text(encoding='ascii')
+            body = {'id': str(uuid4()), 'name': 'PC', 'token': 'hub-orion-' + 'f' * 43}
+            local = await self.client.post('/api/v1/hubs/enroll', headers={'x-orion-local-enrollment': token}, json=body)
+            self.assertEqual(local.status_code, 200)
+            wrong = await self.client.post('/api/v1/hubs/enroll', headers={'x-orion-local-enrollment': token + 'x'}, json=body)
+            self.assertEqual(wrong.status_code, 401)
+            remote_app = _TLSApplication(self.app)
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=remote_app, client=('192.168.1.9', 50000)),
+                                         base_url='https://router') as remote:
+                response = await remote.post('/api/v1/hubs/enroll', headers={'x-orion-local-enrollment': token}, json=body)
+            self.assertEqual(response.status_code, 401)
 
     async def create_account(self, subject=None, key=None):
         return await self.client.post('/api/v1/hubs/accounts', headers={'x-orion-hub-key': self.token},
@@ -139,7 +205,7 @@ class PostgreSQLHubTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(models.json()['models'])
         self.app.state.dynamic_router.tts_providers = {}
         voices = await self.client.get('/api/v1/hubs/catalog/voices', headers=headers)
-        self.assertEqual(voices.json(), {'voices': {}, 'model_voice_groups': {}})
+        self.assertEqual(voices.json(), {'voices': {}, 'model_voice_groups': {}, 'languages': {}})
         forbidden = await self.client.get('/api/v1/hubs/catalog/provider-keys', headers=headers)
         self.assertEqual(forbidden.status_code, 404)
 
@@ -172,13 +238,11 @@ class PostgreSQLHubTests(unittest.IsolatedAsyncioTestCase):
     async def test_shared_router_keeps_two_hubs_distinct_and_respects_revocation(self):
         first = await self.create_account()
         self.hub = str(uuid4()); self.token = 'hub-orion-' + 'd' * 43
-        with patch('core.security.check_admin_secret', AsyncMock(return_value=True)):
-            await self.client.post('/api/v1/hubs/enroll', headers={'x-admin-key': 'password'},
-                json={'id': self.hub, 'name': 'PC', 'token': self.token})
+        await self.enroll(self.hub, self.token)
         self.key = 'sk-orion-' + 'e' * 43
         second = await self.create_account()
         self.assertNotEqual(first.json()['id'], second.json()['id'])
         await self.conn.execute('UPDATE router_hubs SET is_active=false WHERE id=$1', self.hub)
         response = await self.client.get('/api/v1/hubs/providers', headers={'Authorization': 'Bearer ' + self.key})
         self.assertEqual(response.status_code, 403)
-        self.assertEqual((await self.create_account()).status_code, 401)
+        self.assertEqual((await self.create_account()).status_code, 403)

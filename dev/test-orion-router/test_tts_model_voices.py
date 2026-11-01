@@ -23,3 +23,17 @@ class VoiceTests(unittest.TestCase):
             self.assertEqual(provider.get_voices('shared-other'), ['A'])
             with self.assertRaises(ValueError):
                 provider.resolve_voice('shared-model', 'A')
+
+
+class LanguageCatalogTests(unittest.IsolatedAsyncioTestCase):
+    async def test_voice_catalog_lists_languages_only_for_providers_that_take_one(self):
+        from types import SimpleNamespace
+        from api.admin import get_admin_voices
+        from providers.local.tts import LocalTTSProvider
+        local = LocalTTSProvider()
+        router = SimpleNamespace(tts_providers={'gemini': GeminiTTSProvider(), 'local': local})
+        request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(dynamic_router=router)))
+        with patch.object(local, 'get_voices', return_value=[]), \
+                patch.object(local, 'get_languages', return_value=['Auto', 'Turkish']):
+            data = await get_admin_voices(request)
+        self.assertEqual(data['languages'], {'gemini': [], 'local': ['Auto', 'Turkish']})

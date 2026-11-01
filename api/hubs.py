@@ -6,7 +6,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from core.dependencies import authenticate_request, verify_admin, invalidate_vkey_cache
+from core.dependencies import authenticate_request, invalidate_vkey_cache
+from core.hub_enrollment import authorize_enrollment
 from core.security import encrypt, decrypt
 from core.secret_guard import SecretRoute
 from database import db_manager
@@ -19,13 +20,27 @@ def require_tls(request: Request):
         raise HTTPException(403, 'tls_required')
 
 
+class PairingRequest(BaseModel):
+    nonce: str = Field(pattern=r'^[0-9a-f]{64}$')
+
+
+@router.post('/pairing-proof', dependencies=[Depends(require_tls)])
+async def pairing_proof(payload: PairingRequest, request: Request):
+    from core.hub_enrollment import pairing_proofs
+    identity = request.app.state.tls_identity
+    proofs = await pairing_proofs(identity.id, identity.fp, payload.nonce)
+    if not proofs:
+        raise HTTPException(404, 'no_active_code')
+    return {'id': identity.id, 'proofs': proofs}
+
+
 class Enrollment(BaseModel):
     id: UUID
     name: str = Field(min_length=1, max_length=120)
     token: str = Field(pattern=r'^hub-orion-[A-Za-z0-9_-]{43}$')
 
 
-@router.post('/enroll', dependencies=[Depends(require_tls), Depends(verify_admin)])
+@router.post('/enroll', dependencies=[Depends(require_tls), Depends(authorize_enrollment)])
 async def enroll(payload: Enrollment):
     # Reconnecting preserves the Router administrator's active flag and policy.
     row = await db_manager.fetchrow('''
@@ -45,8 +60,11 @@ async def current_hub(request: Request):
     token = request.headers.get('x-orion-hub-key', '')
     row = await db_manager.fetchrow('SELECT id, user_budget, is_active FROM router_hubs WHERE token_hash=$1',
                                     hashlib.sha256(token.encode()).hexdigest())
-    if not row or not row['is_active']:
+    if not row:
         raise HTTPException(401, 'Hub bağlantı yetkisi geçersiz veya kaldırılmış.')
+    if not row['is_active']:
+        # Deactivation is temporary: the Hub keeps its admission and resumes when reactivated.
+        raise HTTPException(403, 'Router yöneticisi bu Hub’ın erişimini kapatmış.')
     return dict(row)
 
 
@@ -89,7 +107,7 @@ async def catalog(section: str, request: Request, hub: dict = Depends(current_hu
     from api import admin
     async def get_catalog_voices():
         v = await admin.get_admin_voices(request)
-        return {field: v.get(field, {}) for field in ('voices', 'model_voice_groups')}
+        return {field: v.get(field, {}) for field in ('voices', 'model_voice_groups', 'languages')}
 
     handlers = {'models': admin.list_models, 'model-groups': admin.list_model_groups,
                 'voices': get_catalog_voices,
@@ -137,7 +155,7 @@ async def account_catalog(section: str, request: Request, auth: dict = Depends(c
     if section == 'voices':
         data = await admin.get_admin_voices(request)
         return {field: {p: v for p, v in data.get(field, {}).items() if p in usable}
-                for field in ('voices', 'model_voice_groups')}
+                for field in ('voices', 'model_voice_groups', 'languages')}
     raise HTTPException(404, 'Unknown catalog section')
 
 

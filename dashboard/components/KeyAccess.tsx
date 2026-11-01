@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { ChevronDown, ShieldCheck, Network, Activity, Check } from 'lucide-react';
 
 type Key = {id: string; name: string; hub_name?: string; hub_id?: string};
@@ -143,25 +144,54 @@ export function HubManagement() {
   const [message,setMessage]=useState('');
   const [open,setOpen]=useState(false);
   const [busy,setBusy]=useState('');
+  const [removing,setRemoving]=useState<Key|null>(null);
   async function load() {
     try {setHubs((await read('/dashboard/api/hubs')).hubs);setMessage('');}
     catch {setMessage(t('access.loadError'));}
   }
   useEffect(()=>{if(adminKey)void load();else setHubs([]);},[adminKey]);
+  // While the list is open and on screen, a Hub that connects or disappears shows up without a reload.
+  useEffect(()=>{
+    if(!adminKey||!open)return;
+    const refresh=()=>{if(!document.hidden)void load();};
+    const timer=window.setInterval(refresh,5000);
+    document.addEventListener('visibilitychange',refresh);
+    return ()=>{window.clearInterval(timer);document.removeEventListener('visibilitychange',refresh);};
+  },[adminKey,open]);
   async function change(h:Key & {is_active:boolean}) {
     setBusy(h.id);
     try {const r=await adminFetch(`/dashboard/api/hubs/${h.id}`,{method:'PUT',body:JSON.stringify({is_active:!h.is_active})});if(!r.ok)throw new Error();await load();}
     catch {setMessage(t('access.saveError'));}finally {setBusy('');}
   }
+  async function remove(h:Key) {
+    setBusy(h.id);
+    try {const r=await adminFetch(`/dashboard/api/hubs/${h.id}`,{method:'DELETE'});if(!r.ok)throw new Error();setRemoving(null);await load();}
+    catch {setMessage(t('access.saveError'));setRemoving(null);}finally {setBusy('');}
+  }
   return <div className={`${panel} mb-6`}>
     <Disclosure title={`${t('access.hubs')}${open?' · '+hubs.length:''}`} icon={<Network className="size-4 text-purple-400"/>} open={open} onClick={()=>setOpen(!open)}/>
     {open && <div className="space-y-3 border-t border-zinc-800 p-4">
       {!hubs.length && <p className="text-sm text-zinc-500">{t('access.noHubs')}</p>}
-      {hubs.map(h=><div key={h.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-        <span className="font-medium">{h.name}</span>{!h.is_active && <Status active={false}/>}
-        <Button type="button" className="ml-auto" variant="outline" disabled={busy===h.id} onClick={()=>change(h)}>{t(h.is_active?'access.deactivate':'access.activate')}</Button>
+      {hubs.map(h=><div key={h.id} className={`flex flex-wrap items-center gap-3 rounded-lg border p-4 ${h.is_active?'border-zinc-800 bg-zinc-900/50':'border-amber-500/20 bg-amber-500/5'}`}>
+        <span className={`font-medium ${h.is_active?'':'text-zinc-400'}`}>{h.name}</span>
+        <Badge className={h.is_active?'border-emerald-500/20 bg-emerald-500/10 text-emerald-400':'border-amber-500/30 bg-amber-500/10 text-amber-300'}>{t(h.is_active?'access.hubActive':'access.hubInactive')}</Badge>
+        <Button type="button" variant="outline" disabled={busy===h.id} onClick={()=>change(h)}
+          className={`ml-auto ${h.is_active?'border-amber-500/40 text-amber-300 hover:bg-amber-500/10':'border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10'}`}>{t(h.is_active?'access.deactivate':'access.activate')}</Button>
+        <Button type="button" variant="destructive" disabled={busy===h.id} onClick={()=>setRemoving(h)}>{t('access.removeHub')}</Button>
       </div>)}
     </div>}
     {message && <p role="alert" className="p-4 text-xs text-red-400">{message}</p>}
+    <Dialog open={removing!==null} onOpenChange={open=>{if(!open&&!busy)setRemoving(null);}}>
+      <DialogContent className="max-w-[440px] border border-border bg-zinc-950 p-8 rounded-2xl text-white shadow-2xl">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-semibold text-white">{t('access.removeHubTitle').replace('{name}',removing?.name||'')}</DialogTitle>
+          <DialogDescription className="text-zinc-400 text-sm mt-2">{t('access.removeHubConfirm')}</DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="mt-4 flex gap-3 justify-end">
+          <Button type="button" variant="outline" disabled={busy!==''} onClick={()=>setRemoving(null)}>{t('common.cancel')}</Button>
+          <Button type="button" disabled={busy!==''} onClick={()=>removing&&remove(removing)} className="bg-red-600 hover:bg-red-700 text-white">{t('access.removeHub')}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>;
 }

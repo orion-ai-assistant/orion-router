@@ -58,6 +58,11 @@ async def lifespan(app: FastAPI):
     app.state.tls_identity = load_identity(config.TLS_DIRECTORY, router_id(config.MDNS_ID_FILE))
     logger.info("Router TLS identity id=%s SPKI SHA-256=%s", app.state.tls_identity.id, app.state.tls_identity.fp)
     try:
+        from core.hub_enrollment import ensure_local_token
+        ensure_local_token()
+    except OSError as exc:
+        logger.warning('Same-PC Hub enrollment unavailable (%s); connection codes still work', type(exc).__name__)
+    try:
         from core.local_installation import refresh_managed_installation
         refresh_managed_installation(config._ROOT, app.state.tls_identity, config.MDNS_ID_FILE, config.TLS_PORT)
     except (OSError, ValueError, RuntimeError) as exc:

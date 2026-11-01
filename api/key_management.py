@@ -16,6 +16,25 @@ async def hubs():
         'SELECT id,name,is_active,user_budget FROM router_hubs ORDER BY name,id')]}
 
 
+@router.post('/api/hubs/enrollment-codes')
+async def hub_enrollment_code():
+    from core.hub_enrollment import create_code
+    return await create_code()
+
+
+@router.delete('/api/hubs/{hub_id}')
+async def remove_hub(hub_id: str):
+    # The Hub's credential and its users' account keys (with their saved provider keys) go together;
+    # usage history stays. The Hub needs a new connection code to come back.
+    row = await db_manager.fetchrow('''
+        WITH removed_accounts AS (DELETE FROM router_virtual_keys WHERE hub_id=$1)
+        DELETE FROM router_hubs WHERE id=$1 RETURNING id''', hub_id)
+    if not row:
+        raise HTTPException(404, 'Hub bulunamadı.')
+    invalidate_vkey_cache()
+    return {'removed': True}
+
+
 @router.put('/api/hubs/{hub_id}')
 async def set_hub(hub_id: str, request: Request):
     body = await request.json()

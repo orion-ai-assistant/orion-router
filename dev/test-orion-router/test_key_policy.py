@@ -19,6 +19,7 @@ from database import db_manager
 
 class PolicyTests(unittest.IsolatedAsyncioTestCase):
     create_account = fixtures.PostgreSQLHubTests.create_account
+    enroll = fixtures.PostgreSQLHubTests.enroll
 
     async def asyncSetUp(self):
         await fixtures.PostgreSQLHubTests.asyncSetUp(self)
@@ -193,13 +194,25 @@ class PolicyTests(unittest.IsolatedAsyncioTestCase):
             response=await self.client.put(path,headers={'x-admin-key':self.key},json=body)
             self.assertEqual(response.status_code,401)
 
+    async def test_removing_a_hub_deletes_its_accounts_and_requires_a_new_code(self):
+        response=await self.client.delete('/dashboard/api/hubs/'+self.hub,headers={'x-admin-key':'admin'})
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(await self.conn.fetchval('SELECT count(*) FROM router_virtual_keys WHERE hub_id=$1',self.hub),0)
+        self.assertEqual(await self.conn.fetchval('SELECT count(*) FROM router_hubs WHERE id=$1',self.hub),0)
+        self.assertEqual((await self.create_account()).status_code,401)
+        self.assertEqual((await self.enroll(self.hub,self.token)).status_code,200)
+        self.assertEqual((await self.client.delete('/dashboard/api/hubs/unknown',headers={'x-admin-key':'admin'})).status_code,404)
+
     async def test_hub_deactivation_preserves_reconnect_decision(self):
         response=await self.client.put('/dashboard/api/hubs/'+self.hub,headers={'x-admin-key':'admin'},json={'is_active':False})
         self.assertEqual(response.status_code,200)
         self.assertEqual(await eligible_ids(self.x,'openrouter'),set())
-        response=await self.client.post('/api/v1/hubs/enroll',headers={'x-admin-key':'admin'},json={'id':self.hub,'name':'PC','token':self.token})
+        from core.hub_enrollment import create_code
+        code=(await create_code())['code']
+        response=await self.client.post('/api/v1/hubs/enroll',headers={'x-orion-enrollment-code':code},json={'id':self.hub,'name':'PC','token':self.token})
         self.assertEqual(response.status_code,403)
-        self.assertEqual((await self.create_account()).status_code,401)
+        # Deactivated, not removed: 403 tells the Hub to keep its admission for reactivation.
+        self.assertEqual((await self.create_account()).status_code,403)
 
     async def test_summary_and_catalog_obey_virtual_restriction(self):
         await replace_rule('virtual',self.x,'only_selected',[])
