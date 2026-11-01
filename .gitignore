@@ -55,3 +55,6 @@ scratch/
 # Native lifecycle ownership records and runtime controls
 .orion-lifecycle/
 .orion-lifecycle-postgres/
+
+# PostgreSQL password state (core/postgres_auth.py)
+.orion-postgres-auth.json
