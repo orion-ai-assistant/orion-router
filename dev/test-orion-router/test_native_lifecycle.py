@@ -56,3 +56,50 @@ def test_native_launcher_propagates_start_failure():
     with patch.object(lifecycle_cli, 'ensure_started', side_effect=LifecycleError('not ready')):
         with pytest.raises(LifecycleError, match='not ready'):
             lifecycle_cli.main(['start'])
+
+
+class _Server:
+    def poll(self):
+        return None
+
+
+def _cluster(tmp_path, status):
+    from core.native_postgres import Postgres
+    data = tmp_path / 'data'
+    data.mkdir()
+    (data / 'postmaster.pid').write_text(f'1\n{data}\n0\n5433\n\nlocalhost\n\n{status}\n', encoding='utf-8')
+    return Postgres(tmp_path / 'pg_ctl.exe', data, 5433, 'orion', 'orion')
+
+
+def test_a_server_in_crash_recovery_is_waited_for(tmp_path):
+    from core.native_postgres import NotAccepting
+    pg, answers = _cluster(tmp_path, 'starting'), iter([NotAccepting('recovering')] * 8 + [True])
+
+    def ready():
+        answer = next(answers)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+    with patch.object(pg, 'ready', ready), patch('core.native_postgres.time.sleep'), \
+         patch('core.native_postgres.time.monotonic', side_effect=range(0, 1000, 10)):
+        assert pg._ready_soon(40, server=_Server())
+
+
+def test_a_server_that_started_but_refuses_the_login_still_fails(tmp_path):
+    from core.native_postgres import NotAccepting
+    pg = _cluster(tmp_path, 'ready')
+    with patch.object(pg, 'ready', side_effect=NotAccepting('password')), \
+         patch('core.native_postgres.time.sleep'), \
+         patch('core.native_postgres.time.monotonic', side_effect=range(0, 1000, 10)), \
+         pytest.raises(NotAccepting):
+        pg._ready_soon(40, server=_Server())
+
+
+def test_crash_recovery_has_an_upper_limit(tmp_path):
+    from core.native_postgres import NotAccepting, RECOVERY_LIMIT
+    pg = _cluster(tmp_path, 'starting')
+    with patch.object(pg, 'ready', side_effect=NotAccepting('recovering')), \
+         patch('core.native_postgres.time.sleep'), \
+         patch('core.native_postgres.time.monotonic', side_effect=range(0, 10 * RECOVERY_LIMIT, 60)), \
+         pytest.raises(NotAccepting):
+        pg._ready_soon(40, server=_Server())
