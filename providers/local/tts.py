@@ -45,18 +45,8 @@ class LocalTTSProvider(BaseTTS):
             logger.debug(f"Could not fetch languages from local TTS: {e}")
         return []
 
-    async def generate_speech(
-        self,
-        model: str,
-        input_text: str,
-        voice: str | None = None,
-        api_key: str | None = None,
-        auth_header: str | None = None,
-        **kwargs,
-    ) -> tuple[bytes, str, dict]:
-        
-        url = f"http://{TTS_HOST}:{TTS_PORT}/v1/audio/speech"
-        
+    def _payload(self, model: str, input_text: str, voice: str | None, kwargs: dict) -> dict:
+        """The local TTS service's request, the same with or without streaming."""
         def safe_float(val, default):
             if val is None or val == "":
                 return default
@@ -116,6 +106,20 @@ class LocalTTSProvider(BaseTTS):
         }
         if tts_instruct and not has_persona:
             payload["instructions"] = tts_instruct
+        return payload
+
+    async def generate_speech(
+        self,
+        model: str,
+        input_text: str,
+        voice: str | None = None,
+        api_key: str | None = None,
+        auth_header: str | None = None,
+        **kwargs,
+    ) -> tuple[bytes, str, dict]:
+        
+        url = f"http://{TTS_HOST}:{TTS_PORT}/v1/audio/speech"
+        payload = self._payload(model, input_text, voice, kwargs)
 
         logger.info(f"Generating Local TTS: model={model}, voice={voice}, url={url}")
 
@@ -154,3 +158,59 @@ class LocalTTSProvider(BaseTTS):
 
         logger.info(f"Local TTS complete: {len(audio_bytes)} bytes WAV")
         return audio_bytes, content_type, usage_dict
+
+    async def generate_speech_stream(
+        self,
+        model: str,
+        input_text: str,
+        voice: str | None = None,
+        api_key: str | None = None,
+        auth_header: str | None = None,
+        **kwargs,
+    ):
+        """Passes the audio on as the local TTS service makes it. An engine that streams (VoxCPM2) sends raw
+        24 kHz 16-bit mono PCM pieces from the first words on; one that does not (OmniVoice) answers with one
+        whole WAV, which goes on as it is (the stream is then labelled audio/wav). Only a caller that asked for
+        PCM gets the raw stream: any other format is the whole file, as before."""
+        if str(kwargs.get("response_format") or "").lower() not in ("pcm", "s16le"):
+            async for chunk in super().generate_speech_stream(model, input_text, voice, api_key, auth_header, **kwargs):
+                yield chunk
+            return
+
+        url = f"http://{TTS_HOST}:{TTS_PORT}/v1/audio/speech"
+        payload = self._payload(model, input_text, voice, dict(kwargs, response_format="pcm"))
+        payload["stream"] = True
+        logger.info(f"Generating Local TTS stream: model={model}, voice={voice}, url={url}")
+
+        client = get_http_client(timeout=120.0)
+        try:
+            response = await client.send(client.build_request("POST", url, json=payload), stream=True)
+        except (httpx.ConnectError, httpx.ConnectTimeout) as e:
+            unavailable(TTS_SERVICE, e)
+            raise RuntimeError(f"Could not connect to local TTS service ({TTS_HOST}:{TTS_PORT}).")
+        except httpx.RequestError as e:
+            logger.error(f"Failed to connect to local TTS server: {e}")
+            raise RuntimeError(f"Local TTS Service Unreachable: {e}")
+        available(TTS_SERVICE)
+
+        try:
+            if response.status_code != 200:
+                detail = (await response.aread()).decode(errors="ignore")
+                logger.error(f"Local TTS API Error: {detail}")
+                raise RuntimeError(f"Local TTS API Error: {response.status_code} - {detail}")
+            content_type = response.headers.get("content-type", "audio/wav")
+            callback = kwargs.get("_archive_metadata")
+            if "pcm" in content_type:
+                rate = response.headers.get("x-sample-rate", "")
+                rate = int(rate) if rate.isdigit() else 24000
+                if rate != 24000:  # The Router labels every PCM stream 24 kHz (core/audio_container.py).
+                    logger.warning(f"Local TTS streams {rate} Hz PCM; it is passed on labelled 24000 Hz")
+                if callback:
+                    callback({"format": "s16le", "sample_rate": rate, "channels": 1, "sample_width": 2})
+            elif callback:
+                callback({"content_type": content_type})
+            async for chunk in response.aiter_bytes():
+                if chunk:
+                    yield chunk
+        finally:
+            await response.aclose()
