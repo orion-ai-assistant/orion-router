@@ -28,3 +28,8 @@ include = [
   "/dashboard",
   "/data",
 ]
+
+[tool.pytest.ini_options]
+# The script-style tests in dev/test-orion-router have plain `async def` tests.
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
