@@ -120,6 +120,9 @@ class DatabaseManager:
         await conn.execute("ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS cached_tokens INTEGER;")
         await conn.execute("ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS cache_write_tokens INTEGER;")
         await conn.execute("ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS cache_saved_cost NUMERIC(10, 6);")
+        # TRUE: the provider never reported this chat's usage (stopped before its usage chunk); the counts are the
+        # Router's guess. FALSE: the provider's own counts. NULL: not a chat or no usage.
+        await conn.execute("ALTER TABLE router_request_logs ADD COLUMN IF NOT EXISTS usage_estimated BOOLEAN;")
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS router_image_archives (
                 id BIGSERIAL PRIMARY KEY,
@@ -502,7 +505,7 @@ class DatabaseManager:
                 return json.loads(val)
             return None
 
-    async def log_request(self, key_id, provider, model, tokens_used, prompt_tokens, completion_tokens, thoughts_tokens, cost, request_json=None, response_json=None, upstream_key_id=None, success=True, capability='chat', prompt_cost=0.0, completion_cost=0.0, thoughts_cost=0.0, status=None, ttft_ms=None, duration_ms=None, usage_unit=None, usage_amount=None, cached_tokens=None, cache_write_tokens=None, cache_saved_cost=None):
+    async def log_request(self, key_id, provider, model, tokens_used, prompt_tokens, completion_tokens, thoughts_tokens, cost, request_json=None, response_json=None, upstream_key_id=None, success=True, capability='chat', prompt_cost=0.0, completion_cost=0.0, thoughts_cost=0.0, status=None, ttft_ms=None, duration_ms=None, usage_unit=None, usage_amount=None, cached_tokens=None, cache_write_tokens=None, cache_saved_cost=None, usage_estimated=None):
         from core.key_policy import selected_upstream
         selected_id, selected_source = selected_upstream.get()
         upstream_key_id = upstream_key_id or selected_id
@@ -521,10 +524,10 @@ class DatabaseManager:
                     """
                     INSERT INTO router_request_logs
                         (key_id, provider, requested_model, tokens_used,
-                         prompt_tokens, completion_tokens, thoughts_tokens, cost, success, request_json, response_json, upstream_key_id, capability, prompt_cost, completion_cost, thoughts_cost, status, ttft_ms, duration_ms, upstream_key_source, recorded_key_id, recorded_hub_id, usage_unit, usage_amount, cached_tokens, cache_write_tokens, cache_saved_cost)
-                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13,$14,$15,$16,$17,$18,$19,$20,$1,(SELECT hub_id FROM router_virtual_keys WHERE id=$1),$21,$22,$23,$24,$25)
+                         prompt_tokens, completion_tokens, thoughts_tokens, cost, success, request_json, response_json, upstream_key_id, capability, prompt_cost, completion_cost, thoughts_cost, status, ttft_ms, duration_ms, upstream_key_source, recorded_key_id, recorded_hub_id, usage_unit, usage_amount, cached_tokens, cache_write_tokens, cache_saved_cost, usage_estimated)
+                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13,$14,$15,$16,$17,$18,$19,$20,$1,(SELECT hub_id FROM router_virtual_keys WHERE id=$1),$21,$22,$23,$24,$25,$26)
                     """,
-                    key_id, provider, model, tokens_used, prompt_tokens, completion_tokens, thoughts_tokens, cost, success, request_json, response_json, upstream_key_id, capability, prompt_cost, completion_cost, thoughts_cost, status, ttft_ms, duration_ms, selected_source, usage_unit, usage_amount, cached_tokens, cache_write_tokens, cache_saved_cost
+                    key_id, provider, model, tokens_used, prompt_tokens, completion_tokens, thoughts_tokens, cost, success, request_json, response_json, upstream_key_id, capability, prompt_cost, completion_cost, thoughts_cost, status, ttft_ms, duration_ms, selected_source, usage_unit, usage_amount, cached_tokens, cache_write_tokens, cache_saved_cost, usage_estimated
                 )
                 if key_id and cost is not None and (success or cost > 0):
                     await conn.execute(
@@ -589,8 +592,10 @@ class DatabaseManager:
         cached_tokens: int | None = None,
         cache_write_tokens: int | None = None,
         cache_saved_cost: float | None = None,
+        usage_estimated: bool | None = None,
     ) -> None:
-        """Canlı streaming oturumunun ara veya nihai sonucunu günceller."""
+        """Canlı streaming oturumunun ara veya nihai sonucunu günceller. A finished log changes again only to put
+        the provider's own usage in place of the Router's estimate (usage_estimated False over True)."""
         if capability == "chat":
             from core.video_archive import archive_log_media_json
             request_json = await archive_log_media_json(request_json, self)
@@ -602,7 +607,9 @@ class DatabaseManager:
         pool = await self.get_db_pool()
         async with pool.acquire() as conn:
             async with conn.transaction():
-                await conn.execute(
+                before = await conn.fetchrow(
+                    "SELECT cost, usage_estimated FROM router_request_logs WHERE id = $1 FOR UPDATE", log_id)
+                result = await conn.execute(
                     """
                     UPDATE router_request_logs
                     SET response_json = COALESCE($2::jsonb, response_json),
@@ -627,19 +634,25 @@ class DatabaseManager:
                         usage_amount = COALESCE($21, usage_amount),
                         cached_tokens = COALESCE($22, cached_tokens),
                         cache_write_tokens = COALESCE($23, cache_write_tokens),
-                        cache_saved_cost = COALESCE($24, cache_saved_cost)
+                        cache_saved_cost = COALESCE($24, cache_saved_cost),
+                        usage_estimated = COALESCE($25, usage_estimated)
                                         WHERE id = $1
-                                            AND ($3 = 'success' OR status NOT IN ('success', 'failed', 'interrupted'))
+                                            AND ($3 = 'success' OR status NOT IN ('success', 'failed', 'interrupted')
+                                                 OR ($25 IS FALSE AND usage_estimated IS TRUE))
                     """,
                     log_id, response_json, status, success, tokens_used, prompt_tokens,
                                         completion_tokens, thoughts_tokens, cost, prompt_cost, completion_cost,
                                         thoughts_cost, duration_ms, ttft_ms, provider, model, request_json, upstream_id, upstream_source, usage_unit, usage_amount,
-                                        cached_tokens, cache_write_tokens, cache_saved_cost
+                                        cached_tokens, cache_write_tokens, cache_saved_cost, usage_estimated
                 )
-                if key_id and cost is not None and cost > 0:
+                charged = cost if cost is not None and cost > 0 else 0
+                if before is not None and before["usage_estimated"] is True and usage_estimated is False:
+                    # The estimate's cost was already added to the key: only the difference goes on top.
+                    charged = (cost or 0) - float(before["cost"] or 0)
+                if result.endswith(" 1") and key_id and charged:
                     await conn.execute(
                         "UPDATE router_virtual_keys SET used_amount = used_amount + $1 WHERE id = $2",
-                        cost, key_id,
+                        charged, key_id,
                     )
 
     async def close_abandoned_logs(self, min_age_seconds: int = 120) -> int:

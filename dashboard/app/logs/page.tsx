@@ -28,6 +28,7 @@ interface LogItem {
   completion_tokens: number;
   thoughts_tokens: number;
   cached_tokens?: number | null;
+  usage_estimated?: boolean | null;
   cache_write_tokens?: number | null;
   cost: number | null;
   success: boolean | null;
@@ -96,7 +97,8 @@ export default function LogsPage() {
                   fresh.completion_tokens !== old.completion_tokens ||
                   fresh.thoughts_tokens !== old.thoughts_tokens ||
                   fresh.cached_tokens !== old.cached_tokens ||
-                  fresh.cache_write_tokens !== old.cache_write_tokens)
+                  fresh.cache_write_tokens !== old.cache_write_tokens ||
+                  fresh.usage_estimated !== old.usage_estimated)
               ) {
                 changed = true;
                 return fresh;
@@ -312,6 +314,11 @@ export default function LogsPage() {
                         ].filter(Boolean).join(' · ')}
                       >
                         {t('logs.cachedShort', { count: log.cached_tokens ?? 0 })}
+                      </div>
+                    )}
+                    {log.usage_estimated && (
+                      <div className="mt-0.5 text-[9px] font-mono text-amber-500/80" title={t('logs.estimatedTooltip')}>
+                        {t('logs.estimated')}
                       </div>
                     )}
                   </TableCell>

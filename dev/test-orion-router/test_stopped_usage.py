@@ -119,3 +119,56 @@ async def test_the_estimate_counts_the_tool_definitions_too():
         await asyncio.gather(*list(runner._log_writers))
         estimates.append(telemetry.log_usage.await_args.args[3]["prompt_tokens"])
     assert estimates[1] > estimates[0] + 500
+
+
+import os
+import unittest
+import uuid
+
+
+@unittest.skipUnless(os.getenv('ORION_IMAGE_TEST_PORT'), 'Requires disposable PostgreSQL cluster')
+class RecoveredUsageInTheDatabase(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        import asyncpg
+        from database.manager import DatabaseManager
+        port = int(os.environ['ORION_IMAGE_TEST_PORT'])
+        self.schema = 'stopped_usage_test_' + uuid.uuid4().hex
+        self.connection = await asyncpg.connect(host='127.0.0.1', port=port, user='postgres', database='postgres')
+        await self.connection.execute(f'CREATE SCHEMA "{self.schema}"')
+        self.manager = DatabaseManager()
+        self.manager.pool = await asyncpg.create_pool(host='127.0.0.1', port=port, user='postgres', database='postgres',
+                                                      min_size=1, max_size=4, server_settings={'search_path': self.schema})
+        async with self.manager.pool.acquire() as conn:
+            with patch.object(self.manager, '_seed_default_models', AsyncMock()), \
+                    patch.object(self.manager, '_seed_admin_secret', AsyncMock()), \
+                    patch.object(self.manager, '_migrate_legacy_provider_keys', AsyncMock()), \
+                    patch.object(self.manager, '_migrate_plaintext_keys', AsyncMock()):
+                await self.manager._ensure_tables(conn)
+
+    async def asyncTearDown(self):
+        await self.manager.pool.close()
+        assert self.schema.startswith('stopped_usage_test_')
+        await self.connection.execute(f'DROP SCHEMA "{self.schema}" CASCADE')
+        await self.connection.close()
+
+    async def row(self, log_id):
+        return await self.manager.fetchrow(
+            'SELECT status, prompt_tokens, cached_tokens, cost, usage_estimated FROM router_request_logs WHERE id=$1',
+            log_id)
+
+    async def test_the_providers_usage_replaces_the_estimate_once(self):
+        log_id = await self.manager.create_streaming_log(None, 'openrouter', 'm', '{}', '{}', capability='chat')
+        write = self.manager.update_streaming_log
+        await write(log_id, status='interrupted', success=None, prompt_tokens=351, cost=0.001,
+                    capability='chat', usage_estimated=True)
+        await write(log_id, status='interrupted', success=None, prompt_tokens=774, cached_tokens=656, cost=0.0004,
+                    capability='chat', usage_estimated=False)
+        row = await self.row(log_id)
+        assert (row['status'], row['prompt_tokens'], row['cached_tokens'], row['usage_estimated']) == \
+            ('interrupted', 774, 656, False)
+        # Settled: a later estimate (or a second recovery) changes nothing.
+        await write(log_id, status='interrupted', success=None, prompt_tokens=1, cost=9.0,
+                    capability='chat', usage_estimated=True)
+        await write(log_id, status='interrupted', success=None, prompt_tokens=2, cost=9.0,
+                    capability='chat', usage_estimated=False)
+        assert (await self.row(log_id))['prompt_tokens'] == 774

@@ -79,6 +79,7 @@ class TelemetryService:
             cached_tokens = cache.read_tokens if capability == "chat" and p is not None else None
             cache_write_tokens = cache.write_tokens if cached_tokens is not None else None
             cache_saved_cost = cache_saved if cached_tokens is not None else None
+            usage_estimated = bool(is_estimated) if capability == "chat" and p is not None else None
 
             if log_id is None:
                 await db_manager.log_request(
@@ -104,6 +105,7 @@ class TelemetryService:
                     cached_tokens=cached_tokens,
                     cache_write_tokens=cache_write_tokens,
                     cache_saved_cost=cache_saved_cost,
+                    usage_estimated=usage_estimated,
                 )
             else:
                 await db_manager.update_streaming_log(
@@ -133,6 +135,7 @@ class TelemetryService:
                     cached_tokens=cached_tokens,
                     cache_write_tokens=cache_write_tokens,
                     cache_saved_cost=cache_saved_cost,
+                    usage_estimated=usage_estimated,
                 )
             logger.info(
                 "Request %s | provider=%s model=%s capability=%s log_id=%s | "

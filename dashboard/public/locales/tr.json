@@ -547,6 +547,8 @@
   "logs.responseAttachments": "Yanıt ekleri",
   "logs.noAttachments": "Ek yok",
   "logs.cachedShort": "{count} önbellekten",
+  "logs.estimated": "tahmini",
+  "logs.estimatedTooltip": "Sağlayıcı kullanımı bildirmeden kesildi; sayılar Router'ın tahmini.",
   "logs.cacheTooltip": "Prompt önbelleğinden gelen input token: {count}",
   "logs.cacheWriteTooltip": "Önbelleğe yazılan token: {count}"
 }

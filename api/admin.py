@@ -261,7 +261,7 @@ async def get_admin_logs(limit: int = 100, offset: int = 0):
         rows = await db_manager.fetch(
             """
             SELECT l.id, k.name as key_name, k.hub_id, h.name AS hub_name, l.upstream_key_id, l.upstream_key_source, l.provider, l.requested_model, l.resolved_model,
-                   l.tokens_used, l.prompt_tokens, l.completion_tokens, l.cached_tokens, l.cache_write_tokens,
+                   l.tokens_used, l.prompt_tokens, l.completion_tokens, l.cached_tokens, l.cache_write_tokens, l.usage_estimated,
                    COALESCE(
                        NULLIF(l.thoughts_tokens, 0),
                        CASE

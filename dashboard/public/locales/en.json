@@ -547,6 +547,8 @@
   "logs.responseAttachments": "Response attachments",
   "logs.noAttachments": "No attachments",
   "logs.cachedShort": "{count} cached",
+  "logs.estimated": "estimated",
+  "logs.estimatedTooltip": "Stopped before the provider reported usage; the counts are the Router's estimate.",
   "logs.cacheTooltip": "{count} input tokens served from the prompt cache",
   "logs.cacheWriteTooltip": "{count} tokens written to the cache"
 }
