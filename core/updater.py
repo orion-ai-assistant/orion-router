@@ -7,6 +7,14 @@ from core.installation_paths import canonical_path
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# A Router run from a source checkout (or an old Git install) is not a registered package: it never updates itself.
+NOT_PACKAGED = ('Bu Router kaynak koddan çalışıyor; buradan güncellenmez. '
+                'Güncelleme, kurulu Orion Router (paketli sürüm) ile çalışır.')
+
+
+class NotPackaged(ValueError):
+    pass
+
 
 def _installation():
     registry = Registry()
@@ -15,7 +23,7 @@ def _installation():
                and c['distribution'] == 'packaged' and c['management'] == 'local'
                and c['ownership'] == 'owned' and Path(c['code_path']).resolve() == ROOT.resolve()]
     if len(matches) != 1:
-        raise ValueError('Legacy/development installations require explicit package conversion')
+        raise NotPackaged('Legacy/development installations require explicit package conversion')
     return registry, record, matches[0]
 
 
@@ -187,6 +195,8 @@ def start_apply():
         _atomic_write(path, json.dumps({'schema': 1, 'installation_id': record['installation_id'],
                                        'action': 'apply'}).encode())
         return {'status': 'started', 'message': 'Güncelleme başlatıldı; Router kısa süre kapanıp yeniden açılacak.'}
+    except NotPackaged:
+        return {'status': 'error', 'message': NOT_PACKAGED}
     except (OSError, ValueError, RuntimeError):
         return {'status': 'error', 'message': 'Güncelleme başlatılamadı: kayıtlı paket kurulumu ve dış güncelleme yardımcısı gerekir.'}
 
@@ -219,5 +229,7 @@ def start_update():
         finally:
             lock.__exit__(None, None, None)
         return {'status': 'started', 'message': 'İmzalı kontrol/hazırlama sıraya alındı. Çalışan Router durdurulmaz; hazır sürüm sonraki güvenli açılışta uygulanır.'}
+    except NotPackaged:
+        return {'status': 'error', 'message': NOT_PACKAGED}
     except (OSError, ValueError, RuntimeError):
-        return {'status': 'error', 'message': 'Kayıtlı paket kurulumu, imzalı Router kaynağı ve dış launcher gerekir. Yerinde Git/pip güncellemesi kapalıdır.'}
+        return {'status': 'error', 'message': 'Güncelleme denetimi başlatılamadı: bu kurulumda güncelleme kaynağı ya da güncelleme yardımcısı bulunamadı.'}

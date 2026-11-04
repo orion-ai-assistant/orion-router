@@ -1096,7 +1096,7 @@ async def get_system_version(check_now: bool = False):
 
 @router.post("/api/system/check-update", dependencies=[Depends(verify_admin)])
 async def force_check_update(request: Request):
-    """Önbelleği atlayarak GitHub ve Git remote üzerinden canlı sürüm kontrolü yapar."""
+    """İmzalı güncelleme kaynağında hemen denetim ister (işi ayrı güncelleme yardımcısı yapar)."""
     return await trigger_system_update(request)
 
 

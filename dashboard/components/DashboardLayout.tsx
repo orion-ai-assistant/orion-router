@@ -108,8 +108,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <span>{t('nav.signOut')}</span>
           </button>
 
-          {/* Sağ Taraf: Güncelleme Varsa Tıklanabilir Buton / Yoksa Düz Metin */}
-          {versionInfo?.update_available ? (
+          {/* Sağ Taraf: kurulabilir güncelleme varsa tıklanabilir buton (yalnızca Router-only kurulum); Hub varsa
+              yeni sürüm görünür ama Orion ayarlarından kurulur; güncelleme yoksa düz metin. */}
+          {versionInfo?.update_available && !versionInfo?.can_apply ? (
+            <span
+              title={versionInfo.apply_hint || versionInfo.message || t('settings.system.updateAvailable')}
+              className="flex items-center gap-1.5 px-2 py-1 text-[11px] font-mono text-zinc-400 select-none shrink-0"
+            >
+              <ChevronUp className="w-3.5 h-3.5 text-emerald-400" />
+              <span>v{versionInfo.latest_version}</span>
+            </span>
+          ) : versionInfo?.update_available ? (
             <button
               type="button"
               onClick={startSystemUpdate}
