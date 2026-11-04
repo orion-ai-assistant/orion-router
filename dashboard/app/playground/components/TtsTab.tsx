@@ -125,6 +125,12 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
     languages?: string[];
   }>({ active: false, engine: null });
 
+  // The model's saved defaults for the engine that runs (each engine keeps its own: Modeller sayfası, per_engine).
+  const enginePart = (config: any) => {
+    const eng = localTtsInfo.active && localTtsInfo.engine ? String(localTtsInfo.engine).toLowerCase() : 'omnivoice';
+    return config?.per_engine?.[eng.includes('voxcpm') ? 'voxcpm2' : 'omnivoice'] || {};
+  };
+
   const [voicesByProvider, setVoicesByProvider] = useState<Record<string, string[]>>({});
   const [modelVoiceGroups, setModelVoiceGroups] = useState<Record<string, any[]>>({});
   const [voices, setVoices] = useState<string[]>([]);
@@ -293,6 +299,12 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
       setTtsVoice(nextVoices[0]);
     }
 
+    // A voice kept from the other engine (OmniVoice's clone while VoxCPM2 runs) is not offered by this one.
+    if (isLocal && localTtsInfo.active && nextVoices.length > 0 && ttsVoice
+        && !nextVoices.map(v => v.toLowerCase()).includes(ttsVoice.toLowerCase())) {
+      setTtsVoice('');
+    }
+
     setVoices(nextVoices);
     setIsLocalTts(isLocal);
 
@@ -333,7 +345,8 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
         const modelDetail = models.find((m) => m.name === mName && m.capability === 'tts');
         return {
           temperature: modelDetail?.temperature ?? null,
-          ...(modelDetail?.default_config || {})
+          ...(modelDetail?.default_config || {}),
+          ...enginePart(modelDetail?.default_config)
         };
       };
 
@@ -427,7 +440,8 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
       const modelDetail = models.find((m) => m.name === mName && m.capability === 'tts');
       return {
         temperature: modelDetail?.temperature ?? null,
-        ...(modelDetail?.default_config || {})
+        ...(modelDetail?.default_config || {}),
+        ...enginePart(modelDetail?.default_config)
       };
     };
 
@@ -445,7 +459,9 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
 
   const resolvedTtsEngine = (() => {
     if (!isLocalTts) return 'omnivoice';
-    return localTtsInfo.active && localTtsInfo.engine ? localTtsInfo.engine : 'omnivoice';
+    const engine = localTtsInfo.active && localTtsInfo.engine ? localTtsInfo.engine.toLowerCase() : 'omnivoice';
+    // The service names its engine "voxcpm2-gguf" / "omnivoice-gguf": the panels and the request follow the family.
+    return engine.includes('voxcpm') ? 'voxcpm2' : engine.includes('omnivoice') ? 'omnivoice' : engine;
   })();
   const isOmniVoice = resolvedTtsEngine.toLowerCase().includes('omnivoice');
 
@@ -698,6 +714,9 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
 
     if (ttsStream) {
       payload.stream = true;
+      // The Router passes the engine's raw PCM pieces on only when PCM is asked for; without it the whole WAV
+      // is buffered first (the Hub asks for pcm, which is why streaming works from there).
+      payload.response_format = 'pcm';
     }
 
     try {
@@ -791,6 +810,40 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
           });
         };
 
+        const PREBUFFER_SECONDS = 0.5;
+        let started = false;
+        let queued: Float32Array<ArrayBuffer>[] = [];
+        let queuedSeconds = 0;
+
+        const playPiece = (float32: Float32Array<ArrayBuffer>) => {
+          const numSamples = float32.length;
+                // If starting or recovering from a network underrun gap, apply 1ms (24 samples) micro-fade to eliminate clicks
+                const isUnderRun = nextStartTime > 0 && audioCtx.currentTime > nextStartTime;
+                if (nextStartTime === 0 || isUnderRun) {
+                  const deClickSamples = Math.min(24, numSamples);
+                  for (let i = 0; i < deClickSamples; i++) {
+                    float32[i] *= (i / deClickSamples);
+                  }
+                }
+
+                const buffer = audioCtx.createBuffer(1, numSamples, 24000);
+                buffer.copyToChannel(float32, 0);
+
+                const source = audioCtx.createBufferSource();
+                source.buffer = buffer;
+                source.connect(audioCtx.destination);
+                streamSourcesRef.current.push(source);
+
+                if (nextStartTime === 0) {
+                  nextStartTime = audioCtx.currentTime + 0.05;
+                  streamPlaybackStartTime = nextStartTime;
+                }
+                const startTime = Math.max(audioCtx.currentTime + 0.005, nextStartTime);
+                source.start(startTime);
+                nextStartTime = startTime + buffer.duration;
+                totalDuration += buffer.duration;
+        };
+
         try {
           while (true) {
             const { done, value } = await reader.read();
@@ -830,32 +883,20 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
                   float32[i] = dataView.getInt16(i * 2, true) / 32768.0;
                 }
 
-                // If starting or recovering from a network underrun gap, apply 1ms (24 samples) micro-fade to eliminate clicks
-                const isUnderRun = nextStartTime > 0 && audioCtx.currentTime > nextStartTime;
-                if (nextStartTime === 0 || isUnderRun) {
-                  const deClickSamples = Math.min(24, numSamples);
-                  for (let i = 0; i < deClickSamples; i++) {
-                    float32[i] *= (i / deClickSamples);
+                // Nothing plays until about half a second of speech has arrived (like the speech service's own page):
+                // the pieces come every 40-120 ms and the first is only ~40 ms of audio, so playing at once ran dry
+                // right after the first sound (a click, then it went on).
+                if (!started) {
+                  queued.push(float32);
+                  queuedSeconds += numSamples / 24000;
+                  if (queuedSeconds >= PREBUFFER_SECONDS) {
+                    started = true;
+                    queued.forEach(playPiece);
+                    queued = [];
                   }
+                } else {
+                  playPiece(float32);
                 }
-
-                const buffer = audioCtx.createBuffer(1, numSamples, 24000);
-                buffer.copyToChannel(float32, 0);
-
-                const source = audioCtx.createBufferSource();
-                source.buffer = buffer;
-                source.connect(audioCtx.destination);
-                streamSourcesRef.current.push(source);
-
-                if (nextStartTime === 0) {
-                  // Ultra-low latency: minimal 15ms lead-time for audio hardware render quantum (imperceptible to human ear)
-                  nextStartTime = audioCtx.currentTime + 0.015;
-                  streamPlaybackStartTime = nextStartTime;
-                }
-                const startTime = Math.max(audioCtx.currentTime + 0.005, nextStartTime);
-                source.start(startTime);
-                nextStartTime = startTime + buffer.duration;
-                totalDuration += buffer.duration;
 
                 if (!progressInterval) {
                   updateProgress();
@@ -865,6 +906,12 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
                 }
               }
             }
+          }
+
+          if (!started) {  // A short answer: it all arrived before the half second.
+            started = true;
+            queued.forEach(playPiece);
+            queued = [];
           }
 
           // Await completion of scheduled audio playback in AudioContext (cancellable via abort signal)
@@ -972,7 +1019,7 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
               {localTtsInfo.active ? (
                 <span className="text-[10px] text-zinc-300 flex items-center gap-1.5 font-medium">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                  {resolvedTtsEngine}
+                  {localTtsInfo.engine || resolvedTtsEngine}
                 </span>
               ) : (
                 <span className="text-[10px] text-red-400 font-semibold flex items-center gap-1.5">
@@ -1085,7 +1132,8 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
           />
         </div>
 
-        {/* Konuşma Hızı (Speed) */}
+        {/* Konuşma Hızı (Speed): VoxCPM2 has no speed setting */}
+        {!(isLocalTts && resolvedTtsEngine === 'voxcpm2') && (
         <div className="flex flex-col gap-1">
           <div className="flex justify-between items-center mb-0.5">
             <label className="text-zinc-400 text-[10px] font-semibold capitalize">
@@ -1109,6 +1157,7 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
             </span>
           )}
         </div>
+        )}
 
         {/* ⚡ Stream (Akış) Seçeneği */}
         <div className="flex flex-col gap-1 p-2 rounded bg-black/30 border border-zinc-850">

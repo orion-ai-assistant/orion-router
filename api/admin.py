@@ -555,6 +555,15 @@ async def get_local_tts_info():
                 except Exception:
                     pass
 
+                voices_by_engine = {}
+                for eng in ("omnivoice", "voxcpm2"):
+                    try:
+                        res_eng = await client.get(f"http://{TTS_HOST}:{TTS_PORT}/v1/voices", params={"engine": eng})
+                        if res_eng.status_code == 200:
+                            voices_by_engine[eng] = [v for v in res_eng.json().get("voices", []) if str(v).lower() != "none"]
+                    except Exception:
+                        pass
+
                 if not _cached_local_languages:
                     try:
                         res_langs = await client.get(f"http://{TTS_HOST}:{TTS_PORT}/v1/languages")
@@ -567,6 +576,7 @@ async def get_local_tts_info():
                     "active": True,
                     "engine": data.get("engine", "omnivoice"),
                     "voices": voices,
+                    "voices_by_engine": voices_by_engine,
                     "languages": _cached_local_languages or [],
                     "low_vram": data.get("low_vram", False),
                     "idle_cleanup_mins": data.get("idle_cleanup_mins", None)

@@ -67,8 +67,14 @@ class TTSDefaultConfig {
   seed: string;
   engine: string;
   tts_instruct: string;
+  // What each engine (omnivoice, voxcpm2) is set to, kept apart: the fields above are the engine being viewed.
+  per_engine: Record<string, Record<string, any>>;
+
+  static readonly ENGINE_FIELDS = ['voice', 'gender', 'age', 'pitch', 'style', 'accent', 'dialect', 'language',
+    'speed', 'steps', 'seed', 'tts_instruct'] as const;
 
   constructor(data?: Partial<TTSDefaultConfig>) {
+    this.per_engine = data?.per_engine && typeof data.per_engine === 'object' ? { ...data.per_engine } : {};
     this.voice = data?.voice && data.voice.toLowerCase() !== 'none' ? data.voice : '';
     this.gender = data?.gender || 'Auto';
     this.age = data?.age || 'Auto';
@@ -112,7 +118,28 @@ class TTSDefaultConfig {
       seed: obj.seed,
       engine: obj.engine,
       tts_instruct: obj.tts_instruct,
+      per_engine: obj.per_engine,
     });
+  }
+
+  /** The viewed engine's own fields, as they are now. */
+  snapshot(): Record<string, any> {
+    const own: Record<string, any> = {};
+    for (const key of TTSDefaultConfig.ENGINE_FIELDS) own[key] = (this as any)[key];
+    return own;
+  }
+
+  /** Show another engine: this one's fields are kept, the other's (or blank ones) come up. */
+  switchEngine(next: string) {
+    const current = this.engine || 'omnivoice';
+    if (next === current) return;
+    this.per_engine[current] = this.snapshot();
+    const blank = new TTSDefaultConfig({ engine: next });
+    const saved = this.per_engine[next] || {};
+    for (const key of TTSDefaultConfig.ENGINE_FIELDS) {
+      (this as any)[key] = saved[key] !== undefined ? saved[key] : (blank as any)[key];
+    }
+    this.engine = next;
   }
 
   toObject(): Record<string, any> {
@@ -130,6 +157,15 @@ class TTSDefaultConfig {
     if (this.seed) obj.seed = this.seed;
     if (this.engine) obj.engine = this.engine;
     if (this.tts_instruct) obj.tts_instruct = this.tts_instruct;
+    // Both engines are saved, whichever one is on screen.
+    const per: Record<string, Record<string, any>> = { ...this.per_engine, [this.engine || 'omnivoice']: this.snapshot() };
+    const clean: Record<string, Record<string, any>> = {};
+    for (const [eng, vals] of Object.entries(per)) {
+      const kept: Record<string, any> = {};
+      for (const [k, v] of Object.entries(vals)) if (v !== '' && v !== 'Auto' && v !== undefined && v !== null) kept[k] = v;
+      clean[eng] = kept;
+    }
+    obj.per_engine = clean;
     return obj;
   }
 }
@@ -201,6 +237,7 @@ export default function ModelsPage() {
     active: boolean;
     engine: string | null;
     voices: string[];
+    voices_by_engine?: Record<string, string[]>;
     languages: string[];
   }>({ active: false, engine: null, voices: [], languages: [] });
   const addableProviders = useMemo(() => providers.filter((name) => name !== 'local'), [providers]);
@@ -808,15 +845,19 @@ export default function ModelsPage() {
 
     const isLocal = formState.provider === 'local';
     const selectedEngine = isLocal ? (formState.default_config?.engine || 'omnivoice') : 'omnivoice';
-    const isOmni = selectedEngine.toLowerCase().includes('omnivoice') || (localTtsInfo.active && String(localTtsInfo.engine).toLowerCase().includes('omnivoice'));
+    // Whichever engine runs, the page edits the engine selected here: its own voices and settings.
+    const isOmni = isLocal ? selectedEngine.toLowerCase().includes('omnivoice') : true;
 
     // Determine voice selection mode
     let voices: string[] = [];
     let showVoiceSelect = false;
     if (isLocal) {
-      const localVoices = (localTtsInfo.voices && localTtsInfo.voices.length > 0)
-        ? localTtsInfo.voices
-        : (voicesByProvider['local'] || []);
+      const ownVoices = localTtsInfo.voices_by_engine?.[selectedEngine];
+      const localVoices = ownVoices
+        ? ownVoices
+        : (localTtsInfo.voices && localTtsInfo.voices.length > 0)
+          ? localTtsInfo.voices
+          : (voicesByProvider['local'] || []);
       if (localTtsInfo.active) {
         voices = localVoices;
         showVoiceSelect = voices.length > 0;
@@ -874,7 +915,11 @@ export default function ModelsPage() {
                 <div className="custom-select-wrapper select-wrapper w-full">
                   <select
                     value={formState.default_config?.engine || 'omnivoice'}
-                    onChange={(e) => updateDefaultConfig(formState, setFormState, 'engine', e.target.value)}
+                    onChange={(e) => {
+                      const config = TTSDefaultConfig.fromObject(formState.default_config);
+                      config.switchEngine(e.target.value);
+                      setFormState({ ...formState, default_config: config.toObject(), });
+                    }}
                     className="orion-native-select"
                   >
                     <option value="omnivoice">{t('tts.engine.omnivoice')}</option>
@@ -1090,7 +1135,8 @@ export default function ModelsPage() {
               </div>
             )}
 
-            <div className={`grid ${isLocal ? 'grid-cols-2' : 'grid-cols-1'} gap-3`}>
+            <div className={`grid ${isLocal && selectedEngine !== 'voxcpm2' ? 'grid-cols-2' : 'grid-cols-1'} gap-3`}>
+              {!(isLocal && selectedEngine === 'voxcpm2') && (
               <div className="flex flex-col gap-1">
                 <label className="text-zinc-500 text-[11px] font-medium">{t('tts.speed')}</label>
                 <Input
@@ -1101,6 +1147,7 @@ export default function ModelsPage() {
                   className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs"
                 />
               </div>
+              )}
               {isLocal && (
                 <div className="flex flex-col gap-1">
                   <label className="text-zinc-500 text-[11px] font-medium">{t('tts.steps')}</label>

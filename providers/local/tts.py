@@ -45,6 +45,12 @@ class LocalTTSProvider(BaseTTS):
             logger.debug(f"Could not fetch languages from local TTS: {e}")
         return []
 
+    @staticmethod
+    def _foreign_voice(payload: dict, status: int, detail: str) -> bool:
+        """The service refused a saved voice that was made for another engine (switching OmniVoice and VoxCPM2
+        leaves it in the settings): the request is then made again without it, with the engine's own voice."""
+        return bool(status == 400 and payload.get("voice") and "uyumlu değil" in detail)
+
     def _payload(self, model: str, input_text: str, voice: str | None, kwargs: dict) -> dict:
         """The local TTS service's request, the same with or without streaming."""
         def safe_float(val, default):
@@ -85,9 +91,11 @@ class LocalTTSProvider(BaseTTS):
 
         speed_val = safe_float(kwargs.get("speed"), 1.0)
         guidance_val = safe_float(
-            kwargs.get("guidance_scale") or kwargs.get("guidance") or kwargs.get("temperature"),
-            2.0
+            kwargs.get("guidance_scale") or kwargs.get("guidance"), None
         )
+        # The "temperature" of a speech request is its creativity (0-2); the TTS service lines it up with its
+        # engine's own guidance range (VoxCPM2: 2-4). Not given: the engine's own default.
+        creativity_val = safe_float(kwargs.get("temperature"), None) if guidance_val is None else None
         steps_val = safe_int(kwargs.get("steps"), 15)
         seed_val = safe_int(kwargs.get("seed"), -1)
         lang_val = kwargs.get("language") or "Auto"
@@ -100,10 +108,13 @@ class LocalTTSProvider(BaseTTS):
             "speed": speed_val,
             "language": lang_val,
             "seed": seed_val,
-            "guidance_scale": guidance_val,
             "steps": steps_val,
             "stream": False
         }
+        if guidance_val is not None:
+            payload["guidance_scale"] = guidance_val
+        elif creativity_val is not None:
+            payload["creativity"] = creativity_val
         if tts_instruct and not has_persona:
             payload["instructions"] = tts_instruct
         return payload
@@ -134,6 +145,10 @@ class LocalTTSProvider(BaseTTS):
             raise RuntimeError(f"Local TTS Service Unreachable: {e}")
         available(TTS_SERVICE)
 
+        if self._foreign_voice(payload, response.status_code, response.text):
+            logger.warning(f"Voice '{payload['voice']}' is not for the running TTS engine; using its own voice")
+            payload["voice"] = ""
+            response = await client.post(url, json=payload)
         if response.status_code != 200:
             logger.error(f"Local TTS API Error: {response.text}")
             raise RuntimeError(f"Local TTS API Error: {response.status_code} - {response.text}")
@@ -196,6 +211,13 @@ class LocalTTSProvider(BaseTTS):
         try:
             if response.status_code != 200:
                 detail = (await response.aread()).decode(errors="ignore")
+                if self._foreign_voice(payload, response.status_code, detail):
+                    logger.warning(f"Voice '{payload['voice']}' is not for the running TTS engine; using its own voice")
+                    await response.aclose()
+                    payload["voice"] = ""
+                    response = await client.send(client.build_request("POST", url, json=payload), stream=True)
+                    detail = "" if response.status_code == 200 else (await response.aread()).decode(errors="ignore")
+            if response.status_code != 200:
                 logger.error(f"Local TTS API Error: {detail}")
                 raise RuntimeError(f"Local TTS API Error: {response.status_code} - {detail}")
             content_type = response.headers.get("content-type", "audio/wav")
