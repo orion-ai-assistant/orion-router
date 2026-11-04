@@ -99,7 +99,8 @@ export function loadLocale(lang: string): Promise<Record<string, string>> {
   // In Next.js with app router and static export, files in public/ are available at root
   // We specify basePath conditionally if needed, but relative to root is usually safe: /dashboard/locales/...
   // Here we assume base path is /dashboard
-  const promise = fetch(`/dashboard/locales/${lang}.json`)
+  // no-cache: revalidated each time, so an update's new texts show at once (not the old file's raw keys).
+  const promise = fetch(`/dashboard/locales/${lang}.json`, { cache: 'no-cache' })
     .then((res) => {
       if (!res.ok) throw new Error(`Failed to load locale: ${lang}`);
       return res.json();

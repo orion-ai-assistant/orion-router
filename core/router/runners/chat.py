@@ -338,8 +338,9 @@ class ChatRunner:
 
             if usage is None and status_val in (True, None):
                 usage = {
-                    # The tool definitions go to the model too (often more than the chat itself).
-                    "prompt_tokens": max(1, len(json.dumps([messages, kwargs.get("tools") or []])) // 4),
+                    # The tool definitions go to the model too (often more than the chat itself). Letters as they are:
+                    # escaped as \uXXXX, every Turkish letter counted six times and the guess came out high.
+                    "prompt_tokens": max(1, len(json.dumps([messages, kwargs.get("tools") or []], ensure_ascii=False)) // 4),
                     "completion_tokens": max(1, len(accumulated_content) // 4)
                     if accumulated_content
                     else 0,
