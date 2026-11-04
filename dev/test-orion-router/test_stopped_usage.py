@@ -89,3 +89,33 @@ async def test_a_finished_stream_asks_nothing_afterwards():
         pass
     await asyncio.gather(*list(runner._log_writers))
     plugin.recover_usage.assert_not_awaited()
+
+
+async def test_the_estimate_counts_the_tool_definitions_too():
+    tools = [{"type": "function", "function": {"name": f"tool_{n}", "description": "x" * 400,
+                                               "parameters": {"type": "object"}}} for n in range(5)]
+
+    async def stream_chat(**_):
+        yield 'data: {"choices":[{"delta":{"content":"Bir gün"}}]}\n\n'
+        await asyncio.sleep(3600)
+
+    estimates = []
+    for given in ({}, {"tools": tools}):
+        telemetry = SimpleNamespace(log_usage=AsyncMock())
+        runner = ChatRunner(None, None, None, telemetry)
+        stream = runner.stream(SimpleNamespace(stream_chat=stream_chat), None, "deepseek", "m",
+                               [{"role": "user", "content": "fıkra"}], None, None, log_id=1, **given)
+
+        async def consume():
+            async for _ in stream:
+                pass
+        task = asyncio.create_task(consume())
+        await asyncio.sleep(0.05)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        await asyncio.gather(*list(runner._log_writers))
+        estimates.append(telemetry.log_usage.await_args.args[3]["prompt_tokens"])
+    assert estimates[1] > estimates[0] + 500

@@ -338,7 +338,8 @@ class ChatRunner:
 
             if usage is None and status_val in (True, None):
                 usage = {
-                    "prompt_tokens": max(1, len(json.dumps(messages)) // 4),
+                    # The tool definitions go to the model too (often more than the chat itself).
+                    "prompt_tokens": max(1, len(json.dumps([messages, kwargs.get("tools") or []])) // 4),
                     "completion_tokens": max(1, len(accumulated_content) // 4)
                     if accumulated_content
                     else 0,
