@@ -172,3 +172,15 @@ class RecoveredUsageInTheDatabase(unittest.IsolatedAsyncioTestCase):
         await write(log_id, status='interrupted', success=None, prompt_tokens=2, cost=9.0,
                     capability='chat', usage_estimated=False)
         assert (await self.row(log_id))['prompt_tokens'] == 774
+
+
+def test_the_estimate_counts_by_script():
+    from core.token_estimate import prompt_tokens, text_tokens
+    assert text_tokens('a' * 400) == 100            # Latin: about four letters a token.
+    assert text_tokens('привет' * 10) == 30          # Cyrillic: about two.
+    assert text_tokens('你好世界' * 25) == 100       # Chinese: about one a character, not a quarter.
+    assert text_tokens('ı' * 40) == 10               # Turkish letters as letters, never as ı.
+    tools = [{"type": "function", "function": {"name": "t", "description": "x" * 400}}]
+    assert prompt_tokens([{"role": "user", "content": "hi"}], tools) > 100   # The tools count.
+    parts = [{"type": "text", "text": "a" * 40}, {"type": "image_url", "image_url": {"url": "data:..."}}]
+    assert prompt_tokens([{"role": "user", "content": parts}]) == 4 + 10

@@ -11,6 +11,7 @@ from typing import Any, AsyncGenerator
 from providers.base import BaseChat
 from core.local_chat_defaults import LOCAL_SAMPLING_DEFAULTS, LOCAL_TEMPERATURE_DEFAULT
 from core.prompt_cache import normalize_usage
+from core import token_estimate as estimate
 
 logger = logging.getLogger("service-router.dynamic")
 
@@ -290,7 +291,7 @@ class ChatRunner:
                     ttft_ms = total_duration_ms
 
                 comp_tokens = (usage.get("completion_tokens") if usage else None) or (
-                    len(accumulated_content) // 4 if is_estimated else 0
+                    estimate.text_tokens(accumulated_content) if is_estimated else 0
                 )
                 metrics_payload = {
                     "ttft_ms": ttft_ms,
@@ -337,21 +338,17 @@ class ChatRunner:
                 ttft_ms = total_duration_ms
 
             if usage is None and status_val in (True, None):
+                # By script (Chinese counts about a token a character, Latin about four); the tool definitions
+                # go to the model too, often more than the chat itself.
                 usage = {
-                    # The tool definitions go to the model too (often more than the chat itself). Letters as they are:
-                    # escaped as \uXXXX, every Turkish letter counted six times and the guess came out high.
-                    "prompt_tokens": max(1, len(json.dumps([messages, kwargs.get("tools") or []], ensure_ascii=False)) // 4),
-                    "completion_tokens": max(1, len(accumulated_content) // 4)
-                    if accumulated_content
-                    else 0,
-                    "thoughts_tokens": max(1, len(accumulated_reasoning) // 4)
-                    if accumulated_reasoning
-                    else 0,
+                    "prompt_tokens": estimate.prompt_tokens(messages, kwargs.get("tools")),
+                    "completion_tokens": max(1, estimate.text_tokens(accumulated_content)) if accumulated_content else 0,
+                    "thoughts_tokens": max(1, estimate.text_tokens(accumulated_reasoning)) if accumulated_reasoning else 0,
                 }
                 is_estimated = True
 
             if usage and accumulated_content and usage.get("completion_tokens", 0) == 0:
-                est_c = max(1, len(accumulated_content) // 4)
+                est_c = max(1, estimate.text_tokens(accumulated_content))
                 t_tokens = usage.get("thoughts_tokens", 0) or 0
                 if t_tokens > est_c:
                     usage["thoughts_tokens"] = t_tokens - est_c
@@ -410,7 +407,7 @@ class ChatRunner:
                     "total_duration_ms": total_duration_ms,
                 }
                 comp_tokens = (usage.get("completion_tokens") if usage else None) or (
-                    len(accumulated_content) // 4 if is_estimated else 0
+                    estimate.text_tokens(accumulated_content) if is_estimated else 0
                 )
                 if comp_tokens and total_duration_ms > 0:
                     metrics_dict["tokens_per_second"] = round(
