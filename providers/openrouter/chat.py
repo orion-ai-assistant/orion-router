@@ -267,7 +267,12 @@ class OpenRouterChatProvider(BaseChat):
                 err = await response.aread()
                 raise RuntimeError(f"OpenRouter HTTP Error {response.status_code}: {err.decode(errors='ignore')}")
 
+            announced = False
             async for data in self._iter_sse_lines(response):
+                    if not announced and data.get("id"):
+                        # Its usage can be asked for later if the stream is cut before the usage chunk.
+                        announced = True
+                        yield {"internal_generation_id": data["id"]}
                     if data.get("usage"):
                         usage = data["usage"]
                         details = usage.get("completion_tokens_details") or {}
@@ -290,3 +295,43 @@ class OpenRouterChatProvider(BaseChat):
                         yield f'data: {{"choices":[{{"delta":{{"content":{json.dumps(delta["content"], ensure_ascii=False)}}}}}]}}\n\n'
                     if delta.get("tool_calls"):
                         yield f'data: {{"choices":[{{"delta":{{"tool_calls":{json.dumps(delta["tool_calls"], ensure_ascii=False)}}}}}]}}\n\n'
+
+    async def recover_usage(self, generation_id, api_key=None, auth_header=None):
+        """A stopped stream's real usage, from OpenRouter's generation stats (GET /api/v1/generation). The stats
+        appear a few seconds after the generation ends, so this asks a few times. Native counts are what the
+        provider bills; reasoning is inside the completion count, as in the stream's own usage."""
+        key = self._resolve_api_key(auth_header=auth_header, api_key=api_key)
+        if not key or not generation_id:
+            return None
+        import asyncio
+        client = get_http_client()
+        for wait in (2, 3, 5, 10):
+            await asyncio.sleep(wait)
+            try:
+                response = await client.get(f"{_BASE_URL}/api/v1/generation", params={"id": generation_id},
+                                            headers={"Authorization": f"Bearer {key}"}, timeout=15)
+            except httpx.HTTPError:
+                continue
+            if response.status_code == 404:
+                continue  # Not recorded yet.
+            if response.status_code != 200:
+                return None
+            data = (response.json() or {}).get("data") or {}
+            prompt = data.get("native_tokens_prompt")
+            if prompt is None:
+                prompt = data.get("tokens_prompt")
+            if prompt is None:
+                continue
+            completion = data.get("native_tokens_completion")
+            if completion is None:
+                completion = data.get("tokens_completion") or 0
+            reasoning = data.get("native_tokens_reasoning") or 0
+            usage = {
+                "prompt_tokens": prompt,
+                "completion_tokens": max(0, completion - reasoning),
+                "prompt_tokens_details": {"cached_tokens": data.get("native_tokens_cached") or 0},
+            }
+            if reasoning:
+                usage["thoughts_tokens"] = reasoning
+            return usage
+        return None

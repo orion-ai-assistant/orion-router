@@ -199,6 +199,7 @@ class ChatRunner:
         status_val = True
         error_details = None
         is_estimated = False
+        generation_id = None
 
         start_time = time.perf_counter()
         ttft_ms: float | None = None
@@ -228,6 +229,8 @@ class ChatRunner:
                 chunk = redact(chunk)
                 if isinstance(chunk, dict) and "internal_usage" in chunk:
                     usage = normalize_usage(chunk["internal_usage"])
+                elif isinstance(chunk, dict) and "internal_generation_id" in chunk:
+                    generation_id = chunk["internal_generation_id"]
                 else:
                     if isinstance(chunk, str):
                         try:
@@ -438,6 +441,33 @@ class ChatRunner:
             # The loop holds tasks weakly; without this a log write could be collected before it finishes.
             self._log_writers.add(writer)
             writer.add_done_callback(self._log_writers.discard)
+            if status_val is None and is_estimated and generation_id:
+                # Stopped before the usage chunk: the estimate above is replaced by what the provider billed,
+                # when it can tell afterwards (OpenRouter's generation stats).
+                recovery = asyncio.create_task(self._recover_usage(
+                    plugin, generation_id, api_key, auth_header, writer, key_id, provider, model, req_data, res_data,
+                    ttft_ms=ttft_ms, duration_ms=total_duration_ms, log_id=log_id))
+                self._log_writers.add(recovery)
+                recovery.add_done_callback(self._log_writers.discard)
+
+    async def _recover_usage(self, plugin, generation_id, api_key, auth_header, writer, key_id, provider, model,
+                             req_data, res_data, **log):
+        try:
+            usage = await plugin.recover_usage(generation_id, api_key=api_key, auth_header=auth_header)
+        except Exception as exc:
+            logger.warning("[%s] Usage of stopped generation %s not recovered: %s", provider, generation_id, exc)
+            return
+        if not usage:
+            return
+        usage = normalize_usage(usage)
+        await writer  # The estimate is written first, so this one is the last word.
+        res_data = {**res_data, "usage": usage}
+        await self.telemetry.log_usage(
+            key_id, provider, model, usage,
+            request_json=json.dumps(req_data, ensure_ascii=False) if req_data else None,
+            response_json=json.dumps(res_data, ensure_ascii=False),
+            success=None, is_estimated=False, **log)
+        logger.info("[%s] Stopped generation %s: usage recovered from the provider", provider, generation_id)
 
     async def run_combo(
         self,

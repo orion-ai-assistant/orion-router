@@ -61,6 +61,13 @@ class _ProviderMixin:
 class BaseChat(_ProviderMixin, ABC):
     """Streaming chat/completion yetenekleri için temel sınıf."""
 
+    async def recover_usage(self, generation_id: str, api_key: str | None = None,
+                            auth_header: str | None = None) -> dict | None:
+        """Usage of a stream that was cut before its usage chunk (the client stopped it), asked of the provider
+        afterwards by the id its stream gave (`{"internal_generation_id": ...}`). None: the provider cannot tell,
+        and the Router's estimate stays."""
+        return None
+
     @staticmethod
     def extract_thinking_config(kwargs: dict[str, Any]) -> ThinkingConfig:
         """kwargs içinden thinking_level / reasoning_effort / thinking_budget okur ve normalize ThinkingConfig döner."""
