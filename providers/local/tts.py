@@ -96,7 +96,7 @@ class LocalTTSProvider(BaseTTS):
         # The "temperature" of a speech request is its creativity (0-2); the TTS service lines it up with its
         # engine's own guidance range (VoxCPM2: 2-4). Not given: the engine's own default.
         creativity_val = safe_float(kwargs.get("temperature"), None) if guidance_val is None else None
-        steps_val = safe_int(kwargs.get("steps"), 15)
+        steps_val = safe_int(kwargs.get("steps"), None)  # not given: the TTS service's engine default
         seed_val = safe_int(kwargs.get("seed"), -1)
         lang_val = kwargs.get("language") or "Auto"
 
@@ -108,9 +108,10 @@ class LocalTTSProvider(BaseTTS):
             "speed": speed_val,
             "language": lang_val,
             "seed": seed_val,
-            "steps": steps_val,
             "stream": False
         }
+        if steps_val is not None:
+            payload["steps"] = steps_val
         if guidance_val is not None:
             payload["guidance_scale"] = guidance_val
         elif creativity_val is not None:

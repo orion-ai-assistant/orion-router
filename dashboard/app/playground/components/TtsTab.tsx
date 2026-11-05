@@ -387,7 +387,7 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
       const defSpeed = getVal('speed', '1.0');
       setTtsSpeed(defSpeed);
 
-      const defSteps = getVal('steps', '15');
+      const defSteps = getVal('steps', '');  // empty: the engine's own default (VoxCPM2 10, OmniVoice 15)
       setTtsSteps(defSteps);
 
       const defSeed = getVal('seed', '-1');
@@ -412,7 +412,7 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
       setTtsInstruct(defInstruct);
     }
 
-    if (isLocal && ttsVoice && (ttsVoice.toLowerCase() === 'alloy' || ttsVoice.toLowerCase() === 'none')) {
+    if (isLocal && ttsVoice && ttsVoice.toLowerCase() === 'alloy') {
       setTtsVoice('');
     }
   }, [ttsModel, groups, models, voicesByProvider, languagesByProvider, localTtsInfo, isLocalTts]);
@@ -625,7 +625,8 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
     // Voice calculation
     let effectiveVoice = ttsVoice;
     if (isLocalTts) {
-      if (effectiveVoice && (effectiveVoice.toLowerCase() === 'none' || effectiveVoice.toLowerCase() === 'alloy')) {
+      // "none" is "no voice at all" (the description or the engine's own voice speaks); '' is the saved default.
+      if (effectiveVoice && effectiveVoice.toLowerCase() === 'alloy') {
         effectiveVoice = '';
       }
     } else {
@@ -674,7 +675,7 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
         if (!isNaN(parsedSteps)) payload.steps = parsedSteps;
       } else {
         const defSteps = parseInt(getTtsFieldDefault('steps'), 10);
-        payload.steps = !isNaN(defSteps) ? defSteps : 15;
+        if (!isNaN(defSteps)) payload.steps = defSteps;
       }
 
       // Seed: use input if typed, otherwise fall back to model override default
@@ -810,7 +811,10 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
           });
         };
 
-        const PREBUFFER_SECONDS = 0.5;
+        // Like the Hub's own player (pcm_speech.dart): 180 ms before the first sound, and when the audio ran dry,
+        // 300 ms gathered before going on (one short pause instead of a cut before every piece).
+        const PREBUFFER_SECONDS = 0.18;
+        const REGATHER_SECONDS = 0.3;
         let started = false;
         let queued: Float32Array<ArrayBuffer>[] = [];
         let queuedSeconds = 0;
@@ -883,16 +887,19 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
                   float32[i] = dataView.getInt16(i * 2, true) / 32768.0;
                 }
 
-                // Nothing plays until about half a second of speech has arrived (like the speech service's own page):
-                // the pieces come every 40-120 ms and the first is only ~40 ms of audio, so playing at once ran dry
+                // The pieces come every 40-120 ms and the first is only ~40 ms of audio: playing each at once ran dry
                 // right after the first sound (a click, then it went on).
+                if (started && nextStartTime > 0 && audioCtx.currentTime > nextStartTime) {
+                  started = false;  // Ran dry: gather again
+                }
                 if (!started) {
                   queued.push(float32);
                   queuedSeconds += numSamples / 24000;
-                  if (queuedSeconds >= PREBUFFER_SECONDS) {
+                  if (queuedSeconds >= (nextStartTime > 0 ? REGATHER_SECONDS : PREBUFFER_SECONDS)) {
                     started = true;
                     queued.forEach(playPiece);
                     queued = [];
+                    queuedSeconds = 0;
                   }
                 } else {
                   playPiece(float32);
@@ -1060,7 +1067,8 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
                 onChange={(e) => setTtsVoice(e.target.value)}
                 className="orion-native-select orion-native-select-sm"
               >
-                {isLocalTts && <option value="">{t('common.none')}</option>}
+                {isLocalTts && <option value="">{t('playground.voiceDefaultOption')}</option>}
+                {isLocalTts && <option value="none">{t('playground.voiceNoneOption')}</option>}
                 {ttsVoice && !voices.includes(ttsVoice) && ttsVoice.toLowerCase() !== 'none' && (!isLocalTts || ttsVoice.toLowerCase() !== 'alloy') && (
                   <option value={ttsVoice}>{ttsVoice} ⚠️</option>
                 )}

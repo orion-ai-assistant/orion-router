@@ -158,6 +158,8 @@
   "playground.systemPrompt": "System Prompt",
   "playground.audioSettings": "Audio Settings",
   "playground.voicePersona": "Voice Persona",
+  "playground.voiceDefaultOption": "Default voice",
+  "playground.voiceNoneOption": "No voice",
   "playground.textToSynthesize": "Text to synthesize",
   "playground.generateAudio": "Generate Audio",
   "playground.stop": "Stop",

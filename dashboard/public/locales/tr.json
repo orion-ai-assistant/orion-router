@@ -158,6 +158,8 @@
   "playground.systemPrompt": "Sistem Yönergesi",
   "playground.audioSettings": "Ses Ayarları",
   "playground.voicePersona": "Ses Karakteri",
+  "playground.voiceDefaultOption": "Varsayılan ses",
+  "playground.voiceNoneOption": "Ses yok",
   "playground.textToSynthesize": "Sentezlenecek metin",
   "playground.generateAudio": "Ses Oluştur",
   "playground.stop": "Durdur",

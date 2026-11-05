@@ -97,13 +97,6 @@ class TTSRunner:
                     except Exception:
                         pass
 
-                target_voice = voice
-                if (
-                    not target_voice
-                    or str(target_voice).lower() in ("none", "null", "default", "alloy")
-                ) and p_def_config.get("voice"):
-                    target_voice = p_def_config.get("voice")
-
                 if not route_kwargs.get("tts_instruct") and not route_kwargs.get("instructions"):
                     instructs = []
                     for field in ("gender", "age", "pitch", "style", "accent", "dialect"):
@@ -112,6 +105,15 @@ class TTSRunner:
                             instructs.append(str(val).strip())
                     if instructs:
                         route_kwargs["tts_instruct"] = ", ".join(instructs)
+
+                # No voice given (or "default"): the provider's saved default voice. "none" is "no voice at all":
+                # the description (or the engine's own voice) speaks, not the saved clone.
+                target_voice = voice
+                if (
+                    not target_voice
+                    or str(target_voice).lower() in ("default", "alloy")
+                ) and p_def_config.get("voice"):
+                    target_voice = p_def_config.get("voice")
 
                 clean_kwargs = {
                     k: v for k, v in route_kwargs.items()
@@ -278,13 +280,6 @@ class TTSRunner:
                     except Exception:
                         pass
 
-                target_voice = voice
-                if (
-                    not target_voice
-                    or str(target_voice).lower() in ("none", "null", "default", "alloy")
-                ) and p_def_config.get("voice"):
-                    target_voice = p_def_config.get("voice")
-
                 if not route_kwargs.get("tts_instruct") and not route_kwargs.get("instructions"):
                     instructs = []
                     for field in ("gender", "age", "pitch", "style", "accent", "dialect"):
@@ -293,6 +288,15 @@ class TTSRunner:
                             instructs.append(str(val).strip())
                     if instructs:
                         route_kwargs["tts_instruct"] = ", ".join(instructs)
+
+                # No voice given (or "default"): the provider's saved default voice. "none" is "no voice at all":
+                # the description (or the engine's own voice) speaks, not the saved clone.
+                target_voice = voice
+                if (
+                    not target_voice
+                    or str(target_voice).lower() in ("default", "alloy")
+                ) and p_def_config.get("voice"):
+                    target_voice = p_def_config.get("voice")
 
                 clean_kwargs = {
                     k: v for k, v in route_kwargs.items()
