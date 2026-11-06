@@ -1,7 +1,7 @@
 import httpx
 import logging
 from providers.base import BaseTTS
-from core.availability import available, unavailable
+from core.availability import available, not_listening, unavailable
 from core.config import TTS_HOST, TTS_PORT
 from core.http_client import get_http_client
 from core.model_catalog import bundled_model
@@ -15,6 +15,8 @@ class LocalTTSProvider(BaseTTS):
     def get_voices(self) -> list[str]:
         """Yerel TTS motorundan klonlanmış sesleri döner."""
         cloned_voices = []
+        if not_listening(TTS_HOST, TTS_PORT):
+            return []  # The service is off: no 2 s wait for a refused connection (core.availability).
         try:
             import httpx
             res = httpx.get(f"http://{TTS_HOST}:{TTS_PORT}/v1/voices", timeout=1.0)
@@ -32,6 +34,8 @@ class LocalTTSProvider(BaseTTS):
         """Yerel TTS motorundan desteklenen dilleri döner (statik liste önbelleklenir)."""
         if self._cached_languages:
             return self._cached_languages
+        if not_listening(TTS_HOST, TTS_PORT):
+            return []  # The service is off: no 2 s wait for a refused connection (core.availability).
         try:
             import httpx
             res = httpx.get(f"http://{TTS_HOST}:{TTS_PORT}/v1/languages", timeout=1.5)
