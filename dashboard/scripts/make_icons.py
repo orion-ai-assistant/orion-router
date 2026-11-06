@@ -9,7 +9,8 @@ crosses around the constellation are left out (at 16 px they only blot it) and t
 The outputs are committed:
   public/favicon.ico        16..256 px: the browser tab, the app window's title bar, and the taskbar icon
                             (the Orion host sets it on the Router window from the installed copy of this file)
-  public/logo-{36,72,108}.png  the sidebar logo at 1x, 2x and 3x
+  public/logo-{36,72,108,144,216,288}.png  the sidebar logo at 1x..8x: a zoomed-in window (Ctrl + wheel)
+                            or a high-DPI screen gets a drawn size, never a small one stretched
 More: orion-ai-assistant/docs/ikonlar.md.
 """
 from pathlib import Path
@@ -18,7 +19,7 @@ from PIL import Image, ImageDraw, ImageFilter
 
 DASHBOARD = Path(__file__).resolve().parents[1]
 ICON_SIZES = (16, 20, 24, 32, 40, 48, 64, 256)  # Windows asks for 16/32 at 100 %, 20/40 at 125 %, 24/48 at 150 %.
-LOGO_SIZES = (36, 72, 108)                      # The sidebar shows it at 36 CSS px.
+LOGO_SIZES = (36, 72, 108, 144, 216, 288)       # The sidebar shows it at 36 CSS px; 1x..8x (zoom, DPI).
 CONTENT = (122, 104, 1113, 1112)                # The drawing inside the logo's white margin.
 SIMPLE = 24                                     # The largest size drawn without the ornaments.
 ORNAMENTS = ((538, 200, 40), (143, 570, 40), (347, 1087, 40), (877, 1085, 40), (843, 255, 60), (285, 745, 60))
