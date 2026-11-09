@@ -1456,8 +1456,8 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
         {isLocalTts && resolvedTtsEngine === 'voxcpm2' && (
           <div className="flex flex-col gap-3.5 border-b border-zinc-855 pb-4 animate-in fade-in duration-200">
             <div
-              onClick={() => !ttsHasPersona && setShowSpeechStyle(!showSpeechStyle)}
-              className={`flex items-center justify-between cursor-pointer group/header ${ttsHasPersona ? 'opacity-50 pointer-events-none' : ''}`}
+              onClick={() => setShowSpeechStyle(!showSpeechStyle)}
+              className="flex items-center justify-between cursor-pointer group/header"
             >
               <div className="flex items-center gap-2">
                 <h4 className="text-xs font-semibold text-zinc-300 group-hover/header:text-white transition-colors">{t('tts.speech.style')}</h4>
@@ -1480,129 +1480,6 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
                   disabled={ttsHasPersona}
                   className="bg-black/40 border border-zinc-850 text-white rounded px-2.5 py-2 text-xs placeholder:text-zinc-600 w-full"
                 />
-              </div>
-            )}
-          </div>
-        )}
-
-        {isLocalTts && resolvedTtsEngine === 'omnivoice' && (
-          <div className="flex flex-col gap-3.5 border-b border-zinc-855 pb-4">
-            <div
-              onClick={() => !ttsHasPersona && setShowCharacterDesign(!showCharacterDesign)}
-              className={`flex items-center justify-between cursor-pointer group/header ${ttsHasPersona ? 'opacity-50 pointer-events-none' : ''}`}
-            >
-              <div className="flex items-center gap-2">
-                <h4 className="text-xs font-semibold text-zinc-300 group-hover/header:text-white transition-colors">{t('tts.character.design')}</h4>
-                {ttsHasPersona && (
-                  <span className="text-[8px] text-zinc-500 font-medium bg-black/40 px-1 py-0.5 rounded border border-zinc-800 normal-case">{t('tts.persona.active')}</span>
-                )}
-              </div>
-              <span className={`text-[10px] text-zinc-500 transition-transform ${showCharacterDesign ? 'rotate-90' : ''}`}>▶</span>
-            </div>
-
-            {showCharacterDesign && (
-              <div className={`grid grid-cols-2 md:grid-cols-3 gap-3.5 animate-in fade-in duration-200 ${ttsHasPersona ? 'opacity-50 pointer-events-none' : ''}`}>
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex justify-between items-center">
-                    <label className="text-zinc-400 text-[9px] font-medium uppercase tracking-wider">{t('tts.char.gender')}</label>
-                    {renderDefaultIndicator('gender', ttsGender)}
-                  </div>
-                  <div className="custom-select-wrapper select-wrapper w-full">
-                    <select
-                      value={ttsGender}
-                      onChange={(e) => setTtsGender(e.target.value)}
-                      className="orion-native-select orion-native-select-sm"
-                    >
-                      <option value="Auto">Auto</option>
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex justify-between items-center">
-                    <label className="text-zinc-400 text-[9px] font-medium uppercase tracking-wider">{t('tts.char.age')}</label>
-                    {renderDefaultIndicator('age', ttsAge)}
-                  </div>
-                  <div className="custom-select-wrapper select-wrapper w-full">
-                    <select
-                      value={ttsAge}
-                      onChange={(e) => setTtsAge(e.target.value)}
-                      className="orion-native-select orion-native-select-sm"
-                    >
-                      <option value="Auto">Auto</option>
-                      <option value="Child">Child</option>
-                      <option value="Teenager">Teenager</option>
-                      <option value="YoungAdult">YoungAdult</option>
-                      <option value="MiddleAged">MiddleAged</option>
-                      <option value="Elderly">Elderly</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex justify-between items-center">
-                    <label className="text-zinc-400 text-[9px] font-medium uppercase tracking-wider">{t('tts.char.pitch')}</label>
-                    {renderDefaultIndicator('pitch', ttsPitch)}
-                  </div>
-                  <div className="custom-select-wrapper select-wrapper w-full">
-                    <select
-                      value={ttsPitch}
-                      onChange={(e) => setTtsPitch(e.target.value)}
-                      className="orion-native-select orion-native-select-sm"
-                    >
-                      <option value="Auto">Auto</option>
-                      <option value="VeryLow">VeryLow</option>
-                      <option value="Low">Low</option>
-                      <option value="Moderate">Moderate</option>
-                      <option value="High">High</option>
-                      <option value="VeryHigh">VeryHigh</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex justify-between items-center">
-                    <label className="text-zinc-400 text-[9px] font-medium uppercase tracking-wider">{t('tts.char.style')}</label>
-                    {renderDefaultIndicator('style', ttsStyle)}
-                  </div>
-                  <div className="custom-select-wrapper select-wrapper w-full">
-                    <select
-                      value={ttsStyle}
-                      onChange={(e) => setTtsStyle(e.target.value)}
-                      className="orion-native-select orion-native-select-sm"
-                    >
-                      <option value="Auto">Auto</option>
-                      <option value="Whispering">Whispering</option>
-                      <option value="Soft">Soft</option>
-                      <option value="Normal">Normal</option>
-                      <option value="Excited">Excited</option>
-                      <option value="Shouting">Shouting</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex justify-between items-center">
-                    <label className="text-zinc-400 text-[9px] font-medium uppercase tracking-wider">{t('tts.char.accent')}</label>
-                    {renderDefaultIndicator('accent', ttsAccent)}
-                  </div>
-                  <div className="custom-select-wrapper select-wrapper w-full">
-                    <select
-                      value={ttsAccent}
-                      onChange={(e) => setTtsAccent(e.target.value)}
-                      className="orion-native-select orion-native-select-sm"
-                    >
-                      <option value="Auto">Auto</option>
-                      <option value="American">American</option>
-                      <option value="British">British</option>
-                      <option value="Australian">Australian</option>
-                      <option value="Indian">Indian</option>
-                      <option value="TurkishAccent">TurkishAccent</option>
-                    </select>
-                  </div>
-                </div>
               </div>
             )}
           </div>
