@@ -1,9 +1,9 @@
 {
   "schema": 1,
   "component": "router",
-  "package_id": "orion-router-0.2.34-windows-x86_64-cpu",
-  "version": "0.2.34",
-  "sequence": 44,
+  "package_id": "orion-router-0.2.35-windows-x86_64-cpu",
+  "version": "0.2.35",
+  "sequence": 45,
   "platform": "windows",
   "arch": "x86_64",
   "profile": "cpu",
