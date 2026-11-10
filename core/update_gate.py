@@ -9,6 +9,8 @@ import os
 from pathlib import Path
 
 TERMINAL = {'completed', 'rolled_back', 'failed'}
+# Another process is switching/health-checking/rolling back right now: wait for it, never alarm.
+APPLYING = {'draining', 'backing_up', 'switching', 'health_check', 'rollback_pending'}
 PREPARING = {'checking', 'downloading', 'verifying', 'staged', 'waiting_for_idle'}
 
 
@@ -33,6 +35,72 @@ def blocked(registry=None):
                 or journal['phase'] not in TERMINAL | PREPARING)
     except (OSError, ValueError, KeyError, TypeError):
         return True
+
+
+def phase(registry=None):
+    """Journal phase of the active update operation, or None (none, or unreadable)."""
+    registry = registry or os.getenv('ORION_INSTALLATION_REGISTRY')
+    if not registry:
+        return None
+    pointer = Path(registry).parent / 'updates/active.json'
+    try:
+        value = json.loads(pointer.read_text(encoding='utf-8'))
+        identity = value['operation_id']
+        journal = json.loads((pointer.parent / identity / 'journal.json').read_text(encoding='utf-8'))
+        if journal.get('schema') != 1 or journal['operation_id'] != identity:
+            return None
+        return journal['phase']
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def progress(registry=None):
+    """Journal phase of an update that is being applied right now, else None.
+
+    Unreadable or inconsistent journals are not progress (they stay a genuine repair case)."""
+    registry = registry or os.getenv('ORION_INSTALLATION_REGISTRY')
+    if not registry:
+        return None
+    pointer = Path(registry).parent / 'updates/active.json'
+    try:
+        from uuid import UUID
+        value = json.loads(pointer.read_text(encoding='utf-8'))
+        identity = value['operation_id']
+        if str(UUID(identity)) != identity or value['schema'] != 1:
+            return None
+        journal = json.loads((pointer.parent / identity / 'journal.json').read_text(encoding='utf-8'))
+        if journal.get('schema') != 1 or journal['operation_id'] != identity:
+            return None
+        return journal['phase'] if journal['phase'] in APPLYING else None
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def applier_running(registry):
+    """Someone holds the installation's operation lock right now. The helper holds it for the whole
+    apply/rollback, so an APPLYING journal whose lock is free was interrupted (power loss, killed process
+    tree, closed window): nobody is coming to finish it except the next launch's recovery."""
+    from .installation_registry import operation_lock
+    from .process_lifecycle import LifecycleError
+    try:
+        with operation_lock(Path(registry), timeout=0):
+            return False
+    except LifecycleError:
+        return True
+    except OSError:
+        return True  # Cannot tell: behave as before (wait).
+
+
+def interrupted(registry=None, *, settle=.5, sleep=None):
+    """An APPLYING phase that no live process is working on (checked twice, `settle` seconds apart)."""
+    import time
+    registry = registry or os.getenv('ORION_INSTALLATION_REGISTRY')
+    for attempt in (1, 2):
+        if progress(registry) is None or applier_running(registry):
+            return False
+        if attempt == 1:
+            (sleep or time.sleep)(settle)
+    return True
 
 
 async def wait_for_admission():

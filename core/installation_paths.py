@@ -8,7 +8,9 @@ import os
 from pathlib import Path
 import shutil
 import stat
+import secrets
 import tempfile
+from contextlib import contextmanager
 
 from .installation_registry import validate_record
 
@@ -181,7 +183,9 @@ def _validate_windows_acl(record):
         own_sid = record['current_sid']
         if not isinstance(own_sid, str) or not own_sid.startswith('S-1-'):
             raise ValueError()
-        allowed = {own_sid, 'S-1-5-18', 'S-1-5-32-544'}  # current user, SYSTEM, Administrators
+        # current user, SYSTEM, Administrators, and OWNER RIGHTS (S-1-3-4: stands for the owner, which must be
+        # allowed anyway; Python 3.13+ adds it to every directory it creates with mode 0o700)
+        allowed = {own_sid, 'S-1-5-18', 'S-1-5-32-544', 'S-1-3-4'}
         if record['owner_sid'] not in allowed:
             raise PathValidationError('Private directory is owned by another user')
         write_mask = 0x2 | 0x4 | 0x10 | 0x40 | 0x100 | 0x10000 | 0x40000 | 0x80000 | 0x10000000 | 0x40000000
@@ -217,6 +221,57 @@ def validate_private_directory(path):
         if details.st_uid not in {0, os.getuid()} or details.st_mode & 0o022:
             raise PathValidationError('Private directory permits writes by another user or group')
     return path
+
+
+SANDBOXED_APP_SID = 'S-1-15-'  # AppContainer package/capability SIDs: sandboxed apps of this same user
+
+
+@contextmanager
+def scratch_directory(prefix, parent):
+    """A temporary folder inside `parent` that inherits `parent`'s permissions. `tempfile` folders do not: on Python
+    3.13+ mkdtemp gives them a protected ACL with an OWNER RIGHTS entry, and a folder renamed out of one (a
+    package tree that becomes <Orion>/bootstrap) would be refused by the older Hubs' private-folder check."""
+    path = Path(parent) / (prefix + secrets.token_hex(8))
+    path.mkdir()
+    try:
+        yield str(path)
+    finally:
+        shutil.rmtree(path, ignore_errors=True)
+
+
+def ensure_private_directory(path):
+    """`validate_private_directory`, healing one known case: an Orion root that inherits a write grant for a
+    sandboxed app (an MSIX/AppContainer SID such as the Claude desktop app's, which grants itself
+    %LOCALAPPDATA%). Such a root owned by this user gets Orion's own protected ACL (this user, SYSTEM,
+    Administrators; no inheritance). That only removes access. A grant to another user or group still fails."""
+    path = canonical_path(path)
+    try:
+        return validate_private_directory(path)
+    except PathValidationError:
+        if os.name != 'nt' or not path.is_dir():
+            raise
+        record = _windows_acl(path)
+        own = record['current_sid']
+        allowed = {own, 'S-1-5-18', 'S-1-5-32-544'}
+        offending = [r['sid'] for r in record['rules'] if r['allow'] and r['sid'] not in allowed]
+        if record['owner_sid'] != own or not offending or not all(sid.startswith(SANDBOXED_APP_SID) for sid in offending):
+            raise
+    protect_private_directory(path)
+    return validate_private_directory(path)
+
+
+def protect_private_directory(path):
+    """Give an Orion-owned directory its own ACL: full control for this user, SYSTEM and Administrators,
+    inherited by everything inside it, and nothing inherited from its parent."""
+    if os.name != 'nt':
+        return
+    import subprocess
+    own = _windows_acl(path)['current_sid']
+    grants = [f'*{sid}:(OI)(CI)F' for sid in (own, 'S-1-5-18', 'S-1-5-32-544')]
+    result = subprocess.run(['icacls', str(path), '/inheritance:r', '/grant:r', *grants, '/Q'],
+                            capture_output=True, timeout=300, creationflags=0x08000000)
+    if result.returncode:
+        raise PathValidationError('Could not protect the private directory permissions')
 
 
 def paths_overlap(first, second):
