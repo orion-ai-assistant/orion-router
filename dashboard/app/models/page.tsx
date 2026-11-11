@@ -225,12 +225,6 @@ const localSamplingConfig = (config: Record<string, any>): Record<LocalSamplingK
   repeat_penalty: config.local_sampling?.repeat_penalty ?? localSamplingDefaults.repeat_penalty,
 });
 
-/** Local chat always sends a temperature (the Router's default when the model has none): show it as a value. */
-const withLocalChatTemperature = <T extends { provider: string; capability: string; temperature: any }>(form: T): T =>
-  form.provider === 'local' && form.capability === 'chat' && String(form.temperature ?? '').trim() === ''
-    ? { ...form, temperature: String(localTemperatureDefault) }
-    : form;
-
 const validateLocalSampling = (config: Record<string, any>): boolean => {
   const sampling = localSamplingConfig(config);
   return (Object.keys(localSamplingDefaults) as LocalSamplingKey[]).every((key) => {
@@ -596,8 +590,7 @@ export default function ModelsPage() {
       return;
     }
 
-    const typedTemp = normalizeTemperature(addForm.temperature);
-    const tempVal = typedTemp === null && provider === 'local' && capability === 'chat' ? localTemperatureDefault : typedTemp;
+    const tempVal = normalizeTemperature(addForm.temperature);
     if (tempVal !== null && (tempVal < 0 || tempVal > 2)) {
       showToast(t('models.toast.invalidTemperature'), 'error');
       return;
@@ -686,9 +679,7 @@ export default function ModelsPage() {
       return;
     }
 
-    const typedTemp = normalizeTemperature(editingModel.temperature);
-    const tempVal = typedTemp === null && provider === 'local' && editingModel.capability === 'chat'
-      ? localTemperatureDefault : typedTemp;
+    const tempVal = normalizeTemperature(editingModel.temperature);
     if (tempVal !== null && (tempVal < 0 || tempVal > 2)) {
       showToast(t('models.toast.invalidTemperature'), 'error');
       return;
@@ -799,9 +790,8 @@ export default function ModelsPage() {
   const openEditModal = (model: ModelItem) => {
     setEditingModel({
       ...model,
-      // Local chat: a model saved without one shows the default the Router sends (white, not a hint).
-      temperature: model.provider === 'local' && model.capability === 'chat' && (model.temperature === null ||
-        (model.default_config?.local_chat_defaults_version !== 1 && model.temperature === 0))
+      temperature: model.provider === 'local' && model.capability === 'chat' &&
+        model.default_config?.local_chat_defaults_version !== 1 && (model.temperature === null || model.temperature === 0)
         ? localTemperatureDefault : model.temperature,
       input_price: formatPriceForInput(model.input_price),
       output_price: formatPriceForInput(model.output_price),
@@ -1536,7 +1526,7 @@ export default function ModelsPage() {
               <div className="custom-select-wrapper select-wrapper w-full">
                 <select
                   value={addForm.provider}
-                  onChange={(e) => setAddForm(withLocalChatTemperature({ ...addForm, provider: e.target.value }))}
+                  onChange={(e) => setAddForm({ ...addForm, provider: e.target.value })}
                   required
                   className="orion-native-select"
                 >
@@ -1555,11 +1545,11 @@ export default function ModelsPage() {
                 <select
                   value={addForm.capability}
                   onChange={(e) =>
-                    setAddForm(withLocalChatTemperature({
+                    setAddForm({
                       ...addForm,
                       capability: e.target.value as any,
                       temperature: (e.target.value === 'chat' || e.target.value === 'tts') ? addForm.temperature : '',
-                    }))
+                    })
                   }
                   className="orion-native-select"
                 >
@@ -1585,15 +1575,7 @@ export default function ModelsPage() {
                       step="0.1"
                       value={addForm.temperature}
                       onChange={(e) => setAddForm({ ...addForm, temperature: e.target.value })}
-                      // Local chat always sends one (the Router's default when none is saved): a blank field is
-                      // filled back with it, so what is sent is what is shown.
-                      onBlur={() => {
-                        if (addForm.provider === 'local' && addForm.capability === 'chat' && String(addForm.temperature).trim() === '') {
-                          setAddForm({ ...addForm, temperature: String(localTemperatureDefault) });
-                        }
-                      }}
-                      placeholder={addForm.provider === 'local' && addForm.capability === 'chat'
-                        ? String(localTemperatureDefault) : t('models.temperaturePlaceholder')}
+                      placeholder={t('models.temperaturePlaceholder')}
                       className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs"
                     />
                   </div>
@@ -1798,14 +1780,7 @@ export default function ModelsPage() {
                       step="0.1"
                       value={editingModel.temperature === null ? '' : editingModel.temperature}
                       onChange={(e) => setEditingModel({ ...editingModel, temperature: e.target.value === '' ? null : parseFloat(e.target.value) })}
-                      // Local chat always sends one: a blank field is filled back with the default (see the add form).
-                      onBlur={() => {
-                        if (editingModel.provider === 'local' && editingModel.capability === 'chat' && editingModel.temperature === null) {
-                          setEditingModel({ ...editingModel, temperature: localTemperatureDefault });
-                        }
-                      }}
-                      placeholder={editingModel.provider === 'local' && editingModel.capability === 'chat'
-                        ? String(localTemperatureDefault) : t('models.temperaturePlaceholder')}
+                      placeholder={t('models.temperaturePlaceholder')}
                       className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs"
                     />
                   </div>
