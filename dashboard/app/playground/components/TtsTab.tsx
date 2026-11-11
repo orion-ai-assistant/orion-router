@@ -138,7 +138,6 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
   const [languages, setLanguages] = useState<string[]>([]);
   const [tabLoading, setTabLoading] = useState(true);
 
-  const ttsHasPersona = !!ttsVoice && ttsVoice.toLowerCase() !== 'none';
 
   const loadVoices = async () => {
     try {
@@ -300,7 +299,8 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
     }
 
     // A voice kept from the other engine (OmniVoice's clone while VoxCPM2 runs) is not offered by this one.
-    if (isLocal && localTtsInfo.active && nextVoices.length > 0 && ttsVoice
+    // "none" (Ses yok) is a choice of its own, never in the clone list: it stays.
+    if (isLocal && localTtsInfo.active && nextVoices.length > 0 && ttsVoice && ttsVoice.toLowerCase() !== 'none'
         && !nextVoices.map(v => v.toLowerCase()).includes(ttsVoice.toLowerCase())) {
       setTtsVoice('');
     }
@@ -506,15 +506,21 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
     }
   };
 
+  // The voice that really speaks: "Varsayılan ses" ('') is the model's saved voice (the Router puts it in), so a
+  // saved clone there is a persona too; "Ses yok" ('none') is none. Only without one does the description apply.
+  const resolvedTtsVoice = ttsVoice === '' ? getTtsFieldDefault('voice') : ttsVoice;
+  const ttsHasPersona = !!resolvedTtsVoice && resolvedTtsVoice.toLowerCase() !== 'none';
+
   const renderDefaultIndicator = (field: string, userValue: string) => {
     let defVal = getTtsFieldDefault(field);
     let isOverridden = false;
     if (field === 'voice') {
       const normUser = (userValue || '').toLowerCase();
       const normDef = (defVal || '').toLowerCase();
-      const isUserNone = normUser === '' || normUser === 'none';
+      const isUserNone = normUser === 'none';
       const isDefNone = normDef === '' || normDef === 'none';
-      isOverridden = (isUserNone && isDefNone) ? false : (normUser !== normDef);
+      // '' is "Varsayılan ses": the saved voice itself, never crossed out.
+      isOverridden = normUser === '' ? false : (isUserNone && isDefNone) ? false : (normUser !== normDef);
     } else {
       isOverridden = userValue !== defVal;
     }
@@ -687,9 +693,8 @@ export default function TtsTab({ models, groups }: TtsTabProps) {
         payload.seed = !isNaN(defSeed) ? defSeed : -1;
       }
 
-      // Construct character design instructs (only when no persona is selected)
-      const hasPersona = !!effectiveVoice && effectiveVoice.toLowerCase() !== 'none';
-      if (!hasPersona) {
+      // Construct character design instructs (only when no voice speaks: "Varsayılan ses" counts the saved one)
+      if (!ttsHasPersona) {
         if (resolvedTtsEngine === 'voxcpm2') {
           payload.tts_instruct = ttsInstruct || '';
         } else {

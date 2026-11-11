@@ -49,6 +49,29 @@ class LocalTTSProvider(BaseTTS):
             logger.debug(f"Could not fetch languages from local TTS: {e}")
         return []
 
+    _engine_cache: tuple[float, str | None] = (0.0, None)
+    ENGINE_CACHE_SECONDS = 15.0
+
+    async def active_engine(self) -> str | None:
+        """The engine family the TTS service runs now ("omnivoice" or "voxcpm2"), so a model's settings for that
+        engine are the ones used. None when the service does not answer: the settings are then used as saved.
+        Asked again at most every few seconds (switching engines restarts the service anyway)."""
+        import time
+        checked, engine = LocalTTSProvider._engine_cache
+        if time.monotonic() - checked < self.ENGINE_CACHE_SECONDS:
+            return engine
+        engine = None
+        if not not_listening(TTS_HOST, TTS_PORT):
+            try:
+                res = await get_http_client().get(f"http://{TTS_HOST}:{TTS_PORT}/v1/model_info", timeout=1.5)
+                if res.status_code == 200:
+                    name = str(res.json().get("engine") or "").lower()
+                    engine = "voxcpm2" if "voxcpm" in name else "omnivoice" if "omnivoice" in name else None
+            except Exception as e:
+                logger.debug(f"Could not ask the local TTS for its engine: {e}")
+        LocalTTSProvider._engine_cache = (time.monotonic(), engine)
+        return engine
+
     @staticmethod
     def _foreign_voice(payload: dict, status: int, detail: str) -> bool:
         """The service refused a saved voice: one made for another engine (switching OmniVoice and VoxCPM2 leaves it

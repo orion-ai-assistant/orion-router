@@ -24,6 +24,81 @@ def _coerce_default_config(default_config) -> dict:
     return {}
 
 
+# The dashboard's own bookkeeping in a model's settings (each engine's values, kept apart): never shown as sent.
+_UNLOGGED_DEFAULTS = {"per_engine"}
+# A local TTS model's settings that belong to one engine (the dashboard keeps them per engine, in "per_engine").
+_ENGINE_FIELDS = ("voice", "gender", "age", "pitch", "style", "accent", "dialect", "language", "speed", "steps",
+                  "seed", "tts_instruct")
+# OmniVoice's character design: VoxCPM2 takes a written description (tts_instruct) instead.
+_OMNIVOICE_DESIGN = ("gender", "age", "pitch", "style", "accent", "dialect")
+
+
+def _engine_defaults(defaults: dict, engine: str | None) -> dict:
+    """The model's settings for the engine that runs now. The top-level fields are only the engine that was on
+    screen when the model was saved: with the other engine running they would carry its values over (OmniVoice's
+    "female, young adult" made VoxCPM2 design a new voice instead of its warm-up voice). Engine unknown (the
+    service did not answer): the settings as saved."""
+    if not engine:
+        return defaults
+    per_engine = defaults.get("per_engine") if isinstance(defaults.get("per_engine"), dict) else {}
+    own = per_engine.get(engine)
+    shared = {k: v for k, v in defaults.items() if k not in _ENGINE_FIELDS}
+    if isinstance(own, dict):
+        chosen = {**shared, **{k: v for k, v in own.items() if k in _ENGINE_FIELDS}}
+    elif str(defaults.get("engine") or "omnivoice").lower() == engine:
+        chosen = dict(defaults)
+    else:
+        chosen = shared  # nothing saved for this engine: its own defaults
+    if engine == "voxcpm2":
+        for key in _OMNIVOICE_DESIGN:
+            chosen.pop(key, None)
+    return chosen
+
+
+def _route_request(route, kwargs: dict, voice: str | None, engine: str | None = None) -> tuple[dict, str | None, dict]:
+    """What goes to the provider on this route: the caller's values, and the model's saved settings (Router →
+    Modeller) for whatever the caller left out. Also returns those filled-in values alone, so the request log shows
+    them: a caller that sent no seed must not look as if it spoke with the engine's default when the model's
+    saved seed was used. engine: the local TTS engine running now, whose own saved settings apply."""
+    defaults = _engine_defaults(_coerce_default_config(route.default_config), engine)
+    given = {key: value for key, value in kwargs.items() if value is not None and value != ""}
+    route_kwargs = {key: value for key, value in defaults.items() if value is not None and value != ""}
+    route_kwargs.update(given)
+
+    if route.temperature is not None and route_kwargs.get("temperature") is None:
+        try:
+            route_kwargs["temperature"] = float(route.temperature)
+        except Exception:
+            pass
+
+    if not route_kwargs.get("tts_instruct") and not route_kwargs.get("instructions"):
+        instructs = []
+        for field in ("gender", "age", "pitch", "style", "accent", "dialect"):
+            val = route_kwargs.get(field)
+            if val and str(val).strip() and str(val).strip().lower() != "auto":
+                instructs.append(str(val).strip())
+        if instructs:
+            route_kwargs["tts_instruct"] = ", ".join(instructs)
+
+    # No voice given (or "default"): the provider's saved default voice. "none" is "no voice at all":
+    # the description (or the engine's own voice) speaks, not the saved clone.
+    target_voice = voice
+    if (not target_voice or str(target_voice).lower() in ("default", "alloy")) and defaults.get("voice"):
+        target_voice = defaults.get("voice")
+
+    clean_kwargs = {
+        k: v for k, v in route_kwargs.items()
+        if k not in ("voice", "model", "input_text", "api_key", "auth_header", "_archive_metadata")
+    }
+    added = {
+        k: v for k, v in clean_kwargs.items()
+        if k not in given and k not in _UNLOGGED_DEFAULTS and not k.startswith("_")
+    }
+    if target_voice != voice:
+        added["voice"] = target_voice
+    return clean_kwargs, target_voice, added
+
+
 class TTSRunner:
     def __init__(self, registry, route_resolver, key_pool, telemetry) -> None:
         self.registry = registry
@@ -41,6 +116,17 @@ class TTSRunner:
             ))
         log_kwargs["response_json"] = json.dumps(response, ensure_ascii=False)
         await self.telemetry.log_usage(**log_kwargs)
+
+    async def _show_added(self, log_id, req_data: dict, added: dict) -> None:
+        """Puts what the Router itself filled in from the model's settings into the logged request, under its own
+        key: the caller's request stays as it came, and nothing the provider got is hidden."""
+        if added == req_data.get("added_by_router", {}):
+            return
+        if added:
+            req_data["added_by_router"] = added
+        else:
+            req_data.pop("added_by_router", None)
+        await self.telemetry.update_processing_request(log_id, req_data)
 
     async def run_speech(
         self,
@@ -76,54 +162,12 @@ class TTSRunner:
             for route in route_plan.routes:
                 p_provider = route.provider
                 p_model = route.model
-                p_def_config = _coerce_default_config(route.default_config)
-
-                route_kwargs = {
-                    key: value
-                    for key, value in p_def_config.items()
-                    if value is not None and value != ""
-                }
-                route_kwargs.update(
-                    {
-                        key: value
-                        for key, value in kwargs.items()
-                        if value is not None and value != ""
-                    }
-                )
-
-                if route.temperature is not None and route_kwargs.get("temperature") is None:
-                    try:
-                        route_kwargs["temperature"] = float(route.temperature)
-                    except Exception:
-                        pass
-
-                if not route_kwargs.get("tts_instruct") and not route_kwargs.get("instructions"):
-                    instructs = []
-                    for field in ("gender", "age", "pitch", "style", "accent", "dialect"):
-                        val = route_kwargs.get(field)
-                        if val and str(val).strip() and str(val).strip().lower() != "auto":
-                            instructs.append(str(val).strip())
-                    if instructs:
-                        route_kwargs["tts_instruct"] = ", ".join(instructs)
-
-                # No voice given (or "default"): the provider's saved default voice. "none" is "no voice at all":
-                # the description (or the engine's own voice) speaks, not the saved clone.
-                target_voice = voice
-                if (
-                    not target_voice
-                    or str(target_voice).lower() in ("default", "alloy")
-                ) and p_def_config.get("voice"):
-                    target_voice = p_def_config.get("voice")
-
-                clean_kwargs = {
-                    k: v for k, v in route_kwargs.items()
-                    if k not in ("voice", "model", "input_text", "api_key", "auth_header", "_archive_metadata")
-                }
-
                 plugin = self.registry.tts_providers.get(p_provider)
                 if not plugin:
                     last_err = ValueError(f"TTS provider not available: {p_provider}")
                     continue
+                engine = await plugin.active_engine() if hasattr(plugin, "active_engine") else None
+                clean_kwargs, target_voice, added = _route_request(route, kwargs, voice, engine)
 
                 keys_to_try = await self.key_pool.get_keys_for_provider(
                     p_provider,
@@ -141,13 +185,15 @@ class TTSRunner:
                         continue
                     tts_params = format_tts_kwargs_summary(clean_kwargs)
                     logger.info(
-                        "Routing TTS to %s (model=%s, voice=%s) using key %s%s",
+                        "Routing TTS to %s (model=%s, voice=%s) using key %s%s%s",
                         p_provider,
                         p_model,
                         target_voice,
                         key_pool_id or "default",
                         f", params={tts_params}" if tts_params else "",
+                        f", from model settings={added}" if added else "",
                     )
+                    await self._show_added(log_id, req_data, added)
                     if logger.isEnabledFor(logging.DEBUG):
                         logger.debug("TTS route debug: keys=%s", sorted(clean_kwargs.keys()))
                     try:
@@ -259,54 +305,12 @@ class TTSRunner:
             for route in route_plan.routes:
                 p_provider = route.provider
                 p_model = route.model
-                p_def_config = _coerce_default_config(route.default_config)
-
-                route_kwargs = {
-                    key: value
-                    for key, value in p_def_config.items()
-                    if value is not None and value != ""
-                }
-                route_kwargs.update(
-                    {
-                        key: value
-                        for key, value in kwargs.items()
-                        if value is not None and value != ""
-                    }
-                )
-
-                if route.temperature is not None and route_kwargs.get("temperature") is None:
-                    try:
-                        route_kwargs["temperature"] = float(route.temperature)
-                    except Exception:
-                        pass
-
-                if not route_kwargs.get("tts_instruct") and not route_kwargs.get("instructions"):
-                    instructs = []
-                    for field in ("gender", "age", "pitch", "style", "accent", "dialect"):
-                        val = route_kwargs.get(field)
-                        if val and str(val).strip() and str(val).strip().lower() != "auto":
-                            instructs.append(str(val).strip())
-                    if instructs:
-                        route_kwargs["tts_instruct"] = ", ".join(instructs)
-
-                # No voice given (or "default"): the provider's saved default voice. "none" is "no voice at all":
-                # the description (or the engine's own voice) speaks, not the saved clone.
-                target_voice = voice
-                if (
-                    not target_voice
-                    or str(target_voice).lower() in ("default", "alloy")
-                ) and p_def_config.get("voice"):
-                    target_voice = p_def_config.get("voice")
-
-                clean_kwargs = {
-                    k: v for k, v in route_kwargs.items()
-                    if k not in ("voice", "model", "input_text", "api_key", "auth_header", "_archive_metadata")
-                }
-
                 plugin = self.registry.tts_providers.get(p_provider)
                 if not plugin:
                     last_err = ValueError(f"TTS provider not available: {p_provider}")
                     continue
+                engine = await plugin.active_engine() if hasattr(plugin, "active_engine") else None
+                clean_kwargs, target_voice, added = _route_request(route, kwargs, voice, engine)
 
                 keys_to_try = await self.key_pool.get_keys_for_provider(
                     p_provider,
@@ -324,13 +328,15 @@ class TTSRunner:
                         continue
                     tts_params = format_tts_kwargs_summary(clean_kwargs)
                     logger.info(
-                        "Routing TTS stream to %s (model=%s, voice=%s) using key %s%s",
+                        "Routing TTS stream to %s (model=%s, voice=%s) using key %s%s%s",
                         p_provider,
                         p_model,
                         target_voice,
                         key_pool_id or "default",
                         f", params={tts_params}" if tts_params else "",
+                        f", from model settings={added}" if added else "",
                     )
+                    await self._show_added(log_id, req_data, added)
                     if logger.isEnabledFor(logging.DEBUG):
                         logger.debug("TTS route stream debug: keys=%s", sorted(clean_kwargs.keys()))
                     try:

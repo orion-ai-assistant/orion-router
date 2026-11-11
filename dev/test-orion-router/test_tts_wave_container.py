@@ -131,6 +131,7 @@ class TTSRunnerKwargsCollisionTests(unittest.IsolatedAsyncioTestCase):
             create_processing_log=AsyncMock(return_value="log-1"),
             log_usage=AsyncMock(),
             finish_processing_log=AsyncMock(),
+            update_processing_request=AsyncMock(),
         )
 
         runner = TTSRunner(registry, route_resolver, key_pool, telemetry)
@@ -147,4 +148,92 @@ class TTSRunnerKwargsCollisionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(call_kwargs["voice"], "Achernar")
         self.assertNotIn("voice", call_kwargs.get("kwargs", {}))
         self.assertEqual(call_kwargs.get("engine"), "omnivoice")
+
+    async def _stream_with_model_settings(self, default_config, plugin_cls=None, **request):
+        from core.router.runners.tts import TTSRunner
+        from core.router.route_types import RoutePlan, ResolvedRoute
+
+        sent = {}
+
+        async def generate_speech_stream(**kwargs):
+            sent.update(kwargs)
+            yield b"pcm"
+
+        if plugin_cls:  # the real provider class (its active_engine), with the TTS service call replaced
+            plugin = plugin_cls()
+            plugin.generate_speech_stream = generate_speech_stream
+        else:
+            plugin = SimpleNamespace(generate_speech_stream=generate_speech_stream)
+        registry = SimpleNamespace(tts_providers={"local": plugin})
+        route_resolver = SimpleNamespace(resolve=AsyncMock(return_value=RoutePlan(
+            routes=(ResolvedRoute(provider="local", model="local-tts", default_config=default_config),),
+            requested_provider="local",
+        )))
+        key_pool = SimpleNamespace(get_keys_for_provider=AsyncMock(return_value=[("k", "k-id")]), mark_key_error=AsyncMock())
+        telemetry = SimpleNamespace(create_processing_log=AsyncMock(return_value=5), log_usage=AsyncMock(),
+                                    finish_processing_log=AsyncMock(), update_processing_request=AsyncMock())
+        runner = TTSRunner(registry, route_resolver, key_pool, telemetry)
+
+        class NoArchive:  # the real one starts a writer thread that the closed log call would leave running
+            metadata = {}
+            def set_metadata(self, meta): pass
+            def feed(self, chunk): pass
+
+        with patch("core.router.runners.tts.background", lambda coro: coro.close()), \
+                patch("core.router.runners.tts.ArchiveSession", NoArchive):
+            chunks = [c async for c in runner.run_speech_stream("local", "local-tts", "selam", None, **request)]
+        self.assertEqual(chunks, [b"pcm"])
+        return sent, telemetry
+
+    async def test_values_filled_from_model_settings_are_in_the_request_log(self):
+        # The Hub sends no seed or steps; the model's saved seed -2 and steps 15 are used, and the log says so.
+        sent, telemetry = await self._stream_with_model_settings(
+            {"seed": "-2", "steps": "15", "engine": "voxcpm2", "per_engine": {"voxcpm2": {"seed": "-2"}}},
+            language="Turkish", response_format="pcm",
+        )
+        self.assertEqual((sent["seed"], sent["steps"]), ("-2", "15"))
+        log_id, logged = telemetry.update_processing_request.call_args.args
+        self.assertEqual(log_id, 5)
+        self.assertEqual(logged["added_by_router"], {"seed": "-2", "steps": "15", "engine": "voxcpm2"})
+        self.assertEqual(logged["language"], "Turkish")  # the caller's own values stay as they came
+        self.assertNotIn("seed", {k for k in logged if k != "added_by_router"})
+
+    async def test_caller_values_win_and_are_not_listed_as_added(self):
+        sent, telemetry = await self._stream_with_model_settings({"seed": "-2", "voice": "ayse"}, seed=7)
+        self.assertEqual((sent["seed"], sent["voice"]), (7, "ayse"))
+        _, logged = telemetry.update_processing_request.call_args.args
+        self.assertEqual(logged["added_by_router"], {"voice": "ayse"})
+
+    def test_the_running_engines_own_settings_are_used(self):
+        from core.router.runners.tts import _engine_defaults
+        saved = {"engine": "voxcpm2", "gender": "female", "age": "young adult", "seed": "-2",
+                 "per_engine": {"omnivoice": {"gender": "male", "seed": "7"},
+                                "voxcpm2": {"gender": "female", "age": "young adult", "tts_instruct": "calm"}}}
+        # VoxCPM2 runs: its own values, without OmniVoice's character design (it takes a description instead).
+        self.assertEqual(_engine_defaults(saved, "voxcpm2"), {"engine": "voxcpm2", "per_engine": saved["per_engine"],
+                                                               "tts_instruct": "calm"})
+        # OmniVoice runs: its values, not the ones of the engine that was on screen when saved.
+        self.assertEqual(_engine_defaults(saved, "omnivoice")["gender"], "male")
+        self.assertEqual(_engine_defaults(saved, "omnivoice")["seed"], "7")
+        # Nothing saved for the running engine: none of the other's; engine unknown: as saved.
+        self.assertNotIn("seed", _engine_defaults({"engine": "voxcpm2", "seed": "-2"}, "omnivoice"))
+        self.assertEqual(_engine_defaults(saved, None), saved)
+
+    async def test_voxcpm2_gets_no_description_from_omnivoice_settings(self):
+        # The case that changed the voice: OmniVoice's "female, young adult" went to VoxCPM2 as a voice description.
+        from providers.local.tts import LocalTTSProvider
+        with patch.object(LocalTTSProvider, "active_engine", AsyncMock(return_value="voxcpm2"), create=True):
+            sent, telemetry = await self._stream_with_model_settings(
+                {"engine": "voxcpm2", "gender": "female", "age": "young adult",
+                 "per_engine": {"voxcpm2": {"gender": "female", "age": "young adult"}}},
+                seed=32, tts_instruct="", plugin_cls=LocalTTSProvider,
+            )
+        self.assertNotIn("tts_instruct", sent)
+        self.assertNotIn("gender", sent)
+        _, logged = telemetry.update_processing_request.call_args.args
+        self.assertEqual(logged["added_by_router"], {"engine": "voxcpm2"})
+
+    async def test_nothing_filled_leaves_the_log_alone(self):
+        _, telemetry = await self._stream_with_model_settings({}, seed=7)
+        telemetry.update_processing_request.assert_not_awaited()
 

@@ -104,6 +104,15 @@ class TTSDefaultConfig {
     if (typeof obj !== 'object') {
       return new TTSDefaultConfig();
     }
+    // The engine on screen shows its own saved values (per_engine), the ones the Router sends while that engine
+    // runs (core/router/runners/tts.py, _engine_defaults), not the top-level copy, which can be older.
+    const engine = obj.engine || 'omnivoice';
+    const own = obj.per_engine && typeof obj.per_engine === 'object' ? obj.per_engine[engine] : undefined;
+    if (own && typeof own === 'object') {
+      const fields: Record<string, any> = {};
+      for (const key of TTSDefaultConfig.ENGINE_FIELDS) fields[key] = own[key];
+      obj = { ...obj, ...fields };
+    }
     return new TTSDefaultConfig({
       voice: obj.voice,
       gender: obj.gender,
@@ -1164,11 +1173,13 @@ export default function ModelsPage() {
             {isLocal && (
               <div className="flex flex-col gap-1">
                 <label className="text-zinc-500 text-[11px] font-medium">{t('tts.seed')}</label>
+                {/* Blank is not sent: the faint text is only what the engine then uses (VoxCPM2: seed 32, the same
+                    voice every time; OmniVoice: a new one each time). Below -1 is not a seed. */}
                 <Input
-                  type="number"
+                  type="number" min="-1" step="1"
                   value={formState.default_config?.seed || ''}
                   onChange={(e) => updateDefaultConfig(formState, setFormState, 'seed', e.target.value)}
-                  placeholder="-1"
+                  placeholder={selectedEngine === 'voxcpm2' ? '32' : '-1'}
                   className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs"
                 />
               </div>
