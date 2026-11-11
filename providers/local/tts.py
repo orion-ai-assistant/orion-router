@@ -9,6 +9,9 @@ from core.model_catalog import bundled_model
 logger = logging.getLogger("service-router.local.tts")
 TTS_SERVICE = "Local text-to-speech service"
 _LOCAL_TTS_NAMES = {bundled_model("local", "tts")["name"]}
+# Model names the TTS service takes as "no voice description" (services/tts/api.py, generic_model_names).
+_TTS_SERVICE_NAMES = {"local-model", "local-tts", "tts-1", "tts-1-hd", "omnivoice", "omnivoice-gguf", "voxcpm",
+                      "voxcpm2", "voxcpm2-gguf", "default", "none"}
 
 class LocalTTSProvider(BaseTTS):
 
@@ -112,9 +115,13 @@ class LocalTTSProvider(BaseTTS):
         has_persona = bool(voice and str(voice).strip() and str(voice).lower() not in ("none", "null", "default", "alloy"))
         payload_voice = voice if has_persona else ""
 
-        if tts_instruct and not has_persona:
+        if str(model).lower() in _TTS_SERVICE_NAMES or model in _LOCAL_TTS_NAMES:
+            # A name the TTS service knows is not read as a voice description there (services/tts/api.py,
+            # generic_model_names): sent as it is, so the request (and its log) names the model.
+            payload_model = model
+        elif tts_instruct and not has_persona:
             payload_model = tts_instruct
-        elif model not in _LOCAL_TTS_NAMES and model not in ("local", "test", "default", "none"):
+        elif model not in ("local", "test"):
             payload_model = model
         else:
             payload_model = ""

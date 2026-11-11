@@ -118,6 +118,24 @@ class LocalTtsPayloadTests(unittest.TestCase):
         self.assertEqual((given["speed"], given["seed"], given["language"]), (1.2, 32, "Turkish"))
 
 
+class ModelNamedTests(unittest.TestCase):
+    def test_every_log_names_the_model(self):
+        from core.outgoing import logged
+        gemini = {"contents": [{"role": "user", "parts": [{"text": "Selam"}]}], "generationConfig": {}}
+        self.assertEqual(list(logged(gemini, "gemini-3.8-flash")), ["model", "contents", "generationConfig"])
+        self.assertEqual(logged(gemini, "gemini-3.8-flash")["model"], "gemini-3.8-flash")
+        openai = {"model": "gpt-4o-mini", "messages": []}
+        self.assertIs(logged(openai, "gpt-4o-mini"), openai)  # a body with its model stays exactly as sent
+
+    def test_the_local_tts_service_is_sent_the_model_name(self):
+        # It reads "local-tts" as no voice description, as it did "": the request now names the model.
+        from providers.local.tts import LocalTTSProvider
+        plain = LocalTTSProvider()._payload("local-tts", "Merhaba.", None, {})
+        self.assertEqual(plain["model"], "local-tts")
+        described = LocalTTSProvider()._payload("local-tts", "Merhaba.", None, {"tts_instruct": "calm voice"})
+        self.assertEqual((described["model"], described["instructions"]), ("local-tts", "calm voice"))
+
+
 class RealBodyTests(unittest.IsolatedAsyncioTestCase):
     async def test_the_log_is_exactly_what_the_provider_api_received(self):
         # The real OpenAI provider, its HTTP client recording as the shared one does, against a stand-in server.

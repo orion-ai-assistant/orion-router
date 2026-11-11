@@ -9,7 +9,7 @@ import time
 from typing import Any, AsyncGenerator
 
 from providers.base import BaseChat
-from core.outgoing import record_outgoing
+from core.outgoing import logged, record_outgoing
 from core.local_chat_defaults import LOCAL_SAMPLING_DEFAULTS  # only its keys: which sampling values a model can have
 from core.prompt_cache import normalize_usage
 from core import token_estimate as estimate
@@ -225,7 +225,7 @@ class ChatRunner:
             ):
                 if not shown and sent.body is not None:
                     shown = True
-                    await self.telemetry.update_processing_request(log_id, sent.body)
+                    await self.telemetry.update_processing_request(log_id, logged(sent.body, model))
                 chunk = redact(chunk)
                 if isinstance(chunk, dict) and "internal_usage" in chunk:
                     usage = normalize_usage(chunk["internal_usage"])
@@ -328,7 +328,7 @@ class ChatRunner:
             if not shown and sent.body is not None:
                 # Refused before any answer (DeepSeek's 401): the log still shows what the provider was sent.
                 shown = True
-                await self.telemetry.update_processing_request(log_id, sent.body)
+                await self.telemetry.update_processing_request(log_id, logged(sent.body, model))
 
             err_msg = redact(str(exc))
             error_details = err_msg
@@ -386,7 +386,7 @@ class ChatRunner:
                 if key not in req_data and value is not None:
                     req_data[key] = value
             if sent.body is not None:
-                req_data = sent.body  # what was really sent; the summary above only when nothing was
+                req_data = logged(sent.body, model)  # what was really sent; the summary above only when nothing was
 
             if status_val is False:
                 res_data = {

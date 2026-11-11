@@ -50,3 +50,11 @@ async def record_httpx_request(request) -> None:
         recording.record(json.loads(request.content))
     except Exception:
         pass
+
+
+def logged(body: Any, model: str | None) -> Any:
+    """The body as the request log shows it: as it was sent, with the model named first when the body itself has no
+    model (Gemini sends it in the address, models/<model>:streamGenerateContent), so every log says which model."""
+    if isinstance(body, dict) and "model" not in body and model:
+        return {"model": model, **body}
+    return body

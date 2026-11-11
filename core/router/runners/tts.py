@@ -9,7 +9,7 @@ from core.logging_utils import format_tts_kwargs_summary, log_provider_failure
 from fastapi import HTTPException
 
 from core.router.route_types import RoutePlan
-from core.outgoing import record_outgoing
+from core.outgoing import logged, record_outgoing
 
 logger = logging.getLogger("service-router.dynamic")
 
@@ -116,13 +116,14 @@ class TTSRunner:
         log_kwargs["response_json"] = json.dumps(response, ensure_ascii=False)
         await self.telemetry.log_usage(**log_kwargs)
 
-    async def _show_sent(self, log_id, req_data: dict, sent) -> None:
+    async def _show_sent(self, log_id, req_data: dict, sent, model: str | None = None) -> None:
         """The request log shows the body the provider was sent, as it was sent (core/outgoing.py): req_data becomes
         it, so every later write of the log carries it too."""
-        if not isinstance(sent.body, dict) or sent.body == req_data:
+        body = logged(sent.body, model)
+        if not isinstance(body, dict) or body == req_data:
             return
         req_data.clear()
-        req_data.update(sent.body)
+        req_data.update(body)
         await self.telemetry.update_processing_request(log_id, req_data)
 
     async def run_speech(
@@ -201,7 +202,7 @@ class TTSRunner:
                             auth_header=None,
                             **clean_kwargs,
                         )
-                        await self._show_sent(log_id, req_data, sent)
+                        await self._show_sent(log_id, req_data, sent, p_model)
 
                         duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
                         archive = ArchiveSession()
@@ -241,7 +242,7 @@ class TTSRunner:
                         return audio_bytes, content_type, response_metadata
                     except Exception as exc:
                         log_provider_failure(logger, "TTS", p_provider, p_model, exc, log_id)
-                        await self._show_sent(log_id, req_data, sent)  # what the provider refused, too
+                        await self._show_sent(log_id, req_data, sent, p_model)  # what the provider refused, too
                         exc = RuntimeError(redact(str(exc)))
                         await self.key_pool.mark_key_error(key_pool_id, str(exc))
                         last_err = exc
@@ -350,7 +351,7 @@ class TTSRunner:
                         try:
                             async for chunk in stream_gen:
                                 if not stream_started:
-                                    await self._show_sent(log_id, req_data, sent)
+                                    await self._show_sent(log_id, req_data, sent, p_model)
                                 stream_started = True
                                 total_bytes += len(chunk)
                                 archive.feed(chunk)
@@ -381,7 +382,7 @@ class TTSRunner:
                         return
                     except Exception as exc:
                         log_provider_failure(logger, "TTS stream", p_provider, p_model, exc, log_id)
-                        await self._show_sent(log_id, req_data, sent)  # what the provider refused, too
+                        await self._show_sent(log_id, req_data, sent, p_model)  # what the provider refused, too
                         if stream_started:
                             duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
                             content_type = archive.metadata.get("content_type", "audio/pcm")
