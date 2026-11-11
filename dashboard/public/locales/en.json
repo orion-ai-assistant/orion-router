@@ -251,6 +251,7 @@
   "groups.chooseModelPlaceholder": "-- Choose a model --",
   "groups.noModelsAvailable": "No available models for this capability. Register a model first or remove duplicates from the group.",
   "groups.temperaturePlaceholder": "Optional override (0-2)",
+  "groups.fromModel": "From model",
   "playground.textToSynthesizePlaceholder": "Text to synthesize...",
   "playground.textToEmbedPlaceholder": "Text to embed...",
   "playground.systemPromptPlaceholder": "Enter system instructions...",

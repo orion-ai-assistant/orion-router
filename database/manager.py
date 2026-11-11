@@ -16,6 +16,43 @@ from core.model_catalog import load_model_catalog
 
 logger = logging.getLogger("service-router.db")
 
+# Settings made of several values: a group item's override replaces only the values it sets, the model gives the rest
+# (an item that sets top_k alone keeps the model's top_p; one engine's TTS settings leave the other engine's alone).
+_NESTED_SETTINGS = {"local_sampling": 1, "per_engine": 2}
+
+
+def _as_dict(value) -> dict:
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except ValueError:
+            return {}
+    return dict(value) if isinstance(value, dict) else {}
+
+
+def _merge(base: dict, over: dict, depth: int) -> dict:
+    merged = dict(base)
+    for key, value in over.items():
+        if depth > 0 and isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _merge(merged[key], value, depth - 1)
+        else:
+            merged[key] = value
+    return merged
+
+
+def merge_item_config(model_config, item_config) -> dict:
+    """A group item's settings as used: the model's current settings, with only what the item itself sets on top.
+    Items hold no copy of the model (a change of the model reaches every group it is in)."""
+    merged = _as_dict(model_config)
+    for key, value in _as_dict(item_config).items():
+        depth = _NESTED_SETTINGS.get(key)
+        if depth and isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _merge(merged[key], value, depth - 1)
+        else:
+            merged[key] = value
+    return merged
+
+
 class DatabaseManager:
     def __init__(self):
         self.pool: Optional[asyncpg.Pool] = None
@@ -317,6 +354,7 @@ class DatabaseManager:
         await conn.execute("ALTER TABLE router_model_group_items ADD COLUMN IF NOT EXISTS default_config JSONB;")
 
         await self._migrate_legacy_provider_keys(conn)
+        await self._clear_copied_group_item_settings(conn)
         await self._seed_default_models(conn)
         await self._seed_admin_secret(conn)
         await self._migrate_plaintext_keys(conn)
@@ -349,6 +387,22 @@ class DatabaseManager:
             await conn.execute(
                 "UPDATE router_provider_key_pool SET api_key = $1 WHERE id = $2",
                 encrypted, row["id"]
+            )
+
+    async def _clear_copied_group_item_settings(self, conn: asyncpg.Connection) -> None:
+        """Once (2026-11-11): group items no longer copy their model. The groups page used to copy every setting of
+        the model into the item when it was added, so later changes of the model never reached the group. Those
+        copies are dropped; every item then uses its model's current settings until something is set on it."""
+        if await conn.fetchval("SELECT config_value FROM router_configs WHERE config_key='group_item_copies_cleared'"):
+            return
+        async with conn.transaction():
+            await conn.execute(
+                "UPDATE router_model_group_items "
+                "SET thinking_level = NULL, system_prompt = NULL, temperature = NULL, default_config = NULL"
+            )
+            await conn.execute(
+                "INSERT INTO router_configs(config_key,config_value) VALUES('group_item_copies_cleared','true'::jsonb) "
+                "ON CONFLICT(config_key) DO NOTHING"
             )
 
     async def _migrate_legacy_provider_keys(self, conn: asyncpg.Connection) -> None:
@@ -764,10 +818,7 @@ class DatabaseManager:
                        g.name AS requested_name, i.priority,
                        COALESCE(i.thinking_level, m.thinking_level) AS thinking_level,
                        COALESCE(i.system_prompt, m.system_prompt) AS system_prompt,
-                       CASE 
-                           WHEN i.default_config IS NOT NULL AND m.default_config IS NOT NULL THEN m.default_config || i.default_config
-                           ELSE COALESCE(i.default_config, m.default_config)
-                       END AS default_config
+                       m.default_config AS model_config, i.default_config AS item_config
                 FROM router_model_group_items i
                 JOIN router_models m ON m.id = i.model_id
                 JOIN router_model_groups g ON g.id = i.group_id
@@ -779,7 +830,12 @@ class DatabaseManager:
             )
             if not rows:
                 raise ValueError(f"Model group '{group['name']}' exists but has no active models.")
-            return [{"is_group": True, **dict(r)} for r in rows]
+            resolved = []
+            for r in rows:
+                row = dict(r)
+                row["default_config"] = merge_item_config(row.pop("model_config"), row.pop("item_config"))
+                resolved.append({"is_group": True, **row})
+            return resolved
 
         row = await self.fetchrow(
             """

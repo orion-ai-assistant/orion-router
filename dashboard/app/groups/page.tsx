@@ -11,6 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Trash2, ChevronUp, ChevronDown, Move } from 'lucide-react';
+import { localSamplingDefaults, type LocalSamplingKey } from '@/lib/local-chat-defaults';
 
 interface GroupItem {
   id: string;
@@ -63,40 +64,44 @@ interface EditingGroupItemState {
   targetModel?: ModelItem;
 }
 
-type LocalSamplingKey = 'top_p' | 'top_k' | 'min_p' | 'repeat_penalty';
+const SAMPLING_KEYS = Object.keys(localSamplingDefaults) as LocalSamplingKey[];
+const isSet = (value: any) => value !== undefined && value !== null && String(value).trim() !== '';
 
-const localSamplingDefaults: Record<LocalSamplingKey, string> = {
-  top_p: '0.9',
-  top_k: '40',
-  min_p: '0.05',
-  repeat_penalty: '1.05',
+/** The model's own local sampling as the Router uses it: its saved values, else the catalog's. */
+const modelSampling = (model: ModelItem | undefined): Record<LocalSamplingKey, string> => {
+  const saved = model?.default_config?.local_sampling || {};
+  return Object.fromEntries(SAMPLING_KEYS.map((key) =>
+    [key, String(isSet(saved[key]) ? saved[key] : localSamplingDefaults[key])])) as Record<LocalSamplingKey, string>;
 };
 
-const localSamplingConfig = (config: Record<string, any> | undefined): Record<LocalSamplingKey, string> => {
+/** An item's sampling overrides: only the values typed into it (a blank one is the model's). */
+const itemSampling = (config: Record<string, any> | undefined): Partial<Record<LocalSamplingKey, string>> => {
   const current = config?.local_sampling || {};
-  return {
-    top_p: current.top_p !== undefined && current.top_p !== null ? String(current.top_p) : localSamplingDefaults.top_p,
-    top_k: current.top_k !== undefined && current.top_k !== null ? String(current.top_k) : localSamplingDefaults.top_k,
-    min_p: current.min_p !== undefined && current.min_p !== null ? String(current.min_p) : localSamplingDefaults.min_p,
-    repeat_penalty:
-      current.repeat_penalty !== undefined && current.repeat_penalty !== null
-        ? String(current.repeat_penalty)
-        : localSamplingDefaults.repeat_penalty,
-  };
+  return Object.fromEntries(SAMPLING_KEYS.filter((key) => isSet(current[key])).map((key) => [key, String(current[key])]));
 };
 
 const validateLocalSampling = (config: Record<string, any> | undefined) => {
-  const sampling = localSamplingConfig(config);
-  const topP = parseFloat(sampling.top_p);
-  const topK = parseInt(sampling.top_k, 10);
-  const minP = parseFloat(sampling.min_p);
-  const repeatPenalty = parseFloat(sampling.repeat_penalty);
+  const sampling = itemSampling(config);
+  const bad = (key: LocalSamplingKey, check: (value: number) => boolean) =>
+    sampling[key] !== undefined && !check(Number(sampling[key]));
+  return !(bad('top_p', (v) => Number.isFinite(v) && v >= 0 && v <= 1)
+    || bad('top_k', (v) => Number.isInteger(v) && v >= 0)
+    || bad('min_p', (v) => Number.isFinite(v) && v >= 0 && v <= 1)
+    || bad('repeat_penalty', (v) => Number.isFinite(v) && v >= 0));
+};
 
-  if (isNaN(topP) || topP < 0 || topP > 1) return false;
-  if (isNaN(topK) || topK < 0) return false;
-  if (isNaN(minP) || minP < 0 || minP > 1) return false;
-  if (isNaN(repeatPenalty) || repeatPenalty < 0) return false;
-  return true;
+/** What an item saves: its own overrides, nothing copied (blank sampling keys and an empty sampling dropped). */
+const itemConfigToSave = (config: Record<string, any> | undefined): Record<string, any> | null => {
+  const saved: Record<string, any> = { ...(config || {}) };
+  delete saved.local_chat_defaults_version;
+  if (saved.thinking_schema && saved.thinking_schema._raw_options !== undefined) {
+    saved.thinking_schema = { ...saved.thinking_schema };
+    delete saved.thinking_schema._raw_options;
+  }
+  const sampling = itemSampling(saved);
+  if (Object.keys(sampling).length) saved.local_sampling = sampling;
+  else delete saved.local_sampling;
+  return Object.keys(saved).length ? saved : null;
 };
 
 function reorderGroupItemsInState(
@@ -449,12 +454,14 @@ export default function GroupsPage() {
       return;
     }
 
+    // Nothing is copied from the model: an item keeps only what is typed into it (its overrides); every blank field
+    // is the model's current setting, read when the request is made (database/manager.py, resolve).
     setAddItemForm({
       model_id: selectedModel.id,
-      thinking_level: selectedModel.thinking_level || '',
-      temperature: selectedModel.temperature !== undefined && selectedModel.temperature !== null ? String(selectedModel.temperature) : '',
-      system_prompt: selectedModel.system_prompt || '',
-      default_config: { ...(selectedModel.default_config || {}) },
+      thinking_level: '',
+      temperature: '',
+      system_prompt: '',
+      default_config: {},
     });
     setShowAddItemThinking(false);
     setShowAddItemLocalSampling(false);
@@ -488,17 +495,7 @@ export default function GroupsPage() {
 
     if (!validateThinking(addItemForm, schema, isBuiltIn)) return;
 
-    let configObj = { ...(addItemForm.default_config || {}) };
-    if (configObj.thinking_schema && configObj.thinking_schema._raw_options !== undefined) {
-      delete configObj.thinking_schema._raw_options;
-    }
-    if (selectedModel?.provider === 'local' && activeGroupForItems.capability === 'chat') {
-      configObj = {
-        ...configObj,
-        local_chat_defaults_version: 1,
-        local_sampling: localSamplingConfig(configObj),
-      };
-    }
+    const configObj = itemConfigToSave(addItemForm.default_config);
 
     try {
       const res = await adminFetch(`/dashboard/api/model-groups/${activeGroupForItems.id}/items`, {
@@ -526,8 +523,13 @@ export default function GroupsPage() {
     }
   };
 
+  /** A blank item field's hint: the model's value now (it is what the request gets while the field is blank). */
+  const fromModelHint = (value: any) =>
+    `${t('groups.fromModel')}: ${isSet(value) ? String(value).replace(/\s+/g, ' ').slice(0, 80) : '-'}`;
+
   const validateThinking = (itemState: { thinking_level?: string | null; default_config?: Record<string, any> }, schema: any, isBuiltIn: boolean) => {
     const dbSchema = itemState.default_config?.thinking_schema;
+    if (!dbSchema && !itemState.thinking_level) return true;  // nothing set on the item: the model's thinking
     let type = 'none';
     if (dbSchema?.type === 'none') {
       type = 'none';
@@ -583,11 +585,7 @@ export default function GroupsPage() {
 
   const openEditGroupItem = (group: ModelGroup, item: GroupItem) => {
     const targetModel = models.find((m) => m.id === item.model_id || m.name === item.name);
-    const itemConfig = { ...(targetModel?.default_config || {}), ...(item.default_config || {}) };
-    const initialThinking = item.thinking_level !== undefined && item.thinking_level !== null 
-      ? item.thinking_level 
-      : (targetModel?.thinking_level || '');
-
+    // The item's own overrides only; the model's values show as hints in the blank fields.
     setEditingGroupItem({
       groupId: group.id,
       itemId: item.id,
@@ -595,10 +593,10 @@ export default function GroupsPage() {
       name: item.name,
       provider: item.provider,
       priority: item.priority,
-      thinking_level: initialThinking,
-      system_prompt: item.system_prompt !== undefined && item.system_prompt !== null ? item.system_prompt : (targetModel?.system_prompt || ''),
-      temperature: item.temperature !== undefined && item.temperature !== null ? item.temperature.toString() : (targetModel?.temperature !== undefined && targetModel?.temperature !== null ? targetModel.temperature.toString() : ''),
-      default_config: itemConfig,
+      thinking_level: item.thinking_level ?? '',
+      system_prompt: item.system_prompt ?? '',
+      temperature: item.temperature !== undefined && item.temperature !== null ? item.temperature.toString() : '',
+      default_config: { ...(item.default_config || {}) },
       targetModel: targetModel,
     });
     setShowEditItemThinking(false);
@@ -630,17 +628,7 @@ export default function GroupsPage() {
 
     if (!validateThinking(editingGroupItem, schema, isBuiltIn)) return;
 
-    let configObj = { ...(editingGroupItem.default_config || {}) };
-    if (configObj.thinking_schema && configObj.thinking_schema._raw_options !== undefined) {
-      delete configObj.thinking_schema._raw_options;
-    }
-    if (editingGroupItem.provider === 'local' && group?.capability === 'chat') {
-      configObj = {
-        ...configObj,
-        local_chat_defaults_version: 1,
-        local_sampling: localSamplingConfig(configObj),
-      };
-    }
+    const configObj = itemConfigToSave(editingGroupItem.default_config);
 
     try {
       const res = await adminFetch(`/dashboard/api/model-groups/${editingGroupItem.groupId}/items/${editingGroupItem.itemId}`, {
@@ -679,10 +667,16 @@ export default function GroupsPage() {
 
     const isBuiltIn = !!targetModel?.is_builtin_thinking;
     const builtInSchema = targetModel?.builtin_thinking || (isBuiltIn ? targetModel?.thinking : null);
-    const dbSchema = formState.default_config?.thinking_schema || targetModel?.default_config?.thinking_schema;
+    const ownSchema = formState.default_config?.thinking_schema;
+    const dbSchema = ownSchema || targetModel?.default_config?.thinking_schema;
+    // Nothing set on the item: the model's thinking, whatever it is when the request is made.
+    const inherits = !ownSchema && !formState.thinking_level;
+    const modelThinking = targetModel?.thinking_level || '-';
 
     let type = 'none';
-    if (dbSchema?.type === 'none') {
+    if (inherits) {
+      type = 'inherit';
+    } else if (dbSchema?.type === 'none') {
       type = 'none';
     } else if (dbSchema?.type) {
       type = dbSchema.type;
@@ -725,7 +719,11 @@ export default function GroupsPage() {
                   value={type}
                   onChange={(e) => {
                     const val = e.target.value;
-                    if (val === 'none') {
+                    if (val === 'inherit') {
+                      const config = { ...(formState.default_config || {}) };
+                      delete config.thinking_schema;
+                      setFormState({ ...formState, default_config: config, thinking_level: '' });
+                    } else if (val === 'none') {
                       setFormState({ 
                         ...formState, 
                         default_config: { ...formState.default_config, thinking_schema: { type: 'none' } }, 
@@ -750,6 +748,7 @@ export default function GroupsPage() {
                   }}
                   className="orion-native-select orion-native-select-sm"
                 >
+                  <option value="inherit">{t('groups.fromModel')} ({modelThinking})</option>
                   <option value="none">API Default</option>
                   {(!allowedType || allowedType === 'budget') && (
                     <option value="budget">Budget</option>
@@ -816,7 +815,7 @@ export default function GroupsPage() {
               </div>
             )}
 
-            {type !== 'none' && (
+            {type !== 'none' && type !== 'inherit' && (
               <div className="flex flex-col gap-1 pt-2 border-t border-zinc-800/50 mt-1">
                 <label className="text-zinc-500 text-[10px] uppercase">Default</label>
                 {type === 'budget' ? (
@@ -851,6 +850,7 @@ export default function GroupsPage() {
   const renderItemLocalSampling = (
     formState: any,
     setFormState: any,
+    targetModel: ModelItem | undefined,
     provider: string,
     capability: string,
     expanded: boolean,
@@ -858,12 +858,12 @@ export default function GroupsPage() {
   ) => {
     if (provider !== 'local' || capability !== 'chat') return null;
     const config = formState.default_config || {};
-    const sampling = localSamplingConfig(config);
-    const updateSampling = (key: string, value: boolean | string) => {
-      setFormState({
-        ...formState,
-        default_config: { ...config, local_sampling: { ...sampling, [key]: value } },
-      });
+    const sampling = itemSampling(config);  // the item's own values; a blank one is the model's (the hint)
+    const fromModel = modelSampling(targetModel);
+    const updateSampling = (key: LocalSamplingKey, value: string) => {
+      const next: Record<string, string> = { ...sampling, [key]: value };
+      if (!value.trim()) delete next[key];
+      setFormState({ ...formState, default_config: { ...config, local_sampling: next } });
     };
 
     return (
@@ -879,7 +879,7 @@ export default function GroupsPage() {
         </button>
         {expanded && (
           <div className="grid grid-cols-2 gap-2 pl-1 animate-in fade-in slide-in-from-top-1 duration-150">
-            {(Object.keys(localSamplingDefaults) as LocalSamplingKey[]).map((key) => (
+            {SAMPLING_KEYS.map((key) => (
               <label key={key} className="flex flex-col gap-1 text-xs text-zinc-400 font-medium">
                 {key.toUpperCase().replace('_', ' ')}
                 <Input
@@ -887,9 +887,10 @@ export default function GroupsPage() {
                   min="0"
                   max={key === 'top_p' || key === 'min_p' ? '1' : undefined}
                   step={key === 'top_k' ? '1' : '0.01'}
-                  value={sampling[key]}
+                  value={sampling[key] ?? ''}
                   onChange={(e) => updateSampling(key, e.target.value)}
-                  className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm"
+                  placeholder={`${t('groups.fromModel')}: ${fromModel[key]}`}
+                  className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs"
                 />
               </label>
             ))}
@@ -1394,7 +1395,7 @@ export default function GroupsPage() {
                       step="0.1"
                       value={addItemForm.temperature}
                       onChange={(e) => setAddItemForm({ ...addItemForm, temperature: e.target.value })}
-                      placeholder={t('groups.temperaturePlaceholder')}
+                      placeholder={fromModelHint(models.find((m) => m.id === addItemForm.model_id)?.temperature)}
                       className="bg-black/40 border border-zinc-855 text-white rounded px-3 py-2 text-xs"
                     />
                   </div>
@@ -1406,7 +1407,7 @@ export default function GroupsPage() {
                     <Textarea
                       value={addItemForm.system_prompt}
                       onChange={(e) => setAddItemForm({ ...addItemForm, system_prompt: e.target.value })}
-                      placeholder={t('models.systemPromptPlaceholder')}
+                      placeholder={fromModelHint(models.find((m) => m.id === addItemForm.model_id)?.system_prompt)}
                       className="bg-black/40 border border-zinc-850 text-white rounded px-3 py-2 text-xs h-14 resize-none custom-scrollbar overflow-y-auto no-field-sizing"
                     />
                   </div>
@@ -1415,6 +1416,7 @@ export default function GroupsPage() {
                 {renderItemLocalSampling(
                   addItemForm,
                   setAddItemForm,
+                  models.find((m) => m.id === addItemForm.model_id),
                   models.find((m) => m.id === addItemForm.model_id)?.provider || '',
                   activeGroupForItems?.capability || 'chat',
                   showAddItemLocalSampling,
@@ -1488,7 +1490,7 @@ export default function GroupsPage() {
                       step="0.1"
                       value={editingGroupItem.temperature}
                       onChange={(e) => setEditingGroupItem({ ...editingGroupItem, temperature: e.target.value })}
-                      placeholder={t('groups.temperaturePlaceholder')}
+                      placeholder={fromModelHint(editingGroupItem.targetModel?.temperature)}
                       className="bg-black/40 border border-zinc-855 text-white rounded px-3 py-2 text-xs"
                     />
                   </div>
@@ -1501,7 +1503,7 @@ export default function GroupsPage() {
                   <Textarea
                     value={editingGroupItem.system_prompt}
                     onChange={(e) => setEditingGroupItem({ ...editingGroupItem, system_prompt: e.target.value })}
-                    placeholder={t('models.systemPromptPlaceholder')}
+                    placeholder={fromModelHint(editingGroupItem.targetModel?.system_prompt)}
                     className="bg-black/40 border border-zinc-850 text-white rounded px-3 py-2 text-xs h-14 resize-none custom-scrollbar overflow-y-auto no-field-sizing"
                   />
                 </div>
@@ -1510,6 +1512,7 @@ export default function GroupsPage() {
               {renderItemLocalSampling(
                 editingGroupItem,
                 setEditingGroupItem,
+                editingGroupItem.targetModel,
                 editingGroupItem.provider,
                 groups.find((g) => g.id === editingGroupItem.groupId)?.capability || 'chat',
                 showEditItemLocalSampling,

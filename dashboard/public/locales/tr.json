@@ -251,6 +251,7 @@
   "groups.chooseModelPlaceholder": "-- Bir model seçin --",
   "groups.noModelsAvailable": "Bu yetenek için kullanılabilir model bulunmamaktadır. Önce bir model kaydedin veya gruptaki kopyaları kaldırın.",
   "groups.temperaturePlaceholder": "İsteğe bağlı geçersiz kılma (0-2)",
+  "groups.fromModel": "Modelden",
   "playground.textToSynthesizePlaceholder": "Sentezlenecek metni girin...",
   "playground.textToEmbedPlaceholder": "Vektörleştirilecek metni girin...",
   "playground.systemPromptPlaceholder": "Sistem yönergelerini girin...",

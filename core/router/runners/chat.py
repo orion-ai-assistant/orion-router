@@ -9,7 +9,7 @@ import time
 from typing import Any, AsyncGenerator
 
 from providers.base import BaseChat
-from core.local_chat_defaults import LOCAL_SAMPLING_DEFAULTS, LOCAL_TEMPERATURE_DEFAULT
+from core.local_chat_defaults import LOCAL_SAMPLING_DEFAULTS
 from core.prompt_cache import normalize_usage
 from core import token_estimate as estimate
 
@@ -603,8 +603,8 @@ class ChatRunner:
                             route_kwargs["temperature"] = float(route.temperature)
                         except (ValueError, TypeError):
                             pass
-                    if p_provider == "local" and route_kwargs.get("temperature") is None:
-                        route_kwargs["temperature"] = LOCAL_TEMPERATURE_DEFAULT
+                    # No temperature saved for the model and none asked for: none is sent (the local server's own
+                    # default). The Router puts in only what the model page shows as a value.
 
                     if not route_kwargs.get("system_prompt") and route.system_prompt:
                         route_kwargs["system_prompt"] = route.system_prompt
