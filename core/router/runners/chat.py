@@ -9,7 +9,7 @@ import time
 from typing import Any, AsyncGenerator
 
 from providers.base import BaseChat
-from core.local_chat_defaults import LOCAL_SAMPLING_DEFAULTS
+from core.local_chat_defaults import LOCAL_SAMPLING_DEFAULTS  # only its keys: which sampling values a model can have
 from core.prompt_cache import normalize_usage
 from core import token_estimate as estimate
 
@@ -188,6 +188,7 @@ class ChatRunner:
         api_key,
         auth_header,
         log_id=None,
+        added_by_router: dict | None = None,
         **kwargs,
     ):
         # From here this generator writes the log's final state, also when the client leaves (finally below).
@@ -216,7 +217,7 @@ class ChatRunner:
             if not (kwargs.get("bypass_defaults") or kwargs.get("is_playground")):
                 await self.telemetry.update_processing_request(
                     log_id,
-                    local_payload,
+                    {**local_payload, "added_by_router": added_by_router} if added_by_router else local_payload,
                 )
 
         try:
@@ -383,7 +384,9 @@ class ChatRunner:
                 if key not in req_data and value is not None:
                     req_data[key] = value
             if local_payload is not None:
-                req_data = local_payload
+                req_data = dict(local_payload)
+            if added_by_router:
+                req_data["added_by_router"] = added_by_router
 
             if status_val is False:
                 res_data = {
@@ -576,6 +579,8 @@ class ChatRunner:
                 p_provider = route.provider
                 p_model = route.model
                 route_kwargs = {**kwargs}
+                # What the Router itself puts in from the model's settings (Router → Modeller): logged as such.
+                added: dict = {}
 
                 if p_provider == "local":
                     config = route.default_config
@@ -585,10 +590,12 @@ class ChatRunner:
                         except json.JSONDecodeError:
                             config = {}
                     sampling = config.get("local_sampling") if isinstance(config, dict) else None
-                    for key, default in LOCAL_SAMPLING_DEFAULTS.items():
-                        if route_kwargs.get(key) is None:
-                            configured = sampling.get(key) if isinstance(sampling, dict) else None
-                            route_kwargs[key] = default if configured is None else configured
+                    # Only the model's own saved values (the page shows them); none saved: the local server's own.
+                    for key in LOCAL_SAMPLING_DEFAULTS:
+                        configured = sampling.get(key) if isinstance(sampling, dict) else None
+                        if route_kwargs.get(key) is None and configured not in (None, ""):
+                            route_kwargs[key] = configured
+                            added[key] = configured
 
                 bypass_defaults = (
                     kwargs.get("bypass_defaults", False)
@@ -601,13 +608,15 @@ class ChatRunner:
                     if route_kwargs.get("temperature") is None and route.temperature is not None:
                         try:
                             route_kwargs["temperature"] = float(route.temperature)
+                            added["temperature"] = route_kwargs["temperature"]
                         except (ValueError, TypeError):
                             pass
-                    # No temperature saved for the model and none asked for: none is sent (the local server's own
+                    # No temperature saved for the model and none asked for: none is sent (the provider's own
                     # default). The Router puts in only what the model page shows as a value.
 
                     if not route_kwargs.get("system_prompt") and route.system_prompt:
                         route_kwargs["system_prompt"] = route.system_prompt
+                        added["system_prompt"] = route.system_prompt
 
                 incoming_think = next(
                     (
@@ -623,6 +632,8 @@ class ChatRunner:
                     route_kwargs["thinking"] = (
                         incoming_think if incoming_think not in (None, "") else route.thinking_level
                     )
+                    if incoming_think in (None, "") and route.thinking_level not in (None, ""):
+                        added["thinking"] = route.thinking_level
 
                 plugin = self.registry.chat_providers.get(p_provider)
                 if not plugin:
@@ -667,6 +678,7 @@ class ChatRunner:
                             api_key=key_val,
                             auth_header=None,
                             log_id=log_id,
+                            added_by_router=added,
                             **route_kwargs,
                         ):
                             if is_error_chunk(chunk):

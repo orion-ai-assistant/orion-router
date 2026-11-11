@@ -150,6 +150,10 @@ class GeminiTTSProvider(BaseTTS):
                     return list(grp["voices"])
         return list(self._cached_voices)
 
+    def default_voice(self, model: str) -> str:
+        """The voice used when none is given: the Router sends it by name, so the log shows it."""
+        return self.resolve_voice(model, None)
+
     def resolve_voice(self, model: str, voice: str | None) -> str:
         voices = self.get_voices(model)
         if not voice:

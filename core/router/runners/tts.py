@@ -172,6 +172,13 @@ class TTSRunner:
                     continue
                 engine = await plugin.active_engine() if hasattr(plugin, "active_engine") else None
                 clean_kwargs, target_voice, added = _route_request(route, kwargs, voice, engine)
+                if not target_voice and hasattr(plugin, "default_voice"):
+                    # A provider that needs a voice (OpenAI, Gemini) would pick one itself: named here, and logged.
+                    try:
+                        target_voice = plugin.default_voice(p_model)
+                        added["voice"] = target_voice
+                    except Exception:
+                        pass
 
                 keys_to_try = await self.key_pool.get_keys_for_provider(
                     p_provider,
@@ -315,6 +322,13 @@ class TTSRunner:
                     continue
                 engine = await plugin.active_engine() if hasattr(plugin, "active_engine") else None
                 clean_kwargs, target_voice, added = _route_request(route, kwargs, voice, engine)
+                if not target_voice and hasattr(plugin, "default_voice"):
+                    # A provider that needs a voice (OpenAI, Gemini) would pick one itself: named here, and logged.
+                    try:
+                        target_voice = plugin.default_voice(p_model)
+                        added["voice"] = target_voice
+                    except Exception:
+                        pass
 
                 keys_to_try = await self.key_pool.get_keys_for_provider(
                     p_provider,

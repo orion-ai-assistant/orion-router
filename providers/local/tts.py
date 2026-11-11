@@ -119,7 +119,7 @@ class LocalTTSProvider(BaseTTS):
         else:
             payload_model = ""
 
-        speed_val = safe_float(kwargs.get("speed"), 1.0)
+        speed_val = safe_float(kwargs.get("speed"), None)
         guidance_val = safe_float(
             kwargs.get("guidance_scale") or kwargs.get("guidance"), None
         )
@@ -127,19 +127,21 @@ class LocalTTSProvider(BaseTTS):
         # engine's own guidance range (VoxCPM2: 2-4). Not given: the engine's own default.
         creativity_val = safe_float(kwargs.get("temperature"), None) if guidance_val is None else None
         steps_val = safe_int(kwargs.get("steps"), None)  # not given: the TTS service's engine default
-        seed_val = safe_int(kwargs.get("seed"), -1)
-        lang_val = kwargs.get("language") or "Auto"
+        seed_val = safe_int(kwargs.get("seed"), None)
+        lang_val = kwargs.get("language") or None
 
+        # Only what the request (or the model's settings) gave: the TTS service's own defaults stand for the rest
+        # (speed 1, language Auto, seed -1: services/tts/schemas.py), nothing goes out that the log does not show.
         payload = {
             "model": payload_model,
             "input": input_text,
             "voice": payload_voice,
             "response_format": kwargs.get("response_format", "wav"),
-            "speed": speed_val,
-            "language": lang_val,
-            "seed": seed_val,
             "stream": False
         }
+        for key, value in (("speed", speed_val), ("language", lang_val), ("seed", seed_val)):
+            if value is not None:
+                payload[key] = value
         if steps_val is not None:
             payload["steps"] = steps_val
         if guidance_val is not None:
