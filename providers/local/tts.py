@@ -51,9 +51,12 @@ class LocalTTSProvider(BaseTTS):
 
     @staticmethod
     def _foreign_voice(payload: dict, status: int, detail: str) -> bool:
-        """The service refused a saved voice that was made for another engine (switching OmniVoice and VoxCPM2
-        leaves it in the settings): the request is then made again without it, with the engine's own voice."""
-        return bool(status == 400 and payload.get("voice") and "uyumlu değil" in detail)
+        """The service refused a saved voice: one made for another engine (switching OmniVoice and VoxCPM2 leaves it
+        in the settings) or one it does not have at all (a stale name, a cloud voice such as Gemini's "zephyr"). The
+        request is then made again without it, with the engine's own voice (its warm-up voice)."""
+        return bool(
+            status == 400 and payload.get("voice") and ("uyumlu değil" in detail or "bulunamadı" in detail)
+        )
 
     def _payload(self, model: str, input_text: str, voice: str | None, kwargs: dict) -> dict:
         """The local TTS service's request, the same with or without streaming."""

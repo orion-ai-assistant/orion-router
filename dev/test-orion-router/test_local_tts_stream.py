@@ -103,5 +103,18 @@ class LocalStream(unittest.TestCase):
         self.assertEqual(audio, WAV + bytes(9600))
 
 
+class RefusedVoice(unittest.TestCase):
+    """A voice the running engine refuses is dropped and the request made again with the engine's own voice."""
+
+    def test_an_unknown_or_foreign_voice_is_retried_without_it(self):
+        retry = local_tts.LocalTTSProvider._foreign_voice
+        unknown = "Böyle bir ses klonu bulunamadı: 'zephyr'. Aktif motor (voxcpm2-gguf) için mevcut sesler: nika"
+        self.assertTrue(retry({"voice": "zephyr"}, 400, unknown))
+        self.assertTrue(retry({"voice": "x"}, 400, "Bu ses bu motorla uyumlu değil"))
+        self.assertFalse(retry({"voice": ""}, 400, unknown))  # Already the engine's own voice.
+        self.assertFalse(retry({"voice": "zephyr"}, 500, unknown))
+        self.assertFalse(retry({"voice": "nika"}, 400, "Metin çok uzun"))
+
+
 if __name__ == "__main__":
     unittest.main()
