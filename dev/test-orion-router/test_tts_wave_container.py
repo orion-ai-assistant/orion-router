@@ -147,7 +147,7 @@ class TTSRunnerKwargsCollisionTests(unittest.IsolatedAsyncioTestCase):
         _, call_kwargs = mock_plugin.generate_speech.call_args
         self.assertEqual(call_kwargs["voice"], "Achernar")
         self.assertNotIn("voice", call_kwargs.get("kwargs", {}))
-        self.assertEqual(call_kwargs.get("engine"), "omnivoice")
+        self.assertNotIn("engine", call_kwargs)  # the dashboard's note of the engine on screen, not a speech setting
 
     async def _stream_with_model_settings(self, default_config, plugin_cls=None, **request):
         from core.router.runners.tts import TTSRunner
@@ -194,7 +194,7 @@ class TTSRunnerKwargsCollisionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((sent["seed"], sent["steps"]), ("-2", "15"))
         log_id, logged = telemetry.update_processing_request.call_args.args
         self.assertEqual(log_id, 5)
-        self.assertEqual(logged["added_by_router"], {"seed": "-2", "steps": "15", "engine": "voxcpm2"})
+        self.assertEqual(logged["added_by_router"], {"seed": "-2", "steps": "15"})
         self.assertEqual(logged["language"], "Turkish")  # the caller's own values stay as they came
         self.assertNotIn("seed", {k for k in logged if k != "added_by_router"})
 
@@ -230,8 +230,28 @@ class TTSRunnerKwargsCollisionTests(unittest.IsolatedAsyncioTestCase):
             )
         self.assertNotIn("tts_instruct", sent)
         self.assertNotIn("gender", sent)
+        telemetry.update_processing_request.assert_not_awaited()  # nothing was added
+
+    async def test_voxcpm2_gets_no_speed_or_language_from_hidden_settings(self):
+        # The model page shows neither for VoxCPM2; values saved there earlier went out as "speed": "1".
+        from providers.local.tts import LocalTTSProvider
+        with patch.object(LocalTTSProvider, "active_engine", AsyncMock(return_value="voxcpm2"), create=True):
+            sent, telemetry = await self._stream_with_model_settings(
+                {"engine": "voxcpm2", "per_engine": {"voxcpm2": {"speed": "1", "language": "Turkish", "steps": "30"}}},
+                plugin_cls=LocalTTSProvider,
+            )
+        self.assertNotIn("speed", sent)
+        self.assertNotIn("language", sent)
+        self.assertNotIn("engine", sent)
         _, logged = telemetry.update_processing_request.call_args.args
-        self.assertEqual(logged["added_by_router"], {"engine": "voxcpm2"})
+        self.assertEqual(logged["added_by_router"], {"steps": "30"})
+        # OmniVoice takes both: its own saved values still go.
+        with patch.object(LocalTTSProvider, "active_engine", AsyncMock(return_value="omnivoice"), create=True):
+            sent, _ = await self._stream_with_model_settings(
+                {"engine": "omnivoice", "per_engine": {"omnivoice": {"speed": "1.2", "language": "Turkish"}}},
+                plugin_cls=LocalTTSProvider,
+            )
+        self.assertEqual((sent["speed"], sent["language"]), ("1.2", "Turkish"))
 
     async def test_nothing_filled_leaves_the_log_alone(self):
         _, telemetry = await self._stream_with_model_settings({}, seed=7)

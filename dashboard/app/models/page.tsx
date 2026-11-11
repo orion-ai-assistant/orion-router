@@ -73,6 +73,16 @@ class TTSDefaultConfig {
   static readonly ENGINE_FIELDS = ['voice', 'gender', 'age', 'pitch', 'style', 'accent', 'dialect', 'language',
     'speed', 'steps', 'seed', 'tts_instruct'] as const;
 
+  // Fields the page does not show for an engine (it does not take them): never saved for it, so nothing hidden is
+  // sent. Kept in step with core/router/runners/tts.py, _NOT_TAKEN.
+  static readonly NOT_TAKEN: Record<string, readonly string[]> = {
+    voxcpm2: ['gender', 'age', 'pitch', 'style', 'accent', 'dialect', 'speed', 'language'],
+  };
+
+  private shown(key: string, engine = this.engine || 'omnivoice'): boolean {
+    return !(TTSDefaultConfig.NOT_TAKEN[engine] || []).includes(key);
+  }
+
   constructor(data?: Partial<TTSDefaultConfig>) {
     this.per_engine = data?.per_engine && typeof data.per_engine === 'object' ? { ...data.per_engine } : {};
     this.voice = data?.voice && data.voice.toLowerCase() !== 'none' ? data.voice : '';
@@ -134,7 +144,7 @@ class TTSDefaultConfig {
   /** The viewed engine's own fields, as they are now. */
   snapshot(): Record<string, any> {
     const own: Record<string, any> = {};
-    for (const key of TTSDefaultConfig.ENGINE_FIELDS) own[key] = (this as any)[key];
+    for (const key of TTSDefaultConfig.ENGINE_FIELDS) if (this.shown(key)) own[key] = (this as any)[key];
     return own;
   }
 
@@ -153,25 +163,20 @@ class TTSDefaultConfig {
 
   toObject(): Record<string, any> {
     const obj: Record<string, any> = {};
-    if (this.voice) obj.voice = this.voice;
-    if (this.gender && this.gender !== 'Auto') obj.gender = this.gender;
-    if (this.age && this.age !== 'Auto') obj.age = this.age;
-    if (this.pitch && this.pitch !== 'Auto') obj.pitch = this.pitch;
-    if (this.style && this.style !== 'Auto') obj.style = this.style;
-    if (this.accent && this.accent !== 'Auto') obj.accent = this.accent;
-    if (this.dialect && this.dialect !== 'Auto') obj.dialect = this.dialect;
-    if (this.language && this.language !== 'Auto') obj.language = this.language;
-    if (this.speed) obj.speed = this.speed;
-    if (this.steps) obj.steps = this.steps;
-    if (this.seed) obj.seed = this.seed;
+    // The engine on screen's own fields, the ones it shows only.
+    for (const key of TTSDefaultConfig.ENGINE_FIELDS) {
+      const value = (this as any)[key];
+      if (this.shown(key) && value && value !== 'Auto') obj[key] = value;
+    }
     if (this.engine) obj.engine = this.engine;
-    if (this.tts_instruct) obj.tts_instruct = this.tts_instruct;
     // Both engines are saved, whichever one is on screen.
     const per: Record<string, Record<string, any>> = { ...this.per_engine, [this.engine || 'omnivoice']: this.snapshot() };
     const clean: Record<string, Record<string, any>> = {};
     for (const [eng, vals] of Object.entries(per)) {
       const kept: Record<string, any> = {};
-      for (const [k, v] of Object.entries(vals)) if (v !== '' && v !== 'Auto' && v !== undefined && v !== null) kept[k] = v;
+      for (const [k, v] of Object.entries(vals)) {
+        if (this.shown(k, eng) && v !== '' && v !== 'Auto' && v !== undefined && v !== null) kept[k] = v;
+      }
       clean[eng] = kept;
     }
     obj.per_engine = clean;

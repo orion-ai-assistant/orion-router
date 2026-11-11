@@ -24,13 +24,17 @@ def _coerce_default_config(default_config) -> dict:
     return {}
 
 
-# The dashboard's own bookkeeping in a model's settings (each engine's values, kept apart): never shown as sent.
-_UNLOGGED_DEFAULTS = {"per_engine"}
+# The dashboard's own notes in a model's settings (which engine view was on screen, each engine's values kept
+# apart): not speech settings, never given to a provider nor shown as sent.
+_DASHBOARD_NOTES = ("engine", "per_engine")
 # A local TTS model's settings that belong to one engine (the dashboard keeps them per engine, in "per_engine").
 _ENGINE_FIELDS = ("voice", "gender", "age", "pitch", "style", "accent", "dialect", "language", "speed", "steps",
                   "seed", "tts_instruct")
 # OmniVoice's character design: VoxCPM2 takes a written description (tts_instruct) instead.
 _OMNIVOICE_DESIGN = ("gender", "age", "pitch", "style", "accent", "dialect")
+# What an engine does not take, so the model page does not show it for that engine: a value saved there (by an
+# older page, or while the other engine was on screen) is not sent. VoxCPM2 has no speed or language setting.
+_NOT_TAKEN = {"voxcpm2": _OMNIVOICE_DESIGN + ("speed", "language")}
 
 
 def _engine_defaults(defaults: dict, engine: str | None) -> dict:
@@ -49,9 +53,8 @@ def _engine_defaults(defaults: dict, engine: str | None) -> dict:
         chosen = dict(defaults)
     else:
         chosen = shared  # nothing saved for this engine: its own defaults
-    if engine == "voxcpm2":
-        for key in _OMNIVOICE_DESIGN:
-            chosen.pop(key, None)
+    for key in _NOT_TAKEN.get(engine, ()):
+        chosen.pop(key, None)
     return chosen
 
 
@@ -60,7 +63,8 @@ def _route_request(route, kwargs: dict, voice: str | None, engine: str | None = 
     Modeller) for whatever the caller left out. Also returns those filled-in values alone, so the request log shows
     them: a caller that sent no seed must not look as if it spoke with the engine's default when the model's
     saved seed was used. engine: the local TTS engine running now, whose own saved settings apply."""
-    defaults = _engine_defaults(_coerce_default_config(route.default_config), engine)
+    defaults = {k: v for k, v in _engine_defaults(_coerce_default_config(route.default_config), engine).items()
+                if k not in _DASHBOARD_NOTES}
     given = {key: value for key, value in kwargs.items() if value is not None and value != ""}
     route_kwargs = {key: value for key, value in defaults.items() if value is not None and value != ""}
     route_kwargs.update(given)
@@ -92,7 +96,7 @@ def _route_request(route, kwargs: dict, voice: str | None, engine: str | None = 
     }
     added = {
         k: v for k, v in clean_kwargs.items()
-        if k not in given and k not in _UNLOGGED_DEFAULTS and not k.startswith("_")
+        if k not in given and not k.startswith("_")
     }
     if target_voice != voice:
         added["voice"] = target_voice
