@@ -22,10 +22,6 @@ class OpenAITTSProvider(BaseTTS):
         """OpenAI tarafından desteklenen seslerin listesini döner."""
         return ["alloy", "echo", "fable", "onyx", "nova", "shimmer"]
 
-    def default_voice(self, model: str) -> str:
-        """The voice used when none is given (the API needs one): the Router sends it by name, so the log shows it."""
-        return self.get_voices()[0]
-
     async def generate_speech(
         self,
         model: str,

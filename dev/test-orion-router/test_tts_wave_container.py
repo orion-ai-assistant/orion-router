@@ -1,3 +1,4 @@
+import json
 import struct
 import unittest
 from types import SimpleNamespace
@@ -155,12 +156,21 @@ class TTSRunnerKwargsCollisionTests(unittest.IsolatedAsyncioTestCase):
 
         sent = {}
 
+        from core.outgoing import record
+
+        plugin = plugin_cls() if plugin_cls else None
+
         async def generate_speech_stream(**kwargs):
             sent.update(kwargs)
+            # What the provider sends (the real local provider's body, or the arguments for a stand-in), recorded as
+            # the HTTP client does it when a request leaves.
+            body = (plugin._payload(kwargs["model"], kwargs["input_text"], kwargs.get("voice"), dict(kwargs))
+                    if plugin_cls else {k: v for k, v in kwargs.items() if not k.startswith("_") and k != "api_key"})
+            record(body)
+            sent["_body"] = body
             yield b"pcm"
 
-        if plugin_cls:  # the real provider class (its active_engine), with the TTS service call replaced
-            plugin = plugin_cls()
+        if plugin_cls:  # the real provider class (its active_engine and request body), its TTS service call replaced
             plugin.generate_speech_stream = generate_speech_stream
         else:
             plugin = SimpleNamespace(generate_speech_stream=generate_speech_stream)
@@ -185,24 +195,24 @@ class TTSRunnerKwargsCollisionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(chunks, [b"pcm"])
         return sent, telemetry
 
-    async def test_values_filled_from_model_settings_are_in_the_request_log(self):
-        # The Hub sends no seed or steps; the model's saved seed -2 and steps 15 are used, and the log says so.
+    async def test_the_request_log_is_the_body_that_was_sent(self):
+        # The Hub sends no seed or steps; the model's saved seed -2 and steps 15 go, and the log is the body sent.
         sent, telemetry = await self._stream_with_model_settings(
             {"seed": "-2", "steps": "15", "engine": "voxcpm2", "per_engine": {"voxcpm2": {"seed": "-2"}}},
             language="Turkish", response_format="pcm",
         )
         self.assertEqual((sent["seed"], sent["steps"]), ("-2", "15"))
         log_id, logged = telemetry.update_processing_request.call_args.args
-        self.assertEqual(log_id, 5)
-        self.assertEqual(logged["added_by_router"], {"seed": "-2", "steps": "15"})
-        self.assertEqual(logged["language"], "Turkish")  # the caller's own values stay as they came
-        self.assertNotIn("seed", {k for k in logged if k != "added_by_router"})
+        self.assertEqual((log_id, logged), (5, sent["_body"]))
+        self.assertNotIn("added_by_router", logged)
+        final = json.loads(telemetry.log_usage.call_args.kwargs["request_json"]) if telemetry.log_usage.call_args else logged
+        self.assertEqual(final, sent["_body"])
 
-    async def test_caller_values_win_and_are_not_listed_as_added(self):
+    async def test_caller_values_win(self):
         sent, telemetry = await self._stream_with_model_settings({"seed": "-2", "voice": "ayse"}, seed=7)
         self.assertEqual((sent["seed"], sent["voice"]), (7, "ayse"))
         _, logged = telemetry.update_processing_request.call_args.args
-        self.assertEqual(logged["added_by_router"], {"voice": "ayse"})
+        self.assertEqual((logged["seed"], logged["voice"]), (7, "ayse"))
 
     def test_the_running_engines_own_settings_are_used(self):
         from core.router.runners.tts import _engine_defaults
@@ -230,7 +240,9 @@ class TTSRunnerKwargsCollisionTests(unittest.IsolatedAsyncioTestCase):
             )
         self.assertNotIn("tts_instruct", sent)
         self.assertNotIn("gender", sent)
-        telemetry.update_processing_request.assert_not_awaited()  # nothing was added
+        _, logged = telemetry.update_processing_request.call_args.args
+        self.assertNotIn("instructions", logged)  # the body the TTS service got: no voice description
+        self.assertEqual(logged["seed"], 32)
 
     async def test_voxcpm2_gets_no_speed_or_language_from_hidden_settings(self):
         # The model page shows neither for VoxCPM2; values saved there earlier went out as "speed": "1".
@@ -244,7 +256,9 @@ class TTSRunnerKwargsCollisionTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("language", sent)
         self.assertNotIn("engine", sent)
         _, logged = telemetry.update_processing_request.call_args.args
-        self.assertEqual(logged["added_by_router"], {"steps": "30"})
+        self.assertEqual(logged["steps"], 30)
+        self.assertNotIn("speed", logged)
+        self.assertNotIn("language", logged)
         # OmniVoice takes both: its own saved values still go.
         with patch.object(LocalTTSProvider, "active_engine", AsyncMock(return_value="omnivoice"), create=True):
             sent, _ = await self._stream_with_model_settings(
@@ -253,7 +267,8 @@ class TTSRunnerKwargsCollisionTests(unittest.IsolatedAsyncioTestCase):
             )
         self.assertEqual((sent["speed"], sent["language"]), ("1.2", "Turkish"))
 
-    async def test_nothing_filled_leaves_the_log_alone(self):
-        _, telemetry = await self._stream_with_model_settings({}, seed=7)
-        telemetry.update_processing_request.assert_not_awaited()
+    async def test_with_nothing_saved_the_log_is_still_what_was_sent(self):
+        sent, telemetry = await self._stream_with_model_settings({}, seed=7)
+        _, logged = telemetry.update_processing_request.call_args.args
+        self.assertEqual(logged, sent["_body"])
 

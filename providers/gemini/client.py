@@ -19,6 +19,9 @@ from collections import OrderedDict
 from typing import Optional
 
 from google import genai
+from google.genai import types
+
+from core.outgoing import record_httpx_request
 
 logger = logging.getLogger("service-router.gemini.client")
 
@@ -74,7 +77,9 @@ def get_gemini_client(api_key: str) -> genai.Client:
 
         masked_key = f"{api_key[:6]}...{api_key[-4:]}" if len(api_key) > 10 else "***"
         logger.info(f"Initializing new persistent Gemini GenAI Client for key [{masked_key}]")
-        client = genai.Client(api_key=api_key.strip())
+        # The SDK sends with httpx: each request body it sends is what the request log shows (core/outgoing.py).
+        client = genai.Client(api_key=api_key.strip(), http_options=types.HttpOptions(
+            async_client_args={"event_hooks": {"request": [record_httpx_request]}}))
         _client_pool[kh] = client
         return client
 

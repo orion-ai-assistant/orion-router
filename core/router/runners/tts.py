@@ -9,6 +9,7 @@ from core.logging_utils import format_tts_kwargs_summary, log_provider_failure
 from fastapi import HTTPException
 
 from core.router.route_types import RoutePlan
+from core.outgoing import record_outgoing
 
 logger = logging.getLogger("service-router.dynamic")
 
@@ -94,13 +95,7 @@ def _route_request(route, kwargs: dict, voice: str | None, engine: str | None = 
         k: v for k, v in route_kwargs.items()
         if k not in ("voice", "model", "input_text", "api_key", "auth_header", "_archive_metadata")
     }
-    added = {
-        k: v for k, v in clean_kwargs.items()
-        if k not in given and not k.startswith("_")
-    }
-    if target_voice != voice:
-        added["voice"] = target_voice
-    return clean_kwargs, target_voice, added
+    return clean_kwargs, target_voice
 
 
 class TTSRunner:
@@ -121,15 +116,13 @@ class TTSRunner:
         log_kwargs["response_json"] = json.dumps(response, ensure_ascii=False)
         await self.telemetry.log_usage(**log_kwargs)
 
-    async def _show_added(self, log_id, req_data: dict, added: dict) -> None:
-        """Puts what the Router itself filled in from the model's settings into the logged request, under its own
-        key: the caller's request stays as it came, and nothing the provider got is hidden."""
-        if added == req_data.get("added_by_router", {}):
+    async def _show_sent(self, log_id, req_data: dict, sent) -> None:
+        """The request log shows the body the provider was sent, as it was sent (core/outgoing.py): req_data becomes
+        it, so every later write of the log carries it too."""
+        if not isinstance(sent.body, dict) or sent.body == req_data:
             return
-        if added:
-            req_data["added_by_router"] = added
-        else:
-            req_data.pop("added_by_router", None)
+        req_data.clear()
+        req_data.update(sent.body)
         await self.telemetry.update_processing_request(log_id, req_data)
 
     async def run_speech(
@@ -171,14 +164,7 @@ class TTSRunner:
                     last_err = ValueError(f"TTS provider not available: {p_provider}")
                     continue
                 engine = await plugin.active_engine() if hasattr(plugin, "active_engine") else None
-                clean_kwargs, target_voice, added = _route_request(route, kwargs, voice, engine)
-                if not target_voice and hasattr(plugin, "default_voice"):
-                    # A provider that needs a voice (OpenAI, Gemini) would pick one itself: named here, and logged.
-                    try:
-                        target_voice = plugin.default_voice(p_model)
-                        added["voice"] = target_voice
-                    except Exception:
-                        pass
+                clean_kwargs, target_voice = _route_request(route, kwargs, voice, engine)
 
                 keys_to_try = await self.key_pool.get_keys_for_provider(
                     p_provider,
@@ -196,15 +182,14 @@ class TTSRunner:
                         continue
                     tts_params = format_tts_kwargs_summary(clean_kwargs)
                     logger.info(
-                        "Routing TTS to %s (model=%s, voice=%s) using key %s%s%s",
+                        "Routing TTS to %s (model=%s, voice=%s) using key %s%s",
                         p_provider,
                         p_model,
                         target_voice,
                         key_pool_id or "default",
                         f", params={tts_params}" if tts_params else "",
-                        f", from model settings={added}" if added else "",
                     )
-                    await self._show_added(log_id, req_data, added)
+                    sent = record_outgoing()
                     if logger.isEnabledFor(logging.DEBUG):
                         logger.debug("TTS route debug: keys=%s", sorted(clean_kwargs.keys()))
                     try:
@@ -216,6 +201,7 @@ class TTSRunner:
                             auth_header=None,
                             **clean_kwargs,
                         )
+                        await self._show_sent(log_id, req_data, sent)
 
                         duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
                         archive = ArchiveSession()
@@ -255,6 +241,7 @@ class TTSRunner:
                         return audio_bytes, content_type, response_metadata
                     except Exception as exc:
                         log_provider_failure(logger, "TTS", p_provider, p_model, exc, log_id)
+                        await self._show_sent(log_id, req_data, sent)  # what the provider refused, too
                         exc = RuntimeError(redact(str(exc)))
                         await self.key_pool.mark_key_error(key_pool_id, str(exc))
                         last_err = exc
@@ -321,14 +308,7 @@ class TTSRunner:
                     last_err = ValueError(f"TTS provider not available: {p_provider}")
                     continue
                 engine = await plugin.active_engine() if hasattr(plugin, "active_engine") else None
-                clean_kwargs, target_voice, added = _route_request(route, kwargs, voice, engine)
-                if not target_voice and hasattr(plugin, "default_voice"):
-                    # A provider that needs a voice (OpenAI, Gemini) would pick one itself: named here, and logged.
-                    try:
-                        target_voice = plugin.default_voice(p_model)
-                        added["voice"] = target_voice
-                    except Exception:
-                        pass
+                clean_kwargs, target_voice = _route_request(route, kwargs, voice, engine)
 
                 keys_to_try = await self.key_pool.get_keys_for_provider(
                     p_provider,
@@ -346,15 +326,14 @@ class TTSRunner:
                         continue
                     tts_params = format_tts_kwargs_summary(clean_kwargs)
                     logger.info(
-                        "Routing TTS stream to %s (model=%s, voice=%s) using key %s%s%s",
+                        "Routing TTS stream to %s (model=%s, voice=%s) using key %s%s",
                         p_provider,
                         p_model,
                         target_voice,
                         key_pool_id or "default",
                         f", params={tts_params}" if tts_params else "",
-                        f", from model settings={added}" if added else "",
                     )
-                    await self._show_added(log_id, req_data, added)
+                    sent = record_outgoing()
                     if logger.isEnabledFor(logging.DEBUG):
                         logger.debug("TTS route stream debug: keys=%s", sorted(clean_kwargs.keys()))
                     try:
@@ -370,6 +349,8 @@ class TTSRunner:
                         )
                         try:
                             async for chunk in stream_gen:
+                                if not stream_started:
+                                    await self._show_sent(log_id, req_data, sent)
                                 stream_started = True
                                 total_bytes += len(chunk)
                                 archive.feed(chunk)
@@ -400,6 +381,7 @@ class TTSRunner:
                         return
                     except Exception as exc:
                         log_provider_failure(logger, "TTS stream", p_provider, p_model, exc, log_id)
+                        await self._show_sent(log_id, req_data, sent)  # what the provider refused, too
                         if stream_started:
                             duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
                             content_type = archive.metadata.get("content_type", "audio/pcm")

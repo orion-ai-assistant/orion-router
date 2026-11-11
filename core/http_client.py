@@ -12,6 +12,8 @@ import threading
 from typing import Optional
 import httpx
 
+from core.outgoing import record_httpx_request
+
 logger = logging.getLogger("service-router.http_client")
 
 _shared_async_client: Optional[httpx.AsyncClient] = None
@@ -41,6 +43,8 @@ def get_http_client(timeout: float = 120.0) -> httpx.AsyncClient:
                 _shared_async_client = httpx.AsyncClient(
                     limits=limits,
                     timeout=timeouts,
+                    # Each JSON body sent is what the request log shows (core/outgoing.py).
+                    event_hooks={"request": [record_httpx_request]},
                 )
                 logger.debug("Initialized shared persistent httpx.AsyncClient with Keep-Alive pool.")
     return _shared_async_client

@@ -76,8 +76,12 @@ class RouterRegressions(unittest.IsolatedAsyncioTestCase):
 
     async def test_local_log_keeps_exact_upstream_payload(self):
         local = LocalChatProvider()
+        real_payload = local.build_payload
 
-        async def successful_chat(**kwargs):
+        async def successful_chat(model, messages, api_key=None, auth_header=None, **kwargs):
+            # The body the real provider sends, recorded as the shared HTTP client does when it leaves.
+            from core.outgoing import record
+            record(real_payload(model, messages, **kwargs))
             yield 'data: {"choices": [{"delta": {"content": "hello"}}]}\n\n'
 
         local.stream_chat = successful_chat
