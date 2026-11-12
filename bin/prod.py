@@ -182,7 +182,10 @@ def _main(runtime, force_build: bool = False) -> None:
 
         backoff = CrashBackoff()
         while not runtime.requested():
-            runtime.refresh_children()
+            try:
+                runtime.refresh_children()
+            except Exception as exc:  # A look that fails this second must not stop a serving Router.
+                warn(f"Child records not refreshed: {exc}")
             alive = [p for _, p in procs if p.poll() is None]
             if not alive:
                 restart_flag = ROOT / ".restart_requested"
