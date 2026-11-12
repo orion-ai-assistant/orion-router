@@ -253,33 +253,33 @@ async def delete_admin_key(key_id: str):
 # ---------------------------------------------------------------------------
 
 @router.get("/api/logs", dependencies=[Depends(verify_admin)])
-async def get_admin_logs(limit: int = 100, offset: int = 0):
+async def get_admin_logs(limit: int = 100, offset: int = 0, with_total: bool = True):
+    """One page of request logs, newest first, with key and Hub names.
+
+    Only summary columns are read: request/response bodies (megabytes with audio or images) stay closed
+    until a row's details are opened. The page is taken from the time index first, then joined. A page
+    that polls passes with_total=false: counting every row each few seconds was most of the cost."""
     if limit < 1 or limit > 500 or offset < 0:
         raise HTTPException(422, "Geçersiz sayfalama.")
-    """Son 100 istek kaydını key adıyla birlikte döner."""
     try:
         rows = await db_manager.fetch(
             """
+            WITH page AS (
+                SELECT id FROM router_request_logs ORDER BY created_at DESC, id DESC LIMIT $1 OFFSET $2
+            )
             SELECT l.id, k.name as key_name, k.hub_id, h.name AS hub_name, l.upstream_key_id, l.upstream_key_source, l.provider, l.requested_model, l.resolved_model,
                    l.tokens_used, l.prompt_tokens, l.completion_tokens, l.cached_tokens, l.cache_write_tokens, l.usage_estimated,
-                   COALESCE(
-                       NULLIF(l.thoughts_tokens, 0),
-                       CASE
-                           WHEN l.response_json->'usage'->>'thoughts_tokens' ~ '^[0-9]+$'
-                           THEN (l.response_json->'usage'->>'thoughts_tokens')::INTEGER
-                       END
-                   ) AS thoughts_tokens,
+                   l.thoughts_tokens,
                    l.cost, l.success, l.created_at, l.ttft_ms, l.duration_ms,
                    COALESCE(l.capability, 'chat') as capability,
                    COALESCE(l.status, CASE WHEN l.success = true THEN 'success' WHEN l.success = false THEN 'failed' ELSE 'interrupted' END) as status
-            FROM router_request_logs l
+            FROM page JOIN router_request_logs l ON l.id = page.id
             LEFT JOIN router_virtual_keys k ON l.key_id = k.id
             LEFT JOIN router_hubs h ON k.hub_id=h.id
             ORDER BY l.created_at DESC, l.id DESC
-            LIMIT $1 OFFSET $2
             """, limit, offset
         )
-        total = await db_manager.fetchval("SELECT COUNT(*) FROM router_request_logs")
+        total = await db_manager.fetchval("SELECT COUNT(*) FROM router_request_logs") if with_total else None
         return {"logs": [dict(r) for r in rows], "limit": limit, "offset": offset, "total": total}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

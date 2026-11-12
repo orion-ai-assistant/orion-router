@@ -53,7 +53,7 @@ def test_state_is_saved_only_when_children_change():
     job = Mock()
     job.__enter__ = Mock(return_value=job)
     job.__exit__ = Mock(return_value=False)
-    job.records.side_effect = lambda: records[0]
+    job.records.side_effect = lambda strict=True: records[0]
     adapter = Mock()
     adapter.Job.return_value = job
     runtime.save = Mock()

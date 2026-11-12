@@ -72,14 +72,17 @@ export default function LogsPage() {
       setLoading(true);
     }
     try {
-      const res = await adminFetch(`/dashboard/api/logs?limit=100&offset=${offset}`);
+      // A poll only refreshes the rows on screen: counting the whole table every 5 s was most of its cost.
+      const res = await adminFetch(`/dashboard/api/logs?limit=100&offset=${offset}${mode === 'poll' ? '&with_total=false' : ''}`);
       if (res.ok) {
         const data = await res.json();
         if (sequence !== fetchSequence.current) {
           return;
         }
-        setTotal(data.total || 0);
-        if(offset > 0 && offset >= data.total) {setOffset(Math.max(0, (Math.ceil(data.total / 100)-1)*100));return;}
+        if (typeof data.total === 'number') {
+          setTotal(data.total);
+          if(offset > 0 && offset >= data.total) {setOffset(Math.max(0, (Math.ceil(data.total / 100)-1)*100));return;}
+        }
         const incoming: LogItem[] = data.logs || [];
         if (mode === 'poll' && offset === 0) {
           setLogs((prev) => {
@@ -131,9 +134,14 @@ export default function LogsPage() {
   useEffect(() => {
     fetchLogs('initial');
 
+    // A tab left open for days in the background asks nothing; it catches up when shown again.
     const pollId = window.setInterval(() => {
-      fetchLogs('poll');
+      if (document.visibilityState === 'visible') fetchLogs('poll');
     }, 5000);
+    const handleVisible = () => {
+      if (document.visibilityState === 'visible') fetchLogs('refresh');
+    };
+    document.addEventListener('visibilitychange', handleVisible);
 
     const handleAuth = () => {
       fetchLogs('refresh');
@@ -141,6 +149,7 @@ export default function LogsPage() {
     window.addEventListener('orion-authenticated', handleAuth);
     return () => {
       window.clearInterval(pollId);
+      document.removeEventListener('visibilitychange', handleVisible);
       window.removeEventListener('orion-authenticated', handleAuth);
     };
   }, [offset]);

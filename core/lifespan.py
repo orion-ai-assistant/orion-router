@@ -180,11 +180,13 @@ async def lifespan(app: FastAPI):
         advertiser.start()
 
     discovery_task = asyncio.create_task(start_discovery())
+    from core.log_maintenance import run_forever as maintain_request_logs
+    log_maintenance_task = asyncio.create_task(admitted(maintain_request_logs()))
     report('backend.started', process_age())
     try:
         yield
     finally:
-        for task in (discovery_task, warmup_task, encoder_task):
+        for task in (discovery_task, warmup_task, encoder_task, log_maintenance_task):
             task.cancel()
             with suppress(asyncio.CancelledError):
                 await task

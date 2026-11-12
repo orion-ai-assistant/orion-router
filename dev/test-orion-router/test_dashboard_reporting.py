@@ -14,6 +14,16 @@ class DashboardReportingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(fetch.await_args.args[1:], (100,100))
         self.assertIn('l.created_at DESC, l.id DESC', fetch.await_args.args[0])
 
+    async def test_polling_page_skips_the_row_count_and_never_reads_bodies(self):
+        with patch.object(db_manager, 'fetch', AsyncMock(return_value=[{'id':5}])) as fetch, patch.object(db_manager, 'fetchval', AsyncMock(return_value=9)) as count:
+            result = await admin.get_admin_logs(limit=50, offset=0, with_total=False)
+        self.assertEqual(result, {'logs':[{'id':5}], 'limit':50, 'offset':0, 'total':None})
+        count.assert_not_awaited()
+        sql = fetch.await_args.args[0]
+        self.assertNotIn('response_json', sql)
+        self.assertNotIn('request_json', sql)
+        self.assertIn('FROM router_request_logs ORDER BY created_at DESC, id DESC LIMIT $1 OFFSET $2', ' '.join(sql.split()))
+
     async def test_invalid_pagination_never_queries_database(self):
         with patch.object(db_manager, 'fetch', AsyncMock()) as fetch:
             for limit,offset in [(0,0),(501,0),(100,-1)]:

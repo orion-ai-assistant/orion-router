@@ -301,6 +301,8 @@ class DatabaseManager:
             UPDATE router_request_logs l SET recorded_key_id=v.id,recorded_hub_id=v.hub_id
               FROM router_virtual_keys v WHERE l.key_id=v.id AND l.recorded_key_id IS NULL;
             CREATE INDEX IF NOT EXISTS router_logs_key_time ON router_request_logs(key_id,created_at);
+            -- The log page reads the newest rows: without this every page sorted the whole table.
+            CREATE INDEX IF NOT EXISTS router_logs_time ON router_request_logs(created_at DESC, id DESC);
         ''')
 
         # 7. Model registry and model groups.
