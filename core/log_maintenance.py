@@ -17,7 +17,8 @@ logger = logging.getLogger(__name__)
 
 PAYLOAD_DAYS = 30
 EVERY_SECONDS = 6 * 3600
-BATCH = 500
+BATCH = 100  # One statement stays far below the pool's 60 s command timeout.
+SMALL = 512  # Bytes as stored: a body this small is left as it is (the note itself is smaller).
 PAUSE = 0.2  # Between batches: requests being served keep the database.
 BACKFILL_DONE = 'maintenance.thoughts_tokens_backfilled'
 PRUNED = json.dumps({'note': f'Gövde {PAYLOAD_DAYS} günden eski olduğu için silindi; özet satırı duruyor.'})
@@ -54,7 +55,7 @@ async def backfill_thoughts_tokens() -> int:
 
 
 async def prune_old_payloads() -> int:
-    """Replace the bodies of rows older than PAYLOAD_DAYS with a short note, a batch at a time."""
+    """Replace the large bodies of rows older than PAYLOAD_DAYS with a short note, a batch at a time."""
     pruned, last_id = 0, 0
     while True:
         rows = await db_manager.fetch(
@@ -67,12 +68,14 @@ async def prune_old_payloads() -> int:
                 UPDATE router_request_logs l SET request_json = $4::jsonb, response_json = $4::jsonb
                 FROM batch
                 WHERE l.id = batch.id AND l.status IS DISTINCT FROM 'processing'
-                  AND (l.request_json IS DISTINCT FROM $4::jsonb OR l.response_json IS DISTINCT FROM $4::jsonb)
+                  -- pg_column_size reads the stored size without opening the body; comparing the bodies
+                  -- themselves opened megabytes per row and ran past the 60 s timeout on the first round.
+                  AND (pg_column_size(l.request_json) > $5 OR pg_column_size(l.response_json) > $5)
                 RETURNING l.id
             )
             SELECT (SELECT max(id) FROM batch) AS last_id, (SELECT count(*) FROM updated) AS pruned
             """,
-            last_id, PAYLOAD_DAYS, BATCH, PRUNED,
+            last_id, PAYLOAD_DAYS, BATCH, PRUNED, SMALL,
         )
         if not rows or rows[0]['last_id'] is None:
             return pruned

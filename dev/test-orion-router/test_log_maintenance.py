@@ -48,7 +48,13 @@ class LogMaintenanceTests(unittest.IsolatedAsyncioTestCase):
         sql = ' '.join(fetch.await_args_list[0].args[0].split())
         self.assertIn("status IS DISTINCT FROM 'processing'", sql)
         self.assertIn('created_at < NOW() - make_interval(days => $2)', sql)
+        # Only large bodies are pruned, by stored size: the bodies themselves are never compared or opened.
+        self.assertIn('pg_column_size(l.request_json) > $5 OR pg_column_size(l.response_json) > $5', sql)
+        self.assertNotIn('IS DISTINCT FROM $4', sql)
         self.assertEqual(fetch.await_args_list[0].args[1:4], (0, 30, log_maintenance.BATCH))
+        self.assertEqual(fetch.await_args_list[0].args[5], log_maintenance.SMALL)
+        self.assertEqual(log_maintenance.BATCH, 100)
+        self.assertGreater(log_maintenance.SMALL, len(log_maintenance.PRUNED))
         self.assertEqual([call.args[1] for call in fetch.await_args_list], [0, 500, 640])
         note = json.loads(fetch.await_args_list[0].args[4])
         self.assertIn('30', note['note'])
