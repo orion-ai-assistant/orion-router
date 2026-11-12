@@ -70,6 +70,29 @@ def launch(router_port: str, runtime) -> list[tuple[str, subprocess.Popen]]:
     return procs
 
 
+class CrashBackoff:
+    """main.py ended without being asked to: started again after 1, 2, 4 ... up to 60 s and never given up (the
+    supervisor used to stop, leaving the Router down until someone started it). A run of STABLE seconds starts
+    the delays over."""
+    STABLE = 600
+    MAX_DELAY = 60
+
+    def __init__(self, clock=time.monotonic):
+        self.clock = clock
+        self.failures = 0
+        self.started = clock()
+
+    def crashed(self) -> float:
+        if self.clock() - self.started >= self.STABLE:
+            self.failures = 0
+        delay = min(2 ** self.failures, self.MAX_DELAY)
+        self.failures += 1
+        return delay
+
+    def started_now(self) -> None:
+        self.started = self.clock()
+
+
 def shutdown(procs, stop_pg, runtime):
     runtime.stop_children()
     # Database is stopped by Runtime only after every child exit is verified.
@@ -157,6 +180,7 @@ def _main(runtime, force_build: bool = False) -> None:
         banner_thread.daemon = True
         banner_thread.start()
 
+        backoff = CrashBackoff()
         while not runtime.requested():
             runtime.refresh_children()
             alive = [p for _, p in procs if p.poll() is None]
@@ -170,9 +194,22 @@ def _main(runtime, force_build: bool = False) -> None:
                     info(f"{CYAN}{BOLD}✔  Güncelleme sonrası servis yeniden başlatılıyor...{RESET}")
                     time.sleep(0.5)
                     procs = launch(router_port, runtime)
+                    backoff.started_now()
                     continue
                 warn(t("service_crashed_single"))
-                break
+                delay = backoff.crashed()
+                info(f"Router service is started again in {delay:.0f} s")
+                deadline = time.monotonic() + delay
+                while time.monotonic() < deadline and not runtime.requested():
+                    time.sleep(.5)
+                if runtime.requested():
+                    break
+                try:
+                    procs = launch(router_port, runtime)
+                    backoff.started_now()
+                except Exception as exc:  # Its port or old process still held: the next round tries again.
+                    warn(f"Router service could not start again: {exc}")
+                continue
             time.sleep(1)
     except RuntimeError as exc:
         err(str(exc))
