@@ -14,6 +14,24 @@ from core.local_chat_defaults import LOCAL_SAMPLING_DEFAULTS  # only its keys: w
 from core.prompt_cache import normalize_usage
 from core import token_estimate as estimate
 
+
+def is_connection_failure(exc: BaseException) -> bool:
+    """A dropped or refused connection or a timeout (httpx/aiohttp/OS), not an answer the provider gave."""
+    try:
+        import httpx
+        if isinstance(exc, httpx.TransportError):
+            return True
+    except ImportError:
+        pass
+    return isinstance(exc, (ConnectionError, TimeoutError, asyncio.TimeoutError))
+
+
+def describe_failure(exc: BaseException, provider: str) -> str:
+    """A readable message for an exception that carries none (httpx ReadError: 'No error message supplied')."""
+    if is_connection_failure(exc):
+        return f"{provider} bağlantısı yanıt gelmeden koptu ({type(exc).__name__}). Tekrar dene."
+    return f"{provider} isteği başarısız oldu ({type(exc).__name__})."
+
 logger = logging.getLogger("service-router.dynamic")
 
 
@@ -702,9 +720,18 @@ class ChatRunner:
                             break
                     except Exception as exc:
                         log_chat_failure(logger, p_provider, p_model, exc, log_id)
-                        err_str = redact(str(exc))
+                        err_str = redact(str(exc)) or describe_failure(exc, p_provider)
                         if is_key_specific_error(err_str):
                             await self.key_pool.mark_key_error(key_pool_id, err_str)
+                        elif is_connection_failure(exc) and not yielded_any_this_try:
+                            # The connection dropped before a word came back (httpx ReadError carries no message):
+                            # not the request's fault, so the next key and the fallback routes may still answer.
+                            logger.info(
+                                "Route %s/%s | log_id=%s | Connection lost before any output; trying the next key/route.",
+                                p_provider,
+                                p_model,
+                                log_id if log_id is not None else "-",
+                            )
                         else:
                             logger.info(
                                 "Route %s/%s | log_id=%s | Key rotation skipped: request/model error; checking fallback routes.",
