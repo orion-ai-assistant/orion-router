@@ -79,6 +79,26 @@ export function extractLogAttachments(request: unknown, response: unknown): LogA
           }
         }
       }
+      // Remote references: Gemini fileData/file_data {mimeType,fileUri}; Anthropic image/document {source:{type:'url'}}.
+      const kindOf = (m?: string): LogAttachment['kind'] | undefined => {
+        const major = m?.split('/')[0]?.toLowerCase();
+        return major === 'image' || major === 'audio' || major === 'video' ? major : m ? 'document' : undefined;
+      };
+      for (const key of ['fileData', 'file_data']) {
+        const file = node[key];
+        if (!file || typeof file !== 'object') continue;
+        const f = file as Record<string, unknown>;
+        const uri = f.fileUri ?? f.file_uri;
+        const fMime = [f.mimeType, f.mime_type].find(v => typeof v === 'string') as string | undefined;
+        const kind = kindOf(fMime);
+        if (typeof uri === 'string' && /^https?:\/\//i.test(uri) && kind) add({ kind, external_url: uri, mime_type: fMime, filename: mediaFilename(f) || filename });
+      }
+      if ((node.type === 'image' || node.type === 'document') && node.source && typeof node.source === 'object') {
+        const source = node.source as Record<string, unknown>;
+        if (source.type === 'url' && typeof source.url === 'string' && /^https?:\/\//i.test(source.url)) {
+          add({ kind: node.type === 'image' ? 'image' : 'document', external_url: source.url, filename: mediaFilename(source) || filename });
+        }
+      }
       Object.values(node).forEach(child => walk(child, filename));
     }
     walk(payload);
