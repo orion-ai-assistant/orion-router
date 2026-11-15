@@ -5,6 +5,7 @@ export type LogAttachment = LogImage & {
   kind: 'image' | 'audio' | 'video' | 'document';
   direction: 'input' | 'output' | 'archive';
   audio_archive_id?: number;
+  input_audio_archive_id?: number;
   video_archive_id?: number;
   document_archive_id?: number;
   representation?: 'text' | 'binary';
@@ -21,7 +22,7 @@ export function extractLogAttachments(request: unknown, response: unknown): LogA
     if (typeof raw === 'string') { try { payload = JSON.parse(raw); } catch { return; } }
     const seen = new Set<string>();
     function add(item: Omit<LogAttachment, 'direction'>) {
-      const key = `${item.kind}:${item.audio_archive_id || item.image_archive_id || item.video_archive_id || item.document_archive_id || item.data_url || item.text_content || item.external_url}:${item.filename || ''}`;
+      const key = `${item.kind}:${item.audio_archive_id || item.input_audio_archive_id || item.image_archive_id || item.video_archive_id || item.document_archive_id || item.data_url || item.text_content || item.external_url}:${item.filename || ''}`;
       if (seen.has(key)) return;
       seen.add(key); attachments.push({ ...item, direction });
     }
@@ -32,9 +33,9 @@ export function extractLogAttachments(request: unknown, response: unknown): LogA
       if (/^https?:\/\//i.test(value)) { add({ kind, external_url: value, mime_type: mime, filename }); return; }
       const match = /^data:(audio|video)\/([^;,]+);base64,([A-Za-z0-9+/=\s]+)$/i.exec(value);
       if (value.startsWith('data:') && (!match || match[1].toLowerCase() !== kind)) return;
-      if (!match && !/^[A-Za-z0-9+/=\s]+$/.test(value)) return;
+      if (!match && !/^[A-Za-z0-9+/=_\s-]+$/.test(value)) return;
       add({ kind, filename, mime_type: match ? `${match[1]}/${match[2]}` : mime,
-        data_url: match ? value : `data:${mime || `${kind}/${kind === 'video' ? 'mp4' : 'wav'}`};base64,${value}` });
+        data_url: match ? value : `data:${mime || `${kind}/${kind === 'video' ? 'mp4' : 'wav'}`};base64,${value.replace(/-/g, '+').replace(/_/g, '/')}` });
     }
     function formatMime(kind: 'audio' | 'video', format: unknown) {
       if (typeof format !== 'string') return undefined;
@@ -59,6 +60,9 @@ export function extractLogAttachments(request: unknown, response: unknown): LogA
         const image = node.image_url;
         const url = typeof image === 'string' ? image : image && typeof image === 'object' ? (image as Record<string, unknown>).url : node.url;
         if (typeof url === 'string' && /^https?:\/\//i.test(url)) add({ kind: 'image', external_url: url, filename });
+      }
+      if (Number.isSafeInteger(node.input_audio_archive_id) && Number(node.input_audio_archive_id) > 0) {
+        add({ kind: 'audio', input_audio_archive_id: Number(node.input_audio_archive_id), mime_type: typeof node.mime_type === 'string' ? node.mime_type : undefined, filename });
       }
       if (Number.isSafeInteger(node.audio_archive_id) && Number(node.audio_archive_id) > 0) {
         add({ kind: 'audio', audio_archive_id: Number(node.audio_archive_id), filename });

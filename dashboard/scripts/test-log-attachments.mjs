@@ -9,9 +9,11 @@ import assert from 'node:assert/strict';
 
 const root = resolve(import.meta.dirname, '..');
 const out = mkdtempSync(join(tmpdir(), 'log-att-'));
-execFileSync(process.execPath, [join(root, 'node_modules/typescript/bin/tsc'), 'lib/log-attachments.ts',
+execFileSync(process.execPath, [join(root, 'node_modules/typescript/bin/tsc'), 'lib/log-attachments.ts', 'lib/inline-archives.ts',
   '--module', 'commonjs', '--target', 'es2020', '--skipLibCheck', '--outDir', out], { cwd: root, stdio: 'inherit' });
-const { extractLogAttachments } = createRequire(import.meta.url)(join(out, 'log-attachments.js'));
+const req = createRequire(import.meta.url);
+const { extractLogAttachments } = req(join(out, 'log-attachments.js'));
+const { inlineArchivedMedia } = req(join(out, 'inline-archives.js'));
 test.after(() => rmSync(out, { recursive: true, force: true }));
 
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
@@ -71,4 +73,46 @@ test('unarchived Gemini inlineData with URL-safe Base64 still shows', () => {
   const [a] = extractLogAttachments(JSON.stringify({ contents: [{ parts: [{ inlineData: { mimeType: 'image/png', data: urlsafe } }] }] }), null);
   assert.equal(a.kind, 'image');
   assert.ok(/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(a.data_url));
+});
+
+test('audio: input archive ref and raw URL-safe audio are playable attachments', () => {
+  assert.deepEqual(summary({ contents: [{ parts: [
+    { inlineData: { mimeType: 'audio/wav', data: { input_audio_archive_id: 21, sha256: 'x'.repeat(64), mime_type: 'audio/wav' } } },
+    { type: 'input_audio', input_audio: { data: { input_audio_archive_id: 22, sha256: 'y'.repeat(64) }, format: 'mp3' } }] }] }),
+  ['audio:inline', 'audio:inline']);
+  const list = extractLogAttachments(JSON.stringify({ contents: [{ parts: [{ inlineData: { mimeType: 'audio/wav', data: { input_audio_archive_id: 21, sha256: 'x'.repeat(64) } } }] }] }), null);
+  assert.equal(list[0].input_audio_archive_id, 21);
+  assert.equal(list[0].kind, 'audio');
+});
+
+test('text attachments are listed by name, OpenAI and Gemini parts alike', () => {
+  const text = ['Ek 1 — Metin: notlar.txt', '<file_content>', 'merhaba', '</file_content>'].join('\n');
+  for (const body of [{ messages: [{ content: [{ type: 'text', text }] }] }, { contents: [{ parts: [{ text }] }] }]) {
+    const [a] = extractLogAttachments(JSON.stringify(body), null);
+    assert.equal(a.kind, 'document');
+    assert.equal(a.filename, 'notlar.txt');
+    assert.equal(a.text_content, 'merhaba');
+  }
+});
+
+test('Tam kopyala inlines every archived kind and leaves unavailable ones as references', async () => {
+  const ref = (key, id, extra = {}) => ({ [key]: id, sha256: 'a'.repeat(64), mime_type: 'image/png', ...extra });
+  const payload = JSON.stringify({ contents: [{ parts: [
+    { inlineData: { mimeType: 'image/png', data: ref('image_archive_id', 1) } },
+    { inlineData: { mimeType: 'audio/wav', data: ref('input_audio_archive_id', 2) } },
+    { type: 'image_url', image_url: { url: ref('image_archive_id', 1) } },
+    { name: 'n.txt', data: ref('document_archive_id', 3, { representation: 'text' }) },
+    { inlineData: { mimeType: 'video/mp4', data: ref('video_archive_id', 4) } }] }] });
+  const calls = [];
+  const out = JSON.parse(await inlineArchivedMedia(payload, async endpoint => {
+    calls.push(endpoint);
+    return endpoint.includes('/video-archives/') ? null : new TextEncoder().encode('hi');
+  }));
+  const parts = out.contents[0].parts;
+  assert.equal(parts[0].inlineData.data, 'aGk=');
+  assert.equal(parts[1].inlineData.data, 'aGk=');
+  assert.equal(parts[2].image_url.url, 'data:image/png;base64,aGk=');
+  assert.equal(parts[3].data, 'hi');
+  assert.equal(parts[4].inlineData.data.video_archive_id, 4);
+  assert.equal(calls.filter(c => c.includes('/image-archives/1/')).length, 1); // one fetch per file
 });

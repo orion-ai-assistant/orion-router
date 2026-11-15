@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { PayloadViewer } from '@/components/PayloadViewer';
 import { extractLogAttachments, LogAttachment } from '@/lib/log-attachments';
+import { inlineArchivedMedia } from '@/lib/inline-archives';
 import { LogAttachments } from '@/components/LogAttachments';
 import { Input } from '@/components/ui/input';
 import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -43,6 +44,8 @@ interface LogDetails {
   requestHtml: string;
   responseHtml: string;
   fullRequest: string;
+  rawRequest: string;
+  rawResponse: string;
   fullResponse: string;
   capability: string;
   attachments: LogAttachment[];
@@ -160,6 +163,8 @@ export default function LogsPage() {
       requestHtml: '',
       responseHtml: '',
       fullRequest: '',
+      rawRequest: '',
+      rawResponse: '',
       fullResponse: '',
       capability: 'chat',
       attachments: [],
@@ -177,6 +182,8 @@ export default function LogsPage() {
           requestHtml: request.displayHtml,
           responseHtml: response.displayHtml,
           fullRequest: request.fullText,
+          rawRequest: typeof data.request_json === 'string' ? data.request_json : JSON.stringify(data.request_json ?? null),
+          rawResponse: typeof data.response_json === 'string' ? data.response_json : JSON.stringify(data.response_json ?? null),
           fullResponse: response.fullText,
           capability,
           attachments: extractLogAttachments(data.request_json, data.response_json),
@@ -191,6 +198,20 @@ export default function LogsPage() {
       showToast('Failed to load log details', 'error');
       setPayloadDialogOpen(false);
       setActiveLogDetails(null);
+    }
+  };
+
+  // "Tam kopyala": fetch each archived file at copy time and inline it as Base64; nothing is stored.
+  const copyInlined = async (raw: string, isReq: boolean) => {
+    try {
+      const text = await inlineArchivedMedia(raw, async endpoint => {
+        const response = await adminFetch(endpoint);
+        return response.ok ? new Uint8Array(await response.arrayBuffer()) : null;
+      });
+      copyText(text, isReq);
+    } catch (err) {
+      console.error(err);
+      showToast(t('logs.copyInlineFailed'), 'error');
     }
   };
 
@@ -408,7 +429,9 @@ export default function LogsPage() {
                 fullText={activeLogDetails.fullRequest}
                 copied={copiedReq}
                 onCopy={() => copyText(activeLogDetails.fullRequest, true)}
-                copyLabel={t('logs.copyFull')}
+                copyLabel={t('logs.copyLogged')}
+                onCopyInlined={() => copyInlined(activeLogDetails.rawRequest, true)}
+                copyInlinedLabel={t('logs.copyFull')}
                 copiedLabel={t('logs.copied')}
                 loadingLabel={t('common.loading')}
               />
@@ -418,7 +441,9 @@ export default function LogsPage() {
                 fullText={activeLogDetails.fullResponse}
                 copied={copiedRes}
                 onCopy={() => copyText(activeLogDetails.fullResponse, false)}
-                copyLabel={t('logs.copyFull')}
+                onCopyInlined={() => copyInlined(activeLogDetails.rawResponse, false)}
+                copyInlinedLabel={t('logs.copyFull')}
+                copyLabel={t('logs.copyLogged')}
                 copiedLabel={t('logs.copied')}
                 loadingLabel={t('common.loading')}
               />

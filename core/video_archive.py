@@ -146,4 +146,5 @@ async def archive_videos_json(value, manager):
 async def archive_log_media_json(value, manager):
     from core.image_archive import archive_images_json
     from core.document_archive import archive_documents_json
-    return await archive_documents_json(await archive_videos_json(await archive_images_json(value, manager), manager), manager)
+    from core.input_audio_archive import archive_input_audio_json
+    return await archive_input_audio_json(await archive_documents_json(await archive_videos_json(await archive_images_json(value, manager), manager), manager), manager)
