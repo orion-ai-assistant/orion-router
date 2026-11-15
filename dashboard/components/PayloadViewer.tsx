@@ -11,6 +11,8 @@ interface PayloadViewerProps {
   copied: boolean;
   onCopy: () => void;
   copyLabel?: string;
+  onCopyInlined?: () => void;
+  copyInlinedLabel?: string;
   copiedLabel?: string;
   loadingLabel?: string;
 }
@@ -21,7 +23,9 @@ export const PayloadViewer = React.memo(function PayloadViewer({
   fullText,
   copied,
   onCopy,
-  copyLabel = 'Copy Full',
+  copyLabel = 'Copy',
+  onCopyInlined,
+  copyInlinedLabel = 'Copy Full',
   copiedLabel = 'Copied',
   loadingLabel = 'Loading...',
 }: PayloadViewerProps) {
@@ -31,6 +35,7 @@ export const PayloadViewer = React.memo(function PayloadViewer({
     <div className="min-w-0 flex flex-col flex-1">
       <div className="flex justify-between items-center mb-2 shrink-0">
         <h3 className="text-zinc-300 font-semibold text-sm tracking-wide">{label}</h3>
+        <div className="flex gap-2">
         {fullText ? (
           <Button
             variant="outline"
@@ -42,6 +47,18 @@ export const PayloadViewer = React.memo(function PayloadViewer({
             {copied ? copiedLabel : copyLabel}
           </Button>
         ) : null}
+        {fullText && onCopyInlined ? (
+          <Button
+            variant="outline"
+            type="button"
+            onClick={onCopyInlined}
+            className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-white text-xs px-2.5 py-1 h-auto flex items-center gap-1 rounded"
+          >
+            <Copy className="w-3.5 h-3.5" />
+            {copyInlinedLabel}
+          </Button>
+        ) : null}
+        </div>
       </div>
       <pre
         className="payload-viewer custom-scrollbar"

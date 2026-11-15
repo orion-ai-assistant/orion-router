@@ -67,6 +67,18 @@ async def get_document(archive_id: int, request: Request):
     return response
 
 
+@router.api_route('/input-audio/{archive_id}/file', methods=['GET', 'HEAD'])
+async def get_input_audio(archive_id: int, request: Request):
+    """Original audio a client sent to a chat model (referenced from request logs as input_audio_archive_id)."""
+    row = await db_manager.fetchrow('SELECT audio, mime_type FROM router_input_audio_archives WHERE id=$1', archive_id)
+    if not row:
+        raise HTTPException(404, 'Input audio archive not found')
+    response = audio_response(bytes(row['audio']), row['mime_type'], request.method,
+        request.headers.get('range'), f'"input-audio-{archive_id}"', request.headers.get('if-range'))
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    return response
+
+
 @video_router.api_route('/{archive_id}/video', methods=['GET', 'HEAD'])
 async def get_video(archive_id: int, request: Request):
     if request.method == 'HEAD':

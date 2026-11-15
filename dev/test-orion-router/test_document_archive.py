@@ -53,8 +53,9 @@ class DocumentTests(unittest.IsolatedAsyncioTestCase):
         with patch('core.document_archive.save_document',AsyncMock(side_effect=save)) as writer:
             stored=json.loads(await archive_documents_json(json.dumps(payload),object()))['messages'][0]['content']
         self.assertEqual(writer.await_count,2)
-        self.assertEqual([stored[0]['text']['filename'],stored[1]['text']['filename']],['note.txt','renamed.txt'])
-        self.assertEqual(stored[0]['text']['document_archive_id'],stored[2]['data']['document_archive_id'])
+        # Wrapped text attachments stay readable in the body (the log page lists them by name).
+        self.assertEqual(stored[:2],payload['messages'][0]['content'][:2])
+        self.assertEqual(stored[2]['data']['document_archive_id'],1)
         self.assertEqual(stored[6:],payload['messages'][0]['content'][6:]); self.assertEqual(payload,before)
 
     async def test_error_and_resource_fallback_do_not_change_log(self):

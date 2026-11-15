@@ -5,7 +5,7 @@ export type LogDocument = { document_archive_id?: number; filename?: string; mim
 
 export function textAttachment(value: unknown): { filename?: string; text: string } | null {
   if (typeof value !== 'string') return null;
-  const match = /^(?:Ek|Attachment)\s+\d+\s*[—–-]\s*(?:Metin dosyası|Text file|Not|Note)\s*:\s*([^\r\n]+)\r?\n<file_content>(\r?\n)([\s\S]*)\2<\/file_content>$/i.exec(value);
+  const match = /^(?:Ek|Attachment)\s+\d+\s*[—–-]\s*(?:Metin dosyası|Metin|Text file|Text|Not|Note)\s*:\s*([^\r\n]+)\r?\n<file_content>(\r?\n)([\s\S]*)\2<\/file_content>$/i.exec(value);
   return match ? { filename: cleanFilename(match[1]), text: match[3] } : null;
 }
 
@@ -21,8 +21,8 @@ export function extractLogDocuments(payload: unknown): LogDocument[] {
     if (text) { add({ filename, text_content: value, representation: 'text', mime_type: mime === 'application/pdf' ? 'text/plain' : mime || 'text/plain' }); return; }
     if (/^https?:\/\//i.test(value)) { add({ filename, external_url: value, mime_type: mime }); return; }
     const match = /^data:((?:text|application)\/[^;,]+)(?:;[^,;]+)*;base64,([A-Za-z0-9+/=\s]*)$/i.exec(value);
-    if (value.startsWith('data:') && !match || !match && !/^[A-Za-z0-9+/=\s]*$/.test(value)) return;
-    add({ filename, data_url: match ? value : `data:${mime || 'application/octet-stream'};base64,${value}`, mime_type: match?.[1] || mime });
+    if (value.startsWith('data:') && !match || !match && !/^[A-Za-z0-9+/=_\s-]*$/.test(value)) return;
+    add({ filename, data_url: match ? value : `data:${mime || 'application/octet-stream'};base64,${value.replace(/-/g, '+').replace(/_/g, '/')}`, mime_type: match?.[1] || mime });
   }
   function walk(value: unknown, inheritedName?: string) {
     if (Array.isArray(value)) { value.forEach(item => walk(item,inheritedName)); return; }
@@ -31,7 +31,8 @@ export function extractLogDocuments(payload: unknown): LogDocument[] {
     if (Number.isSafeInteger(node.document_archive_id) && Number(node.document_archive_id) > 0) {
       add({ ...node, filename } as LogDocument); return;
     }
-    const wrapped = node.type === 'text' ? textAttachment(node.text) : null;
+    // OpenAI/Anthropic parts carry type 'text'; Gemini parts are just {text}.
+    const wrapped = node.type === 'text' || node.type === undefined ? textAttachment(node.text) : null;
     if (wrapped) add({ filename: wrapped.filename, text_content: wrapped.text, mime_type: 'text/plain', representation: 'text' });
     const mime = [node.mime_type,node.mimeType,node.media_type].find(isDocumentMime);
     if (node.isText === true && (!node.mime_type && !node.mimeType || mime)) candidate(node.data,mime,filename,true);

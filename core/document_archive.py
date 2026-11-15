@@ -13,7 +13,7 @@ logger = logging.getLogger('service-router.document-archive')
 MAX_DOCUMENT_BYTES = 32 * 1024 * 1024
 MAX_DOCUMENT_JOBS = 4
 _active_jobs = 0
-TEXT_ATTACHMENT = re.compile(r'\A(?:Ek|Attachment)\s+\d+\s*[—–-]\s*(?:Metin dosyası|Text file|Not|Note)\s*:\s*(?P<name>[^\r\n]+)\r?\n<file_content>(?P<separator>\r?\n)(?P<content>[\s\S]*)(?P=separator)</file_content>\Z', re.IGNORECASE)
+TEXT_ATTACHMENT = re.compile(r'\A(?:Ek|Attachment)\s+\d+\s*[—–-]\s*(?:Metin dosyası|Metin|Text file|Text|Not|Note)\s*:\s*(?P<name>[^\r\n]+)\r?\n<file_content>(?P<separator>\r?\n)(?P<content>[\s\S]*)(?P=separator)</file_content>\Z', re.IGNORECASE)
 
 
 def text_attachment(value):
@@ -126,6 +126,8 @@ async def archive_documents_json(value, manager):
             for container, key, encoding, mime, filename in document_fields(node):
                 location = (id(container),key)
                 raw = container.get(key)
+                if encoding == 'wrapped':
+                    continue  # Text attachments stay readable in the body; the log page lists them by name.
                 if location in visited or not isinstance(raw,str) or _active_jobs >= MAX_DOCUMENT_JOBS:
                     continue
                 visited.add(location)

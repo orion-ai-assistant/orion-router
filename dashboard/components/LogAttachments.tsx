@@ -16,6 +16,7 @@ export function AttachmentPreview({ attachment }: { attachment: LogAttachment })
     let objectUrl = '';
     const endpoint = attachment.image_archive_id
       ? `/dashboard/api/image-archives/${attachment.image_archive_id}/image`
+      : attachment.input_audio_archive_id ? `/dashboard/api/media-archives/input-audio/${attachment.input_audio_archive_id}/file`
       : attachment.audio_archive_id ? `/dashboard/api/audio-archives/${attachment.audio_archive_id}/audio`
       : attachment.video_archive_id ? `/dashboard/api/video-archives/${attachment.video_archive_id}/video`
       : attachment.document_archive_id ? `/dashboard/api/media-archives/document/${attachment.document_archive_id}/file` : null;
