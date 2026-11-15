@@ -39,6 +39,8 @@ def decode_video(value):
         if not separator or not header.lower().startswith('data:video/') or not header.lower().endswith(';base64'):
             raise ValueError('Expected a Base64 video data URL')
     value = ''.join(value.split())
+    # The Gemini SDK sends URL-safe Base64 (- and _): normalise to the standard alphabet.
+    value = value.replace('-', '+').replace('_', '/')
     data = base64.b64decode(value + '=' * (-len(value) % 4), validate=True)
     if not data or len(data) > MAX_VIDEO_BYTES:
         raise ValueError('Empty or oversized video')

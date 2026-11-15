@@ -63,6 +63,8 @@ def _decode_image(value):
             raise ValueError("Expected a Base64 image data URL")
     # Standard MIME Base64 can contain whitespace; missing final padding is accepted.
     value = "".join(value.split())
+    # The Gemini SDK sends URL-safe Base64 (- and _): normalise to the standard alphabet.
+    value = value.replace('-', '+').replace('_', '/')
     data = base64.b64decode(value + "=" * (-len(value) % 4), validate=True)
     if not data or len(data) > MAX_IMAGE_BYTES:
         raise ValueError("Empty or oversized image")

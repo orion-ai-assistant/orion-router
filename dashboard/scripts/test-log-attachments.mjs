@@ -65,3 +65,10 @@ test('image injected after a tool result is listed once, even when repeated', ()
     injected, injected] }),
   ['image:4', 'image:9'].sort());
 });
+
+test('unarchived Gemini inlineData with URL-safe Base64 still shows', () => {
+  const urlsafe = PNG.replace(/\+/g, '-').replace(/\//g, '_');
+  const [a] = extractLogAttachments(JSON.stringify({ contents: [{ parts: [{ inlineData: { mimeType: 'image/png', data: urlsafe } }] }] }), null);
+  assert.equal(a.kind, 'image');
+  assert.ok(/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(a.data_url));
+});

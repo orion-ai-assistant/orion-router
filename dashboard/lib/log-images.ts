@@ -35,8 +35,9 @@ export function extractLogImages(...payloads: unknown[]): LogImage[] {
     if (typeof value !== 'string' || !value || /^https?:\/\//i.test(value)) return;
     if (value.startsWith('data:') && !/^data:image\/[^;,]+;base64,/i.test(value)) return;
     // Avoid rendering arbitrary URI schemes or SVG from a legacy log.
-    if (/^data:image\/svg/i.test(value) || mime?.toLowerCase() === 'image/svg+xml' || (!value.startsWith('data:') && !/^[A-Za-z0-9+/=\s]+$/.test(value))) return;
-    const url = value.startsWith('data:') ? value : `data:${mime?.startsWith('image/') ? mime : 'image/jpeg'};base64,${value}`;
+    if (/^data:image\/svg/i.test(value) || mime?.toLowerCase() === 'image/svg+xml' || (!value.startsWith('data:') && !/^[A-Za-z0-9+/=_\s-]+$/.test(value))) return;
+    // Gemini SDK bodies carry URL-safe Base64 (- and _); browsers need the standard alphabet.
+    const url = value.startsWith('data:') ? value : `data:${mime?.startsWith('image/') ? mime : 'image/jpeg'};base64,${value.replace(/-/g, '+').replace(/_/g, '/')}`;
     if (seen.has(url)) return;
     seen.add(url); images.push({ data_url: url, mime_type: mime, ...(filename ? { filename } : {}) });
   }

@@ -77,6 +77,8 @@ def decode_document(value, encoding, mime=None, filename=None):
                     raise ValueError('Expected a Base64 document data URL')
                 mime = header[5:].split(';',1)[0].lower()
             value = ''.join(value.split())
+            # The Gemini SDK sends URL-safe Base64 (- and _): normalise to the standard alphabet.
+            value = value.replace('-', '+').replace('_', '/')
             data = base64.b64decode(value + '=' * (-len(value) % 4), validate=True)
         mime = mime or mimetypes.guess_type(filename or '')[0] or 'application/octet-stream'
         if data.lstrip().startswith(b'%PDF-'):
