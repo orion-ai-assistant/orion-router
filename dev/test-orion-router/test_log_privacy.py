@@ -1,8 +1,8 @@
 """
 dev/test-orion-router/test_log_privacy.py
 -----------------------------------------
-The Hub's log-privacy headers (x-orion-log-content, x-orion-memory-profile, x-orion-purpose):
-what the request log stores, for streaming and non-streaming requests, and that nothing reaches a provider.
+The Hub's log label headers (x-orion-memory-profile, x-orion-purpose): the request log keeps EVERYTHING
+(full messages, memory profile block, answer) and only gains an extra label; nothing reaches a provider.
 """
 import json
 import sys
@@ -20,7 +20,7 @@ from fastapi.testclient import TestClient
 
 from api import chat as chat_api
 from core.dependencies import authenticate_request
-from core.log_privacy import HIDDEN_MARKER, LogPolicy, policy_from_headers, scrub_request, scrub_response, set_policy
+from core.log_privacy import LogPolicy, policy_from_headers, scrub_request, set_policy
 from core.router.telemetry import TelemetryService
 
 PROFILE = (
@@ -36,80 +36,71 @@ class PolicyTests(unittest.TestCase):
         set_policy(None)
 
     def test_headers_to_policy(self):
-        self.assertEqual(policy_from_headers({"x-orion-log-content": "hidden", "x-orion-purpose": "memory-extraction"}),
-                         LogPolicy(hidden=True, purpose="memory-extraction"))
+        self.assertEqual(policy_from_headers({"x-orion-purpose": "memory-extraction"}),
+                         LogPolicy(purpose="memory-extraction"))
         self.assertEqual(policy_from_headers({"x-orion-memory-profile": PROFILE_HEADER}),
                          LogPolicy(profile=PROFILE_HEADER))
-        # "show" is the explicit opt-in: the profile is logged in full.
-        self.assertIsNone(policy_from_headers({"x-orion-log-content": "show", "x-orion-memory-profile": PROFILE_HEADER}))
-        # Unknown / malformed values behave as absent.
-        self.assertIsNone(policy_from_headers({"x-orion-log-content": "maybe"}))
+        # x-orion-log-content has no effect any more: hidden does not hide, show changes nothing.
+        self.assertIsNone(policy_from_headers({"x-orion-log-content": "hidden"}))
+        self.assertEqual(policy_from_headers({"x-orion-log-content": "show", "x-orion-memory-profile": PROFILE_HEADER}),
+                         LogPolicy(profile=PROFILE_HEADER))
+        # Malformed values are ignored.
         self.assertIsNone(policy_from_headers({"x-orion-memory-profile": "tokens=abc; facts=<script>"}))
         self.assertIsNone(policy_from_headers({"x-orion-memory-profile": "x" * 100000}))
-        self.assertEqual(policy_from_headers({"x-orion-log-content": "hidden", "x-orion-purpose": "bad purpose!"}),
-                         LogPolicy(hidden=True))
+        self.assertIsNone(policy_from_headers({"x-orion-purpose": "bad purpose!"}))
         self.assertIsNone(policy_from_headers(None))
 
-    def test_profile_block_replaced_in_logged_copy_only(self):
+    def test_content_stays_in_full_and_labels_are_added(self):
         request = {"model": "m", "messages": [{"role": "system", "content": SYSTEM}, {"role": "user", "content": "hi"}]}
-        set_policy(LogPolicy(profile=PROFILE_HEADER))
+        set_policy(LogPolicy(profile=PROFILE_HEADER, purpose="memory-extraction"))
         logged = scrub_request(request)
-        self.assertEqual(logged["messages"][0]["content"], "You are Orion.\n\n[hafıza profili: tokens=42; facts=1,2,3]")
-        self.assertEqual(logged["messages"][1]["content"], "hi")
-        self.assertIn("Ayse", request["messages"][0]["content"])  # the sent request is untouched
-        # Provider-shaped bodies (parts, system field) and JSON strings are handled too.
-        gemini = {"systemInstruction": {"parts": [{"text": SYSTEM}]}}
-        self.assertNotIn("Ayse", scrub_request(json.dumps(gemini)))
-        self.assertIn("[hafıza profili: tokens=42; facts=1,2,3]", scrub_request(json.dumps(gemini)))
-        # A profile block alone (empty system prompt) and text after it.
-        self.assertEqual(scrub_request({"s": PROFILE})["s"], "[hafıza profili: tokens=42; facts=1,2,3]")
-        self.assertEqual(scrub_request({"s": PROFILE + "\n\nAfter."})["s"],
-                         "[hafıza profili: tokens=42; facts=1,2,3]\n\nAfter.")
+        self.assertEqual(logged["messages"], request["messages"])  # profile block and all text untouched
+        self.assertIn("Ayse", json.dumps(logged))
+        self.assertEqual(logged["orion_log"]["etiketler"], ["hafıza profili: 42 token", "amaç: hafıza çıkarımı"])
+        self.assertEqual(logged["orion_log"]["memory_profile"], PROFILE_HEADER)
+        self.assertNotIn("orion_log", request)  # the sent request is untouched
+        as_text = json.loads(scrub_request(json.dumps(request)))
+        self.assertEqual(as_text["messages"], request["messages"])
+        self.assertIn("amaç: hafıza çıkarımı", as_text["orion_log"]["etiketler"])
+        self.assertNotIn("[içerik gizli]", json.dumps(logged, ensure_ascii=False))
 
-    def test_hidden_keeps_metadata_only(self):
-        set_policy(LogPolicy(hidden=True, purpose="memory-extraction"))
-        logged = scrub_request({"model": "m", "temperature": 0.1, "messages": [{"role": "user", "content": "secret"}],
-                                "tools": [{"function": {"name": "secret_tool"}}]})
-        self.assertEqual(logged, {"model": "m", "temperature": 0.1, "messages": HIDDEN_MARKER,
-                                  "content_hidden": True, "purpose": "memory-extraction"})
-        res = scrub_response({"choices": [{"message": {"content": "secret", "tool_calls": [{"x": "secret"}]}}],
-                              "usage": {"prompt_tokens": 5}, "metrics": {"total_duration_ms": 3}})
-        self.assertNotIn("secret", json.dumps(res))
-        self.assertEqual(res["usage"], {"prompt_tokens": 5})
-        self.assertTrue(res["content_hidden"])
-
-    def test_no_policy_changes_nothing(self):
+    def test_unknown_purpose_label_and_no_policy(self):
+        set_policy(LogPolicy(purpose="chat-title"))
+        self.assertEqual(scrub_request({"a": 1})["orion_log"]["etiketler"], ["amaç: chat-title"])
+        set_policy(None)
         request = {"messages": [{"role": "system", "content": SYSTEM}]}
         self.assertIs(scrub_request(request), request)
-        self.assertEqual(scrub_response({"a": 1}), {"a": 1})
 
 
 class TelemetryTests(unittest.IsolatedAsyncioTestCase):
     def tearDown(self):
         set_policy(None)
 
-    async def test_telemetry_writes_scrubbed_copies(self):
-        set_policy(LogPolicy(hidden=True, purpose="memory-extraction"))
+    async def test_telemetry_logs_full_content_with_label(self):
+        set_policy(LogPolicy(profile=PROFILE_HEADER, purpose="memory-extraction"))
         db = SimpleNamespace(
             create_streaming_log=AsyncMock(return_value=7), update_streaming_log=AsyncMock(),
             update_streaming_request=AsyncMock(), log_request=AsyncMock())
+        answer = {"choices": [{"message": {"content": "the answer"}}]}
         with patch("core.router.telemetry.db_manager", db):
             service = TelemetryService(SimpleNamespace(pricing_cache={}))
             req = {"model": "m", "messages": [{"role": "user", "content": "secret"}]}
             await service.create_processing_log("k", "openai", "m", "chat", req)
             await service.update_processing_request(7, req)
-            await service.finish_processing_log(7, {"choices": [{"message": {"content": "secret"}}]}, "success", True)
+            await service.finish_processing_log(7, answer, "success", True)
             await service.log_usage("k", "openai", "m", {"prompt_tokens": 1, "completion_tokens": 2}, log_id=7,
-                                    request_json=json.dumps(req), response_json=json.dumps({"choices": [{"message": {"content": "secret"}}]}))
+                                    request_json=json.dumps(req), response_json=json.dumps(answer))
         written = json.dumps([db.create_streaming_log.await_args.kwargs, db.update_streaming_request.await_args.args,
                               db.update_streaming_log.await_args_list[0].kwargs, db.update_streaming_log.await_args_list[1].kwargs], ensure_ascii=False)
-        self.assertNotIn("secret", written)
-        self.assertIn(HIDDEN_MARKER, written)
-        self.assertEqual(db.update_streaming_log.await_args_list[1].kwargs["prompt_tokens"], 1)  # metadata stays
+        self.assertIn("secret", written)
+        self.assertIn("the answer", written)
+        self.assertNotIn("içerik gizli", written)
+        self.assertIn("amaç: hafıza çıkarımı", written)
+        self.assertEqual(db.update_streaming_log.await_args_list[1].kwargs["prompt_tokens"], 1)
 
 
 class EndpointTests(unittest.TestCase):
-    """The policy set by the endpoint reaches the log writes of streaming and non-streaming requests."""
+    """The labels set by the endpoint reach the log writes of streaming and non-streaming requests."""
 
     def _client(self, seen):
         async def run_combo(**kwargs):
@@ -138,28 +129,30 @@ class EndpointTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         return seen
 
-    def test_hidden_streaming_and_not(self):
+    def test_purpose_label_full_content(self):
         for stream in (True, False):
+            # Even the old "hidden" value hides nothing now.
             seen = self._post({"x-orion-log-content": "hidden", "x-orion-purpose": "memory-extraction"}, stream)
-            self.assertNotIn("secret", seen["logged"])
-            self.assertIn("content_hidden", seen["logged"])
+            self.assertIn("secret", seen["logged"])
+            self.assertNotIn("içerik gizli", seen["logged"])
+            self.assertIn("amaç: hafıza çıkarımı", seen["logged"])
             # The provider path got the real messages and no header-derived argument.
             self.assertEqual(seen["messages"][1]["content"], "secret")
             self.assertFalse([k for k in seen if "orion" in k or "purpose" in k or "log_content" in k])
 
-    def test_profile_replaced_and_show_opt_in(self):
+    def test_profile_block_stays_with_label(self):
         for stream in (True, False):
             seen = self._post({"x-orion-memory-profile": PROFILE_HEADER}, stream)
-            self.assertNotIn("Ayse", seen["logged"])
-            self.assertIn("[hafıza profili: tokens=42; facts=1,2,3]", seen["logged"])
+            self.assertIn("Ayse", seen["logged"])
             self.assertIn("secret", seen["logged"])
+            self.assertNotIn("[hafıza profili: tokens=", seen["logged"])
+            self.assertIn("hafıza profili: 42 token", seen["logged"])
             self.assertIn("Ayse", seen["messages"][0]["content"])
-            shown = self._post({"x-orion-memory-profile": PROFILE_HEADER, "x-orion-log-content": "show"}, stream)
-            self.assertIn("Ayse", shown["logged"])
 
     def test_malformed_headers_never_break_the_request(self):
         seen = self._post({"x-orion-memory-profile": "tokens=;;; facts=\x7f", "x-orion-log-content": "???"}, False)
         self.assertIn("Ayse", seen["logged"])
+        self.assertNotIn("orion_log", seen["logged"])
 
 
 if __name__ == "__main__":

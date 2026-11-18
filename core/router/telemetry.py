@@ -1,7 +1,7 @@
 import json
 import logging
 
-from core.log_privacy import scrub_request, scrub_response
+from core.log_privacy import scrub_request
 from core.prompt_cache import CacheUsage, extract_cache_usage, prompt_cost
 from database import db_manager
 
@@ -30,7 +30,6 @@ class TelemetryService:
         usage_amount: float | None = None,
     ) -> None:
         request_json = scrub_request(request_json)
-        response_json = scrub_response(response_json)
         try:
             if usage is None:
                 p, c, t = None, None, None
@@ -195,7 +194,7 @@ class TelemetryService:
             return
         await db_manager.update_streaming_log(
             log_id=log_id,
-            response_json=json.dumps(scrub_response(response), ensure_ascii=False),
+            response_json=json.dumps(response, ensure_ascii=False),
             status=status,
             success=success,
         )

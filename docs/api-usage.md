@@ -61,15 +61,14 @@ X-Orion-Bypass-Defaults: true
 }
 ```
 
-### Log gizliliği başlıkları (Orion Hub hafızası)
-Bu başlıklar yalnızca isteğin **Router logunda** ne saklanacağını belirler; sağlayıcıya hiçbir zaman iletilmez ve sağlayıcıya giden metin değişmez. Hatalı değerler yok sayılır (istek bozulmaz).
+### Log etiketi başlıkları (Orion Hub hafızası)
+Router logunda **hiçbir içerik gizlenmez veya değiştirilmez**: istek metninin tamamı (hafıza profili bloğu dahil) ve yanıt aynen loglanır. Bu başlıklar yalnızca log kaydına ek etiket (üst veri) ekler; sağlayıcıya hiçbir zaman iletilmez. Hatalı değerler yok sayılır.
 
 | Başlık | Değer | Etki |
 |---|---|---|
-| `x-orion-log-content` | `hidden` | Log yalnızca üst veri tutar (zaman, model, durum, süre, token sayıları, `purpose`, kayıt id); mesajlar, araçlar ve yanıt metni `[içerik gizli]` olur, kayıt JSON'unda `content_hidden: true` yazar. Akışlı ve akışsız isteklerde geçerli. |
-| `x-orion-log-content` | `show` | İsteğe özel açık izin: içerik, hafıza profili dahil, tam loglanır. Başka değerler başlık yokmuş gibi davranır. |
-| `x-orion-memory-profile` | `tokens=N; facts=1,2,3` | Loglanan kopyada sistem mesajındaki profil bloğu `[hafıza profili: tokens=N; facts=1,2,3]` işaretiyle değişir; sistem mesajının geri kalanı eskisi gibi loglanır. |
-| `x-orion-purpose` | örn. `memory-extraction` | Gizli log kaydında amaç etiketi olarak kalır. |
+| `x-orion-memory-profile` | `tokens=N; facts=1,2,3` | Log kaydına `orion_log` alanı eklenir: etiket "hafıza profili: N token". Profil bloğu metni yine tam loglanır. |
+| `x-orion-purpose` | örn. `memory-extraction` | Etiket "amaç: hafıza çıkarımı" (bilinmeyen değerler olduğu gibi). |
+| `x-orion-log-content` | - | Artık etkisi yok (içerik her zaman gösterilir). |
 
 ---
 
