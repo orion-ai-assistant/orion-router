@@ -21,6 +21,8 @@ logger = logging.getLogger("service-router.openrouter")
 # OpenRouter modellerinin girdi modaliteleri için önbellek
 _MODEL_CATALOG_CACHE: dict[str, set[str]] = {}
 _MODEL_CATALOG_LAST_FETCH: float = 0.0
+# Same fetch also fills the context lengths (tokens), keyed like the modality cache.
+_CONTEXT_LENGTH_CACHE: dict[str, int] = {}
 _MODEL_CATALOG_TTL: float = 3600.0  # 1 saat
 
 
@@ -126,6 +128,7 @@ async def fetch_openrouter_model_modalities() -> dict[str, set[str]]:
         if res.status_code == 200:
             data = res.json().get("data", [])
             new_cache = {}
+            new_ctx: dict[str, int] = {}
             for item in data:
                 mid = (item.get("id") or "").lower()
                 if not mid:
@@ -138,16 +141,34 @@ async def fetch_openrouter_model_modalities() -> dict[str, set[str]]:
                 if not mods:
                     mods = {"text"}
                 new_cache[mid] = mods
+                ctx = item.get("context_length")
+                ctx = ctx if isinstance(ctx, int) and not isinstance(ctx, bool) and ctx > 0 else None
+                if ctx:
+                    new_ctx[mid] = ctx
                 if "/" in mid:
                     short = mid.split("/", 1)[1]
                     if short not in new_cache:
                         new_cache[short] = mods
+                    if ctx and short not in new_ctx:
+                        new_ctx[short] = ctx
+            _CONTEXT_LENGTH_CACHE.clear()
+            _CONTEXT_LENGTH_CACHE.update(new_ctx)
             _MODEL_CATALOG_CACHE = new_cache
             _MODEL_CATALOG_LAST_FETCH = now
     except Exception as exc:
         logger.warning("OpenRouter model kataloğu güncellenemedi: %s", exc)
 
     return _MODEL_CATALOG_CACHE
+
+
+async def openrouter_context_length(model: str) -> int | None:
+    """Context length (tokens) of an OpenRouter model from the cached list; None if unknown."""
+    await fetch_openrouter_model_modalities()
+    key = (model or "").lower().strip()
+    found = _CONTEXT_LENGTH_CACHE.get(key)
+    if found is None and "/" in key:
+        found = _CONTEXT_LENGTH_CACHE.get(key.split("/", 1)[1])
+    return found
 
 
 async def validate_model_modalities(model: str, messages: list[dict[str, Any]]) -> None:

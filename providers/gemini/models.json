@@ -4,6 +4,7 @@
       "name": "gemini-3.1-flash-lite",
       "provider": "gemini",
       "capability": "chat",
+      "context_length": 1048576,
       "temperature": 0.7,
       "pricing": {
         "input": 0.25,

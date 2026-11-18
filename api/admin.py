@@ -697,6 +697,7 @@ async def delete_provider_key_pool_item(key_id: str):
 @router.get("/api/models", dependencies=[Depends(verify_admin)])
 async def list_models():
     from core.model_catalog import load_model_catalog
+    from core.context_length import resolve_context_length
     catalog_models = {m["name"]: m for m in load_model_catalog().get("models", [])}
 
     rows = await db_manager.fetch(
@@ -723,6 +724,7 @@ async def list_models():
         # Inject thinking schema from JSON catalog if exists, else from default_config
         db_schema = item["default_config"].get("thinking_schema") if item["default_config"] else None
         c_model = catalog_models.get(item["name"])
+        item["context_length"] = await resolve_context_length(item, c_model)
         builtin_schema = c_model.get("thinking") if c_model else None
         item["builtin_thinking"] = builtin_schema
         item["is_builtin_thinking"] = builtin_schema is not None
