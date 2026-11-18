@@ -1,6 +1,7 @@
 import json
 import logging
 
+from core.log_privacy import scrub_request, scrub_response
 from core.prompt_cache import CacheUsage, extract_cache_usage, prompt_cost
 from database import db_manager
 
@@ -28,6 +29,8 @@ class TelemetryService:
         usage_unit: str | None = None,
         usage_amount: float | None = None,
     ) -> None:
+        request_json = scrub_request(request_json)
+        response_json = scrub_response(response_json)
         try:
             if usage is None:
                 p, c, t = None, None, None
@@ -172,7 +175,7 @@ class TelemetryService:
                 key_id=key_id,
                 provider=provider,
                 model=model,
-                request_json=json.dumps(request_data, ensure_ascii=False),
+                request_json=json.dumps(scrub_request(request_data), ensure_ascii=False),
                 response_json=json.dumps({"status": "processing"}, ensure_ascii=False),
                 capability=capability,
                 status="processing",
@@ -192,7 +195,7 @@ class TelemetryService:
             return
         await db_manager.update_streaming_log(
             log_id=log_id,
-            response_json=json.dumps(response, ensure_ascii=False),
+            response_json=json.dumps(scrub_response(response), ensure_ascii=False),
             status=status,
             success=success,
         )
@@ -203,7 +206,7 @@ class TelemetryService:
         try:
             await db_manager.update_streaming_request(
                 log_id,
-                json.dumps(request_data, ensure_ascii=False),
+                json.dumps(scrub_request(request_data), ensure_ascii=False),
             )
         except Exception as exc:
             logger.warning("Failed to update processing request log: %s", exc)

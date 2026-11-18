@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse, JSONResponse
 
 from core.dependencies import authenticate_request
+from core.log_privacy import policy_from_headers, set_policy
 from dynamic_router import DynamicLLMRouter
 
 logger = logging.getLogger("service-router.chat")
@@ -28,6 +29,9 @@ async def chat_completions(
     provider = request.headers.get("x-orion-provider")
     api_key = request.headers.get("x-orion-api-key")
     auth_header = request.headers.get("authorization")
+
+    # Hub log-privacy headers: they only shape what the request log stores and are never sent to a provider.
+    set_policy(policy_from_headers(request.headers))
 
     # --- Body'yi oku ---
     try:
