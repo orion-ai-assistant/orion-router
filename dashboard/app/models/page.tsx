@@ -1585,6 +1585,26 @@ export default function ModelsPage() {
                     />
                   </div>
                 )}
+
+                {addForm.capability === 'chat' && (
+                  <div className="flex-1 flex flex-col gap-2">
+                    <label className="text-zinc-400 text-sm font-medium">{t('models.contextLength')}</label>
+                    <Input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={addForm.default_config?.context_length ?? ''}
+                      onChange={(e) => {
+                        const cfg = { ...(addForm.default_config || {}) };
+                        const n = parseInt(e.target.value, 10);
+                        if (Number.isFinite(n) && n > 0) cfg.context_length = n; else delete cfg.context_length;
+                        setAddForm({ ...addForm, default_config: cfg });
+                      }}
+                      placeholder={t('models.contextLengthPlaceholder')}
+                      className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs"
+                    />
+                  </div>
+                )}
               </div>
             )}
 
@@ -1786,6 +1806,26 @@ export default function ModelsPage() {
                       value={editingModel.temperature === null ? '' : editingModel.temperature}
                       onChange={(e) => setEditingModel({ ...editingModel, temperature: e.target.value === '' ? null : parseFloat(e.target.value) })}
                       placeholder={t('models.temperaturePlaceholder')}
+                      className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs"
+                    />
+                  </div>
+                )}
+
+                {editingModel.capability === 'chat' && (
+                  <div className="flex-1 flex flex-col gap-2">
+                    <label className="text-zinc-400 text-sm font-medium">{t('models.contextLength')}</label>
+                    <Input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={editingModel.default_config?.context_length ?? ''}
+                      onChange={(e) => {
+                        const cfg = { ...(editingModel.default_config || {}) };
+                        const n = parseInt(e.target.value, 10);
+                        if (Number.isFinite(n) && n > 0) cfg.context_length = n; else delete cfg.context_length;
+                        setEditingModel({ ...editingModel, default_config: cfg });
+                      }}
+                      placeholder={t('models.contextLengthPlaceholder')}
                       className="bg-black/40 border border-zinc-855 text-white rounded px-2 py-2 text-sm placeholder:text-xs"
                     />
                   </div>

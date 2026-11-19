@@ -245,6 +245,8 @@
   "models.thinkingLevel": "Thinking Level",
   "models.thinkingLevelPlaceholder": "İsteğe bağlı (low, 1024)",
   "models.temperature": "Temperature",
+  "models.contextLength": "Bağlam uzunluğu (token)",
+  "models.contextLengthPlaceholder": "İsteğe bağlı (otomatik bulunur)",
   "models.temperaturePlaceholder": "İsteğe bağlı (0-2)",
   "models.systemPromptPlaceholder": "İsteğe bağlı sistem yönergeleri...",
   "groups.editItemModalTitle": "Grup Öğesini Düzenle",

@@ -245,6 +245,8 @@
   "models.thinkingLevel": "Thinking Level",
   "models.thinkingLevelPlaceholder": "Optional (low, 1024)",
   "models.temperature": "Temperature",
+  "models.contextLength": "Context length (tokens)",
+  "models.contextLengthPlaceholder": "Optional (auto-detected)",
   "models.temperaturePlaceholder": "Optional (0-2)",
   "models.systemPromptPlaceholder": "Optional system instructions...",
   "groups.editItemModalTitle": "Edit Group Item",
